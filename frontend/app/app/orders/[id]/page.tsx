@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -29,8 +29,9 @@ import { orderActionLabel } from "@/lib/commerce-history-labels";
 import { useCurrentUser } from "@/lib/use-user";
 import { useCan } from "@/lib/use-can";
 import CreatePaymentForm from "@/components/finance/CreatePaymentForm";
-import PaymentsTable, { buildPaymentsTableRows } from "@/components/finance/PaymentsTable";
+import PaymentsTable, { buildPaymentsTableRows, type PaymentsTableRow } from "@/components/finance/PaymentsTable";
 import SupplierPaymentsPanel from "@/components/finance/SupplierPaymentsPanel";
+import { financeCenterApi, type SupplierPayment } from "@/lib/finance-center-api";
 
 interface OrderDetail {
   id: string;
@@ -124,6 +125,8 @@ export default function OrderDetailPage() {
   // orderId фиксирован — текущий Order заменить нельзя.
   const canCreatePayment = useCan("finance.payment.create");
   const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
+  const [supplierPaymentOpen, setSupplierPaymentOpen] = useState(false);
+  const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
 
   const loadOrder = useCallback(async () => {
     try {
@@ -173,14 +176,63 @@ export default function OrderDetailPage() {
   const handlePaymentCreated = useCallback(() => {
     void loadFinHistory();
     void loadOrder();
+    void loadSupplierPayments();
   }, [loadFinHistory, loadOrder]);
+
+  const loadSupplierPayments = useCallback(async () => {
+    try {
+      const result = await financeCenterApi.listSupplierPayments({ orderId: id, pageSize: 100 });
+      setSupplierPayments(result.items);
+    } catch {
+      setSupplierPayments([]);
+    }
+  }, [id]);
 
   useEffect(() => {
     void loadOrder();
     void loadHistory(1);
     void loadFinHistory();
+    void loadSupplierPayments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadOrder, id]);
+
+  const ledgerRows = useMemo<PaymentsTableRow[]>(() => {
+    if (!order) return [];
+    const clientRows: PaymentsTableRow[] = buildPaymentsTableRows({
+      payments: finHistory.payments,
+      history: finHistory.paymentsHistory,
+      orderTotal: order.amount,
+    }).map((row) => ({ ...row, kind: "CLIENT" as const }));
+    const supplierRows: PaymentsTableRow[] = supplierPayments.map((payment) => ({
+      id: `supplier-${payment.id}`,
+      ordinal: null,
+      code: payment.code,
+      createdAt: payment.occurredAt,
+      amount: payment.aznAmount,
+      currency: "AZN",
+      paymentMethod: payment.method,
+      status: payment.status,
+      acceptedBy: null,
+      remainingAfter: null,
+      kind: "SUPPLIER" as const,
+    }));
+    const combined = [...clientRows, ...supplierRows].sort((a, b) => {
+      const ta = Date.parse(a.createdAt);
+      const tb = Date.parse(b.createdAt);
+      return ta - tb;
+    });
+    let income = 0;
+    return combined.map((row) => {
+      const amount = Number(row.amount);
+      if (row.kind === "CLIENT" && ["CAPTURED", "REFUNDED"].includes(row.status)) {
+        income += Number.isFinite(amount) ? amount : 0;
+      }
+      if (row.kind === "SUPPLIER" && row.status === "CONFIRMED") {
+        income -= Number.isFinite(amount) ? amount : 0;
+      }
+      return { ...row, incomeAfter: income.toFixed(2) };
+    });
+  }, [order, finHistory, supplierPayments]);
 
   const runAction = async (action: string) => {
     if (!order) return;
@@ -277,18 +329,25 @@ export default function OrderDetailPage() {
               <EntityFinanceCell label={t("crm.detail.payment_status", locale) || "Статус оплаты"} value={<StatusBadge status={order.paymentStatus} />} tone="neutral" />
             </div>
             {canCreatePayment && (
-              <button
-                type="button"
-                data-testid="order-create-payment-button"
-                onClick={() => setCreatePaymentOpen(true)}
-                className="mt-3 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
-              >
-                {t("payments.create.button", locale)}
-              </button>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  data-testid="order-create-payment-button"
+                  onClick={() => setCreatePaymentOpen(true)}
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                >
+                  Платёж клиента
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSupplierPaymentOpen(true)}
+                  className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
+                >
+                  Платёж поставщику
+                </button>
+              </div>
             )}
           </EntitySectionCard>
-
-          <SupplierPaymentsPanel orderId={order.id} orderCode={order.referenceNumber} />
 
           {order.items && order.items.length > 0 && (
             <EntitySectionCard title={t("order.items", locale)}>
@@ -375,16 +434,13 @@ export default function OrderDetailPage() {
         <EntityDetailWide>
           <EntitySectionCard title={t("finance.client_payments", locale) || "Платежи клиента"}>
             {finHistoryLoading && <div className="text-xs text-slate-400">{t("crm.loading", locale)}</div>}
-            {!finHistoryLoading && finHistory.payments.length === 0 && finHistory.refunds.length === 0 && (
+            {!finHistoryLoading && ledgerRows.length === 0 && finHistory.refunds.length === 0 && (
               <div className="text-xs text-slate-400">{t("finance.no_history", locale) || "Нет финансовых событий"}</div>
             )}
-            {!finHistoryLoading && finHistory.payments.length > 0 && (
+            {!finHistoryLoading && ledgerRows.length > 0 && (
               <PaymentsTable
-                rows={buildPaymentsTableRows({
-                  payments: finHistory.payments,
-                  history: finHistory.paymentsHistory,
-                  orderTotal: order.amount,
-                })}
+                rows={ledgerRows}
+                ledger
                 locale={locale}
                 onActionCompleted={handlePaymentCreated}
               />
@@ -420,6 +476,19 @@ export default function OrderDetailPage() {
         }}
         onCreated={handlePaymentCreated}
       />
+
+      {supplierPaymentOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-4 pt-16">
+          <div className="w-full max-w-3xl rounded-xl bg-white p-4 shadow-2xl">
+            <SupplierPaymentsPanel
+              compact
+              orderId={order.id}
+              orderCode={order.referenceNumber}
+              onClose={() => setSupplierPaymentOpen(false)}
+            />
+          </div>
+        </div>
+      )}
     </EntityDetailShell>
   );
 }

@@ -45,6 +45,10 @@ export interface PaymentsTableRow {
   acceptedBy: string | null;
   /** Остаток к оплате ПОСЛЕ этого платежа (total − Σ CAPTURED/REFUNDED). */
   remainingAfter: string | null;
+  /** Клиентский платёж = приход, платёж поставщику = расход. */
+  kind?: "CLIENT" | "SUPPLIER";
+  /** Накопленный доход после строки (клиентские приходы − выплаты поставщикам). */
+  incomeAfter?: string | null;
   /** Ссылка на карточку платежа (реестр). */
   paymentHref?: string | null;
   /** Контекст заказа (реестр): ссылка + подпись. */
@@ -173,6 +177,8 @@ interface PaymentsTableProps {
   statusHeaderExtra?: React.ReactNode;
   /** confirm/cancel успешен — родитель перезагружает данные (реестр/Order/Booking). */
   onActionCompleted?: () => void;
+  /** Combined client/supplier ledger with income column. */
+  ledger?: boolean;
 }
 
 export default function PaymentsTable({
@@ -184,6 +190,7 @@ export default function PaymentsTable({
   amountHeaderExtra,
   statusHeaderExtra,
   onActionCompleted,
+  ledger = false,
 }: PaymentsTableProps) {
   // Статусные действия — только finance.payment.manage (ADMIN/FINANCE).
   const canManage = useCan("finance.payment.manage");
@@ -234,21 +241,23 @@ export default function PaymentsTable({
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }} data-testid="payments-table">
         <colgroup>
-          <col style={{ width: "8%" }} />
-          <col style={{ width: "14%" }} />
+          <col style={{ width: ledger ? "7%" : "8%" }} />
+          <col style={{ width: ledger ? "12%" : "14%" }} />
+          {ledger && <col style={{ width: "9%" }} />}
+          <col style={{ width: ledger ? "14%" : "15%" }} />
           <col style={{ width: "15%" }} />
-          <col style={{ width: "15%" }} />
-          <col style={{ width: "15%" }} />
-          <col style={{ width: "19%" }} />
+          {ledger && <col style={{ width: "15%" }} />}
+          <col style={{ width: ledger ? "15%" : "19%" }} />
           <col style={{ width: "14%" }} />
         </colgroup>
         <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
           <tr>
             <th className="px-4 py-2.5 font-medium">{t("payments.table.col_ordinal", locale)}</th>
             {dateTh}
+            {ledger && <th className="px-4 py-2.5 font-medium">Тип</th>}
             {amountTh}
             {plainTh(t("payments.col.remaining", locale), true)}
-            {plainTh(t("payments.table.col_method", locale))}
+            {ledger ? plainTh("Доход", true) : plainTh(t("payments.table.col_method", locale))}
             {statusTh}
             {plainTh(t("payments.col.accepted_by", locale))}
           </tr>
@@ -278,37 +287,52 @@ export default function PaymentsTable({
                   )}
                 </td>
                 <td className="px-4 py-2.5 align-top text-xs text-slate-500">{fmtDate(row.createdAt, locale)}</td>
+                {ledger && (
+                  <td className="px-4 py-2.5 align-top text-xs">
+                    <span className={row.kind === "SUPPLIER" ? "text-rose-600" : "text-emerald-700"}>
+                      {row.kind === "SUPPLIER" ? "Расход" : "Приход"}
+                    </span>
+                  </td>
+                )}
                 <td className="px-4 py-2.5 text-right align-top font-medium text-slate-700">
                   {fmtMoney(row.amount, row.currency, locale)}
                 </td>
                 <td className="px-4 py-2.5 text-right align-top text-slate-600">
                   {row.remainingAfter != null ? fmtMoney(row.remainingAfter, row.currency, locale) : "—"}
                 </td>
-                <td className="px-4 py-2.5 align-top text-xs text-slate-500">{methodLabel(row.paymentMethod, locale)}</td>
+                {ledger ? (
+                  <td className={`px-4 py-2.5 text-right align-top font-medium ${row.incomeAfter?.startsWith("-") ? "text-rose-600" : "text-emerald-700"}`}>
+                    {row.incomeAfter != null ? fmtMoney(row.incomeAfter, "AZN", locale) : "—"}
+                  </td>
+                ) : (
+                  <td className="px-4 py-2.5 align-top text-xs text-slate-500">{methodLabel(row.paymentMethod, locale)}</td>
+                )}
                 <td className="px-4 py-2.5 align-top">
                   <StatusBadge status={row.status} label={statusLabel(row.status, locale)} />
-                  {canManage && row.status === "PENDING" && (
-                    <div className="mt-1.5 flex flex-wrap gap-1">
-                      <button
-                        type="button"
-                        data-testid="payment-confirm-button"
-                        disabled={actionBusyId !== null}
-                        onClick={() => void runAction(row, "confirm")}
-                        className="rounded border border-emerald-600 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
-                      >
-                        {t("payments.action.confirm", locale)}
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="payment-cancel-button"
-                        disabled={actionBusyId !== null}
-                        onClick={() => void runAction(row, "cancel")}
-                        className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
-                      >
-                        {t("payments.action.cancel", locale)}
-                      </button>
-                    </div>
-                  )}
+                  {!ledger || row.kind !== "SUPPLIER" ? (
+                    canManage && row.status === "PENDING" && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        <button
+                          type="button"
+                          data-testid="payment-confirm-button"
+                          disabled={actionBusyId !== null}
+                          onClick={() => void runAction(row, "confirm")}
+                          className="rounded border border-emerald-600 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                        >
+                          {t("payments.action.confirm", locale)}
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="payment-cancel-button"
+                          disabled={actionBusyId !== null}
+                          onClick={() => void runAction(row, "cancel")}
+                          className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          {t("payments.action.cancel", locale)}
+                        </button>
+                      </div>
+                    )
+                  ) : null}
                   {actionError?.id === row.id && (
                     <div
                       className="mt-1 text-[10px] text-red-500"
@@ -324,7 +348,7 @@ export default function PaymentsTable({
             );
           })}
           {rows.length === 0 && (
-            <OperationsEmptyState colSpan={7} message={emptyMessage ?? t("payments.table.empty", locale)} />
+            <OperationsEmptyState colSpan={ledger ? 8 : 7} message={emptyMessage ?? t("payments.table.empty", locale)} />
           )}
         </tbody>
       </table>

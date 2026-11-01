@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -30,6 +30,7 @@ import { useCan } from "@/lib/use-can";
 import CreatePaymentForm from "@/components/finance/CreatePaymentForm";
 import PaymentsTable, { buildPaymentsTableRows, type PaymentsTableRow } from "@/components/finance/PaymentsTable";
 import SupplierPaymentsPanel from "@/components/finance/SupplierPaymentsPanel";
+import { financeCenterApi, type SupplierPayment } from "@/lib/finance-center-api";
 
 interface BookingDetail {
   id: string;
@@ -143,6 +144,8 @@ export default function BookingDetailPage() {
   // payload строится из linkedOrder.id (bookingId НИКОГДА не отправляется).
   const canCreatePayment = useCan("finance.payment.create");
   const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
+  const [supplierPaymentOpen, setSupplierPaymentOpen] = useState(false);
+  const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
 
   // MULTI/PARTIAL §7: платежи linked Order в Booking detail (permission-tolerant:
   // 403/404 на financial-history → таблица просто не показывается, страница живёт).
@@ -200,6 +203,40 @@ export default function BookingDetailPage() {
     })();
     return () => { cancelled = true; };
   }, [booking]);
+
+  useEffect(() => {
+    if (!booking?.orderId) return;
+    let cancelled = false;
+    financeCenterApi.listSupplierPayments({ orderId: booking.orderId, bookingId: booking.id, pageSize: 100 })
+      .then((result) => { if (!cancelled) setSupplierPayments(result.items); })
+      .catch(() => { if (!cancelled) setSupplierPayments([]); });
+    return () => { cancelled = true; };
+  }, [booking]);
+
+  const ledgerRows = useMemo<PaymentsTableRow[]>(() => {
+    const clientRows = orderPaymentRows.map((row) => ({ ...row, kind: "CLIENT" as const }));
+    const supplierRows: PaymentsTableRow[] = supplierPayments.map((payment) => ({
+      id: `supplier-${payment.id}`,
+      ordinal: null,
+      code: payment.code,
+      createdAt: payment.occurredAt,
+      amount: payment.aznAmount,
+      currency: "AZN",
+      paymentMethod: payment.method,
+      status: payment.status,
+      acceptedBy: null,
+      remainingAfter: null,
+      kind: "SUPPLIER" as const,
+    }));
+    const combined = [...clientRows, ...supplierRows].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+    let income = 0;
+    return combined.map((row) => {
+      const amount = Number(row.amount);
+      if (row.kind === "CLIENT" && ["CAPTURED", "REFUNDED"].includes(row.status)) income += Number.isFinite(amount) ? amount : 0;
+      if (row.kind === "SUPPLIER" && row.status === "CONFIRMED") income -= Number.isFinite(amount) ? amount : 0;
+      return { ...row, incomeAfter: income.toFixed(2) };
+    });
+  }, [orderPaymentRows, supplierPayments]);
 
   // UI-C9: action errors surface in an inline header banner — the page content
   // and its centered load/not-found state remain untouched.
@@ -300,31 +337,31 @@ export default function BookingDetailPage() {
                 <span>{t("crm.detail.payment_status", locale)}: <StatusBadge status={activePayment.status ?? ""} /></span>
               </div>
             )}
-            {!paymentsUnavailable && orderPaymentRows.length > 0 && (
+            {!paymentsUnavailable && ledgerRows.length > 0 && (
               <div className="mt-3 border-t border-slate-100 pt-3" data-testid="booking-payments-table">
-                <PaymentsTable rows={orderPaymentRows} locale={locale} onActionCompleted={() => void loadBooking()} />
+                <PaymentsTable rows={ledgerRows} ledger locale={locale} onActionCompleted={() => void loadBooking()} />
               </div>
             )}
             {canCreatePayment && (
-              <button
-                type="button"
-                data-testid="booking-create-payment-button"
-                onClick={() => setCreatePaymentOpen(true)}
-                className="mt-3 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
-              >
-                {t("payments.create.button", locale)}
-              </button>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  data-testid="booking-create-payment-button"
+                  onClick={() => setCreatePaymentOpen(true)}
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                >
+                  Платёж клиента
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSupplierPaymentOpen(true)}
+                  className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
+                >
+                  Платёж поставщику
+                </button>
+              </div>
             )}
           </EntitySectionCard>
-
-          {(booking.orderId || booking.linkedOrder?.id) && (
-            <SupplierPaymentsPanel
-              orderId={booking.orderId ?? booking.linkedOrder?.id ?? ""}
-              orderCode={booking.orderCode ?? booking.linkedOrder?.referenceNumber ?? booking.orderId}
-              bookingId={booking.id}
-              bookingCode={booking.referenceNumber}
-            />
-          )}
 
           {booking.passengers && booking.passengers.length > 0 && (
             <EntitySectionCard title={t("bookings.passengers", locale)}>
@@ -428,6 +465,21 @@ export default function BookingDetailPage() {
           void loadBooking();
         }}
       />
+
+      {supplierPaymentOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-4 pt-16">
+          <div className="w-full max-w-3xl rounded-xl bg-white p-4 shadow-2xl">
+            <SupplierPaymentsPanel
+              compact
+              orderId={booking.linkedOrder?.id ?? booking.orderId}
+              orderCode={booking.linkedOrder?.referenceNumber ?? booking.orderReference ?? booking.orderCode}
+              bookingId={booking.id}
+              bookingCode={booking.referenceNumber}
+              onClose={() => setSupplierPaymentOpen(false)}
+            />
+          </div>
+        </div>
+      )}
     </EntityDetailShell>
   );
 }

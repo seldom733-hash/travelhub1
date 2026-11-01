@@ -20,17 +20,21 @@ export default function SupplierPaymentsPanel({
   orderCode,
   bookingId,
   bookingCode,
+  onClose,
+  compact = false,
 }: {
   orderId: string;
   orderCode: string;
   bookingId?: string;
   bookingCode?: string;
+  onClose?: () => void;
+  compact?: boolean;
 }) {
   const locale = useLocale();
   const [obligations, setObligations] = useState<SupplierObligation[]>([]);
   const [payments, setPayments] = useState<SupplierPayment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(compact);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ obligationCode: "", amount: "", method: "" });
@@ -122,6 +126,11 @@ export default function SupplierPaymentsPanel({
           >
             + Платёж поставщику
           </button>
+          {onClose && (
+            <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700" aria-label="Close">
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
@@ -171,7 +180,7 @@ export default function SupplierPaymentsPanel({
       )}
 
       {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
-      {loading ? (
+      {!compact && (loading ? (
         <p className="mt-3 text-xs text-slate-400">Загрузка…</p>
       ) : payments.length === 0 ? (
         <p className="mt-3 text-xs text-slate-400">Платежей поставщикам по этому заказу пока нет.</p>
@@ -200,7 +209,7 @@ export default function SupplierPaymentsPanel({
             </tbody>
           </table>
         </div>
-      )}
+      ))}
     </div>
   );
 }
