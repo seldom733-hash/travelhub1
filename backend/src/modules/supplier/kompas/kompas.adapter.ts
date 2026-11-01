@@ -472,9 +472,15 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           appliedState = await selectedState();
         }
         if (appliedState !== stateId) {
+          const available = await page!.evaluate(() => {
+            const sel = document.querySelector("select[name=STATEINC]") as HTMLSelectElement | null;
+            return Array.from(sel?.options ?? [])
+              .map((option) => `${option.value}:${option.textContent?.trim() ?? ""}`)
+              .join(", ");
+          });
           throw new Error(
-            `KOMPAS: STATEINC=${stateId} is not applied (form reports ${appliedState || "?"}); ` +
-              `refusing to run a search for a different country`,
+            `KOMPAS: STATEINC=${stateId} is not available for departure Baku ` +
+              `(form offers ${available || "no states"}); refusing to run a search for a different country`,
           );
         }
         // Wait for TOURINC options for this country to populate
