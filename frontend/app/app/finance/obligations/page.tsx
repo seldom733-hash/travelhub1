@@ -98,6 +98,21 @@ function ObligationsContent() {
     }
   };
 
+  const cancelCurrent = async () => {
+    if (!detail) return;
+    if (!window.confirm(`Отменить обязательство ${detail.code}? Это закроет остаток долга.`)) return;
+    setTermsBusy(true);
+    try {
+      const updated = await financeCenterApi.cancelObligation(detail.code, "Отмена услуги/заказа");
+      setDetail(updated);
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setTermsBusy(false);
+    }
+  };
+
   const saveTerms = async () => {
     if (!detail) return;
     setTermsBusy(true);
@@ -350,6 +365,16 @@ function ObligationsContent() {
                   className="mt-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                 >
                   {termsBusy ? t("common.loading", locale) : t("finance.obligations.terms.save", locale)}
+                </button>
+              )}
+              {canManage && detail.status !== "CLOSED" && detail.status !== "CANCELLED" && (
+                <button
+                  type="button"
+                  disabled={termsBusy}
+                  onClick={() => void cancelCurrent()}
+                  className="mt-2 ml-2 rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 disabled:opacity-50"
+                >
+                  Отменить обязательство
                 </button>
               )}
               {termsNotice && <p className="mt-2 text-xs text-slate-600">{termsNotice}</p>}

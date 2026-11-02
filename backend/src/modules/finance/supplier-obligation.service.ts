@@ -652,12 +652,25 @@ export class SupplierObligationService {
       where: { OR: [{ code: codeOrId }, { id: codeOrId }] },
     });
     if (!ob) throw new NotFoundError(`SupplierObligation ${codeOrId} not found`);
-    if (!ob.paidAmount.isZero()) {
-      throw new ConflictError(`cannot cancel ${ob.code}: ${ob.paidAmount.toString()} AZN already paid; reverse payouts first (future step)`);
+    // A payout reversed by a confirmed INCOMING supplier refund has zero net
+    // cash paid. Allow cancellation in that case; without a refund, a paid
+    // obligation still requires an explicit payout reversal.
+    const refunds = ob.orderId
+      ? await this.prisma.supplierPayout.aggregate({
+          where: { orderId: ob.orderId, direction: "INCOMING", status: "CONFIRMED" },
+          _sum: { aznAmount: true },
+        })
+      : null;
+    const netPaid = ob.paidAmount.minus(refunds?._sum.aznAmount ?? new Prisma.Decimal(0));
+    if (netPaid.greaterThan(0)) {
+      throw new ConflictError(`cannot cancel ${ob.code}: ${netPaid.toString()} AZN net paid; reverse payouts first`);
     }
     if (ob.status === "CANCELLED") return this.toDto(ob, null);
     const updated = await this.prisma.$transaction(async (tx) => {
-      const row = await tx.supplierObligation.update({ where: { id: ob.id }, data: { status: "CANCELLED", updatedAt: new Date() } });
+      const row = await tx.supplierObligation.update({
+        where: { id: ob.id },
+        data: { status: "CANCELLED", remainingAmount: new Prisma.Decimal(0), updatedAt: new Date() },
+      });
       await this.security.audit(tx, {
         action: "finance.obligation.cancelled",
         resource: "SupplierObligation",
