@@ -111,7 +111,7 @@ export function calculateCancellationSettlement(
   if (!penalty.equals(platformPenalty.add(supplierPenalty))) {
     blockers.push("PENALTY_SPLIT_MISMATCH");
   }
-  if (finalLiability != null && penalty.greaterThan(finalLiability)) {
+  if (finalLiability != null && clientPenalty.greaterThan(finalLiability)) {
     blockers.push("PENALTY_EXCEEDS_LIABILITY");
   }
 

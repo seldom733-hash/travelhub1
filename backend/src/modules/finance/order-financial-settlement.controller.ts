@@ -19,6 +19,11 @@ class SettlementPreviewDto {
   @IsOptional()
   @IsString()
   @Matches(MONEY)
+  clientPenaltyAmount?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(MONEY)
   platformPenaltyShare?: string;
 
   @IsOptional()
@@ -42,6 +47,11 @@ class SettlementConfirmDto {
   @IsString()
   @Matches(MONEY)
   penaltyAmount?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(MONEY)
+  clientPenaltyAmount?: string;
 
   @IsOptional()
   @IsString()

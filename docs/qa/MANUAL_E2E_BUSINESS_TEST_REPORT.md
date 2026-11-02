@@ -461,7 +461,60 @@ SPO-00000001
 CONFIRMED
 ```
 
-## 9. Исправленные дефекты
+## 9. Штрафы обеих сторон — PASS
+
+Сделка:
+
+```text
+MKT-REQ-00000009
+client paid 300 AZN
+client penalty 100 AZN
+supplier penalty 80 AZN
+```
+
+Расчёт:
+
+```text
+Окончательное обязательство клиента: 100.00
+Штраф: 180.00
+Штраф клиента: 100.00
+Доля платформы: 100.00
+Доля поставщика: 80.00
+```
+
+Результат:
+
+```text
+clientReceived   300.00
+clientRefunded   200.00
+clientDebt         0.00
+clientPenalty    100.00
+supplierPenalty   80.00
+expectedIncome    20.00
+currentIncome     20.00
+```
+
+Settlement:
+
+```text
+SET-00000005
+FINANCIALLY_SETTLED_WITH_PENALTY
+```
+
+Исправлен DTO-контроллер: `clientPenaltyAmount` теперь принимается API, а проверка `PENALTY_EXCEEDS_LIABILITY` сравнивает с обязательством клиента, а не с общей суммой штрафов.
+
+KPI после сценария:
+
+```text
+salesAmount      2130.00
+costAmount       1760.00
+grossMargin       370.00
+expectedIncome    370.00
+clientPenalty     130.00
+supplierPenalty   160.00
+```
+
+## 10. Исправленные дефекты
 
 | ID | Дефект | Исправление |
 |---|---|---|
@@ -477,15 +530,16 @@ CONFIRMED
 | DEF-010 | Отменённые сделки попадали в KPI «Сумма продаж» и «Себестоимость» | отменённые входят только признанным штрафом: clientPenalty / supplierPenalty |
 | DEF-011 | Отмена заказа не закрывала SupplierObligation | добавлено закрытие при net paid=0 и UI-действие «Отменить обязательство» |
 | DEF-012 | Штраф только поставщика записывался и как штраф клиента | добавлено отдельное `clientPenaltyAmount`, backfill и KPI-использование |
+| DEF-013 | API settlement не принимал `clientPenaltyAmount`; liability-guard сравнивал общую сумму штрафов | DTO дополнен, guard сравнивает clientPenalty |
 
-## 10. Ограничения
+## 11. Ограничения
 
 1. Отмена после выплаты поставщику проверена с полным возвратом и закрытием обязательства.
 2. Штраф только поставщика исправлен: clientPenalty 0, supplierPenalty 80, expectedIncome −80.
 3. Универсальный поиск авиабилетов остаётся BLOCKED из-за внешних источников.
 4. Роли и конкурентные операции не завершены.
 
-## 11. Следующий этап
+## 12. Следующий этап
 
 1. Исправить отмену оплаченной Booking: создавать OrderFinancialSettlement, закрывать долг и создавать Refund.
 2. Проверить возврат клиенту и возврат от поставщика.
