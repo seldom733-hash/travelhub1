@@ -177,7 +177,18 @@ export class AzalController {
 
   @Post("request")
   @Public()
-  async createRequest(@Body() body: { from: string; to: string; departureDate: string; returnDate?: string; tripType: string; passengers: any; fareFamily: string; price: number; currency: string; segments: any[]; supplierCode?: string }) {
+  async createRequest(@Body() body: { from: string; to: string; departureDate: string; returnDate?: string; tripType: string; passengers: any; fareFamily: string; price: number; currency: string; segments: any[]; supplierCode?: string; customer?: { firstName?: string; lastName?: string; phone?: string; email?: string } }) {
+    const customer = body.customer;
+    const normalizedPhone = (customer?.phone ?? "").replace(/[\s()\-]/g, "").replace(/^00/, "+");
+    if (!customer?.firstName?.trim() || !customer?.lastName?.trim()) {
+      throw new HttpException({ error: "CUSTOMER_REQUIRED", message: "First name and last name are required" }, 400);
+    }
+    if (!/^\+[1-9]\d{7,14}$/.test(normalizedPhone)) {
+      throw new HttpException({ error: "INVALID_PHONE", message: "A valid phone number with international code is required" }, 400);
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email?.trim() ?? "")) {
+      throw new HttpException({ error: "INVALID_EMAIL", message: "A valid email address is required" }, 400);
+    }
     // Server-authoritative price (§16): body.price is NEVER trusted — the
     // displayed price is re-derived from a fresh search of the same query.
     // A request is an inquiry, not a booking: if the supplier re-check is
@@ -229,6 +240,8 @@ export class AzalController {
         requestedServiceDate: new Date(body.departureDate), quantity: 1, travelerCount: body.passengers?.adults ?? 1,
         productSnapshot: {
           type: "FLIGHT",
+          productType: "FLIGHT",
+          productTitle: `${body.from} → ${body.to}`,
           from: body.from,
           to: body.to,
           departureDate: body.departureDate,
@@ -241,6 +254,12 @@ export class AzalController {
           currency: authoritative.currency,
           supplierCode: authoritative.supplierCode,
           priceVerification: authoritative.verification,
+          customer: {
+            firstName: customer.firstName.trim(),
+            lastName: customer.lastName.trim(),
+            phone: normalizedPhone,
+            email: customer.email?.trim() ?? "",
+          },
         },
         displayedPrice: authoritative.amount, displayedCurrency: authoritative.currency,
         ...(commercialSnapshot ? { commercialSnapshot: commercialSnapshot as never } : {}),

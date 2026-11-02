@@ -2,6 +2,7 @@ import { useState } from "react";
 import { airlineNameOf, routeChain } from "@/lib/flight-api";
 import type { FlightFare, FlightOffer, FlightSegment } from "@/lib/flight-api";
 import { useSupplierLabels } from "@/lib/supplier-registry";
+import FlightOfferModal from "./FlightOfferModal";
 
 interface FlightResultsProps {
   flights: FlightOffer[];
@@ -151,6 +152,7 @@ export default function FlightResults({
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [familyFilter, setFamilyFilter] = useState<string>("ALL");
+  const [selectedFlight, setSelectedFlight] = useState<FlightOffer | null>(null);
   const supplierLabels = useSupplierLabels("flights");
   if (loading) {
     // §SKELETON-PARITY: загрузка рисует ТУ ЖЕ форму, что и результат — таблицу рейсов
@@ -316,13 +318,12 @@ export default function FlightResults({
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("children")}>Дети {arrow("children")}</th>
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("price")}>{hasInbound ? "Общая цена" : "Цена"} {arrow("price")}</th>
               <th className="px-2 py-2">Места</th>
-              <th className="px-2 py-2"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
             {displayRows.map((r, idx) => {
               const outSeg = r.out.segments?.[0]; const inSeg = r.inn?.segments?.[0];
-              const outLast = r.out.segments?.[r.out.segments.length - 1];
+
               const outMins = flightDurationMins(r.out);
               const inMins = r.inn ? flightDurationMins(r.inn) : 0;
               const totalMins = outMins + inMins;
@@ -330,7 +331,7 @@ export default function FlightResults({
               const hand = handLabel(r.outFare);
               const seatsAvailable = isRowAvailable(r);
               return (
-                <tr key={`${r.out.optionId}-${r.inn?.optionId ?? "ow"}-${r.fareFamily}-${idx}`} className={`hover:bg-white/5 ${seatsAvailable ? "" : "opacity-60"}`}>
+                <tr key={`${r.out.optionId}-${r.inn?.optionId ?? "ow"}-${r.fareFamily}-${idx}`} className={`cursor-pointer hover:bg-white/5 ${seatsAvailable ? "" : "opacity-60"}`} onClick={() => setSelectedFlight({ ...r.out, segments: [...(r.out.segments ?? []), ...(r.inn?.segments ?? [])], fares: [{ ...(r.outFare ?? {}), fareFamily: r.fareFamily, total: { amount: r.total, currency: r.currency } }], requested: r.out.requested })}>
                   <td className="px-2 py-2 text-white">{formatDate(getDateTime(outSeg?.departure) || r.out.requested?.departureDate)}</td>
                   <td className="px-2 py-2 text-white">{chainOf(r.out.segments)}</td>
                   <td className="px-2 py-2 text-neutral-300">{airlineNameOf(outSeg)}</td>
@@ -354,7 +355,6 @@ export default function FlightResults({
                       {seatsAvailable ? "Есть места" : "Нет мест"}
                     </span>
                   </td>
-                  <td className="px-2 py-2"><button type="button" disabled={!seatsAvailable} onClick={async () => { try { const { createFlightRequest } = await import("@/lib/flight-api"); await createFlightRequest({ from: outSeg?.departure?.airport ?? "", to: outLast?.arrival?.airport ?? outSeg?.arrival?.airport ?? "", departureDate: getDateTime(outSeg?.departure) || r.out.requested?.departureDate || "", returnDate: r.inn ? (getDateTime(r.inn.segments?.[0]?.departure) || r.inn.requested?.departureDate || undefined) : undefined, tripType: r.inn ? "RT" : "OW", passengers: r.out.requested?.passengers ?? { adults: 1, children: 0, infants: 0 }, fareFamily: r.fareFamily, price: r.total, currency: r.currency, supplierCode: r.out.source, segments: [...(r.out.segments ?? []), ...(r.inn?.segments ?? [])] }); alert(`Заявка создана: ${r.fareFamily} ${r.total} ${r.currency}`); } catch (e) { alert(`Ошибка: ${(e as Error).message}`); } }} className={`rounded-lg px-3 py-1 text-xs font-semibold ${seatsAvailable ? "bg-white text-black hover:opacity-90" : "cursor-not-allowed bg-white/20 text-white/50"}`}>Подать заявку</button></td>
                 </tr>
               );
             })}
@@ -380,7 +380,11 @@ export default function FlightResults({
         return (
           <article
             key={flight.optionId ?? `${flight.optionSetId ?? "flight"}-${index}`}
-            className={`rounded-2xl border border-white/10 bg-white/[0.03] ${isOWLeg ? "p-3" : "p-5"}`}
+            className={`cursor-pointer rounded-2xl border border-white/10 bg-white/[0.03] transition-colors hover:border-white/25 hover:bg-white/[0.06] ${isOWLeg ? "p-3" : "p-5"}`}
+            onClick={() => setSelectedFlight(flight)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setSelectedFlight(flight); }}
           >
             <div className={`flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between ${isOWLeg ? "text-[13px]" : ""}`}>
               <div className="flex-1">
@@ -473,7 +477,7 @@ export default function FlightResults({
                         {handLabel(f) ? ` ${handLabel(f)}` : ""}
                       </span>
                       {isRTCombined && (
-                        <button type="button" onClick={async () => { try { const { createFlightRequest } = await import("@/lib/flight-api"); const request = await createFlightRequest({ from: first?.departure?.airport ?? "", to: last?.arrival?.airport ?? "", departureDate: getDateTime(first?.departure) || flight.requested?.departureDate || "", returnDate: segments[1] ? (getDateTime(segments[1]?.departure) || flight.requested?.returnDate || undefined) : undefined, tripType: segments[1] ? "RT" : "OW", passengers: flight.requested?.passengers ?? { adults: 1, children: 0, infants: 0 }, fareFamily: fareFamilyOf(f), price: fareAmount(f), currency: fareCurrency(f), supplierCode: flight.source, segments }); alert(`Заявка создана: ${request.referenceNumber}\n${fareFamilyOf(f)} • ${fareAmount(f)} ${fareCurrency(f)}`); } catch (e) { alert(`Ошибка: ${(e as Error).message}`); } }} className="rounded-lg bg-white px-3 py-1 text-xs font-semibold text-black hover:opacity-90">Подать заявку</button>
+                        <span className="rounded bg-white/10 px-2 py-1 text-[10px] text-neutral-300">Нажмите на рейс, чтобы подать заявку</span>
                       )}
                     </div>
                   ))}
@@ -483,6 +487,12 @@ export default function FlightResults({
           </article>
         );
       })}
+      {selectedFlight && (
+        <FlightOfferModal
+          flight={selectedFlight}
+          onClose={() => setSelectedFlight(null)}
+        />
+      )}
     </div>
   );
 }

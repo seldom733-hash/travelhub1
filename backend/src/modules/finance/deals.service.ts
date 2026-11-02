@@ -230,6 +230,7 @@ export class DealsService {
       const customer = request.customerId ? customerById.get(request.customerId) : undefined;
       const product = request.productId ? productById.get(request.productId) : undefined;
       const snapshot = (request.productSnapshot ?? {}) as Record<string, unknown>;
+      const snapCustomer = (snapshot.customer ?? {}) as Record<string, unknown>;
       const commercial = (order?.commercialSnapshot ?? request.commercialSnapshot ?? {}) as Record<string, unknown>;
       const clientPayments = order ? paymentsByOrder.get(order.id) ?? [] : [];
       const clientRefunds = order ? refundsByOrder.get(order.id) ?? [] : [];
@@ -299,16 +300,21 @@ export class DealsService {
         status,
         statusLabel: status,
         customerId: customer?.id ?? null,
-        customerName: customer ? [customer.firstName, customer.lastName].filter(Boolean).join(" ") || customer.companyName || "—" : "—",
-        customerPhone: customer?.phone ?? null,
-        customerEmail: customer?.email ?? null,
+        customerName: customer
+          ? [customer.firstName, customer.lastName].filter(Boolean).join(" ") || customer.companyName || "—"
+          : [String(snapCustomer.firstName ?? ""), String(snapCustomer.lastName ?? "")].filter(Boolean).join(" ") || "—",
+        customerPhone: customer?.phone ?? (typeof snapCustomer.phone === "string" ? snapCustomer.phone : null),
+        customerEmail: customer?.email ?? (typeof snapCustomer.email === "string" ? snapCustomer.email : null),
         productId: request.productId,
         productType: String(snapshot.productType ?? product?.type ?? ""),
         productTitle: String(snapshot.productTitle ?? product?.title ?? "—"),
         supplierId: product?.partnerId ?? request.partnerId ?? null,
-        supplierCode: partnerById.get(product?.partnerId ?? request.partnerId ?? "")?.code
-          ?? partnerById.get(product?.partnerId ?? request.partnerId ?? "")?.name
-          ?? request.partnerId ?? null,
+        supplierCode: typeof snapshot.supplierCode === "string"
+          ? snapshot.supplierCode
+          : partnerById.get(product?.partnerId ?? request.partnerId ?? "")?.code
+            ?? partnerById.get(product?.partnerId ?? request.partnerId ?? "")?.name
+            ?? request.partnerId
+            ?? null,
         manager: order?.createdBy ?? null,
         travelerCount: request.travelerCount ?? null,
         serviceDate: dateOrNull(request.requestedServiceDate),
