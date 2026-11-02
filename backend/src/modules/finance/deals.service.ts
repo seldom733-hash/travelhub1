@@ -115,10 +115,17 @@ export class DealsService {
 
   private kpi(rows: DealRow[]) {
     const sum = (field: keyof DealRow) => rows.reduce((total, row) => total + Number(row[field] ?? 0), 0);
+    // A cancelled deal is not a sale: its displayed price/cost must not inflate
+    // the sales and cost KPI cards. Cash-flow and penalty cards still include
+    // cancelled deals because money may have moved before cancellation.
+    const cancelledStatuses = new Set(["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"]);
+    const realizedRows = rows.filter((row) => !cancelledStatuses.has(row.status));
+    const realizedSum = (field: keyof DealRow) =>
+      realizedRows.reduce((total, row) => total + Number(row[field] ?? 0), 0);
     return {
-      salesAmount: fixed(sum("salesAmount")),
-      costAmount: fixed(sum("costAmount")),
-      grossMargin: fixed(sum("salesAmount") - sum("costAmount")),
+      salesAmount: fixed(realizedSum("salesAmount")),
+      costAmount: fixed(realizedSum("costAmount")),
+      grossMargin: fixed(realizedSum("salesAmount") - realizedSum("costAmount")),
       clientReceived: fixed(sum("clientReceived")),
       clientDebt: fixed(sum("clientDebt")),
       clientRefunded: fixed(sum("clientRefunded")),

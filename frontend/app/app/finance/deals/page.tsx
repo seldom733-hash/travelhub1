@@ -119,7 +119,7 @@ export default function DealsRegistryPage() {
       <div className="space-y-4 p-4 lg:p-6">
         <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
           {KPI.map((card) => (
-            <button key={card.key} type="button" title={card.key === "expectedIncome" ? "Доход по правилам признания: активные/завершённые — маржа, отменённые — штрафы" : card.key === "grossMargin" ? "Сумма продаж − себестоимость по всем сделкам, включая отменённые" : undefined} onClick={() => setSelectedKpi(card)} className="rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-300">
+            <button key={card.key} type="button" title={card.key === "expectedIncome" ? "Доход по правилам признания: активные/завершённые — маржа, отменённые — штрафы" : card.key === "grossMargin" ? "Сумма продаж − себестоимость по неотменённым сделкам" : undefined} onClick={() => setSelectedKpi(card)} className="rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-300">
               <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{card.label}</span>
               <span className={`mt-1 block font-mono text-lg font-semibold ${card.color}`}>{fmt(String(kpi[card.key] ?? "0"), kpi.currency)}</span>
             </button>
