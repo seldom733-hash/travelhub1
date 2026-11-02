@@ -70,9 +70,9 @@ export default function DealDetailPage() {
       />
       <div className="space-y-4 p-4 lg:p-6">
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="rounded-full bg-slate-100 px-2 py-1 font-mono">{deal.requestCode}</span>
-          {deal.orderCode && <span className="rounded-full bg-slate-100 px-2 py-1 font-mono">{deal.orderCode}</span>}
-          {deal.bookingCode && <span className="rounded-full bg-slate-100 px-2 py-1 font-mono">{deal.bookingCode}</span>}
+          <Link href={`/app/finance/deals/${deal.sequence}`} className="rounded-full bg-slate-100 px-2 py-1 font-mono">{deal.requestCode}</Link>
+          {deal.orderCode && <Link href={`/app/finance/deals/${deal.sequence}`} className="rounded-full bg-slate-100 px-2 py-1 font-mono">{deal.orderCode}</Link>}
+          {deal.bookingCode && <Link href={`/app/finance/deals/${deal.sequence}`} className="rounded-full bg-slate-100 px-2 py-1 font-mono">{deal.bookingCode}</Link>}
           <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-blue-700">{deal.stageLabel}</span>
           <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-slate-600">{deal.status}</span>
           <span className="ml-auto text-slate-400">Создано: {new Date(deal.createdAt).toLocaleString("ru-RU")}</span>
