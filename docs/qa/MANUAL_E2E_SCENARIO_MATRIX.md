@@ -8,8 +8,7 @@
 | Канал | Услуга | Поиск | Выбор | Данные | Заявка | Статус |
 |---|---|---|---|---|---|---|
 | Витрина | Туры (TEST) | PASS | PASS | PASS | PASS | PASS |
-| Витрина | Отели / авиа / круизы / трансферы | NOT TESTED — в каталоге только TOUR |
-| Витрина | Отели | PASS | BLOCKED | NOT TESTED | NOT TESTED | BLOCKED |
+| Витрина | Отели | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
 | Витрина | Авиабилеты | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
 | Витрина | Круизы / трансферы / страховка | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
 | Универсальный поиск | Туры | PASS | NOT TESTED | NOT TESTED | NOT TESTED | BLOCKED |
@@ -23,7 +22,7 @@
 | Авторизованный клиент | PARTIAL — prefill имени; профиль admin без телефона/email |
 | Один клиент — несколько заявок | PASS — Aysel, REQ-1 и REQ-2 |
 | Разные клиенты | PASS — Aysel Mammadova и Elvin Quliyev |
-| Совпадение контактов | NOT TESTED |
+| Совпадение контактов | PASS — телефон/email Aysel совпали, создана одна карточка клиента |
 
 ## Жизненный цикл
 
@@ -64,7 +63,7 @@
 | Штраф withheld | PASS — удержан 30, возврат 270, доход 30 |
 | Штраф received | PASS — возврат 270, штраф 30, доход 30 |
 | Штраф cancelled (полный цикл) | NOT TESTED |
-| Частичный / полный возврат | NOT TESTED |
+| Частичный / полный возврат | PASS — частичный 270/300, полный 300/300 и 1000/1000 |
 | Возврат от поставщика | PASS — INCOMING 300 AZN CONFIRMED, obligation закрыт |
 
 ## Финансы
@@ -91,7 +90,7 @@
 | Менеджер: доступ к финансам | PASS — /app/finance/deals redirect, create payment скрыт |
 | Клиент: доступ к финансам | PASS — /app/finance/deals и /app/payments → /account |
 | Финансист: доступ к реестру | PASS — /app/finance/deals доступен |
-| Двойное нажатие «Подать заявку» | NOT TESTED |
+| Двойное нажатие «Подать заявку» | PASS — создана одна MKT-REQ-00000006 |
 | Двойная отправка заявки | PASS — создана одна MKT-REQ-00000006 |
 | Повторный платёж / webhook | NOT TESTED |
 | Конкурентное изменение | PASS — два одновременных confirm, одна запись CAPTURED и одна проводка |
