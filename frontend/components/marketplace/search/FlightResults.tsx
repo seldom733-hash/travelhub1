@@ -361,6 +361,9 @@ export default function FlightResults({
           </tbody>
         </table>
         {visibleRows.length > displayRows.length && <div className="px-3 py-2 text-center text-xs text-neutral-500">Показано {displayRows.length} из {visibleRows.length} вариантов</div>}
+        {selectedFlight && (
+          <FlightOfferModal flight={selectedFlight} onClose={() => setSelectedFlight(null)} />
+        )}
       </div>
     );
   }
