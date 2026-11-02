@@ -53,6 +53,9 @@ type DealRow = {
   supplierBasePrice: string;
   supplierBaseCurrency: string;
   supplierBasePriceAzn: string;
+  channel: string;
+  trip: { country: string | null; dateFrom: string | null; dateTo: string | null; nights: number | null; adults: number | null; children: number | null };
+  services: Array<{ id: string; title: string; type: string; serviceDate: string | null; clientPrice: string; cost: string; income: string }>;
   markupAmount: string;
   commissionAmount: string;
   clientReceived: string;
@@ -211,7 +214,7 @@ export class DealsService {
     const requests = await this.prisma.request.findMany({ orderBy: { createdAt: "desc" }, take: 1000 });
     if (requests.length === 0) return [];
     const orderIds = requests.map((r) => r.convertedOrderId).filter((id): id is string => Boolean(id));
-    const orders = await this.prisma.order.findMany({ where: { OR: [{ id: { in: orderIds } }, { commerceSequence: { in: requests.map((r) => r.commerceSequence) } }] }, select: { id: true, code: true, referenceNumber: true, commerceSequence: true, status: true, amount: true, currency: true, paidAmount: true, refundedAmount: true, customerId: true, createdBy: true, financialStatus: true, commercialSnapshot: true } });
+    const orders = await this.prisma.order.findMany({ where: { OR: [{ id: { in: orderIds } }, { commerceSequence: { in: requests.map((r) => r.commerceSequence) } }] }, select: { id: true, code: true, referenceNumber: true, commerceSequence: true, status: true, amount: true, currency: true, paidAmount: true, refundedAmount: true, customerId: true, createdBy: true, financialStatus: true, commercialSnapshot: true, items: { select: { id: true, title: true, type: true, serviceDate: true, amount: true } } } });
     const orderBySequence = new Map(orders.map((order) => [order.commerceSequence, order]));
     const resolvedOrderIds = [...new Set([...orderIds, ...orders.map((o) => o.id)])];
     const [bookings, payments, refunds, payouts, obligations, settlements, customers, products] = await Promise.all([
@@ -309,7 +312,7 @@ export class DealsService {
       const penaltyClosed = cancelled || settlement?.status === "FINANCIALLY_SETTLED_WITH_PENALTY";
       // A cancelled deal has no remaining upside: expected income is the
       // retained penalty spread, never the catalogue-margin expectation.
-      const expectedIncome = penaltyClosed ? clientPenalty - supplierPenalty : sales - cost;
+      const expectedIncome = penaltyClosed ? clientPenalty - supplierPenalty : !order ? 0 : sales - cost;
       const completed = ["FULFILLED", "CLOSED"].includes(order?.status ?? "") || status === "COMPLETED";
       // Revenue is recognized only for a completed deal. For an active
       // partially paid deal, current income is not cash-in; it stays 0 until
@@ -321,6 +324,22 @@ export class DealsService {
           : settlement
             ? Math.max(0, money(settlement.finalCustomerLiability) - supplierPaid + supplierRefunded)
             : 0;
+      const attrs = productAttributes;
+      const nights = Number(attrs.nights ?? snapOffer.nights ?? 0) || null;
+      const country = typeof attrs.country === "string" ? attrs.country : typeof snapOffer.country === "string" ? snapOffer.country : null;
+      const dateFrom = request.requestedServiceDate ? request.requestedServiceDate.toISOString() : null;
+      const dateTo = dateFrom && nights ? new Date(new Date(dateFrom).getTime() + nights * 86400000).toISOString() : null;
+      const adults = Number(attrs.adults ?? 0) || null;
+      const children = Number(attrs.children ?? 0) || null;
+      const channel = commercial.priceSource === "PUBLIC" ? "Сайт (универсальный поиск)" : String(commercial.priceSource ?? "Ручное создание");
+      const itemRows = order?.items ?? [];
+      const services = itemRows.length > 0
+        ? itemRows.map((item) => {
+            const itemAmount = money(item.amount);
+            const itemCost = sales > 0 ? cost * (itemAmount / sales) : 0;
+            return { id: item.id, title: item.title, type: item.type, serviceDate: item.serviceDate ? item.serviceDate.toISOString() : null, clientPrice: fixed(itemAmount), cost: fixed(itemCost), income: fixed(itemAmount - itemCost) };
+          })
+        : [{ id: request.id, title: String(snapshot.productTitle ?? product?.title ?? "—"), type: String(snapshot.type ?? product?.type ?? "—"), serviceDate: dateFrom, clientPrice: fixed(sales), cost: fixed(cost), income: fixed(expectedIncome) }];
       return {
         sequence: request.commerceSequence,
         requestId: request.id,
@@ -362,6 +381,9 @@ export class DealsService {
         supplierBasePrice: fixed(money(commercial.supplierPrice as number | string | undefined) || cost),
         supplierBaseCurrency: String(commercial.supplierCurrency ?? order?.currency ?? request.confirmedCurrency ?? "AZN"),
         supplierBasePriceAzn: fixed(money(fx?.aznAmount as number | string | undefined) || cost),
+        channel,
+        trip: { country, dateFrom, dateTo, nights, adults, children },
+        services,
         markupAmount: fixed(money(commercial.markupAmount as number | string | undefined)),
         commissionAmount: fixed(money(commercial.commissionAmount as number | string | undefined)),
         clientReceived: fixed(captured),

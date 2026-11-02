@@ -2,261 +2,97 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import PageHeader from "@/components/PageHeader";
 import { formatPrice } from "@/lib/i18n";
 import { dealsApi, type DealKpi, type DealList, type DealQuery, type DealRow } from "@/lib/deals-api";
 
-const KPI: Array<{ key: keyof DealKpi; label: string; color: string }> = [
-  { key: "salesAmount", label: "Сумма продаж", color: "text-blue-600" },
-  { key: "costAmount", label: "Себестоимость", color: "text-violet-600" },
-  { key: "grossMargin", label: "Валовая разница", color: "text-slate-700" },
-  { key: "clientReceived", label: "Получено от клиентов", color: "text-emerald-600" },
-  { key: "clientDebt", label: "Долги клиентов", color: "text-amber-600" },
-  { key: "clientRefunded", label: "Возвращено клиентам", color: "text-rose-600" },
-  { key: "supplierPaid", label: "Оплачено поставщикам", color: "text-blue-600" },
-  { key: "supplierDebt", label: "Долги перед поставщиками", color: "text-orange-600" },
-  { key: "supplierRefunded", label: "Возврат от поставщика", color: "text-sky-600" },
-  { key: "clientPenalty", label: "Штрафы клиентам", color: "text-rose-600" },
-  { key: "supplierPenalty", label: "Штрафы от поставщика", color: "text-violet-600" },
-  { key: "expectedIncome", label: "Ожидаемый доход", color: "text-emerald-600" },  { key: "currentIncome", label: "Текущий доход", color: "text-emerald-700" },
+type KpiCard = { key: keyof DealKpi; label: string; icon: string; tone: string };
+const KPI: KpiCard[] = [
+  { key: "salesAmount", label: "Сумма продаж", icon: "₼", tone: "bg-blue-50 text-blue-700" },
+  { key: "costAmount", label: "Себестоимость", icon: "▦", tone: "bg-violet-50 text-violet-700" },
+  { key: "clientReceived", label: "Получено от клиентов", icon: "↓", tone: "bg-emerald-50 text-emerald-700" },
+  { key: "clientDebt", label: "Долги клиентов", icon: "◷", tone: "bg-amber-50 text-amber-700" },
+  { key: "clientRefunded", label: "Возвращено клиентам", icon: "↩", tone: "bg-rose-50 text-rose-700" },
+  { key: "supplierPaid", label: "Оплачено поставщикам", icon: "↑", tone: "bg-sky-50 text-sky-700" },
+  { key: "supplierDebt", label: "Долги поставщикам", icon: "◔", tone: "bg-orange-50 text-orange-700" },
+  { key: "supplierRefunded", label: "Возврат от поставщика", icon: "↪", tone: "bg-cyan-50 text-cyan-700" },
+  { key: "clientPenalty", label: "Штрафы клиентам", icon: "!", tone: "bg-red-50 text-red-700" },
+  { key: "supplierPenalty", label: "Штрафы от поставщика", icon: "⚑", tone: "bg-fuchsia-50 text-fuchsia-700" },
+  { key: "expectedIncome", label: "Ожидаемый доход", icon: "↗", tone: "bg-emerald-50 text-emerald-700" },
+  { key: "currentIncome", label: "Текущий доход", icon: "✓", tone: "bg-teal-50 text-teal-700" },
 ];
+const EMPTY: DealKpi = { salesAmount: "0", costAmount: "0", grossMargin: "0", clientReceived: "0", clientDebt: "0", clientRefunded: "0", supplierPaid: "0", supplierDebt: "0", supplierRefunded: "0", clientPenalty: "0", supplierPenalty: "0", expectedIncome: "0", currentIncome: "0", currency: "AZN", count: 0 };
+const label: Record<string, string> = { NEW: "Новая", IN_PROCESSING: "В работе", READY_FOR_BOOKING: "Готова к брони", SENT_TO_BOOKING: "На бронировании", FULFILLED: "Завершён", CONFIRMED: "Подтверждён", COMPLETED: "Завершён", CANCELLED: "Отменён", CANCELLED_BY_CUSTOMER: "Отменён клиентом" };
+function fmt(v: string | null | undefined, c = "AZN") { return formatPrice(v ?? "0", c, "ru") ?? v ?? "0"; }
+function tone(s: string) { if (/CANCEL|REJECT|FAIL/.test(s)) return "border-rose-200 bg-rose-50 text-rose-700"; if (/PAID|CONFIRM|COMPLETED|FULFILLED/.test(s)) return "border-emerald-200 bg-emerald-50 text-emerald-700"; if (/PARTIAL|PENDING|SENT/.test(s)) return "border-amber-200 bg-amber-50 text-amber-700"; return "border-[#d9e6e1] bg-[#f2faf7] text-[#0f6b5f]"; }
 
-const PAGE_SIZE = 20;
-const EMPTY_KPI: DealKpi = {
-  salesAmount: "0", costAmount: "0", grossMargin: "0", clientReceived: "0", clientDebt: "0", clientRefunded: "0",
-  supplierPaid: "0", supplierDebt: "0", supplierRefunded: "0", clientPenalty: "0",
-  supplierPenalty: "0", expectedIncome: "0", currentIncome: "0", currency: "AZN", count: 0,
-};
-
-function fmt(value: string, currency = "AZN") {
-  return formatPrice(value, currency, "ru") ?? value;
-}
-
-function statusTone(status: string) {
-  if (/CANCEL|REJECT|FAIL/.test(status)) return "border-rose-200 bg-rose-50 text-rose-700";
-  if (/PAID|CONFIRM|COMPLETED|CONVERTED/.test(status)) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (/PARTIAL|PENDING|CHECK/.test(status)) return "border-amber-200 bg-amber-50 text-amber-700";
-  return "border-slate-200 bg-slate-50 text-slate-600";
-}
-
-export default function DealsRegistryPage() {
+export default function DealsPage() {
   const [data, setData] = useState<DealList | null>(null);
-  const [kpi, setKpi] = useState<DealKpi>(EMPTY_KPI);
+  const [kpi, setKpi] = useState(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [columnsOpen, setColumnsOpen] = useState(false);
-  const [selectedKpi, setSelectedKpi] = useState<(typeof KPI)[number] | null>(null);
-  const [advanced, setAdvanced] = useState(false);
-  const [columns, setColumns] = useState({ customer: true, supplier: true, travelers: true, cost: true, currentIncome: true });
+  const [pageSize, setPageSize] = useState(20);
+  const [modal, setModal] = useState<KpiCard | null>(null);
   const [query, setQuery] = useState({ search: "", stage: "", status: "", financialStatus: "", clientPayment: "", supplierPayment: "", serviceType: "", dateField: "createdAt", dateFrom: "", dateTo: "", supplierId: "", manager: "" });
-
-  const apiQuery = useMemo<DealQuery>(() => ({ ...query, page, pageSize: PAGE_SIZE }), [query, page]);
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const result = await dealsApi.list(apiQuery);
-      setData(result);
-      setKpi(result.kpi);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [apiQuery]);
+  const apiQuery = useMemo<DealQuery>(() => ({ ...query, page, pageSize }), [query, page, pageSize]);
+  const load = useCallback(async () => { setLoading(true); setError(""); try { const r = await dealsApi.list(apiQuery); setData(r); setKpi(r.kpi); } catch (e) { setError((e as Error).message); } finally { setLoading(false); } }, [apiQuery]);
   useEffect(() => { void load(); }, [load]);
-
-  const exportXlsx = async () => {
-    const blob = await dealsApi.exportXlsx(query);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "deals.xlsx";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const setFilter = (patch: Partial<typeof query>) => {
-    setPage(1);
-    setQuery((current) => ({ ...current, ...patch }));
-  };
+  const setFilter = (patch: Partial<typeof query>) => { setPage(1); setQuery((q) => ({ ...q, ...patch })); };
 
   return (
-    <div>
-      <PageHeader
-        title="Реестр продаж и взаиморасчётов"
-        breadcrumbs={["Navitravel", "Финансы", "Реестр продаж и взаиморасчётов"]}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-400">Период:</span>
-            <select value={query.dateField} onChange={(e) => setFilter({ dateField: e.target.value })} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs">
-              <option value="createdAt">Дата создания</option>
-              <option value="serviceDate">Дата поездки</option>
-              <option value="financial">Дата фин. операции</option>
-            </select>
-            <input type="date" value={query.dateFrom} onChange={(e) => setFilter({ dateFrom: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
-            <span className="text-xs text-slate-400">—</span>
-            <input type="date" value={query.dateTo} onChange={(e) => setFilter({ dateTo: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
-            <button type="button" onClick={() => void exportXlsx()} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600">Экспорт XLSX</button>
-            <div className="relative">
-              <button type="button" onClick={() => setColumnsOpen((v) => !v)} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">+ Колонки</button>
-              {columnsOpen && (
-                <div className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
-                  {Object.entries(columns).map(([key, value]) => (
-                    <label key={key} className="flex items-center gap-2 px-2 py-1 text-xs text-slate-600">
-                      <input type="checkbox" checked={value} onChange={() => setColumns((c) => ({ ...c, [key]: !c[key as keyof typeof c] }))} />
-                      {key === "customer" ? "Клиент" : key === "supplier" ? "Поставщик" : key === "travelers" ? "Туристы" : key === "cost" ? "Себестоимость" : "Текущий доход"}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        }
-      />
+    <div className="min-h-screen bg-[#f6f4ef] font-sans">
+      <div className="border-b border-[#e5e2da] bg-white px-4 py-3 lg:px-6">
+        <div className="mb-1 text-[11px] text-[#98a2b3]">Navitravel / Финансы / <span className="text-[#667085]">Реестр продаж и взаиморасчётов</span></div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2"><h1 style={{ fontFamily: "var(--font-body), Manrope, sans-serif" }} className="font-sans text-[24px] font-semibold tracking-tight text-[#101828]">Реестр продаж и взаиморасчётов</h1><span className="grid h-5 w-5 place-items-center rounded-full border border-[#cfcabf] text-[10px] text-[#667085]">i</span></div>
+          <div className="flex items-center gap-2"><button type="button" className="rounded-lg border border-[#e5e2da] bg-white px-3 py-2 text-xs text-[#344054]">01.01.2026 — 31.12.2026</button><button type="button" onClick={async () => { const blob = await dealsApi.exportXlsx(query); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "deals.xlsx"; a.click(); URL.revokeObjectURL(url); }} className="rounded-lg border border-[#e5e2da] bg-white px-3 py-2 text-xs text-[#344054]">Экспорт XLSX</button><button type="button" className="rounded-lg bg-[#0f6b5f] px-3 py-2 text-xs font-semibold text-white">+ Колонки</button></div>
+        </div>
+        <p className="mt-1 text-xs text-[#667085]">Единый реестр заявок, заказов и бронирований с оплатами, расчётами с поставщиками и доходностью.</p>
+      </div>
+
       <div className="space-y-4 p-4 lg:p-6">
         <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-          {KPI.map((card) => (
-            <button key={card.key} type="button" title={card.key === "expectedIncome" ? "Доход по правилам признания: активные/завершённые — маржа, отменённые — штрафы" : card.key === "grossMargin" ? "Сумма продаж − себестоимость по неотменённым сделкам" : undefined} onClick={() => setSelectedKpi(card)} className="rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-300">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{card.label}</span>
-              <span className={`mt-1 block font-mono text-lg font-semibold ${card.color}`}>{fmt(String(kpi[card.key] ?? "0"), kpi.currency)}</span>
-            </button>
-          ))}
+          {KPI.map((c) => <button key={c.key} type="button" onClick={() => setModal(c)} className="flex items-start gap-2 rounded-xl border border-[#e5e2da] bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-semibold ${c.tone}`}>{c.icon}</span><span className="min-w-0"><span className="block truncate text-[10px] font-medium uppercase tracking-wide text-[#667085]">{c.label}</span><span className="mt-1 block font-mono text-[16px] font-semibold tabular-nums text-[#101828]">{fmt(String(kpi[c.key] ?? "0"), kpi.currency)}</span></span></button>)}
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="flex flex-wrap items-center gap-2">
-            <input value={query.search} onChange={(e) => setFilter({ search: e.target.value })} placeholder="Поиск по общему №, коду заявки/заказа/брони, ФИО клиента или телефону" className="min-w-[280px] flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
-            <select value={query.stage} onChange={(e) => setFilter({ stage: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-2 text-xs">
-              <option value="">Все стадии</option><option value="REQUEST">Заявка</option><option value="ORDER">Заказ</option><option value="BOOKING">Бронь</option>
-            </select>
-            <select value={query.status} onChange={(e) => setFilter({ status: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-2 text-xs">
-              <option value="">Все статусы</option>
-              {["NEW","IN_PROCESSING","READY_FOR_BOOKING","SENT_TO_BOOKING","FULFILLED","CANCELLED","CONFIRMED","COMPLETED","CANCELLED_BY_CUSTOMER"].map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <select value={query.financialStatus} onChange={(e) => setFilter({ financialStatus: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-2 text-xs">
-              <option value="">Фин. статус</option><option value="OPEN">OPEN</option><option value="PENDING_SETTLEMENT">PENDING_SETTLEMENT</option><option value="FINANCIALLY_SETTLED">FINANCIALLY_SETTLED</option><option value="FINANCIALLY_SETTLED_WITH_PENALTY">WITH_PENALTY</option><option value="FINANCIALLY_SETTLED_FULL_REFUND">FULL_REFUND</option>
-            </select>
-            <button type="button" onClick={() => setAdvanced((v) => !v)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600">Ещё фильтры</button>
+        <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm">
+          <div className="flex flex-wrap items-center gap-2"><div className="relative min-w-[320px] flex-1"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">⌕</span><input value={query.search} onChange={(e) => setFilter({ search: e.target.value })} placeholder="Поиск по номеру/коду (заявка, заказ, бронь), ФИО клиента или телефону" className="w-full rounded-lg border border-[#e5e2da] bg-[#fbfaf7] py-2 pl-9 pr-3 text-xs outline-none focus:border-[#0f6b5f]" /></div><span className="text-[10px] text-[#98a2b3]">Например:</span>{["00000001", "mkt-ord-00000001", "Алиев Эльвин", "+994 50 123 45 67"].map((h) => <button key={h} type="button" onClick={() => setFilter({ search: h })} className="rounded-full border border-[#e5e2da] bg-[#fbfaf7] px-2 py-1 text-[10px] text-[#475467]">{h}</button>)}</div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
+            <Sel label="Страна"><option>Все страны</option></Sel>
+            <Sel label="Поставщик" value={query.supplierId} onChange={(v) => setFilter({ supplierId: v })}><option value="">Все поставщики</option></Sel>
+            <Sel label="Менеджер" value={query.manager} onChange={(v) => setFilter({ manager: v })}><option value="">Все менеджеры</option></Sel>
+            <Sel label="Стадия" value={query.stage} onChange={(v) => setFilter({ stage: v })}><option value="">Все стадии</option><option value="REQUEST">Заявка</option><option value="ORDER">Заказ</option><option value="BOOKING">Бронь</option></Sel>
+            <Sel label="Статус заказа" value={query.status} onChange={(v) => setFilter({ status: v })}><option value="">Все статусы</option>{Object.keys(label).map((s) => <option key={s} value={s}>{label[s]}</option>)}</Sel>
+            <Sel label="Оплата клиента" value={query.clientPayment} onChange={(v) => setFilter({ clientPayment: v })}><option value="">Все</option><option value="UNPAID">Не оплачено</option><option value="PARTIALLY_PAID">Частично</option><option value="PAID">Оплачено</option></Sel>
+            <Sel label="Оплата поставщику" value={query.supplierPayment} onChange={(v) => setFilter({ supplierPayment: v })}><option value="">Все</option><option value="UNPAID">Не оплачено</option><option value="PARTIALLY_PAID">Частично</option><option value="PAID">Оплачено</option></Sel>
+            <Sel label="Фин. статус" value={query.financialStatus} onChange={(v) => setFilter({ financialStatus: v })}><option value="">Все</option><option value="OPEN">OPEN</option><option value="PENDING_SETTLEMENT">PENDING_SETTLEMENT</option><option value="FINANCIALLY_SETTLED">FINANCIALLY_SETTLED</option></Sel>
+            <button type="button" className="rounded-lg border border-[#e5e2da] px-2 py-1.5 text-[11px] text-[#475467]">Ещё фильтры</button>
           </div>
-          {advanced && (
-            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <select value={query.clientPayment} onChange={(e) => setFilter({ clientPayment: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-2 text-xs"><option value="">Оплата клиента</option><option value="UNPAID">Не оплачено</option><option value="PARTIALLY_PAID">Частично</option><option value="PAID">Оплачено</option></select>
-              <select value={query.supplierPayment} onChange={(e) => setFilter({ supplierPayment: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-2 text-xs"><option value="">Оплата поставщику</option><option value="UNPAID">Не оплачено</option><option value="PARTIALLY_PAID">Частично</option><option value="PAID">Оплачено</option></select>
-              <select value={query.serviceType} onChange={(e) => setFilter({ serviceType: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-2 text-xs"><option value="">Тип услуги</option><option value="TOUR">Тур</option><option value="HOTEL">Отель</option><option value="FLIGHT">Авиабилет</option><option value="CRUISE">Круиз</option></select>
-              <input value={query.supplierId} onChange={(e) => setFilter({ supplierId: e.target.value })} placeholder="ID поставщика" className="rounded-lg border border-slate-200 px-2 py-2 text-xs" />
-              <input value={query.manager} onChange={(e) => setFilter({ manager: e.target.value })} placeholder="Менеджер" className="rounded-lg border border-slate-200 px-2 py-2 text-xs" />
-            </div>
-          )}
         </div>
 
         {error && <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="min-w-[1200px] w-full text-left text-xs">
-              <thead className="sticky top-0 border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-2 py-3" />
-                  <th className="px-2 py-3">Общий №</th>
-                  <th className="px-2 py-3">Коды</th>
-                  <th className="px-2 py-3">Стадия</th>
-                  {columns.customer && <th className="px-2 py-3">Клиент</th>}
-                  <th className="px-2 py-3">Услуга</th>
-                  {columns.supplier && <th className="px-2 py-3">Поставщик</th>}
-                  {columns.travelers && <th className="px-2 py-3">Туристы</th>}
-                  <th className="px-2 py-3 text-right">Сумма продажи</th>
-                  {columns.cost && <th className="px-2 py-3 text-right">Себестоимость</th>}
-                  <th className="px-2 py-3 text-right">Оплата клиента</th>
-                  <th className="px-2 py-3 text-right">Оплата поставщику</th>
-                  <th className="px-2 py-3 text-right">Ожидаемый доход</th>
-                  {columns.currentIncome && <th className="px-2 py-3 text-right">Текущий доход</th>}
-                  <th className="px-2 py-3">Статус</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && <tr><td colSpan={16} className="px-3 py-10 text-center text-slate-400">Загрузка…</td></tr>}
-                {!loading && data?.items.length === 0 && <tr><td colSpan={16} className="px-3 py-10 text-center text-slate-400">Сделки не найдены</td></tr>}
-                {data?.items.map((row) => (
-                  <DealTableRow key={row.sequence} row={row} expanded={expanded === row.sequence} onToggle={() => setExpanded((v) => v === row.sequence ? null : row.sequence)} columns={columns} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2 text-xs text-slate-500">
-            <span>Показано: {data ? (data.page - 1) * data.pageSize + 1 : 0}–{data ? Math.min(data.page * data.pageSize, data.total) : 0} из {data?.total ?? 0}</span>
-            <div className="flex gap-1">
-              <button type="button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-slate-200 px-2 py-1 disabled:opacity-40">←</button>
-              <span className="rounded bg-blue-600 px-2 py-1 text-white">{data?.page ?? 1}</span>
-              <button type="button" disabled={!data?.hasMore} onClick={() => setPage((p) => p + 1)} className="rounded border border-slate-200 px-2 py-1 disabled:opacity-40">→</button>
-            </div>
-          </div>
+        <div className="overflow-hidden rounded-xl border border-[#e5e2da] bg-white shadow-sm">
+          <div className="overflow-x-auto"><table className="w-full min-w-[1380px] text-left text-xs">
+            <thead className="border-b border-[#e5e2da] bg-[#fbfaf7] text-[10px] uppercase tracking-wide text-[#667085]"><tr><th className="px-2 py-3" /><th className="px-2 py-3">№</th><th className="px-2 py-3">Коды</th><th className="px-2 py-3">Стадия</th><th className="px-2 py-3">Клиент</th><th className="px-2 py-3">Услуга</th><th className="px-2 py-3">Поставщик</th><th className="px-2 py-3">Туристы</th><th className="px-2 py-3 text-right">Сумма продажи</th><th className="px-2 py-3 text-right">Цена поставщика</th><th className="px-2 py-3 text-right">Оплата клиента</th><th className="px-2 py-3 text-right">Оплата поставщику</th><th className="px-2 py-3 text-right">Ожидаемый доход</th><th className="px-2 py-3 text-right">Текущий доход</th><th className="px-2 py-3">Статус</th></tr></thead>
+            <tbody>
+              {loading && <tr><td colSpan={15} className="px-3 py-12 text-center text-[#98a2b3]">Загрузка реестра…</td></tr>}
+              {!loading && data?.items.length === 0 && <tr><td colSpan={15} className="px-3 py-12 text-center text-[#98a2b3]">Сделки не найдены</td></tr>}
+              {data?.items.map((row) => <Row key={row.sequence} row={row} open={expanded === row.sequence} toggle={() => setExpanded(expanded === row.sequence ? null : row.sequence)} />)}
+            </tbody>
+          </table></div>
+          <div className="flex items-center justify-between border-t border-[#e5e2da] px-3 py-3 text-xs text-[#667085]"><span>Показано: {data ? (data.page - 1) * data.pageSize + 1 : 0}–{data ? Math.min(data.page * data.pageSize, data.total) : 0} из {data?.total ?? 0}</span><div className="flex items-center gap-2"><select value={pageSize} onChange={(e) => { setPage(1); setPageSize(Number(e.target.value)); }} className="rounded-lg border border-[#e5e2da] px-2 py-1"><option value={5}>5</option><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option></select><button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded border border-[#e5e2da] px-2 py-1 disabled:opacity-40">‹</button><span className="rounded bg-[#0f6b5f] px-2 py-1 text-white">{page}</span><button type="button" disabled={!data?.hasMore} onClick={() => setPage(page + 1)} className="rounded border border-[#e5e2da] px-2 py-1 disabled:opacity-40">›</button></div></div>
         </div>
       </div>
 
-      {selectedKpi && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setSelectedKpi(null)}>
-          <div className="max-h-[80vh] w-full max-w-2xl overflow-auto rounded-xl bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between"><h3 className="font-semibold text-slate-900">{selectedKpi.label}: {fmt(String(kpi[selectedKpi.key] ?? "0"), kpi.currency)}</h3><button type="button" onClick={() => setSelectedKpi(null)} className="text-slate-400">✕</button></div>
-            {data?.items.map((row) => (
-              <Link key={row.sequence} href={`/app/finance/deals/${row.sequence}`} className="flex items-center justify-between border-b border-slate-100 py-2 text-xs hover:bg-slate-50">
-                <span>{row.sequence} · {row.customerName} · {row.productTitle}</span>
-                <span className="font-mono">{fmt(String(row[selectedKpi.key as keyof DealRow] ?? "0"), row.currency)}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
+      {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setModal(null)}><div className="max-h-[80vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white p-5" onClick={(e) => e.stopPropagation()}><div className="mb-3 flex justify-between"><h3 className="font-semibold">{modal.label}: {fmt(String(kpi[modal.key] ?? "0"), kpi.currency)}</h3><button type="button" onClick={() => setModal(null)}>✕</button></div>{data?.items.map((r) => <Link key={r.sequence} href={`/app/finance/deals/${r.sequence}`} className="flex justify-between border-b border-[#f0eee8] py-2 text-xs"><span>{r.sequence} · {r.customerName}</span><span className="font-mono">{fmt(String(r[modal.key as keyof DealRow] ?? "0"), r.currency)}</span></Link>)}</div></div>}
     </div>
   );
 }
 
-function DealTableRow({ row, expanded, onToggle, columns }: { row: DealRow; expanded: boolean; onToggle: () => void; columns: { customer: boolean; supplier: boolean; travelers: boolean; cost: boolean; currentIncome: boolean } }) {
-  return (
-    <>
-      <tr className="border-b border-slate-100 hover:bg-slate-50/70">
-        <td className="px-2 py-2"><button type="button" onClick={onToggle} className="text-slate-400">{expanded ? "▾" : "›"}</button></td>
-        <td className="px-2 py-2"><Link href={`/app/finance/deals/${row.sequence}`} className="font-mono text-sm font-semibold text-blue-600 hover:underline">{row.sequence}</Link></td>
-        <td className="px-2 py-2 font-mono text-[10px] leading-4 text-slate-500">
-          <Link href={`/app/finance/deals/${row.sequence}`} className="block hover:text-blue-600">REQ {row.requestCode}</Link>
-          <Link href={`/app/finance/deals/${row.sequence}`} className="block hover:text-blue-600">ORD {row.orderCode ?? "—"}</Link>
-          <Link href={`/app/finance/deals/${row.sequence}`} className="block hover:text-blue-600">BKG {row.bookingCode ?? "—"}</Link>
-        </td>
-        <td className="px-2 py-2"><span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px]">{row.stageLabel}</span></td>
-        {columns.customer && <td className="px-2 py-2"><div className="font-medium text-slate-700">{row.customerName}</div><div className="text-[10px] text-slate-400">{row.customerPhone ?? "—"}</div></td>}
-        <td className="max-w-[220px] px-2 py-2"><div className="truncate font-medium text-slate-700" title={row.productTitle}>{row.productTitle}</div><div className="text-[10px] text-slate-400">{row.productType || "—"}</div></td>
-        {columns.supplier && <td className="px-2 py-2 text-slate-600">{row.supplierCode ?? "—"}</td>}
-        {columns.travelers && <td className="px-2 py-2 text-slate-600">{row.travelerCount != null ? `${row.travelerCount} чел.` : "—"}</td>}
-        <td className="px-2 py-2 text-right font-mono">{fmt(row.salesAmount, row.currency)}</td>
-        {columns.cost && <td className="px-2 py-2 text-right font-mono">{fmt(row.costAmount, row.currency)}</td>}
-        <td className="px-2 py-2 text-right font-mono text-emerald-700">{fmt(row.clientReceived, row.currency)}<div className="text-[10px] text-amber-600">долг {fmt(row.clientDebt, row.currency)}</div></td>
-        <td className="px-2 py-2 text-right font-mono text-slate-600">{fmt(row.supplierPaid, row.currency)}<div className="text-[10px] text-orange-600">долг {fmt(row.supplierDebt, row.currency)}</div></td>
-        <td className="px-2 py-2 text-right font-mono text-emerald-700">{fmt(row.expectedIncome, row.currency)}</td>
-        {columns.currentIncome && <td className="px-2 py-2 text-right font-mono text-emerald-700">{fmt(row.currentIncome, row.currency)}</td>}
-        <td className="px-2 py-2"><span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusTone(row.status)}`}>{row.status}</span></td>
-      </tr>
-      {expanded && (
-        <tr className="border-b border-slate-200 bg-slate-50/60">
-          <td colSpan={16} className="px-4 py-3">
-            <div className="grid gap-3 text-xs sm:grid-cols-3 lg:grid-cols-5">
-              <div><div className="text-slate-400">База поставщика</div><div>{fmt(row.supplierBasePrice, row.supplierBaseCurrency)}</div>{row.supplierBaseCurrency !== "AZN" && <div className="text-[11px] text-slate-400">≈ {fmt(row.supplierBasePriceAzn, "AZN")}</div>}</div>
-              <div><div className="text-slate-400">Наценка</div><div>{fmt(row.markupAmount, row.currency)}</div></div>
-              <div><div className="text-slate-400">Комиссия</div><div>{fmt(row.commissionAmount, row.currency)}</div></div>
-              <div><div className="text-slate-400">Финансовый статус</div><div className="font-semibold">{row.financialStatus}</div></div>
-              <div><div className="text-slate-400">Оплата клиента</div><div>{row.paymentStatus}</div></div>
-              <div><div className="text-slate-400">Оплата поставщику</div><div>{row.supplierPaymentStatus}</div></div>
-              <div><div className="text-slate-400">Возвращено клиенту</div><div>{fmt(row.clientRefunded, row.currency)}</div></div>
-              <div><div className="text-slate-400">Возврат поставщика</div><div>{fmt(row.supplierRefunded, row.currency)}</div></div>
-              <div><div className="text-slate-400">Штраф клиента</div><div>{fmt(row.clientPenalty, row.currency)}</div></div>
-              <div><div className="text-slate-400">Штраф поставщика</div><div>{fmt(row.supplierPenalty, row.currency)}</div></div>
-              <div><div className="text-slate-400">Дата услуги</div><div>{row.serviceDate ? new Date(row.serviceDate).toLocaleDateString("ru-RU") : "—"}</div></div>
-              <div><div className="text-slate-400">Менеджер</div><div>{row.manager ?? "—"}</div></div>
-              <div><Link href={`/app/finance/deals/${row.sequence}`} className="font-semibold text-blue-600">Открыть карточку сделки →</Link></div>
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
-  );
+function Sel({ label, value, onChange, children }: { label: string; value?: string; onChange?: (v: string) => void; children: React.ReactNode }) { return <label className="block min-w-0"><span className="mb-0.5 block truncate text-[9px] uppercase tracking-wide text-[#98a2b3]">{label}</span><select value={value ?? ""} onChange={(e) => onChange?.(e.target.value)} className="w-full rounded-lg border border-[#e5e2da] bg-white px-2 py-1.5 text-[11px]">{children}</select></label>; }
+
+function Row({ row, open, toggle }: { row: DealRow; open: boolean; toggle: () => void }) {
+  return <><tr className={`border-b border-[#f0eee8] align-top hover:bg-[#fbfaf7] ${open ? "bg-[#fbfaf7]" : ""}`}><td className="px-2 py-3"><button type="button" onClick={toggle} className="text-[#98a2b3]">{open ? "▾" : "›"}</button></td><td className="px-2 py-3"><Link href={`/app/finance/deals/${row.sequence}`} className="font-mono text-[13px] font-semibold text-[#0f6b5f]">{row.sequence}</Link></td><td className="whitespace-nowrap px-2 py-3 font-mono text-[9px] leading-4 text-[#667085]"><div>REQ {row.requestCode}</div><div>ORD {row.orderCode ?? "—"}</div><div>BKG {row.bookingCode ?? "—"}</div></td><td className="px-2 py-3"><span className="rounded-full border border-[#d9e6e1] bg-[#f2faf7] px-2 py-0.5 text-[10px] text-[#0f6b5f]">{row.stageLabel}</span></td><td className="px-2 py-3"><div className="font-medium text-[#101828]">{row.customerName}</div><div className="text-[10px] text-[#98a2b3]">{row.customerPhone ?? "—"}</div></td><td className="max-w-[240px] px-2 py-3"><div className="truncate font-medium text-[#101828]">{row.productTitle}</div><div className="text-[10px] text-[#98a2b3]">{row.productType ?? "—"} · {row.trip.country ?? "—"}</div></td><td className="px-2 py-3 text-[#475467]">{row.supplierCode ?? "—"}</td><td className="px-2 py-3 text-[#475467]">{row.travelerCount ?? "—"} чел.</td><td className="px-2 py-3 text-right font-mono">{fmt(row.salesAmount, row.currency)}</td><td className="px-2 py-3 text-right font-mono">{fmt(row.costAmount, row.currency)}</td><td className="px-2 py-3 text-right font-mono"><div className="text-emerald-700">{fmt(row.clientReceived, row.currency)}</div><div className="text-[10px] text-amber-600">долг {fmt(row.clientDebt, row.currency)}</div></td><td className="px-2 py-3 text-right font-mono"><div>{fmt(row.supplierPaid, row.currency)}</div><div className="text-[10px] text-orange-600">остаток {fmt(row.supplierDebt, row.currency)}</div></td><td className="px-2 py-3 text-right font-mono text-emerald-700">{fmt(row.expectedIncome, row.currency)}</td><td className="px-2 py-3 text-right font-mono text-teal-700">{fmt(row.currentIncome, row.currency)}</td><td className="px-2 py-3"><span className={`rounded-full border px-2 py-0.5 text-[10px] ${tone(row.status)}`}>{label[row.status] ?? row.status}</span></td></tr>{open && <tr className="border-b border-[#d9e6e1] bg-[#fbfaf7]"><td colSpan={15} className="px-4 py-3"><div className="grid gap-4 text-xs md:grid-cols-3 xl:grid-cols-5"><Cell title="Идентификация" rows={[["Заявка", row.requestCode], ["Заказ", row.orderCode ?? "—"], ["Бронь", row.bookingCode ?? "—"], ["Менеджер", row.manager ?? "—"]]} /><Cell title="Клиент" rows={[["Клиент", row.customerName], ["Телефон", row.customerPhone ?? "—"], ["Email", row.customerEmail ?? "—"]]} /><Cell title="Поездка" rows={[["Страна", row.trip.country ?? "—"], ["Даты", row.trip.dateFrom ? `${new Date(row.trip.dateFrom).toLocaleDateString("ru-RU")} — ${row.trip.dateTo ? new Date(row.trip.dateTo).toLocaleDateString("ru-RU") : "—"}` : "—"], ["Туристы", `${row.travelerCount ?? "—"} чел.`], ["Поставщик", row.supplierCode ?? "—"]]} /><Cell title="Деньги" rows={[["Сумма продажи", fmt(row.salesAmount, row.currency)], ["Цена поставщика", fmt(row.costAmount, row.currency)], ["Оплачено клиентом", fmt(row.clientReceived, row.currency)], ["Оплачено поставщику", fmt(row.supplierPaid, row.currency)], ["Возвращено клиенту", fmt(row.clientRefunded, row.currency)]]} /><div className="rounded-xl border border-[#cfe5dc] bg-[#eef8f3] p-3"><div className="text-[10px] uppercase text-[#667085]">Результат</div><div className="mt-1 flex justify-between"><span>Ожидаемый доход</span><span className="font-mono font-semibold text-emerald-700">{fmt(row.expectedIncome, row.currency)}</span></div><div className="flex justify-between"><span>Текущий доход</span><span className="font-mono font-semibold">{fmt(row.currentIncome, row.currency)}</span></div><Link href={`/app/finance/deals/${row.sequence}`} className="mt-3 inline-block text-[11px] font-semibold text-[#0f6b5f]">Открыть карточку сделки →</Link></div></div></td></tr>}</>;
 }
+function Cell({ title, rows }: { title: string; rows: string[][] }) { return <div><div className="mb-1 text-[10px] uppercase tracking-wide text-[#98a2b3]">{title}</div>{rows.map(([l, v]) => <div key={l} className="flex justify-between border-b border-[#f0eee8] py-1"><span className="text-[#98a2b3]">{l}</span><span className="text-right font-medium text-[#344054]">{v}</span></div>)}</div>; }
