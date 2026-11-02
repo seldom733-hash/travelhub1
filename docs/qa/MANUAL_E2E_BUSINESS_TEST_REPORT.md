@@ -1114,3 +1114,6 @@ supplierPenalty   240.00
 
 
 
+
+
+Подробные доказательства BLOCKED: [MANUAL_E2E_REMAINING_CHECKS.md](MANUAL_E2E_REMAINING_CHECKS.md).

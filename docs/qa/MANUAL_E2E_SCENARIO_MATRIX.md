@@ -8,9 +8,9 @@
 | Канал | Услуга | Поиск | Выбор | Данные | Заявка | Статус |
 |---|---|---|---|---|---|---|
 | Витрина | Туры (TEST) | PASS | PASS | PASS | PASS | PASS |
-| Витрина | Отели | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
-| Витрина | Авиабилеты | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
-| Витрина | Круизы / трансферы / страховка | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
+| Витрина | Отели | BLOCKED | BLOCKED | BLOCKED | BLOCKED | BLOCKED |
+| Витрина | Авиабилеты | BLOCKED | BLOCKED | BLOCKED | BLOCKED | BLOCKED |
+| Витрина | Круизы / трансферы / страховка | BLOCKED | BLOCKED | BLOCKED | BLOCKED | BLOCKED |
 | Универсальный поиск | Туры | PASS | PASS | PASS | PASS — MKT-REQ-00000020 | PASS — NEW |
 | Универсальный поиск | Авиабилеты | BLOCKED | NOT TESTED | NOT TESTED | NOT TESTED | BLOCKED |
 
@@ -62,7 +62,7 @@
 | Штраф waived | PASS — clientPenalty 0, KPI не включает |
 | Штраф withheld | PASS — удержан 30, возврат 270, доход 30 |
 | Штраф received | PASS — возврат 270, штраф 30, доход 30 |
-| Штраф cancelled (полный цикл) | NOT TESTED |
+| Штраф cancelled (полный цикл) | BLOCKED — нет операции отмены начисленного штрафа |
 | Частичный / полный возврат | PASS — частичный 270/300, полный 300/300 и 1000/1000 |
 | Возврат от поставщика | PASS — INCOMING 300 AZN CONFIRMED, obligation закрыт |
 
@@ -93,7 +93,8 @@
 | Финансист: доступ к реестру | PASS — /app/finance/deals доступен |
 | Двойное нажатие «Подать заявку» | PASS — создана одна MKT-REQ-00000006 |
 | Двойная отправка заявки | PASS — создана одна MKT-REQ-00000006 |
-| Повторный платёж / webhook | NOT TESTED |
+| Повторный платёж / webhook | BLOCKED — webhook-endpoint отсутствует |
 | Конкурентное изменение | PASS — два одновременных confirm, одна запись CAPTURED и одна проводка |
 | Конкурентное закрытие settlement | PASS — два одновременных confirm, один SET-00000012 |
 | Конкурентное создание Refund | PASS — два одновременных клика, один RFD-00000025 |
+| Конкурентное подтверждение Refund | BLOCKED — нет отдельного UI-действия подтверждения |
