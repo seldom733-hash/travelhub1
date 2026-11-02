@@ -48,6 +48,9 @@ type DealRow = {
   createdAt: string;
   salesAmount: string;
   costAmount: string;
+  supplierBasePrice: string;
+  markupAmount: string;
+  commissionAmount: string;
   clientReceived: string;
   clientDebt: string;
   clientRefunded: string;
@@ -240,7 +243,7 @@ export class DealsService {
       const sales = order ? money(order.amount) : money(request.confirmedPrice ?? request.displayedPrice);
       const fx = commercial.fx as Record<string, unknown> | undefined;
       const supplierPrice = money(commercial.supplierPrice as number | string | undefined);
-      const costFromSnapshot = supplierPrice > 0 ? money((fx?.aznAmount as number | string | undefined) ?? supplierPrice) : 0;
+      const costFromSnapshot = money((commercial.netSupplierCost as number | string | undefined) ?? (fx?.aznAmount as number | string | undefined) ?? supplierPrice);
       const productAttributes = (product?.attributes ?? {}) as Record<string, unknown>;
       const costFromProduct = money(
         (productAttributes.priceLocal as number | string | undefined)
@@ -312,6 +315,9 @@ export class DealsService {
         createdAt: request.createdAt.toISOString(),
         salesAmount: fixed(sales),
         costAmount: fixed(cost),
+        supplierBasePrice: fixed(money(commercial.supplierPrice as number | string | undefined) || cost),
+        markupAmount: fixed(money(commercial.markupAmount as number | string | undefined)),
+        commissionAmount: fixed(money(commercial.commissionAmount as number | string | undefined)),
         clientReceived: fixed(captured),
         clientDebt: fixed(clientDebt),
         clientRefunded: fixed(refunded),

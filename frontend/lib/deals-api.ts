@@ -27,6 +27,9 @@ export interface DealRow {
   createdAt: string;
   salesAmount: string;
   costAmount: string;
+  supplierBasePrice: string;
+  markupAmount: string;
+  commissionAmount: string;
   clientReceived: string;
   clientDebt: string;
   clientRefunded: string;

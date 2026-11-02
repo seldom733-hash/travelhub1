@@ -69,6 +69,15 @@ export interface CommercialSnapshot {
   markupRuleCode: string | null;
   markupRuleVersion: number | null;
 
+  /** Supplier commission agreement frozen alongside markup. */
+  commissionType: "PERCENT" | "FIXED" | "NONE" | null;
+  commissionRate: string | null;
+  commissionAmount: number;
+  commissionRuleCode: string | null;
+  commissionRuleVersion: number | null;
+  netSupplierCost: number;
+  platformGrossIncome: number;
+
   publicPrice: number;
 
   individualDiscount: boolean;
@@ -161,6 +170,7 @@ export function buildWorkingSnapshot(input: {
     throw new ValidationDomainError("invalid public price: must be greater than 0");
   }
   const customerCurrency = fx != null ? (p.publicCurrency ?? "AZN") : supplierCurrency;
+  const commissionAmount = toMoney2(p.commission?.amount ?? 0, "commissionAmount");
 
   return {
     supplierCode: input.supplierCode,
@@ -171,6 +181,13 @@ export function buildWorkingSnapshot(input: {
     markupAmount: Number(markupAmount.toString()),
     markupRuleCode: p.markupRuleCode ?? null,
     markupRuleVersion: p.markupRuleVersion ?? null,
+    commissionType: p.commission?.type ?? null,
+    commissionRate: p.commission?.rate ?? null,
+    commissionAmount: Number(commissionAmount.toString()),
+    commissionRuleCode: p.commission?.ruleCode ?? null,
+    commissionRuleVersion: p.commission?.ruleVersion ?? null,
+    netSupplierCost: Number(toMoney2(p.commission?.netSupplierCost ?? supplierPrice, "netSupplierCost").toString()),
+    platformGrossIncome: Number(toMoney2(p.commission?.platformGrossIncome ?? markupAmount, "platformGrossIncome").toString()),
     publicPrice: Number(publicPrice.toString()),
     individualDiscount: false,
     discountType: QuoteDiscountType.NONE,

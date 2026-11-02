@@ -36,6 +36,7 @@ import { MoneyInput, toMoney2 } from "../sales/sales.money";
 import { SupplierFxRateService } from "../finance/supplier-fx-rate.service";
 import { ValidationDomainError } from "../../shared/errors";
 import { MarkupRuleService, MarkupRuleResolution } from "./markup-rule.service";
+import { SupplierCommissionService } from "./supplier-commission.service";
 import { validateServiceType, validateSupplierCode } from "./pricing.validation";
 import type { MarkupPricingJson } from "./pricing.types";
 import type {
@@ -51,6 +52,14 @@ export interface ResolvedMarkup {
   rate: Prisma.Decimal;
   ruleCode: string | null;
   ruleVersion: number | null;
+  commission?: {
+    commissionType: "PERCENT" | "FIXED";
+    rate: Prisma.Decimal | null;
+    fixedAmount: Prisma.Decimal | null;
+    calculationBase: "SUPPLIER_BASE" | "STOREFRONT";
+    ruleCode: string;
+    ruleVersion: number;
+  } | null;
 }
 
 /** Структурированный результат apply — достаточно для frozen snapshot (§20). */
@@ -64,6 +73,13 @@ export interface MarkupPricingResult {
   markupRuleVersion: number | null;
   configurationState: "CONFIGURED" | "NOT_CONFIGURED";
   pricingCalculatedAt: Date;
+  commissionRate?: Prisma.Decimal | null;
+  commissionAmount?: Prisma.Decimal;
+  netSupplierCost?: Prisma.Decimal;
+  platformGrossIncome?: Prisma.Decimal;
+  commissionRuleCode?: string | null;
+  commissionRuleVersion?: number | null;
+  commissionType?: "PERCENT" | "FIXED" | "NONE";
 }
 
 /** UNIFIED FINANCE CENTER Phase 1: минимальный FX-resolver-контракт
@@ -89,14 +105,8 @@ export class SupplierPricingService {
 
   constructor(
     private readonly markupRules: MarkupRuleService,
-    /** UNIFIED FINANCE CENTER Phase 1: опциональный FX-resolver (Finance export).
-     *  @Inject по КЛАССУ обязателен: FxRateResolver — интерфейс, он стирается
-     *  в рантайме, и без явного токена Nest молча инжектил undefined (в проде
-     *  не конвертировалось НИЧЕГО). PricingModule уже импортирует FinanceModule
-     *  (цикла нет: finance не импортирует pricing). @Optional — только для
-     *  совместимости с legacy unit-тестами (ручная конструкция без резолвера
-     *  → fail-open no-FX, как раньше). */
     @Optional() @Inject(SupplierFxRateService) private readonly fxRates?: FxRateResolver,
+    @Optional() private readonly commissions?: SupplierCommissionService,
   ) {}
   /** Разовый warn, если browse-путь просит не-AZN без подключённого резолвера. */
   private fxMissingWarned = false;
@@ -104,12 +114,16 @@ export class SupplierPricingService {
   /** Разрешить активное правило для key (supplierCode + serviceType) на instant. */
   async resolve(supplierCode: string, serviceType: string, at: Date = new Date()): Promise<ResolvedMarkup> {
     const resolution: MarkupRuleResolution = await this.markupRules.resolve(supplierCode, serviceType, at);
-    if (!resolution.found) return { ...NOT_CONFIGURED };
+    const commission = this.commissions
+      ? await this.commissions.resolveActive(supplierCode, serviceType, at)
+      : null;
+    if (!resolution.found) return { ...NOT_CONFIGURED, commission };
     return {
       state: "CONFIGURED",
       rate: resolution.rate,
       ruleCode: resolution.ruleCode,
       ruleVersion: resolution.ruleVersion,
+      commission,
     };
   }
 
@@ -135,6 +149,18 @@ export class SupplierPricingService {
 
     const markupAmount = toMoney2(price.mul(rate), "markupAmount");
     const publicPrice = toMoney2(price.plus(markupAmount), "publicPrice");
+    const commission = resolution.commission;
+    let commissionAmount = new Prisma.Decimal(0);
+    let commissionRate: Prisma.Decimal | null = null;
+    if (commission?.commissionType === "PERCENT") {
+      commissionRate = commission.rate ?? new Prisma.Decimal(0);
+      const base = commission.calculationBase === "STOREFRONT" ? publicPrice : price;
+      commissionAmount = toMoney2(base.mul(commissionRate), "commissionAmount");
+    } else if (commission?.commissionType === "FIXED") {
+      commissionAmount = toMoney2(commission.fixedAmount ?? new Prisma.Decimal(0), "commissionAmount");
+    }
+    const netSupplierCost = toMoney2(price.minus(commissionAmount), "netSupplierCost");
+    const platformGrossIncome = toMoney2(publicPrice.minus(netSupplierCost), "platformGrossIncome");
 
     return {
       supplierPrice: price,
@@ -146,6 +172,13 @@ export class SupplierPricingService {
       markupRuleVersion: resolution.ruleVersion,
       configurationState: resolution.state,
       pricingCalculatedAt: new Date(),
+      commissionType: commission?.commissionType ?? "NONE",
+      commissionRate,
+      commissionAmount,
+      netSupplierCost,
+      platformGrossIncome,
+      commissionRuleCode: commission?.ruleCode ?? null,
+      commissionRuleVersion: commission?.ruleVersion ?? null,
     };
   }
 
@@ -194,6 +227,15 @@ export class SupplierPricingService {
       markupRuleVersion: result.markupRuleVersion,
       configurationState: result.configurationState,
       calculatedAt: result.pricingCalculatedAt.toISOString(),
+      commission: {
+        type: result.commissionType ?? "NONE",
+        rate: result.commissionRate?.toString() ?? null,
+        amount: Number(result.commissionAmount?.toString() ?? "0"),
+        netSupplierCost: Number(result.netSupplierCost?.toString() ?? result.supplierPrice.toString()),
+        platformGrossIncome: Number(result.platformGrossIncome?.toString() ?? result.markupAmount.toString()),
+        ruleCode: result.commissionRuleCode ?? null,
+        ruleVersion: result.commissionRuleVersion ?? null,
+      },
     };
     if (fxJson) {
       return {

@@ -36,6 +36,16 @@ export interface MarkupPricingJson {
   configurationState: "CONFIGURED" | "NOT_CONFIGURED";
   /** ISO timestamp of the calculation. */
   calculatedAt: string;
+  /** Supplier commission agreement resolved at the same instant. */
+  commission?: {
+    type: "PERCENT" | "FIXED" | "NONE";
+    rate: string | null;
+    amount: number;
+    netSupplierCost: number;
+    platformGrossIncome: number;
+    ruleCode: string | null;
+    ruleVersion: number | null;
+  };
 
   /**
    * UNIFIED FINANCE CENTER Phase 1: present iff supplier price was converted

@@ -110,6 +110,31 @@ export class SupplierCommissionService {
     return this.prisma.supplierCommissionRuleHistory.findMany({ where: { ruleId: row.id }, orderBy: { createdAt: "desc" } });
   }
 
+  async resolveActive(supplierCode: string, serviceType: string, at: Date = new Date()) {
+    const rows = await this.prisma.supplierCommissionRule.findMany({
+      where: {
+        supplierCode: validateSupplierCode(supplierCode),
+        serviceType: validateServiceType(serviceType),
+        status: MarkupRuleStatus.ACTIVE,
+        effectiveFrom: { lte: at },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gt: at } }],
+      },
+      orderBy: { effectiveFrom: "desc" },
+      take: 2,
+    });
+    if (rows.length > 1) throw new ConflictError(`Multiple active commission rules for ${supplierCode}/${serviceType}`);
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      commissionType: row.commissionType as "PERCENT" | "FIXED",
+      rate: row.rate,
+      fixedAmount: row.fixedAmount,
+      calculationBase: row.calculationBase as "SUPPLIER_BASE" | "STOREFRONT",
+      ruleCode: row.code,
+      ruleVersion: row.version,
+    };
+  }
+
   private money(value: string, field: string): Prisma.Decimal {
     const amount = new Prisma.Decimal(value);
     if (amount.isNegative()) throw new ValidationDomainError(`${field} must be >= 0`);
