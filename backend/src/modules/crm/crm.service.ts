@@ -225,11 +225,23 @@ export class CrmService {
    * end-customers from Platform CRM Customers.
    */
   private async getMarketplaceCustomerIds(): Promise<string[]> {
-    const marketplaceOrders = await this.prisma.order.findMany({
-      where: { acquisitionSource: 'MARKETPLACE' as any },
-      select: { customerId: true },
-    });
-    return [...new Set(marketplaceOrders.map((o) => o.customerId).filter((c): c is string => c !== null))];
+    const [marketplaceOrders, marketplaceRequests] = await Promise.all([
+      this.prisma.order.findMany({
+        where: { acquisitionSource: 'MARKETPLACE' as any },
+        select: { customerId: true },
+      }),
+      // A customer who submitted a Marketplace Request is already a CRM lead,
+      // even before Request → Order conversion. Excluding Request-only
+      // customers hides every fresh public request from CRM.
+      this.prisma.request.findMany({
+        where: { customerId: { not: null } },
+        select: { customerId: true },
+      }),
+    ]);
+    return [...new Set([
+      ...marketplaceOrders.map((o) => o.customerId),
+      ...marketplaceRequests.map((r) => r.customerId),
+    ].filter((c): c is string => c !== null))];
   }
   async listCustomers(query: CustomerListQuery) {
     const page = Math.max(1, query.page ?? 1);
