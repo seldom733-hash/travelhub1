@@ -26,6 +26,7 @@ type MonthlyCalendarQuery = Omit<SupplierPriceCalendarQuery, "dateFrom" | "dateT
 
 // Bump this to invalidate all cached calendar data (old keys become stale)
 const CAL_CACHE_V = 6;
+const CAL_CACHE_TTL_MS = 30_000;
 
 function buildCacheKey(base: MonthlyCalendarQuery, year: number, month: number): string {
   // month 0-based — includes all KOMPAS filters that affect price
@@ -182,7 +183,7 @@ export default function MonthlyCalendar({
       // CACHE_HIT — global memory first, then sessionStorage (survives full reload)
       if (!forceRefresh) {
         const cached = globalCalendarCache.get(key);
-        if (cached) {
+        if (cached && Date.now() - cached.lastUpdated.getTime() < CAL_CACHE_TTL_MS) {
           console.log(`[MonthlyCalendar] CACHE_HIT memory ${year}-${String(month+1).padStart(2,"0")}`);
           setEntries(cached.entries);
           setLastUpdated(cached.lastUpdated);
@@ -192,7 +193,7 @@ export default function MonthlyCalendar({
           return;
         }
         const sess = getSessionCache(key);
-        if (sess) {
+        if (sess && Date.now() - sess.lastUpdated.getTime() < CAL_CACHE_TTL_MS) {
           console.log(`[MonthlyCalendar] CACHE_HIT sessionStorage ${year}-${String(month+1).padStart(2,"0")} key=${key.slice(0,80)}`);
           globalCalendarCache.set(key, sess);
           setEntries(sess.entries);
