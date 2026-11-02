@@ -571,16 +571,23 @@ export class BookingService {
       // отклоняются 409. Это закрывает compensation-vs-command race детерминированно
       // для последовательного сценария (staff подтверждает бронь уже отменённого
       // заказа → 409, а не «confirm после cancel»).
+      const orderForGuard = await tx.order.findUnique({
+        where: { id: booking.orderId },
+        select: { code: true, status: true },
+      });
       if (action !== "cancel") {
-        const order = await tx.order.findUnique({
-          where: { id: booking.orderId },
-          select: { code: true, status: true },
-        });
-        if (order && ORDER_TERMINAL_GUARD.includes(order.status)) {
+        if (orderForGuard && ORDER_TERMINAL_GUARD.includes(orderForGuard.status)) {
           throw new ConflictError(
-            `Cannot ${action} booking ${booking.code}: order ${order.code} is ${order.status}`,
+            `Cannot ${action} booking ${booking.code}: order ${orderForGuard.code} is ${orderForGuard.status}`,
           );
         }
+      } else if (orderForGuard && ["FULFILLED", "CLOSED"].includes(orderForGuard.status)) {
+        // A delivered/closed service cannot be cancelled by a booking-status
+        // action: that would leave the Order fulfilled while its Booking is
+        // CANCELLED and bypass the financial refund/settlement contour.
+        throw new ConflictError(
+          `Cannot cancel booking ${booking.code}: order ${orderForGuard.code} is ${orderForGuard.status}; use the refund/settlement flow`,
+        );
       }
 
       // Step 2.9 §23: optimistic concurrency (как Order, Step 1.14 §19) — переход
