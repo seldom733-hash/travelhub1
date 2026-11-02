@@ -1,0 +1,28 @@
+const { chromium } = require("../backend/node_modules/playwright");
+(async () => {
+  const b = await chromium.launch({ headless: true });
+  const p = await b.newPage({ viewport: { width: 1600, height: 1200 } });
+  await p.goto("http://127.0.0.1:3000/login", { waitUntil: "networkidle" });
+  await p.locator("input[autocomplete=username]").fill("admin");
+  await p.locator("input[type=password]").fill("admin123");
+  await p.locator("button[type=submit]").click();
+  await p.waitForTimeout(700);
+  await p.goto("http://127.0.0.1:3000/app/finance/refunds", { waitUntil: "networkidle" });
+  await p.waitForTimeout(800);
+  await p.locator("select").selectOption({ label: "PAY-00000028 · 60 AZN · " });
+  await p.locator('input[placeholder="Сумма"]').fill("10");
+  await p.locator('input[placeholder="Причина"]').fill("Refund confirmation test");
+  await p.getByRole("button", { name: "Создать", exact: true }).click();
+  await p.waitForTimeout(1200);
+  console.log("created", (await p.locator("body").innerText()).slice(-500));
+  const approve = p.getByRole("button", { name: "Подтвердить", exact: true });
+  console.log("approve count", await approve.count());
+  await approve.first().click();
+  await p.waitForTimeout(1000);
+  const process = p.getByRole("button", { name: "Исполнить", exact: true });
+  console.log("process count", await process.count());
+  await process.first().click();
+  await p.waitForTimeout(1200);
+  console.log("done", (await p.locator("body").innerText()).slice(-500));
+  await b.close();
+})();
