@@ -4,6 +4,54 @@
 **Ð¡Ñ€ÐµÐ´Ð°:** production `travelhub` (Ð¿Ð¾ Ð¿Ñ€ÑÐ¼Ð¾Ð¼Ñƒ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ð¸ÑŽ Ð¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÐµÐ»Ñ)  
 **Backup Ð´Ð¾ Ð¾Ñ‡Ð¸ÑÑ‚ÐºÐ¸:** `reports/backups/travelhub_before_full_e2e_clear_20261102.dump`
 
+## 0. Итог аудита
+
+Проведён ручной E2E-аудит через UI по цепочке:
+
+```text
+Request → Order → Booking → Payment
+→ Supplier Payout → Cancellation
+→ Refund → Settlement → Ledger
+```
+
+Итоговая матрица:
+
+```text
+PASS        56
+FAIL         0
+BLOCKED      3
+PARTIAL      1
+NOT TESTED  23
+```
+
+Ключевые исправленные дефекты:
+
+- отсутствие клиентского Refund из settlement;
+- отсутствие INCOMING supplier refund в UI;
+- незакрытие SupplierObligation после отмены;
+- неверное признание штрафов в KPI;
+- смешивание client/supplier penalty;
+- отсутствие Ledger-проводок по supplier refund;
+- отсутствие экрана Financial Ledger.
+
+Проверены:
+
+- полный и частичный возврат;
+- штрафы клиента, поставщика и обеих сторон;
+- статусы штрафа pending / confirmed / withheld / received / waived;
+- конкурентные платёж, settlement и создание Refund;
+- роли ADMIN / FINANCE / MANAGER / BUYER;
+- сверка денежных остатков с Ledger.
+
+Не проверены:
+
+- cancelled-штраф после начисления;
+- конкурентное подтверждение Refund;
+- отели, авиа, круизы, трансферы, страховка, экскурсии;
+- повторный webhook.
+
+Рекомендация: выпуск возможен для туров TEST и проверенных финансовых сценариев; перед полным production rollout нужны проверки из блока «Не проверены».
+
 ## 1. ÐŸÐ¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²ÐºÐ° ÑÑ€ÐµÐ´Ñ‹
 
 Ð¢Ñ€Ð°Ð½Ð·Ð°ÐºÑ†Ð¸Ð¾Ð½Ð½Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¾Ñ‡Ð¸Ñ‰ÐµÐ½Ñ‹: Request, Order, Booking, Payment, Refund, SupplierObligation, SupplierPayout, Ledger Ð¸ ÑÐ²ÑÐ·Ð°Ð½Ð½Ñ‹Ðµ Ð¸ÑÑ‚Ð¾Ñ€Ð¸Ð¸. Master data ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹.
