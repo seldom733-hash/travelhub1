@@ -28,6 +28,7 @@ import { HotelMatchingService } from "../hotel/hotel-matching.service";
 import { TourMatchingService } from "../tour-matching.service";
 import { applyCanonicalName } from "../hotel/hotel-identity";
 import { NotFoundError, ValidationDomainError } from "../../../shared/errors";
+import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
 import { SIGNED_URL_TTL_SECONDS } from "../media/product-media.service";
 import { hotelPhotoUrl } from "../hotel/hotel-photo-url";
 import type { ObjectStorageService } from "../media/storage/storage.interface";
@@ -136,6 +137,7 @@ export class PublicCatalogService {
     @Inject("ObjectStorageService") private readonly storage: ObjectStorageService,
     private readonly hotelMatching?: HotelMatchingService,
     private readonly tourMatching?: TourMatchingService,
+    private readonly pricing?: SupplierPricingService,
   ) {}
 
   // ── Visibility predicate (§3/§16/§17) ────────────────────────────────────
@@ -969,17 +971,20 @@ export class PublicCatalogService {
   }
 
   /** Маппинг детали (PDP) — общий для Marketplace и Storefront-контура. */
-  private toDetail(
+  private async toDetail(
     row: PublicProductRow,
     seller: PublicSeller | null,
     partnerCode: string | null,
     fx: SupplierFxByPartner,
     hotel: HotelRegistryEntry | null = null,
-  ): PublicProductDetail {
+  ): Promise<PublicProductDetail> {
     const media = row.media.map((m) => this.toPublicMedia(m));
     const availability = this.toAvailabilitySummary(row.availability ?? []);
     const price = this.minTariff(row.tariffs);
-    const shown = price ? this.toDisplayPrice(price.amount, price.currency, row.partnerId, fx) : null;
+    const live = await this.liveStorefrontAmount(row);
+    const shown = live
+      ? { amount: live.amount, currency: live.currency }
+      : price ? this.toDisplayPrice(price.amount, price.currency, row.partnerId, fx) : null;
     // Единое имя физической гостиницы из реестра (Hotel.name): поставщики
     // называют один отель по-разному, карточка показывает каноническое имя.
     const title = applyCanonicalName(row.title, hotel?.canonicalName);
@@ -988,11 +993,15 @@ export class PublicCatalogService {
     // подменяем и их, иначе PDP показывает «Currency USD / Starting price»
     // рядом с ценой в AZN. Ключей нет (ручные товары) → не invent facts.
     const converted = !!price && price.currency.toUpperCase() !== "AZN" && shown?.currency === "AZN";
+    const baseStarting = Number((row.attributes as Record<string, unknown> | null)?.startingPrice);
+    const liveMultiplier = live && baseStarting > 0 ? Number(live.amount) / baseStarting : 1;
     const rawAttributes = (row.attributes ?? null) as Record<string, unknown> | null;
     const attributes =
-      converted && rawAttributes && "startingPrice" in rawAttributes && "currency" in rawAttributes
-        ? { ...rawAttributes, startingPrice: Number(shown!.amount), currency: "AZN" }
-        : rawAttributes;
+      live && rawAttributes
+        ? { ...rawAttributes, startingPrice: Number(shown!.amount), currency: live.currency, supplierBasePrice: rawAttributes.supplierBasePrice ?? rawAttributes.startingPrice }
+        : converted && rawAttributes && "startingPrice" in rawAttributes && "currency" in rawAttributes
+          ? { ...rawAttributes, startingPrice: Number(shown!.amount), currency: "AZN" }
+          : rawAttributes;
     return {
       product: {
         id: row.id,
@@ -1018,11 +1027,14 @@ export class PublicCatalogService {
             };
           }
           const shownTariff = this.toDisplayPrice(t.price, t.currency, row.partnerId, fx);
+          const liveAmount = live
+            ? (Number(shownTariff.amount) * liveMultiplier).toFixed(2)
+            : shownTariff.amount;
           return {
             id: t.id,
             name: t.name,
-            price: shownTariff.amount,
-            currency: shownTariff.currency,
+            price: liveAmount,
+            currency: live ? live.currency : shownTariff.currency,
             validFrom: t.validFrom ? t.validFrom.toISOString() : null,
             validTo: t.validTo ? t.validTo.toISOString() : null,
             pricingMode: t.pricingMode as "FIXED" | "PRICE_ON_REQUEST",
@@ -1108,20 +1120,42 @@ export class PublicCatalogService {
     };
   }
 
-  private toCard(
+  /** Live storefront price from the preserved supplier base + active markup. */
+  private async liveStorefrontAmount(row: PublicProductRow): Promise<{ amount: string; currency: string } | null> {
+    if (!this.pricing) return null;
+    const attrs = (row.attributes ?? {}) as Record<string, unknown>;
+    const supplierCode = typeof attrs.supplierCode === "string" ? attrs.supplierCode : null;
+    const base = Number(attrs.supplierBasePrice ?? attrs.startingPrice ?? attrs.convertedPrice);
+    if (!supplierCode || !Number.isFinite(base) || base <= 0) return null;
+    const serviceType = row.type === "HOTEL" ? "hotels" : row.type === "FLIGHT" ? "flights" : row.type === "TOUR" ? "tours" : String(row.type).toLowerCase();
+    try {
+      const result = await this.pricing.applyFor(supplierCode, serviceType, base, String(attrs.supplierBaseCurrency ?? attrs.currency ?? "AZN"));
+      return { amount: result.publicPrice.toFixed(2), currency: result.supplierCurrency === "AZN" ? "AZN" : result.supplierCurrency };
+    } catch {
+      return null;
+    }
+  }
+
+  private async toCard(
     row: PublicProductRow,
     availability: PublicAvailabilitySummary | null,
     seller: PublicSeller | null,
     partnerCode: string | null,
     fx: SupplierFxByPartner,
     hotelRegistry?: Map<string, HotelRegistryEntry>,
-  ): PublicProductCard {
+  ): Promise<PublicProductCard> {
     const primary = row.media.find((m) => m.isPrimary) ?? row.media[0] ?? null;
     const primaryImage = primary
       ? { id: primary.id, thumbUrl: this.publicMediaUrl(primary.id, "thumb"), largeUrl: this.publicMediaUrl(primary.id, "large") }
       : null;
     const price = this.minTariff(row.tariffs);
-    const shown = price ? this.toDisplayPrice(price.amount, price.currency, row.partnerId, fx) : null;
+    const live = await this.liveStorefrontAmount(row);
+    const rawShown = live
+      ? { amount: Number(live.amount), currency: live.currency }
+      : price ? this.toDisplayPrice(price.amount, price.currency, row.partnerId, fx) : null;
+    const shown = rawShown
+      ? { amount: String(rawShown.amount), currency: String(rawShown.currency) }
+      : null;
     const key = PublicCatalogService.hotelRefKey(row.attributes);
     const registryEntry = key && hotelRegistry ? hotelRegistry.get(key) : undefined;
     // Каноническое имя физической гостиницы — то же, что в PDP и саджесте.

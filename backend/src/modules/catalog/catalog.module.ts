@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { PricingModule } from "../pricing/pricing.module";
 import { CatalogController } from "./catalog.controller";
 import { CatalogService } from "./catalog.service";
 import { CatalogAccessPolicy } from "./catalog-access.policy";
@@ -77,6 +78,7 @@ import { TourMatchingService } from "./tour-matching.service";
  * soft lifecycle; валюта наследуется из Tariff; POR без числовых периодов.
  */
 @Module({
+  imports: [PricingModule],
   controllers: [CatalogController, ModerationController, PublicCatalogController, PublicSuggestController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, PublicStorefrontDomainController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController, RatePlansController, CommercialPeriodsController, CommercialRestrictionsController, TourBuilderController, TourBuilderDictionariesController, HotelMatchReviewController],
   providers: [
     CatalogService,
