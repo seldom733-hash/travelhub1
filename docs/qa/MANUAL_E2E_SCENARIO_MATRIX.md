@@ -82,7 +82,8 @@
 | Проверка | Статус |
 |---|---|
 | Менеджер: доступ к финансам | PASS — /app/finance/deals redirect, create payment скрыт |
-| Клиент / финансист / админ | NOT TESTED |
+| Клиент: доступ к финансам | PASS — /app/finance/deals и /app/payments → /account |
+| Финансист: доступ к реестру | PASS — /app/finance/deals доступен |
 | Двойное нажатие «Подать заявку» | NOT TESTED |
 | Двойная отправка заявки | PASS — создана одна MKT-REQ-00000006 |
 | Повторный платёж / webhook | NOT TESTED |
