@@ -9,8 +9,8 @@
 |---|---|---|---|---|---|---|
 | Витрина | Туры (TEST) | PASS | PASS | PASS | PASS | PASS |
 | Витрина | Отели | PASS | PASS | PASS | PASS — MKT-REQ-00000021 | PASS — NEW |
-| Витрина | Авиабилеты | PASS — страница продукта | PASS | PASS | NOT TESTED — требует login | NOT TESTED |
-| Витрина | Трансферы / экскурсии / санатории | PASS — страницы продуктов | PASS | PASS | NOT TESTED | NOT TESTED |
+| Витрина | Авиабилеты | PASS | PASS | PASS | PASS — MKT-REQ-00000023 | PASS — NEW |
+| Витрина | Трансферы / экскурсии / санатории | PASS | PASS | PASS | PASS — MKT-REQ-00000024..26 | PASS — NEW |
 | Витрина | Круизы / страховка | BLOCKED | BLOCKED | BLOCKED | BLOCKED | BLOCKED |
 | Универсальный поиск | Туры | PASS | PASS | PASS | PASS — MKT-REQ-00000020 | PASS — NEW |
 | Универсальный поиск | Авиабилеты | BLOCKED | NOT TESTED | NOT TESTED | NOT TESTED | BLOCKED |

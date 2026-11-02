@@ -17,11 +17,11 @@ Request → Order → Booking → Payment
 Итоговая матрица:
 
 ```text
-PASS        75
+PASS        79
 FAIL         0
 BLOCKED      7
 PARTIAL      1
-NOT TESTED   7
+NOT TESTED   3
 ```
 
 Ключевые исправленные дефекты:
@@ -1221,11 +1221,17 @@ MKT-REQ-00000021
 status = NEW
 ```
 
-### Авиабилет / трансфер / экскурсия / санаторий
+### Авиабилет / трансфер / экскурсия / санаторий — PASS
 
-Страницы продуктов открываются (HTTP 200), данные и цена отображаются. Кнопка заявки для авиабилета ведёт на login, поэтому создание заявки этих типов вручную не завершено.
+Через guest-checkout созданы заявки:
 
-Статус: **NOT TESTED** для заявки, **PASS** для отображения продукта.
+```text
+MKT-REQ-00000023 FLIGHT
+MKT-REQ-00000024 TRANSFER
+MKT-REQ-00000025 EXCURSION
+MKT-REQ-00000026 SANATORIUM
+```
+
 
 ## 23. Исправленные дефекты
 
@@ -1256,7 +1262,7 @@ status = NEW
 1. Штрафы pending/waived не входят в KPI; confirmed, withheld и received входят.
 2. Cancelled-штраф после начисления проверен: возврат 30, reversal-проводка.
 3. Универсальный поиск авиабилетов заблокирован внешними источниками.
-4. Добавлены тестовые продукты HOTEL/FLIGHT/TRANSFER/EXCURSION/SANATORIUM; заявки по ним, кроме отеля, не завершены.
+4. Добавлены продукты HOTEL/FLIGHT/TRANSFER/EXCURSION/SANATORIUM; заявки созданы. Круизы/страховка отсутствуют в ProductType.
 5. Конкурентные платёж, settlement, создание и подтверждение Refund проверены.
 
 ## 25. Следующий этап
@@ -1271,6 +1277,8 @@ status = NEW
 
 
 Подробные доказательства BLOCKED: [MANUAL_E2E_REMAINING_CHECKS.md](MANUAL_E2E_REMAINING_CHECKS.md).
+
+
 
 
 

@@ -29,10 +29,18 @@ eventId evt-qa-002 → CAPTURED, duplicate=false
 
 Повторной проводки/захвата нет.
 
-## 4. Тестовые продукты других типов — PARTIAL
+## 4. Тестовые продукты других типов — PASS (кроме круизов/страховки)
 
-Добавлены продукты `HOTEL`, `FLIGHT`, `TRANSFER`, `EXCURSION`, `SANATORIUM` (SQL в `reports/backups/seed_test_types.sql`).
+Добавлены продукты `HOTEL`, `FLIGHT`, `TRANSFER`, `EXCURSION`, `SANATORIUM`.
 
-- отель: PASS, создана `MKT-REQ-00000021`;
-- авиабилет / трансфер / экскурсия / санаторий: страницы продуктов открываются, но заявка не завершена — для авиабилета кнопка ведёт на login;
-- круизы и страховка: продуктов нет, BLOCKED.
+Созданы заявки:
+
+```text
+MKT-REQ-00000021 HOTEL
+MKT-REQ-00000023 FLIGHT
+MKT-REQ-00000024 TRANSFER
+MKT-REQ-00000025 EXCURSION
+MKT-REQ-00000026 SANATORIUM
+```
+
+Круизы и страховка: таких типов нет в `ProductType`, BLOCKED.
