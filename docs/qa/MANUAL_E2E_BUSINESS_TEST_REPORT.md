@@ -252,19 +252,34 @@ currentIncome     30.00
 
 **Результат:** отмена со штрафом 10% — PASS.
 
-### Возврат от поставщика — BLOCKED
+### Возврат от поставщика — PARTIAL
 
-Backend поддерживает `SupplierPayout.direction = INCOMING` для возврата от поставщика, но форма создания выплаты в UI не содержит полей:
+В UI выплат поставщикам добавлены поля:
 
 ```text
-direction
-orderId
-bookingId
+direction = OUTGOING | INCOMING
+orderId (для INCOMING)
 ```
 
-Поэтому после уже выполненной выплаты поставщику возврат от поставщика через интерфейс создать нельзя.
+Создан возврат от поставщика:
 
-Статус сценария: **BLOCKED** до добавления UI для INCOMING supplier refund.
+```text
+SPO-00000001-2
+direction = INCOMING
+amount = 300 AZN
+status = PENDING → CONFIRMED
+```
+
+Реестр показывает:
+
+```text
+supplierPaid     300.00
+supplierRefunded 300.00
+```
+
+Однако полноценная связка «отменённая сделка + выплата поставщику + возврат от поставщика + закрытие обязательства» ещё не проверена на чистой сделке. Текущая MKT-ORD-00000001 имеет историческую несогласованность (Order FULFILLED, Booking CANCELLED).
+
+Статус: **PARTIAL**.
 
 ### Защита от дублирования — PASS
 
@@ -394,12 +409,12 @@ CONFIRMED
 | DEF-006 | Отменённая сделка без obligation показывала supplierDebt 800 | для cancelled без obligation supplierDebt = 0 |
 | DEF-007 | Отмена Booking у FULFILLED Order оставляла финансовую несогласованность | прямая отмена при FULFILLED/CLOSED теперь блокируется 409 |
 | DEF-008 | После отмены Order с оплатой не было UI-создания Refund; settlement блокировался REMAINING_TO_REFUND | добавлено действие «Вернуть клиенту» → Refund PROCESSED → settlement закрыт |
-| DEF-009 | Нет UI для возврата от поставщика (INCOMING supplier payment) | OPEN — форма не содержит direction/orderId |
+| DEF-009 | Нет UI для возврата от поставщика (INCOMING supplier payment) | добавлены direction/orderId; INCOMING 300 AZN создан и подтверждён |
 | DEF-010 | Отменённые сделки попадали в KPI «Сумма продаж» и «Себестоимость» | отменённые входят только признанным штрафом: clientPenalty / supplierPenalty |
 
 ## 10. Ограничения
 
-1. Отмена после выплаты поставщику заблокирована: UI не поддерживает INCOMING supplier refund.
+1. INCOMING supplier refund в UI работает, но полная связка с отменой оплаченной сделки ещё не проверена.
 2. Штраф поставщика, переплата и отклонённые платежи не выполнены.
 3. Универсальный поиск авиабилетов остаётся BLOCKED из-за внешних источников.
 4. Роли и конкурентные операции не завершены.

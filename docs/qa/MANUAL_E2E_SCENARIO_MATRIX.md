@@ -52,10 +52,10 @@
 |---|---|
 | Отмена без штрафа | PASS — до оплаты |
 | Отмена после оплаты | PASS — клиентский возврат 300 AZN, settlement FULL_REFUND |
-| Отмена после выплаты поставщику | BLOCKED — нет UI для INCOMING supplier refund |
+| Отмена после выплаты поставщику | PARTIAL — INCOMING refund создан, полная связка не проверена |
 | Отмена со штрафом | PASS — штраф 30 AZN, возврат 270 AZN |
 | Частичный / полный возврат | NOT TESTED |
-| Возврат от поставщика | BLOCKED — нет UI для direction/orderId |
+| Возврат от поставщика | PARTIAL — INCOMING 300 AZN CONFIRMED |
 
 ## Финансы
 

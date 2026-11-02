@@ -239,6 +239,8 @@ export default function SupplierPaymentsPage() {
           : undefined;
       const input: CreateSupplierPaymentInput = {
         supplierCode: form.supplierCode || undefined,
+        direction: form.direction ?? "OUTGOING",
+        orderId: form.direction === "INCOMING" ? form.orderId?.trim() || undefined : undefined,
         amount: form.amount,
         currency: form.currency,
         aznAmount: form.aznAmount || undefined,
@@ -320,6 +322,11 @@ export default function SupplierPaymentsPage() {
         breadcrumbs={["Navitravel", t("nav.group.finance", locale), t("finance.supplier_payments.title", locale)]}
         actions={
           <div className="flex items-center gap-2">
+            {canManage && (
+              <button type="button" onClick={() => setShowCreate(true)} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700">
+                {t("finance.supplier_payments.create_button", locale)}
+              </button>
+            )}
             <TableExportButton
               exportUrl="/api/v1/finance/supplier-payments/export"
               extraParams={{ status, search }}
@@ -378,6 +385,28 @@ export default function SupplierPaymentsPage() {
           onClose={() => setShowCreate(false)}
         >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <label className="text-sm">
+              <span className="mb-1 block text-slate-600">{t("finance.supplier_payments.field.direction", locale)}</span>
+              <select
+                value={form.direction ?? "OUTGOING"}
+                onChange={(e) => setForm({ ...form, direction: e.target.value as "OUTGOING" | "INCOMING" })}
+                className="w-full rounded-lg border border-line px-3 py-2"
+              >
+                <option value="OUTGOING">{t("finance.supplier_payments.field.direction_outgoing", locale)}</option>
+                <option value="INCOMING">{t("finance.supplier_payments.field.direction_incoming", locale)}</option>
+              </select>
+            </label>
+            {form.direction === "INCOMING" && (
+              <label className="text-sm">
+                <span className="mb-1 block text-slate-600">{t("finance.supplier_payments.field.order_id", locale)}</span>
+                <input
+                  value={form.orderId ?? ""}
+                  onChange={(e) => setForm({ ...form, orderId: e.target.value })}
+                  placeholder="MKT-ORD-..."
+                  className="w-full rounded-lg border border-line px-3 py-2"
+                />
+              </label>
+            )}
             <label className="text-sm">
               <span className="mb-1 block text-slate-600">{t("finance.supplier_payments.field.supplier", locale)}</span>
               <select
@@ -501,7 +530,7 @@ export default function SupplierPaymentsPage() {
           <div className="mt-4 flex gap-2">
             <button
               type="button"
-              disabled={creating || !form.amount || !form.currency || !form.supplierCode}
+              disabled={creating || !form.amount || !form.currency || !form.supplierCode || (form.direction === "INCOMING" && !form.orderId?.trim())}
               onClick={() => void submitCreate()}
               className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
