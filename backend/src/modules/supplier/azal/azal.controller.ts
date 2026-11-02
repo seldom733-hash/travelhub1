@@ -180,7 +180,23 @@ export class AzalController {
   async createRequest(@Body() body: { from: string; to: string; departureDate: string; returnDate?: string; tripType: string; passengers: any; fareFamily: string; price: number; currency: string; segments: any[]; supplierCode?: string }) {
     // Server-authoritative price (§16): body.price is NEVER trusted — the
     // displayed price is re-derived from a fresh search of the same query.
-    const authoritative = await this.deriveAuthoritativePrice(body);
+    // A request is an inquiry, not a booking: if the supplier re-check is
+    // temporarily unavailable, keep the selected offer snapshot and flag it
+    // for manager verification instead of losing the customer's request.
+    let authoritative: Awaited<ReturnType<AzalController["deriveAuthoritativePrice"]>>;
+    try {
+      authoritative = await this.deriveAuthoritativePrice(body);
+    } catch (e) {
+      if (!(Number(body.price) > 0) || !body.currency) throw e;
+      this.logger.warn(`[FlightRequest] re-check unavailable — saving submitted offer pending verification: ${(e as Error).message}`);
+      authoritative = {
+        amount: Number(body.price),
+        currency: String(body.currency).toUpperCase(),
+        supplierCode: (body.supplierCode || "AZAL").toUpperCase(),
+        collectedAt: null,
+        verification: "SUBMITTED_OFFER",
+      };
+    }
     const code = await this.ids.nextCode(null as any, "REQ");
     const commerceSequence = await this.refNum.nextCommerceSequence(null as any);
     const referenceNumber = this.refNum.commerceRequestRef(commerceSequence);
@@ -211,7 +227,21 @@ export class AzalController {
       data: {
         code, commerceSequence, referenceNumber, customerId: null, productId: null, partnerId: null, status: "NEW",
         requestedServiceDate: new Date(body.departureDate), quantity: 1, travelerCount: body.passengers?.adults ?? 1,
-        productSnapshot: { type: "FLIGHT", from: body.from, to: body.to, fareFamily: body.fareFamily },
+        productSnapshot: {
+          type: "FLIGHT",
+          from: body.from,
+          to: body.to,
+          departureDate: body.departureDate,
+          returnDate: body.returnDate ?? null,
+          tripType: body.tripType,
+          passengers: body.passengers,
+          fareFamily: body.fareFamily,
+          segments: body.segments,
+          price: authoritative.amount,
+          currency: authoritative.currency,
+          supplierCode: authoritative.supplierCode,
+          priceVerification: authoritative.verification,
+        },
         displayedPrice: authoritative.amount, displayedCurrency: authoritative.currency,
         ...(commercialSnapshot ? { commercialSnapshot: commercialSnapshot as never } : {}),
         confirmedPrice: null, confirmedCurrency: null,
@@ -219,7 +249,7 @@ export class AzalController {
         supplierResponseDeadline: new Date(now.getTime() + 24*60*60*1000),
       },
     });
-    return { id: request.id, code: request.code, referenceNumber: request.referenceNumber, status: request.status };
+    return { id: request.id, code: request.code, referenceNumber: request.referenceNumber, status: request.status, priceVerification: authoritative.verification };
   }
 
   @Post("calendar")
@@ -427,6 +457,7 @@ export class AzalController {
     pricing?: MarkupPricingJson;
     supplierCode: string;
     collectedAt: string | null;
+    verification: "SUPPLIER_RECHECK" | "SUBMITTED_OFFER";
   }> {
     const tripType = body.tripType === "RT" ? "RT" : "OW";
     const query: FlightSearchQuery = {
@@ -454,7 +485,7 @@ export class AzalController {
       typeof response.collectedAt === "string" && !Number.isNaN(Date.parse(response.collectedAt))
         ? response.collectedAt
         : null;
-    return { ...derived, collectedAt };
+    return { ...derived, collectedAt, verification: "SUPPLIER_RECHECK" as const };
   }
 
   /** Fresh-by-TTL search cache: reuse the recent response, else re-search. */

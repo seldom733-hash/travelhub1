@@ -150,7 +150,11 @@ const API_BASE =
 
 export async function createFlightRequest(body: { from: string; to: string; departureDate: string; returnDate?: string; tripType: string; passengers: any; fareFamily: string; price: number; currency: string; segments: any[]; supplierCode?: string }): Promise<any> {
   const res = await fetch(`${API_BASE}/supplier/azal/request`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!res.ok) throw new Error(`Flight request failed (${res.status})`);
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null);
+    const message = payload && typeof payload.message === "string" ? payload.message : `Flight request failed (${res.status})`;
+    throw new Error(message);
+  }
   return res.json();
 }
 
