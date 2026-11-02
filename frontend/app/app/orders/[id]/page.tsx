@@ -378,7 +378,7 @@ export default function OrderDetailPage() {
               <EntityFinanceCell label={t("finance.refundable_amount", locale)} value={formatPrice(order.refundableAmount, order.currency, locale)} tone="info" />
               <EntityFinanceCell label={t("crm.detail.payment_status", locale) || "Статус оплаты"} value={<StatusBadge status={order.paymentStatus} />} tone="neutral" />
             </div>
-            {canCreatePayment && (
+            {canCreatePayment && !order.linkedBooking && !["CANCELLED", "FULFILLED", "CLOSED"].includes(order.status) && (
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
