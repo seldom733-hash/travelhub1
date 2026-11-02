@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import { SupplierCommissionService } from "./supplier-commission.service";
 import { MarkupMatrixService } from "./markup-matrix.service";
@@ -33,6 +33,12 @@ export class CommissionPricingController {
   @RequirePermissions("pricing.markup.manage")
   create(@Body() body: Record<string, string | undefined>, @CurrentUser() user: { id: string; username: string }) {
     return this.commissions.create(body as never, user);
+  }
+
+  @Patch("commission-rules/:code")
+  @RequirePermissions("pricing.markup.manage")
+  update(@Param("code") code: string, @Body() body: Record<string, string | number | undefined>, @CurrentUser() user: { id: string; username: string }) {
+    return this.commissions.update(code, body as never, user);
   }
 
   @Post("commission-rules/:code/activate")
