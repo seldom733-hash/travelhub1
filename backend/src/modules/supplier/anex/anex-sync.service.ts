@@ -167,6 +167,7 @@ export class AnexSyncService {
         let minPrice = validOffers.length > 0
           ? Math.min(...validOffers.map((o) => o.price.amount))
           : 0;
+        const supplierBasePrice = minPrice;
         const currency = validOffers[0]?.price.currency || "AZN";
         // Markup
         if (minPrice > 0 && !offers.some((o) => o.pricing)) {
@@ -187,6 +188,8 @@ export class AnexSyncService {
           meals,
           nights: offers[0].nights,
           startingPrice: minPrice,
+          supplierBasePrice,
+          supplierBaseCurrency: currency,
           currency,
           supplierCode: "ANEX",
           country,
@@ -208,7 +211,7 @@ export class AnexSyncService {
             if (currentAttrs?.startingPrice !== minPrice) {
               await tx.product.update({
                 where: { id: existing.id },
-                data: { attributes: { ...currentAttrs, startingPrice: minPrice, currency } },
+                data: { attributes: { ...currentAttrs, startingPrice: minPrice, supplierBasePrice, supplierBaseCurrency: currency, currency } },
               });
             }
             const tariff = await tx.tariff.findFirst({
