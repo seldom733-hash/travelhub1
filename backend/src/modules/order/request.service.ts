@@ -731,6 +731,18 @@ export class RequestService {
     dto.customerPhone = customer?.phone ?? null;
     dto.productType = product?.type ?? null;
     dto.partnerCountry = partner?.countryCode ?? null;
+    // Request-only supplier context: a test/manual supplier may have no
+    // Partner row, but the frozen snapshot still carries the supplier code.
+    const requestSnapshot = (request.productSnapshot ?? {}) as Record<string, unknown>;
+    const snapshotSupplier = typeof requestSnapshot.supplierCode === "string"
+      ? requestSnapshot.supplierCode
+      : typeof (requestSnapshot.offer as Record<string, unknown> | undefined)?.supplierCode === "string"
+        ? String((requestSnapshot.offer as Record<string, unknown>).supplierCode)
+        : null;
+    if (!partner && snapshotSupplier) {
+      dto.partnerName = snapshotSupplier;
+      dto.partnerCode = snapshotSupplier;
+    }
 
     // Two-stage §4/§6: server-authoritative состав + readiness. UI (и
     // availableActions ниже) читают ЭТОТ результат, а не считают сами.
