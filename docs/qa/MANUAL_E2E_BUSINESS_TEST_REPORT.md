@@ -461,7 +461,7 @@ SPO-00000001
 CONFIRMED
 ```
 
-## 9. Штрафы обеих сторон — PARTIAL
+## 9. Штрафы обеих сторон — PASS
 
 Сделка:
 
@@ -506,15 +506,35 @@ FINANCIALLY_SETTLED_WITH_PENALTY
 KPI после сценария:
 
 ```text
-salesAmount      2130.00
-costAmount       1760.00
-grossMargin       370.00
-expectedIncome    370.00
+salesAmount      2230.00
+costAmount       1840.00
+grossMargin       390.00
+expectedIncome    390.00
 clientPenalty     130.00
 supplierPenalty   160.00
 ```
 
-**Ограничение проверки:** UI-подтверждение после DTO-фикса не перепроверено; settlement `SET-00000005` подтверждён через API. Поэтому сценарий имеет статус **PARTIAL** до повторного ручного подтверждения в UI.
+Повторный ручной UI-прогон:
+
+```text
+MKT-REQ-00000010
+client penalty 100
+supplier penalty 80
+refund 200
+settlement confirmed через кнопку UI
+```
+
+Результат:
+
+```text
+clientRefunded   200.00
+clientPenalty    100.00
+supplierPenalty   80.00
+expectedIncome    20.00
+currentIncome     20.00
+```
+
+Статус: **PASS**.
 
 ## 10. Исправленные дефекты
 
