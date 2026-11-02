@@ -529,6 +529,8 @@ export class SupplierObligationService {
         data: {
           code,
           obligationId: obligation.id,
+          orderId: obligation.orderId,
+          bookingId: obligation.bookingId,
           supplierCode: obligation.supplierCode,
           partnerId: obligation.partnerId,
           status: "CONFIRMED",

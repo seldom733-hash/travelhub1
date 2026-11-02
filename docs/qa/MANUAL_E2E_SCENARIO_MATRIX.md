@@ -1,52 +1,48 @@
 # Матрица ручного E2E-тестирования Navitravel
 
 **Дата:** 2026-11-02  
-**Статусы:** PASS — выполнено вручную; FAIL — выполнено, есть дефект; BLOCKED — невозможно из-за внешней зависимости; NOT TESTED — не проверялось.
+**Статусы:** PASS — выполнено вручную; FAIL — есть дефект; BLOCKED — внешняя зависимость; NOT TESTED — не проверялось.
 
-## Каналы и типы услуг
+## Каналы и услуги
 
-| Канал | Услуга | Поиск | Выбор предложения | Данные путешественника | Подача заявки | Статус |
+| Канал | Услуга | Поиск | Выбор | Данные | Заявка | Статус |
 |---|---|---|---|---|---|---|
-| Витрина | Туры (тестовое предложение TEST) | PASS | PASS | PASS | PASS | PASS |
+| Витрина | Туры (TEST) | PASS | PASS | PASS | PASS | PASS |
 | Витрина | Отели | PASS | BLOCKED | NOT TESTED | NOT TESTED | BLOCKED |
 | Витрина | Авиабилеты | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
-| Витрина | Круизы | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
-| Витрина | Трансферы | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
-| Витрина | Страхование | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
+| Витрина | Круизы / трансферы / страховка | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
 | Универсальный поиск | Туры | PASS | NOT TESTED | NOT TESTED | NOT TESTED | BLOCKED |
-| Универсальный поиск | Отели | PASS | NOT TESTED | NOT TESTED | NOT TESTED | BLOCKED |
 | Универсальный поиск | Авиабилеты | BLOCKED | NOT TESTED | NOT TESTED | NOT TESTED | BLOCKED |
 
 ## Клиенты
 
 | Сценарий | Статус |
 |---|---|
-| Гость | PASS (тестовая заявка) |
-| Авторизованный клиент | PARTIAL — prefill имени; телефон/email отсутствуют в профиле admin |
+| Гость | PASS |
+| Авторизованный клиент | PARTIAL — prefill имени; профиль admin без телефона/email |
 | Один клиент — несколько заявок | NOT TESTED |
 | Разные клиенты | NOT TESTED |
-| Совпадение телефона/email | NOT TESTED |
+| Совпадение контактов | NOT TESTED |
 
 ## Жизненный цикл
 
 | Сценарий | Статус |
 |---|---|
-| Заявка подана | PASS (MKT-REQ-00000001) |
-| Клиент не подтвердил | NOT TESTED |
-| Клиент подтвердил | NOT TESTED |
-| Поставщик подтвердил | NOT TESTED |
-| Request → Order | NOT TESTED |
-| Order → Booking | NOT TESTED |
+| Заявка подана | PASS |
+| Подтверждение поставщика | PASS |
+| Подтверждение клиента | PASS |
+| Request → Order | PASS |
+| Order → Booking | PASS |
+| Booking подтверждён | PASS |
+| Order исполнен | PASS |
 
 ## Оплаты
 
 | Сценарий | Статус |
 |---|---|
-| Без оплаты | NOT TESTED |
-| Частичная оплата клиента | NOT TESTED |
-| Несколько частичных оплат | NOT TESTED |
+| Частичная оплата клиента 300 AZN | PASS |
+| Частичная выплата поставщику 300 AZN | PASS |
 | Полная оплата клиента | NOT TESTED |
-| Частичная выплата поставщику | NOT TESTED |
 | Полная выплата поставщику | NOT TESTED |
 | Переплата / отклонённый платёж | NOT TESTED |
 
@@ -54,36 +50,31 @@
 
 | Сценарий | Статус |
 |---|---|
-| Отмена до подтверждения | NOT TESTED |
 | Отмена без штрафа | NOT TESTED |
 | Отмена со штрафом | NOT TESTED |
-| Частичный возврат | NOT TESTED |
-| Полный возврат | NOT TESTED |
+| Частичный / полный возврат | NOT TESTED |
 | Возврат от поставщика | NOT TESTED |
-| Штраф поставщика | NOT TESTED |
 
-## Финансы и реестр
+## Финансы
 
 | Проверка | Статус |
 |---|---|
-| Очистка Request/Order/Booking | PASS |
-| Очистка платежей/возвратов/обязательств | PASS |
-| KPI реестра = 0 | PASS |
-| Finance Ledger = 0 | PASS |
-| Сверка оплат | NOT TESTED |
-| Сверка задолженностей | NOT TESTED |
-| Сверка выплат поставщику | NOT TESTED |
-| Единая карточка сделки | NOT TESTED |
+| Очистка данных | PASS |
+| KPI после очистки = 0 | PASS |
+| Клиент в реестре | PASS |
+| Услуга в реестре | PASS |
+| Поставщик TEST в реестре | PASS |
+| clientReceived / clientDebt | PASS |
+| supplierPaid / supplierDebt | PASS |
+| SupplierObligation | PASS |
+| Expected/current income | PASS (0 из-за sales=cost) |
+| Полная сверка с Ledger | NOT TESTED |
 
 ## Роли и защита
 
 | Проверка | Статус |
 |---|---|
-| Клиент | NOT TESTED |
-| Менеджер | NOT TESTED |
-| Старший менеджер | NOT TESTED |
-| Финансовый сотрудник | NOT TESTED |
-| Администратор | NOT TESTED |
+| Клиент / менеджер / финик / админ | NOT TESTED |
 | Двойное нажатие «Подать заявку» | NOT TESTED |
-| Повторный платёж/webhook | NOT TESTED |
+| Повторный платёж / webhook | NOT TESTED |
 | Конкурентное изменение | NOT TESTED |
