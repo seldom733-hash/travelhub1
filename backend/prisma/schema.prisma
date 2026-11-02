@@ -5040,6 +5040,50 @@ enum MarkupRuleStatus {
   @@schema("finance")
 }
 
+/// Supplier commission agreement. Independent from MarkupRule: it reduces the
+/// supplier net cost and never changes the supplier base price.
+model SupplierCommissionRule {
+  id            String                  @id @default(uuid())
+  code          String                  @unique // CMR-00000001
+  supplierCode  String
+  serviceType   String
+  /// PERCENT | FIXED
+  commissionType String                 @default("PERCENT")
+  rate          Decimal?                @db.Decimal(18, 6)
+  fixedAmount   Decimal?                @db.Decimal(18, 2)
+  fixedCurrency String?
+  /// SUPPLIER_BASE | STOREFRONT
+  calculationBase String                @default("SUPPLIER_BASE")
+  status        MarkupRuleStatus        @default(DRAFT)
+  version       Int                     @default(1)
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  history SupplierCommissionRuleHistory[]
+
+  @@index([supplierCode, serviceType, status])
+  @@index([effectiveFrom])
+  @@schema("finance")
+}
+
+model SupplierCommissionRuleHistory {
+  id        String                  @id @default(uuid())
+  ruleId    String
+  rule      SupplierCommissionRule  @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  action    String
+  version   Int
+  fields    Json?
+  actorId   String?
+  actorName String?
+  comment   String?
+  createdAt DateTime                @default(now())
+
+  @@index([ruleId])
+  @@schema("finance")
+}
+
 /// Валюта (CUR-*) — Finance master data (единственный владелец, Screen Design
 /// §7 / Architecture §8; Settings НЕ дублирует). isoCode — canonical ключ.
 model Currency {

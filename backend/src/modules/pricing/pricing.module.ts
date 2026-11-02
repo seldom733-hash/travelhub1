@@ -3,6 +3,8 @@ import { FinanceModule } from "../finance/finance.module";
 import { MarkupMatrixService } from "./markup-matrix.service";
 import { MarkupRuleService } from "./markup-rule.service";
 import { PricingController } from "./pricing.controller";
+import { CommissionPricingController } from "./commission-pricing.controller";
+import { SupplierCommissionService } from "./supplier-commission.service";
 import { SupplierPricingService } from "./supplier-pricing.service";
 
 /**
@@ -22,8 +24,8 @@ import { SupplierPricingService } from "./supplier-pricing.service";
  */
 @Module({
   imports: [FinanceModule],
-  controllers: [PricingController],
-  providers: [MarkupRuleService, SupplierPricingService, MarkupMatrixService],
-  exports: [MarkupRuleService, SupplierPricingService, MarkupMatrixService],
+  controllers: [PricingController, CommissionPricingController],
+  providers: [MarkupRuleService, SupplierPricingService, MarkupMatrixService, SupplierCommissionService],
+  exports: [MarkupRuleService, SupplierPricingService, MarkupMatrixService, SupplierCommissionService],
 })
 export class PricingModule {}

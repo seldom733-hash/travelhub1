@@ -18,6 +18,7 @@ import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import PanelFrame from "@/components/PanelFrame";
 import Pagination from "@/components/Pagination";
+import CommissionRulesPanel from "@/components/pricing/CommissionRulesPanel";
 import { useLocale, t } from "@/lib/i18n";
 import { useCan } from "@/lib/use-can";
 import {
@@ -247,6 +248,7 @@ function MarkupAdminContent() {
       />
 
       <div className="space-y-6 p-6">
+        <CommissionRulesPanel />
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>
         )}
