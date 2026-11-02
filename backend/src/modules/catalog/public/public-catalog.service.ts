@@ -1129,8 +1129,11 @@ export class PublicCatalogService {
     if (!supplierCode || !Number.isFinite(base) || base <= 0) return null;
     const serviceType = row.type === "HOTEL" ? "hotels" : row.type === "FLIGHT" ? "flights" : row.type === "TOUR" ? "tours" : String(row.type).toLowerCase();
     try {
-      const result = await this.pricing.applyFor(supplierCode, serviceType, base, String(attrs.supplierBaseCurrency ?? attrs.currency ?? "AZN"));
-      return { amount: result.publicPrice.toFixed(2), currency: result.supplierCurrency === "AZN" ? "AZN" : result.supplierCurrency };
+      const resolution = await this.pricing.resolveSafe(supplierCode, serviceType);
+      const currency = String(attrs.supplierBaseCurrency ?? attrs.currency ?? "AZN");
+      const fx = await this.pricing.resolveFxSafe(supplierCode, currency);
+      const { pricing } = this.pricing.applyWithFx(resolution, base, currency, fx);
+      return { amount: pricing.publicPrice.toFixed(2), currency: pricing.supplierCurrency };
     } catch {
       return null;
     }
