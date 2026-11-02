@@ -23,6 +23,7 @@ import { OrderFinancialSettlementController } from "./order-financial-settlement
 import { OrderFinancialSettlementService } from "./order-financial-settlement.service";
 import { DealsController } from "./deals.controller";
 import { DealsService } from "./deals.service";
+import { PaymentWebhookController } from "./payment-webhook.controller";
 import { S3ObjectStorageService } from "../catalog/media/storage/s3-storage.service";
 
 /**
@@ -41,7 +42,7 @@ import { S3ObjectStorageService } from "../catalog/media/storage/s3-storage.serv
  */
 @Module({
   imports: [PaymentProviderModule],
-  controllers: [FinanceController, OrderFinancialSettlementController, DealsController],
+  controllers: [FinanceController, OrderFinancialSettlementController, DealsController, PaymentWebhookController],
   providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService, CommissionPolicyService, CommissionService, CommissionAccrualConsumer, SupplierFxRateService, SupplierObligationService, SupplierPaymentService, SupplierPaymentEvidenceService, SupplierDebtReportService, SupplierPaymentTermsService, { provide: "ObjectStorageService", useClass: S3ObjectStorageService }, SupplierObligationConsumer, FinanceOverviewService, LedgerPostingConsumer, OrderFinancialSettlementService, DealsService],
   /** Step 2.12E: CommissionPolicyService экспортируется для Sales/Order
    *  freeze-time read (ADR-0013 D1: read by Sales/Order at freeze boundary,

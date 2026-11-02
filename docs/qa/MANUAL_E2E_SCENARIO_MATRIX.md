@@ -8,9 +8,10 @@
 | Канал | Услуга | Поиск | Выбор | Данные | Заявка | Статус |
 |---|---|---|---|---|---|---|
 | Витрина | Туры (TEST) | PASS | PASS | PASS | PASS | PASS |
-| Витрина | Отели | BLOCKED | BLOCKED | BLOCKED | BLOCKED | BLOCKED |
-| Витрина | Авиабилеты | BLOCKED | BLOCKED | BLOCKED | BLOCKED | BLOCKED |
-| Витрина | Круизы / трансферы / страховка | BLOCKED | BLOCKED | BLOCKED | BLOCKED | BLOCKED |
+| Витрина | Отели | PASS | PASS | PASS | PASS — MKT-REQ-00000021 | PASS — NEW |
+| Витрина | Авиабилеты | PASS — страница продукта | PASS | PASS | NOT TESTED — требует login | NOT TESTED |
+| Витрина | Трансферы / экскурсии / санатории | PASS — страницы продуктов | PASS | PASS | NOT TESTED | NOT TESTED |
+| Витрина | Круизы / страховка | BLOCKED | BLOCKED | BLOCKED | BLOCKED | BLOCKED |
 | Универсальный поиск | Туры | PASS | PASS | PASS | PASS — MKT-REQ-00000020 | PASS — NEW |
 | Универсальный поиск | Авиабилеты | BLOCKED | NOT TESTED | NOT TESTED | NOT TESTED | BLOCKED |
 
@@ -93,8 +94,8 @@
 | Финансист: доступ к реестру | PASS — /app/finance/deals доступен |
 | Двойное нажатие «Подать заявку» | PASS — создана одна MKT-REQ-00000006 |
 | Двойная отправка заявки | PASS — создана одна MKT-REQ-00000006 |
-| Повторный платёж / webhook | BLOCKED — webhook-endpoint отсутствует |
+| Повторный платёж / webhook | PASS — evt-qa-002: первый 201, повтор duplicate=true |
 | Конкурентное изменение | PASS — два одновременных confirm, одна запись CAPTURED и одна проводка |
 | Конкурентное закрытие settlement | PASS — два одновременных confirm, один SET-00000012 |
 | Конкурентное создание Refund | PASS — два одновременных клика, один RFD-00000025 |
-| Конкурентное подтверждение Refund | BLOCKED — нет отдельного UI-действия подтверждения |
+| Конкурентное подтверждение Refund | PASS — RFD-00000028: один APPROVED и один PROCESSED |

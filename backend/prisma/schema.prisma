@@ -5214,6 +5214,16 @@ model TaxRule {
 /// исправление — только будущий compensating/reversal факт (одобренный шаг).
 /// Double-entry/account chart/balances — НЕ входят в 2.10A (Roadmap определяет
 /// только append-only; debit/credit/balance — без канонического контракта).
+model PaymentWebhookEvent {
+  id        String   @id @default(uuid())
+  eventId   String   @unique
+  provider  String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@schema("finance")
+}
+
 model LedgerTransaction {
   id            String    @id @default(uuid())
   code          String    @unique // LTX-########

@@ -364,6 +364,18 @@ export const financeCenterApi = {
     return api.get(`${BASE}/payments?orderId=${encodeURIComponent(orderId)}&pageSize=100`);
   },
 
+  listPayments(query: { status?: string; page?: number; pageSize?: number } = {}): Promise<{ items: Array<{ id: string; code: string; amount: string; status: string; currency: string; orderCode?: string }>; total: number }> {
+    const q = new URLSearchParams({ page: String(query.page ?? 1), pageSize: String(query.pageSize ?? 50) });
+    if (query.status) q.set("status", query.status);
+    return api.get(`${BASE}/payments?${q}`);
+  },
+
+  listRefunds(query: { status?: string; page?: number; pageSize?: number } = {}): Promise<{ items: Array<{ code: string; status: string; amount: string; currency: string; paymentCode?: string; orderCode?: string }>; total: number }> {
+    const q = new URLSearchParams({ page: String(query.page ?? 1), pageSize: String(query.pageSize ?? 50) });
+    if (query.status) q.set("status", query.status);
+    return api.get(`${BASE}/refunds?${q}`);
+  },
+
   createRefund(input: { paymentId: string; amount: string; reason: string }): Promise<{ code: string; status: string }> {
     return api.post(`${BASE}/refunds`, input);
   },
