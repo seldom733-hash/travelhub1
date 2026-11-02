@@ -405,6 +405,7 @@ export class SupplierPaymentService {
         payload: {
           payoutId: payment.id,
           payoutCode: payment.code,
+          direction: payment.direction,
           obligationId: first?.obligationId ?? "",
           obligationCode: first?.obligation.code ?? "MULTI",
           amount: payment.amount.toString(),

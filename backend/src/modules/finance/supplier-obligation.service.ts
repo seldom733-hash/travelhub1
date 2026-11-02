@@ -599,6 +599,7 @@ export class SupplierObligationService {
         payload: {
           payoutId: payout.id,
           payoutCode: payout.code,
+          direction: "OUTGOING",
           obligationId: obligation.id,
           obligationCode: obligation.code,
           amount: amount.toString(),

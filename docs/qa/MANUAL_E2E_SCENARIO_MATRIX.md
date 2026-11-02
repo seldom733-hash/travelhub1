@@ -75,7 +75,7 @@
 | SupplierObligation | PASS |
 | Expected/current income | PASS — 200 AZN на второй сделке |
 | KPI SENT_TO_BOOKING | PASS — 1 при статусе SENT_TO_BOOKING |
-| Полная сверка с Ledger | PARTIAL — payments/refunds/outgoing payouts сходятся; 2 INCOMING refund (600 AZN) отсутствуют |
+| Полная сверка с Ledger | PASS — payments/refunds/payouts/supplier refunds сходятся |
 
 ## Роли и защита
 

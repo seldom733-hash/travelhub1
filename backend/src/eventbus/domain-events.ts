@@ -487,6 +487,8 @@ export interface SupplierPayoutCreatedPayload {
   /** SupplierPayout (SPO-*, canonical cash-movement fact). */
   payoutId: string;
   payoutCode: string;
+  /** OUTGOING — payment to supplier, INCOMING — refund received from supplier. */
+  direction?: "OUTGOING" | "INCOMING";
   /** SupplierObligation (SBO-*), которую частично/полностью покрывает payout. */
   obligationId: string;
   obligationCode: string;

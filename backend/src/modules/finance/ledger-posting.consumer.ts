@@ -78,7 +78,7 @@ export class LedgerPostingConsumer implements OnModuleInit {
       this.post<SupplierPayoutCreatedPayload>(ev, (p) => ({
         amount: p.amount,
         currency: p.currency,
-        type: "SUPPLIER_PAYOUT",
+        type: p.direction === "INCOMING" ? "SUPPLIER_REFUND" : "SUPPLIER_PAYOUT",
         sourceType: "SUPPLIER_PAYOUT",
         sourceId: p.payoutId,
         sourceEventId: ev.id,
