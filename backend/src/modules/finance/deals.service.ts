@@ -49,6 +49,7 @@ type DealRow = {
   salesAmount: string;
   costAmount: string;
   grossMargin: string;
+  settlementStatus: string | null;
   supplierBasePrice: string;
   markupAmount: string;
   commissionAmount: string;
@@ -115,17 +116,27 @@ export class DealsService {
 
   private kpi(rows: DealRow[]) {
     const sum = (field: keyof DealRow) => rows.reduce((total, row) => total + Number(row[field] ?? 0), 0);
-    // A cancelled deal is not a sale: its displayed price/cost must not inflate
-    // the sales and cost KPI cards. Cash-flow and penalty cards still include
-    // cancelled deals because money may have moved before cancellation.
+    // A cancelled deal contributes only its recognised penalties to the sales,
+    // cost and gross-margin KPI cards. The original storefront price and
+    // service cost of a non-delivered service are not revenue/cost. Pending
+    // (not yet confirmed) penalties stay in the settlement workflow and are
+    // excluded from recognised financial KPIs.
     const cancelledStatuses = new Set(["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"]);
-    const realizedRows = rows.filter((row) => !cancelledStatuses.has(row.status));
-    const realizedSum = (field: keyof DealRow) =>
-      realizedRows.reduce((total, row) => total + Number(row[field] ?? 0), 0);
+    const recognisedPenaltyStatuses = new Set(["FINANCIALLY_SETTLED_WITH_PENALTY"]);
+    const kpiSales = (row: DealRow) =>
+      cancelledStatuses.has(row.status)
+        ? (recognisedPenaltyStatuses.has(row.settlementStatus ?? "") ? Number(row.clientPenalty) : 0)
+        : Number(row.salesAmount);
+    const kpiCost = (row: DealRow) =>
+      cancelledStatuses.has(row.status)
+        ? (recognisedPenaltyStatuses.has(row.settlementStatus ?? "") ? Number(row.supplierPenalty) : 0)
+        : Number(row.costAmount);
+    const kpiSalesTotal = rows.reduce((total, row) => total + kpiSales(row), 0);
+    const kpiCostTotal = rows.reduce((total, row) => total + kpiCost(row), 0);
     return {
-      salesAmount: fixed(realizedSum("salesAmount")),
-      costAmount: fixed(realizedSum("costAmount")),
-      grossMargin: fixed(realizedSum("salesAmount") - realizedSum("costAmount")),
+      salesAmount: fixed(kpiSalesTotal),
+      costAmount: fixed(kpiCostTotal),
+      grossMargin: fixed(kpiSalesTotal - kpiCostTotal),
       clientReceived: fixed(sum("clientReceived")),
       clientDebt: fixed(sum("clientDebt")),
       clientRefunded: fixed(sum("clientRefunded")),
@@ -336,6 +347,7 @@ export class DealsService {
         salesAmount: fixed(sales),
         costAmount: fixed(cost),
         grossMargin: fixed(sales - cost),
+        settlementStatus: settlement?.status ?? null,
         supplierBasePrice: fixed(money(commercial.supplierPrice as number | string | undefined) || cost),
         markupAmount: fixed(money(commercial.markupAmount as number | string | undefined)),
         commissionAmount: fixed(money(commercial.commissionAmount as number | string | undefined)),
