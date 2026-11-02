@@ -60,7 +60,8 @@
 | Штраф только поставщика | PASS — clientPenalty 0, supplierPenalty 80, expectedIncome −80 |
 | Штрафы обеих сторон | PASS — client 100, supplier 80, возврат 200, доход 20, UI confirm |
 | Штраф pending | PASS — clientPenalty 0, KPI не включает |
-| Штраф waived / cancelled | NOT TESTED |
+| Штраф waived | PASS — clientPenalty 0, KPI не включает |
+| Штраф cancelled (полный цикл) | NOT TESTED |
 | Частичный / полный возврат | NOT TESTED |
 | Возврат от поставщика | PASS — INCOMING 300 AZN CONFIRMED, obligation закрыт |
 
