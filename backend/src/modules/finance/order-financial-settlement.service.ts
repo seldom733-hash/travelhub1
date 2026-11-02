@@ -15,6 +15,7 @@ type Actor = { id: string; username: string };
 export interface SettlementConfirmInput {
   finalCustomerLiability?: string | null;
   penaltyAmount?: string | null;
+  clientPenaltyAmount?: string | null;
   platformPenaltyShare?: string | null;
   supplierPenaltyShare?: string | null;
   reason?: string;
@@ -111,6 +112,7 @@ export class OrderFinancialSettlementService {
           pendingRefundAmount: new Prisma.Decimal(result.pendingRefundAmount),
           finalCustomerLiability: new Prisma.Decimal(result.finalCustomerLiability ?? "0"),
           penaltyAmount: new Prisma.Decimal(result.penaltyAmount),
+          clientPenaltyAmount: new Prisma.Decimal(result.clientPenaltyAmount),
           platformPenaltyShare: new Prisma.Decimal(result.platformPenaltyShare),
           supplierPenaltyShare: new Prisma.Decimal(result.supplierPenaltyShare),
           annulledUnpaidAmount: new Prisma.Decimal(result.annulledUnpaidAmount),
@@ -186,6 +188,7 @@ export class OrderFinancialSettlementService {
           status: result.status,
           finalCustomerLiability: result.finalCustomerLiability,
           penaltyAmount: result.penaltyAmount,
+          clientPenaltyAmount: result.clientPenaltyAmount,
           annulledUnpaidAmount: result.annulledUnpaidAmount,
           reason,
         },
@@ -265,6 +268,7 @@ export class OrderFinancialSettlementService {
       cancellationConfirmed: context.order.cancelledAt !== null,
       finalCustomerLiability: finalLiability,
       penaltyAmount: input.penaltyAmount ?? "0",
+      clientPenaltyAmount: input.clientPenaltyAmount ?? input.penaltyAmount ?? "0",
       platformPenaltyShare: input.platformPenaltyShare ?? "0",
       supplierPenaltyShare: input.supplierPenaltyShare ?? "0",
       penaltyReason: input.reason ?? null,
@@ -273,11 +277,12 @@ export class OrderFinancialSettlementService {
   }
 
   private sameSettlement(
-    existing: { finalCustomerLiability: Prisma.Decimal; penaltyAmount: Prisma.Decimal; annulledUnpaidAmount: Prisma.Decimal; status: OrderFinancialStatus },
+    existing: { finalCustomerLiability: Prisma.Decimal; penaltyAmount: Prisma.Decimal; clientPenaltyAmount: Prisma.Decimal; annulledUnpaidAmount: Prisma.Decimal; status: OrderFinancialStatus },
     result: CancellationSettlementResult,
   ): boolean {
     return new Prisma.Decimal(existing.finalCustomerLiability).equals(result.finalCustomerLiability ?? "0") &&
       new Prisma.Decimal(existing.penaltyAmount).equals(result.penaltyAmount) &&
+      new Prisma.Decimal(existing.clientPenaltyAmount).equals(result.clientPenaltyAmount) &&
       new Prisma.Decimal(existing.annulledUnpaidAmount).equals(result.annulledUnpaidAmount) &&
       existing.status === result.status;
   }
@@ -285,7 +290,7 @@ export class OrderFinancialSettlementService {
   private toDto(row: {
     id: string; code: string; orderId: string; originalAmount: Prisma.Decimal; currency: string;
     capturedAmount: Prisma.Decimal; refundedAmount: Prisma.Decimal; pendingRefundAmount: Prisma.Decimal;
-    finalCustomerLiability: Prisma.Decimal; penaltyAmount: Prisma.Decimal; platformPenaltyShare: Prisma.Decimal;
+    finalCustomerLiability: Prisma.Decimal; penaltyAmount: Prisma.Decimal; clientPenaltyAmount: Prisma.Decimal; platformPenaltyShare: Prisma.Decimal;
     supplierPenaltyShare: Prisma.Decimal; annulledUnpaidAmount: Prisma.Decimal; remainingToPay: Prisma.Decimal;
     remainingToRefund: Prisma.Decimal; status: OrderFinancialStatus; reason: string; confirmedAt: Date;
     confirmedById: string | null; createdAt: Date;
@@ -296,6 +301,7 @@ export class OrderFinancialSettlementService {
       capturedAmount: row.capturedAmount.toString(), refundedAmount: row.refundedAmount.toString(),
       pendingRefundAmount: row.pendingRefundAmount.toString(),
       finalCustomerLiability: row.finalCustomerLiability.toString(), penaltyAmount: row.penaltyAmount.toString(),
+      clientPenaltyAmount: row.clientPenaltyAmount.toString(),
       platformPenaltyShare: row.platformPenaltyShare.toString(), supplierPenaltyShare: row.supplierPenaltyShare.toString(),
       annulledUnpaidAmount: row.annulledUnpaidAmount.toString(), remainingToPay: row.remainingToPay.toString(),
       remainingToRefund: row.remainingToRefund.toString(), status: row.status, reason: row.reason,

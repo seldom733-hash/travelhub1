@@ -19,6 +19,7 @@ export interface CancellationSettlementInput {
   cancellationConfirmed: boolean;
   finalCustomerLiability: string | null;
   penaltyAmount: string;
+  clientPenaltyAmount?: string;
   platformPenaltyShare: string;
   supplierPenaltyShare: string;
   penaltyReason: string | null;
@@ -40,6 +41,7 @@ export interface CancellationSettlementResult {
   pendingRefundAmount: string;
   finalCustomerLiability: string | null;
   penaltyAmount: string;
+  clientPenaltyAmount: string;
   platformPenaltyShare: string;
   supplierPenaltyShare: string;
   annulledUnpaidAmount: string;
@@ -65,6 +67,7 @@ export function calculateCancellationSettlement(
   const refunded = money(input.refundedAmount, "refundedAmount");
   const pendingRefund = money(input.pendingRefundAmount, "pendingRefundAmount");
   const penalty = money(input.penaltyAmount, "penaltyAmount");
+  const clientPenalty = money(input.clientPenaltyAmount ?? input.penaltyAmount, "clientPenaltyAmount");
   const platformPenalty = money(input.platformPenaltyShare, "platformPenaltyShare");
   const supplierPenalty = money(input.supplierPenaltyShare, "supplierPenaltyShare");
   const blockers: string[] = [];
@@ -81,6 +84,7 @@ export function calculateCancellationSettlement(
       pendingRefundAmount: two(pendingRefund),
       finalCustomerLiability: null,
       penaltyAmount: two(penalty),
+    clientPenaltyAmount: two(clientPenalty),
       platformPenaltyShare: two(platformPenalty),
       supplierPenaltyShare: two(supplierPenalty),
       annulledUnpaidAmount: "0.00",
@@ -146,6 +150,7 @@ export function calculateCancellationSettlement(
     pendingRefundAmount: two(pendingRefund),
     finalCustomerLiability: finalLiability == null ? null : two(finalLiability),
     penaltyAmount: two(penalty),
+    clientPenaltyAmount: two(clientPenalty),
     platformPenaltyShare: two(platformPenalty),
     supplierPenaltyShare: two(supplierPenalty),
     annulledUnpaidAmount: two(annulledUnpaid),
@@ -155,3 +160,5 @@ export function calculateCancellationSettlement(
     blockers: [...new Set(blockers)],
   };
 }
+
+

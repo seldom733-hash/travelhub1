@@ -28,6 +28,7 @@ export default function OrderFinancialSettlementPanel({
   const [form, setForm] = useState({
     finalCustomerLiability: "",
     penaltyAmount: "0",
+    clientPenaltyAmount: "0",
     platformPenaltyShare: "0",
     supplierPenaltyShare: "0",
     reason: "",
@@ -130,6 +131,7 @@ export default function OrderFinancialSettlementPanel({
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <input value={form.finalCustomerLiability} onChange={(e) => setForm({ ...form, finalCustomerLiability: e.target.value })} placeholder="Окончательное обязательство клиента" className="rounded-lg border border-slate-200 px-2 py-2 text-xs" />
           <input value={form.penaltyAmount} onChange={(e) => setForm({ ...form, penaltyAmount: e.target.value })} placeholder="Штраф" className="rounded-lg border border-slate-200 px-2 py-2 text-xs" />
+          <input value={form.clientPenaltyAmount} onChange={(e) => setForm({ ...form, clientPenaltyAmount: e.target.value })} placeholder="Штраф клиента" className="rounded-lg border border-slate-200 px-2 py-2 text-xs" />
           <input value={form.platformPenaltyShare} onChange={(e) => setForm({ ...form, platformPenaltyShare: e.target.value })} placeholder="Доля штрафа платформы" className="rounded-lg border border-slate-200 px-2 py-2 text-xs" />
           <input value={form.supplierPenaltyShare} onChange={(e) => setForm({ ...form, supplierPenaltyShare: e.target.value })} placeholder="Доля штрафа поставщика" className="rounded-lg border border-slate-200 px-2 py-2 text-xs" />
           <input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="Основание (обязательно)" className="rounded-lg border border-slate-200 px-2 py-2 text-xs sm:col-span-2" />

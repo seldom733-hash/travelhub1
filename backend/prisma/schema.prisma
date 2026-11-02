@@ -4614,6 +4614,7 @@ model OrderFinancialSettlement {
   pendingRefundAmount   Decimal               @db.Decimal(12, 2)
   finalCustomerLiability Decimal              @db.Decimal(12, 2)
   penaltyAmount         Decimal               @db.Decimal(12, 2)
+  clientPenaltyAmount   Decimal               @db.Decimal(12, 2) @default(0)
   platformPenaltyShare  Decimal               @db.Decimal(12, 2)
   supplierPenaltyShare  Decimal               @db.Decimal(12, 2)
   annulledUnpaidAmount  Decimal               @db.Decimal(12, 2)

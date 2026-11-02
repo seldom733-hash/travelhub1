@@ -54,7 +54,7 @@
 | Отмена после оплаты | PASS — клиентский возврат 300 AZN, settlement FULL_REFUND |
 | Отмена после выплаты поставщику | PASS — клиентский и supplier refund, obligation закрыт |
 | Отмена со штрафом | PASS — штраф 30 AZN, возврат 270 AZN |
-| Штраф только поставщика | FAIL — clientPenalty 80 вместо 0, expectedIncome 0 вместо −80 |
+| Штраф только поставщика | PASS — clientPenalty 0, supplierPenalty 80, expectedIncome −80 |
 | Частичный / полный возврат | NOT TESTED |
 | Возврат от поставщика | PASS — INCOMING 300 AZN CONFIRMED, obligation закрыт |
 
