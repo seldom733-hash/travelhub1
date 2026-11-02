@@ -16,6 +16,8 @@ export interface SettlementConfirmInput {
   finalCustomerLiability?: string | null;
   penaltyAmount?: string | null;
   clientPenaltyAmount?: string | null;
+  clientPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
+  supplierPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
   platformPenaltyShare?: string | null;
   supplierPenaltyShare?: string | null;
   reason?: string;
@@ -113,6 +115,8 @@ export class OrderFinancialSettlementService {
           finalCustomerLiability: new Prisma.Decimal(result.finalCustomerLiability ?? "0"),
           penaltyAmount: new Prisma.Decimal(result.penaltyAmount),
           clientPenaltyAmount: new Prisma.Decimal(result.clientPenaltyAmount),
+          clientPenaltyStatus: result.clientPenaltyStatus,
+          supplierPenaltyStatus: result.supplierPenaltyStatus,
           platformPenaltyShare: new Prisma.Decimal(result.platformPenaltyShare),
           supplierPenaltyShare: new Prisma.Decimal(result.supplierPenaltyShare),
           annulledUnpaidAmount: new Prisma.Decimal(result.annulledUnpaidAmount),
@@ -130,10 +134,10 @@ export class OrderFinancialSettlementService {
       if (Number(result.annulledUnpaidAmount) > 0) {
         adjustmentSpecs.push({ type: "UNPAID_WRITE_OFF", amount: result.annulledUnpaidAmount });
       }
-      if (Number(result.platformPenaltyShare) > 0) {
+      if (result.clientPenaltyStatus === "CONFIRMED" && Number(result.platformPenaltyShare) > 0) {
         adjustmentSpecs.push({ type: "PLATFORM_PENALTY_SHARE", amount: result.platformPenaltyShare });
       }
-      if (Number(result.supplierPenaltyShare) > 0) {
+      if (result.supplierPenaltyStatus === "CONFIRMED" && Number(result.supplierPenaltyShare) > 0) {
         adjustmentSpecs.push({ type: "SUPPLIER_PENALTY_SHARE", amount: result.supplierPenaltyShare });
       }
 
@@ -269,6 +273,8 @@ export class OrderFinancialSettlementService {
       finalCustomerLiability: finalLiability,
       penaltyAmount: input.penaltyAmount ?? "0",
       clientPenaltyAmount: input.clientPenaltyAmount ?? input.penaltyAmount ?? "0",
+      clientPenaltyStatus: input.clientPenaltyStatus ?? "CONFIRMED",
+      supplierPenaltyStatus: input.supplierPenaltyStatus ?? "CONFIRMED",
       platformPenaltyShare: input.platformPenaltyShare ?? "0",
       supplierPenaltyShare: input.supplierPenaltyShare ?? "0",
       penaltyReason: input.reason ?? null,
@@ -277,12 +283,14 @@ export class OrderFinancialSettlementService {
   }
 
   private sameSettlement(
-    existing: { finalCustomerLiability: Prisma.Decimal; penaltyAmount: Prisma.Decimal; clientPenaltyAmount: Prisma.Decimal; annulledUnpaidAmount: Prisma.Decimal; status: OrderFinancialStatus },
+    existing: { finalCustomerLiability: Prisma.Decimal; penaltyAmount: Prisma.Decimal; clientPenaltyAmount: Prisma.Decimal; clientPenaltyStatus: string; supplierPenaltyStatus: string; annulledUnpaidAmount: Prisma.Decimal; status: OrderFinancialStatus },
     result: CancellationSettlementResult,
   ): boolean {
     return new Prisma.Decimal(existing.finalCustomerLiability).equals(result.finalCustomerLiability ?? "0") &&
       new Prisma.Decimal(existing.penaltyAmount).equals(result.penaltyAmount) &&
       new Prisma.Decimal(existing.clientPenaltyAmount).equals(result.clientPenaltyAmount) &&
+      existing.clientPenaltyStatus === result.clientPenaltyStatus &&
+      existing.supplierPenaltyStatus === result.supplierPenaltyStatus &&
       new Prisma.Decimal(existing.annulledUnpaidAmount).equals(result.annulledUnpaidAmount) &&
       existing.status === result.status;
   }
@@ -290,7 +298,7 @@ export class OrderFinancialSettlementService {
   private toDto(row: {
     id: string; code: string; orderId: string; originalAmount: Prisma.Decimal; currency: string;
     capturedAmount: Prisma.Decimal; refundedAmount: Prisma.Decimal; pendingRefundAmount: Prisma.Decimal;
-    finalCustomerLiability: Prisma.Decimal; penaltyAmount: Prisma.Decimal; clientPenaltyAmount: Prisma.Decimal; platformPenaltyShare: Prisma.Decimal;
+    finalCustomerLiability: Prisma.Decimal; penaltyAmount: Prisma.Decimal; clientPenaltyAmount: Prisma.Decimal; clientPenaltyStatus: string; supplierPenaltyStatus: string; platformPenaltyShare: Prisma.Decimal;
     supplierPenaltyShare: Prisma.Decimal; annulledUnpaidAmount: Prisma.Decimal; remainingToPay: Prisma.Decimal;
     remainingToRefund: Prisma.Decimal; status: OrderFinancialStatus; reason: string; confirmedAt: Date;
     confirmedById: string | null; createdAt: Date;
@@ -302,6 +310,8 @@ export class OrderFinancialSettlementService {
       pendingRefundAmount: row.pendingRefundAmount.toString(),
       finalCustomerLiability: row.finalCustomerLiability.toString(), penaltyAmount: row.penaltyAmount.toString(),
       clientPenaltyAmount: row.clientPenaltyAmount.toString(),
+      clientPenaltyStatus: row.clientPenaltyStatus,
+      supplierPenaltyStatus: row.supplierPenaltyStatus,
       platformPenaltyShare: row.platformPenaltyShare.toString(), supplierPenaltyShare: row.supplierPenaltyShare.toString(),
       annulledUnpaidAmount: row.annulledUnpaidAmount.toString(), remainingToPay: row.remainingToPay.toString(),
       remainingToRefund: row.remainingToRefund.toString(), status: row.status, reason: row.reason,

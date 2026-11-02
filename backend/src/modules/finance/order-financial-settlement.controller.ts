@@ -23,6 +23,16 @@ class SettlementPreviewDto {
 
   @IsOptional()
   @IsString()
+  @Matches(/^(PENDING|CONFIRMED|WAIVED)$/)
+  clientPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(PENDING|CONFIRMED|WAIVED)$/)
+  supplierPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
+
+  @IsOptional()
+  @IsString()
   @Matches(MONEY)
   platformPenaltyShare?: string;
 
@@ -52,6 +62,16 @@ class SettlementConfirmDto {
   @IsString()
   @Matches(MONEY)
   clientPenaltyAmount?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(PENDING|CONFIRMED|WAIVED)$/)
+  clientPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(PENDING|CONFIRMED|WAIVED)$/)
+  supplierPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
 
   @IsOptional()
   @IsString()
@@ -95,3 +115,4 @@ export class OrderFinancialSettlementController {
     return this.settlements.confirm(id, dto, user);
   }
 }
+

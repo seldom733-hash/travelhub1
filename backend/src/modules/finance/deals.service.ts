@@ -213,7 +213,7 @@ export class DealsService {
       this.prisma.refund.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, processedAt: true, createdAt: true, orderId: true } }),
       this.prisma.supplierPayout.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, direction: true, occurredAt: true, orderId: true } }),
       this.prisma.supplierObligation.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { orderId: true, aznAmount: true, remainingAmount: true } }),
-      this.prisma.orderFinancialSettlement.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { orderId: true, status: true, penaltyAmount: true, clientPenaltyAmount: true, supplierPenaltyShare: true, remainingToPay: true, remainingToRefund: true, finalCustomerLiability: true } }),
+      this.prisma.orderFinancialSettlement.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { orderId: true, status: true, penaltyAmount: true, clientPenaltyAmount: true, clientPenaltyStatus: true, supplierPenaltyStatus: true, supplierPenaltyShare: true, remainingToPay: true, remainingToRefund: true, finalCustomerLiability: true } }),
       this.prisma.customer.findMany({ where: { id: { in: requests.map((r) => r.customerId).filter((id): id is string => Boolean(id)) } }, select: { id: true, firstName: true, lastName: true, companyName: true, phone: true, email: true } }),
       this.prisma.product.findMany({ where: { id: { in: requests.map((r) => r.productId).filter((id): id is string => Boolean(id)) } }, select: { id: true, title: true, type: true, partnerId: true, attributes: true } }),
     ]);
@@ -293,8 +293,12 @@ export class DealsService {
       const clientDebt = settlement
         ? money(settlement.remainingToPay)
         : order?.status === "CANCELLED" ? 0 : Math.max(0, sales - captured);
-      const clientPenalty = money(settlement?.clientPenaltyAmount as number | string | undefined);
-      const supplierPenalty = money(settlement?.supplierPenaltyShare);
+      const clientPenalty = settlement?.clientPenaltyStatus === "CONFIRMED"
+        ? money(settlement?.clientPenaltyAmount)
+        : 0;
+      const supplierPenalty = settlement?.supplierPenaltyStatus === "CONFIRMED"
+        ? money(settlement?.supplierPenaltyShare)
+        : 0;
       const penaltyClosed = cancelled || settlement?.status === "FINANCIALLY_SETTLED_WITH_PENALTY";
       // A cancelled deal has no remaining upside: expected income is the
       // retained penalty spread, never the catalogue-margin expectation.
@@ -357,8 +361,8 @@ export class DealsService {
         supplierPaid: fixed(supplierPaid),
         supplierDebt: fixed(supplierDebt),
         supplierRefunded: fixed(supplierRefunded),
-        clientPenalty: fixed(clientPenalty),
-        supplierPenalty: fixed(supplierPenalty),
+        clientPenalty: fixed(Number(clientPenalty)),
+        supplierPenalty: fixed(Number(supplierPenalty)),
         expectedIncome: fixed(expectedIncome),
         currentIncome: fixed(currentIncome),
         currency: order?.currency ?? request.confirmedCurrency ?? request.displayedCurrency ?? "AZN",

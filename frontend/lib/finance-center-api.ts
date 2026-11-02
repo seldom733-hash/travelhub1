@@ -251,6 +251,8 @@ export interface OrderFinancialSettlement {
   finalCustomerLiability: string | null;
   penaltyAmount: string;
   clientPenaltyAmount: string;
+  clientPenaltyStatus: string;
+  supplierPenaltyStatus: string;
   platformPenaltyShare: string;
   supplierPenaltyShare: string;
   annulledUnpaidAmount: string;
@@ -265,6 +267,8 @@ export interface OrderFinancialSettlementInput {
   finalCustomerLiability?: string;
   penaltyAmount?: string;
   clientPenaltyAmount?: string;
+  clientPenaltyStatus?: string;
+  supplierPenaltyStatus?: string;
   platformPenaltyShare?: string;
   supplierPenaltyShare?: string;
   reason?: string;

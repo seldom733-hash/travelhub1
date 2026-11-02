@@ -729,7 +729,40 @@ grossMargin       590.00
 expectedIncome    590.00
 ```
 
-## 14. Исправленные дефекты
+## 14. Pending-штраф — PASS
+
+Сделка:
+
+```text
+MKT-REQ-00000013
+MKT-ORD-00000013
+client paid 300 AZN
+```
+
+В settlement указано:
+
+```text
+penaltyAmount 30.00
+clientPenaltyAmount 30.00
+clientPenaltyStatus PENDING
+supplierPenaltyStatus CONFIRMED
+finalCustomerLiability 300.00
+```
+
+Результат:
+
+```text
+clientReceived   300.00
+clientRefunded     0.00
+clientPenalty      0.00
+supplierPenalty    0.00
+expectedIncome     0.00
+currentIncome      0.00
+```
+
+Pending-штраф не включён в KPI и не создал ledger-проводку штрафа.
+
+## 15. Исправленные дефекты
 
 | ID | Ð”ÐµÑ„ÐµÐºÑ‚ | Ð˜ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¸Ðµ |
 |---|---|---|
@@ -747,27 +780,30 @@ expectedIncome    590.00
 | DEF-012 | Ð¨Ñ‚Ñ€Ð°Ñ„ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¿Ð¾ÑÑ‚Ð°Ð²Ñ‰Ð¸ÐºÐ° Ð·Ð°Ð¿Ð¸ÑÑ‹Ð²Ð°Ð»ÑÑ Ð¸ ÐºÐ°Ðº ÑˆÑ‚Ñ€Ð°Ñ„ ÐºÐ»Ð¸ÐµÐ½Ñ‚Ð° | Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½Ð¾Ðµ `clientPenaltyAmount`, backfill Ð¸ KPI-Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ð½Ð¸Ðµ |
 | DEF-013 | API settlement Ð½Ðµ Ð¿Ñ€Ð¸Ð½Ð¸Ð¼Ð°Ð» `clientPenaltyAmount`; liability-guard ÑÑ€Ð°Ð²Ð½Ð¸Ð²Ð°Ð» Ð¾Ð±Ñ‰ÑƒÑŽ ÑÑƒÐ¼Ð¼Ñƒ ÑˆÑ‚Ñ€Ð°Ñ„Ð¾Ð² | DTO Ð´Ð¾Ð¿Ð¾Ð»Ð½ÐµÐ½, guard ÑÑ€Ð°Ð²Ð½Ð¸Ð²Ð°ÐµÑ‚ clientPenalty |
 
-| DEF-014 | Нет отдельных состояний штрафа pending/waived/cancelled | OPEN — settlement хранит только подтверждённые суммы |
+| DEF-014 | Нет отдельных состояний штрафа | добавлены client/supplier penalty status PENDING/CONFIRMED/WAIVED; KPI учитывает только CONFIRMED |
 
 | DEF-015 | INCOMING supplier refund не создавал LedgerTransaction | добавлен тип SUPPLIER_REFUND, direction в событии, backfill 2 записей на 600 AZN |
 
-## 15. Ограничения
+## 16. Ограничения
 
 1. Отмена после выплаты поставщику проверена с полным возвратом и закрытием обязательства.
 2. Штрафы клиента, поставщика и обеих сторон проверены.
-3. Статусы штрафа pending / waived не реализованы как отдельная сущность: settlement хранит только подтверждённые суммы.
+3. Штраф pending не входит в KPI; waived/cancelled ещё не проверены.
 4. Универсальный поиск авиабилетов остаётся BLOCKED из-за внешних источников.
 5. Отклонённый платёж проверен; конкурентные операции не проверены.
 6. В каталоге 11135 продуктов, все типа TOUR; отели/авиа/круизы/трансферы как отдельные услуги не проверены.
 6. Finance Ledger сверен: payments, refunds, исходящие и входящие выплаты сходятся.
 
-## 16. Следующий этап
+## 17. Следующий этап
 
-1. Добавить жизненный цикл штрафа: pending → confirmed → withheld → cancelled.
+1. Проверить waived/cancelled и полный цикл withheld → received.
 2. Проверить конкурентные операции и роль клиента.
 3. Проверить роли финансиста и клиента.
 4. Проверить остатки после backfill Ledger.
 5. Проверить оставшиеся типы услуг.
+
+
+
 
 
 

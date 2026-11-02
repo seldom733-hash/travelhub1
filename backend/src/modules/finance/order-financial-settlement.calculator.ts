@@ -20,6 +20,8 @@ export interface CancellationSettlementInput {
   finalCustomerLiability: string | null;
   penaltyAmount: string;
   clientPenaltyAmount?: string;
+  clientPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
+  supplierPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
   platformPenaltyShare: string;
   supplierPenaltyShare: string;
   penaltyReason: string | null;
@@ -42,6 +44,8 @@ export interface CancellationSettlementResult {
   finalCustomerLiability: string | null;
   penaltyAmount: string;
   clientPenaltyAmount: string;
+  clientPenaltyStatus: "PENDING" | "CONFIRMED" | "WAIVED";
+  supplierPenaltyStatus: "PENDING" | "CONFIRMED" | "WAIVED";
   platformPenaltyShare: string;
   supplierPenaltyShare: string;
   annulledUnpaidAmount: string;
@@ -68,6 +72,8 @@ export function calculateCancellationSettlement(
   const pendingRefund = money(input.pendingRefundAmount, "pendingRefundAmount");
   const penalty = money(input.penaltyAmount, "penaltyAmount");
   const clientPenalty = money(input.clientPenaltyAmount ?? input.penaltyAmount, "clientPenaltyAmount");
+  const clientPenaltyStatus = input.clientPenaltyStatus ?? "CONFIRMED";
+  const supplierPenaltyStatus = input.supplierPenaltyStatus ?? "CONFIRMED";
   const platformPenalty = money(input.platformPenaltyShare, "platformPenaltyShare");
   const supplierPenalty = money(input.supplierPenaltyShare, "supplierPenaltyShare");
   const blockers: string[] = [];
@@ -85,6 +91,8 @@ export function calculateCancellationSettlement(
       finalCustomerLiability: null,
       penaltyAmount: two(penalty),
     clientPenaltyAmount: two(clientPenalty),
+      clientPenaltyStatus: input.clientPenaltyStatus ?? "CONFIRMED",
+      supplierPenaltyStatus: input.supplierPenaltyStatus ?? "CONFIRMED",
       platformPenaltyShare: two(platformPenalty),
       supplierPenaltyShare: two(supplierPenalty),
       annulledUnpaidAmount: "0.00",
@@ -151,6 +159,8 @@ export function calculateCancellationSettlement(
     finalCustomerLiability: finalLiability == null ? null : two(finalLiability),
     penaltyAmount: two(penalty),
     clientPenaltyAmount: two(clientPenalty),
+      clientPenaltyStatus: input.clientPenaltyStatus ?? "CONFIRMED",
+      supplierPenaltyStatus: input.supplierPenaltyStatus ?? "CONFIRMED",
     platformPenaltyShare: two(platformPenalty),
     supplierPenaltyShare: two(supplierPenalty),
     annulledUnpaidAmount: two(annulledUnpaid),
@@ -160,5 +170,6 @@ export function calculateCancellationSettlement(
     blockers: [...new Set(blockers)],
   };
 }
+
 
 
