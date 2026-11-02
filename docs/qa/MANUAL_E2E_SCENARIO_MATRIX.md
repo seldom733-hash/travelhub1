@@ -20,7 +20,7 @@
 |---|---|
 | Гость | PASS |
 | Авторизованный клиент | PARTIAL — prefill имени; профиль admin без телефона/email |
-| Один клиент — несколько заявок | NOT TESTED |
+| Один клиент — несколько заявок | PASS — Aysel, REQ-1 и REQ-2 |
 | Разные клиенты | NOT TESTED |
 | Совпадение контактов | NOT TESTED |
 
@@ -42,8 +42,8 @@
 |---|---|
 | Частичная оплата клиента 300 AZN | PASS |
 | Частичная выплата поставщику 300 AZN | PASS |
-| Полная оплата клиента | NOT TESTED |
-| Полная выплата поставщику | NOT TESTED |
+| Полная оплата клиента 1000 AZN | PASS |
+| Полная выплата поставщику 800 AZN | PASS |
 | Переплата / отклонённый платёж | NOT TESTED |
 
 ## Отмены и возвраты
@@ -67,7 +67,7 @@
 | clientReceived / clientDebt | PASS |
 | supplierPaid / supplierDebt | PASS |
 | SupplierObligation | PASS |
-| Expected/current income | PASS (0 из-за sales=cost) |
+| Expected/current income | PASS — 200 AZN на второй сделке |
 | Полная сверка с Ledger | NOT TESTED |
 
 ## Роли и защита

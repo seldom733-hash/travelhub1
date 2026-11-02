@@ -11,7 +11,7 @@ import type {
   SupplierSearchQuery,
 } from "./supplier.types";
 
-const TEST_PRICE = 1000;
+const TEST_PRICE = 800;
 
 /** Isolated manual-E2E supplier: never calls an external system. */
 @Injectable()
