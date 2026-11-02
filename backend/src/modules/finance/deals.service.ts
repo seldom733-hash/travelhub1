@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 
@@ -207,6 +207,56 @@ export class DealsService {
       const bv = b[key];
       if (typeof av === "number" && typeof bv === "number") return (av - bv) * direction;
       return String(av ?? "").localeCompare(String(bv ?? "")) * direction;
+    });
+  }
+
+  private async resolveOrder(sequence: string) {
+    const order = await this.prisma.order.findFirst({ where: { commerceSequence: sequence }, select: { id: true } });
+    if (!order) throw new NotFoundException("Deal has no order yet");
+    return order;
+  }
+
+  async paymentSchedule(sequence: string) {
+    const order = await this.resolveOrder(sequence);
+    return this.prisma.orderPaymentSchedule.findMany({ where: { orderId: order.id }, orderBy: [{ sortOrder: "asc" }, { dueDate: "asc" }] });
+  }
+
+  async createSchedule(sequence: string, input: { stage?: string; dueDate?: string; amount?: number | string; percent?: number; condition?: string; note?: string }) {
+    const order = await this.resolveOrder(sequence);
+    const stage = input.stage?.trim();
+    const dueDate = input.dueDate ? new Date(input.dueDate) : null;
+    const amount = Number(input.amount);
+    if (!stage || !dueDate || Number.isNaN(dueDate.getTime()) || !Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException("stage, dueDate and positive amount are required");
+    }
+    const count = await this.prisma.orderPaymentSchedule.count({ where: { orderId: order.id } });
+    return this.prisma.orderPaymentSchedule.create({
+      data: {
+        orderId: order.id,
+        stage,
+        dueDate,
+        amount,
+        percent: input.percent == null ? null : Math.trunc(Number(input.percent)),
+        condition: input.condition?.trim() || null,
+        note: input.note?.trim() || null,
+        sortOrder: count,
+      },
+    });
+  }
+
+  async updateSchedule(sequence: string, id: string, input: { status?: string; amount?: number | string; condition?: string }) {
+    const order = await this.resolveOrder(sequence);
+    const item = await this.prisma.orderPaymentSchedule.findFirst({ where: { id, orderId: order.id } });
+    if (!item) throw new NotFoundException("Schedule item not found");
+    const allowed = ["PLANNED", "DUE", "PAID", "OVERDUE", "CANCELLED"];
+    if (input.status && !allowed.includes(input.status)) throw new BadRequestException("Unknown schedule status");
+    return this.prisma.orderPaymentSchedule.update({
+      where: { id },
+      data: {
+        ...(input.status ? { status: input.status } : {}),
+        ...(input.amount != null ? { amount: Number(input.amount) } : {}),
+        ...(input.condition !== undefined ? { condition: input.condition || null } : {}),
+      },
     });
   }
 

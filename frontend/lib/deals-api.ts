@@ -71,6 +71,18 @@ export interface DealList {
   kpi: DealKpi;
 }
 
+export interface DealScheduleItem {
+  id: string;
+  stage: string;
+  dueDate: string;
+  amount: string;
+  percent: number | null;
+  condition: string | null;
+  status: string;
+  note: string | null;
+  sortOrder: number;
+}
+
 export type DealQuery = Record<string, string | number | undefined>;
 
 export const dealsApi = {
@@ -84,6 +96,15 @@ export const dealsApi = {
   },
   bySequence(sequence: string): Promise<DealRow | null> {
     return api.get(`/finance/deals/${encodeURIComponent(sequence)}`);
+  },
+  schedule(sequence: string): Promise<DealScheduleItem[]> {
+    return api.get(`/finance/deals/${encodeURIComponent(sequence)}/schedule`);
+  },
+  createSchedule(sequence: string, body: { stage: string; dueDate: string; amount: number; percent?: number; condition?: string; note?: string }): Promise<DealScheduleItem> {
+    return api.post(`/finance/deals/${encodeURIComponent(sequence)}/schedule`, body);
+  },
+  updateSchedule(sequence: string, id: string, body: { status?: string; amount?: number; condition?: string }): Promise<DealScheduleItem> {
+    return api.patch(`/finance/deals/${encodeURIComponent(sequence)}/schedule/${encodeURIComponent(id)}`, body);
   },
   async exportXlsx(query: DealQuery = {}): Promise<Blob> {
     const params = new URLSearchParams();

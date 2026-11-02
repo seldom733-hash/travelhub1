@@ -6561,3 +6561,25 @@ model WhatsAppSuppression {
 
   @@schema("whatsapp")
 }
+
+/// Плановая рассрочка клиента по сделке (график платежей и штрафов).
+/// orderId — ref order.Order, без FK (ADR-0001). Строки создаются вручную
+/// финансовым менеджером; фактические Payment остаются источником истины.
+model OrderPaymentSchedule {
+  id        String   @id @default(uuid())
+  orderId   String
+  stage     String
+  dueDate   DateTime
+  amount    Decimal  @db.Decimal(12, 2)
+  percent   Int?
+  condition String?
+  /// PLANNED | DUE | PAID | OVERDUE | CANCELLED
+  status    String   @default("PLANNED")
+  note      String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@schema("finance")
+}

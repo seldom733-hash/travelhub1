@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Res } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, Res } from "@nestjs/common";
 import type { Response } from "express";
 import ExcelJS from "exceljs";
 import { RequirePermissions } from "../../security/auth/decorators";
@@ -55,6 +55,24 @@ export class DealsController {
     res.setHeader("Content-Disposition", 'attachment; filename="deals.xlsx"');
     await workbook.xlsx.write(res);
     res.end();
+  }
+
+  @Get(":sequence/schedule")
+  @RequirePermissions("finance.overview.read")
+  schedule(@Param("sequence") sequence: string) {
+    return this.deals.paymentSchedule(sequence);
+  }
+
+  @Post(":sequence/schedule")
+  @RequirePermissions("finance.settlement.manage")
+  createSchedule(@Param("sequence") sequence: string, @Body() body: { stage?: string; dueDate?: string; amount?: number | string; percent?: number; condition?: string; note?: string }) {
+    return this.deals.createSchedule(sequence, body);
+  }
+
+  @Patch(":sequence/schedule/:id")
+  @RequirePermissions("finance.settlement.manage")
+  updateSchedule(@Param("sequence") sequence: string, @Param("id") id: string, @Body() body: { status?: string; amount?: number | string; condition?: string }) {
+    return this.deals.updateSchedule(sequence, id, body);
   }
 
   @Get(":sequence")

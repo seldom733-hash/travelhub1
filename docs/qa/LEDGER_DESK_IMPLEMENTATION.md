@@ -1,0 +1,53 @@
+# Ledger Desk: реестр и карточка сделки
+
+## Реализовано
+
+- Реестр `/app/finance/deals`:
+  - 12 KPI с иконками и модалкой;
+  - поиск, фильтры, page size, пагинация;
+  - таблица с кодами REQ/ORD/BKG, деньгами и статусами;
+  - раскрытие строки с деталями.
+- Карточка `/app/finance/deals/[sequence]`:
+  - шапка, stepper, 4 обзорные карточки;
+  - услуги, финансовая сводка, платежи клиента/поставщика;
+  - правый rail: действия, история, заметки;
+  - вкладки.
+- Backend `DealRow`: `trip`, `channel`, `services`, корректный `expectedIncome` для заявок без заказа.
+- График платежей:
+  - таблица `finance.OrderPaymentSchedule`;
+  - `GET/POST /api/v1/finance/deals/:sequence/schedule`;
+  - `PATCH /api/v1/finance/deals/:sequence/schedule/:id`;
+  - UI: добавление этапа, смена статуса, итог по графику.
+- Для сделки `00000002` созданы 3 этапа (30/40/30) как демонстрационные данные.
+
+## Проверено вручную
+
+- поиск `00000002` возвращает одну сделку;
+- карточка `00000002` показывает график, этапы и суммы;
+- добавление этапа через UI сохраняется и отображается;
+- мобильная ширина 390 px: страница не имеет горизонтального overflow.
+
+## Инцидент при миграции
+
+`prisma db push` выявил drift и удалил `catalog.RoomView` и `catalog.RoomType.aliases`.
+Данные восстановлены из `reports/backups/travelhub_before_full_e2e_clear_20261102.dump`:
+
+- `RoomView`: 13 строк;
+- `RoomType.aliases`: 21 значение.
+
+Проверка после восстановления:
+
+```sql
+SELECT count(*) FROM catalog."RoomView";              -- 13
+SELECT count(*) FROM catalog."RoomType" WHERE aliases IS NOT NULL; -- 21
+```
+
+Для будущих изменений использовать только `prisma migrate`, без `db push --accept-data-loss`.
+
+## Осталось
+
+- добавление услуги в заказ (backend endpoint);
+- inline-редактирование клиента/поездки/канала;
+- заметки/документы/коммуникации в агрегате сделки;
+- полный chooser колонок и bulk-actions;
+- серверный список доступных действий для кнопок карточки.

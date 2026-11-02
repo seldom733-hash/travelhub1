@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { formatPrice } from "@/lib/i18n";
@@ -141,7 +141,7 @@ export default function DealDetailPage() {
             </div>
 
             <div className="grid gap-3 lg:grid-cols-2">
-              <section className="rounded-xl border border-[#e5e2da] bg-white shadow-sm"><Header title="График платежей и штрафов" right={<span className="text-slate-400">⌃</span>} /><div className="p-4"><div className="rounded-lg border border-dashed border-[#cfcabf] bg-[#fbfaf7] p-4 text-[11px] text-[#667085]"><div className="font-medium text-[#344054]">График не настроен</div><p className="mt-1">Бэкенд пока не хранит рассрочку по сделке. Ниже — фактические остатки.</p><div className="mt-3 grid grid-cols-3 gap-2"><Mini label="Остаток клиента" value={money(deal.clientDebt, deal.currency)} /><Mini label="Остаток поставщику" value={money(deal.supplierDebt, deal.currency)} /><Mini label="Штраф клиента" value={money(deal.clientPenalty, deal.currency)} /></div></div></div></section>
+              <PaymentSchedule sequence={deal.sequence} currency={deal.currency} />
               <section className="rounded-xl border border-[#e5e2da] bg-white shadow-sm"><Header title="Штрафы и возвраты" right={<span className="text-slate-400">⌃</span>} /><div className="divide-y divide-[#f0eee8] px-4 text-[11px]"><Line label="Штрафы клиента" value={money(deal.clientPenalty, deal.currency)} /><Line label="Штрафы поставщика" value={money(deal.supplierPenalty, deal.currency)} /><Line label="Возврат клиента" value={money(deal.clientRefunded, deal.currency)} /><Line label="Возврат от поставщика" value={money(deal.supplierRefunded, deal.currency)} /></div></section>
             </div>
 
@@ -174,3 +174,29 @@ function Line({ label, value }: { label: string; value: string }) { return <div 
 function Info({ label, value }: { label: string; value: string }) { return <div className="flex justify-between border-b border-[#f0eee8] py-1.5"><span className="text-[#98a2b3]">{label}</span><span className="font-medium text-[#344054]">{value}</span></div>; }
 function Empty({ text }: { text: string }) { return <div className="rounded-lg border border-dashed border-[#e5e2da] bg-[#fbfaf7] px-3 py-4 text-[10px] text-[#98a2b3]">{text}</div>; }
 function Timeline({ title, code, date, tone }: { title: string; code: string | null; date: string; tone: "done" | "current" | "todo" }) { return <div className="relative flex gap-2 pb-3 last:pb-0"><span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full text-[8px] text-white ${tone === "done" ? "bg-emerald-600" : tone === "current" ? "bg-[#0f6b5f]" : "bg-[#d0d5dd]"}`}>{tone === "done" ? "✓" : "•"}</span><div><div className="text-[10px] font-medium text-[#344054]">{title}</div><div className="font-mono text-[9px] text-[#98a2b3]">{code ?? "—"}</div><div className="text-[9px] text-[#98a2b3]">{date}</div></div></div>; }
+
+
+function PaymentSchedule({ sequence, currency }: { sequence: string; currency: string }) {
+  const [items, setItems] = React.useState<Array<{ id: string; stage: string; dueDate: string; amount: string; percent: number | null; condition: string | null; status: string }>>([]);
+  const [open, setOpen] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const [form, setForm] = React.useState({ stage: "", dueDate: "", amount: "", percent: "", condition: "" });
+  const load = React.useCallback(() => { dealsApi.schedule(sequence).then(setItems).catch((e) => setError((e as Error).message)); }, [sequence]);
+  React.useEffect(() => { load(); }, [load]);
+  async function add() {
+    if (!form.stage.trim() || !form.dueDate || !Number(form.amount)) { setError("Заполните этап, срок и сумму"); return; }
+    setBusy(true); setError("");
+    try {
+      await dealsApi.createSchedule(sequence, { stage: form.stage.trim(), dueDate: form.dueDate, amount: Number(form.amount), percent: form.percent ? Number(form.percent) : undefined, condition: form.condition.trim() || undefined });
+      setForm({ stage: "", dueDate: "", amount: "", percent: "", condition: "" }); setOpen(false); load();
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  async function setStatus(id: string, status: string) { setBusy(true); try { await dealsApi.updateSchedule(sequence, id, { status }); load(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }
+  const total = items.reduce((sum, item) => sum + Number(item.amount), 0);
+  return <section className="rounded-xl border border-[#e5e2da] bg-white shadow-sm"><Header title="График платежей и штрафов" right={<button type="button" onClick={() => setOpen((v) => !v)} className="rounded-lg border border-[#e5e2da] px-2 py-1 text-[11px] text-[#344054]">+ Добавить этап</button>} /><div className="p-3">
+    {error && <div className="mb-2 rounded-lg bg-rose-50 px-2 py-1 text-[10px] text-rose-700">{error}</div>}
+    {open && <div className="mb-3 grid gap-2 rounded-lg border border-[#d9e6e1] bg-[#f2faf7] p-2 sm:grid-cols-2"><input value={form.stage} onChange={(e) => setForm({ ...form, stage: e.target.value })} placeholder="Этап (например, Первоначальная оплата)" className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><input value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="Сумма" inputMode="decimal" className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><input value={form.percent} onChange={(e) => setForm({ ...form, percent: e.target.value })} placeholder="Процент, %" inputMode="numeric" className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><input value={form.condition} onChange={(e) => setForm({ ...form, condition: e.target.value })} placeholder="Условие / штраф" className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px] sm:col-span-2" /><button type="button" disabled={busy} onClick={() => void add()} className="rounded bg-[#0f6b5f] px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50 sm:col-span-2">Сохранить этап</button></div>}
+    {items.length === 0 ? <div className="rounded-lg border border-dashed border-[#cfcabf] bg-[#fbfaf7] p-4 text-[11px] text-[#667085]"><div className="font-medium text-[#344054]">График не настроен</div><p className="mt-1">Добавьте этапы оплаты: срок, сумму, процент и условие штрафа.</p></div> : <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-[10px]"><thead className="text-[#98a2b3]"><tr><th className="py-1">Этап</th><th>Срок</th><th className="text-right">Сумма</th><th className="text-right">%</th><th>Условие</th><th>Статус</th></tr></thead><tbody>{items.map((item) => <tr key={item.id} className="border-t border-[#f0eee8]"><td className="py-2 font-medium text-[#344054]">{item.stage}</td><td>{new Date(item.dueDate).toLocaleDateString("ru-RU")}</td><td className="text-right font-mono">{money(item.amount, currency)}</td><td className="text-right">{item.percent ?? "—"}</td><td className="max-w-[180px] text-[#667085]">{item.condition ?? "—"}</td><td><select value={item.status} disabled={busy} onChange={(e) => void setStatus(item.id, e.target.value)} className="rounded border border-[#e5e2da] bg-white px-1 py-0.5 text-[10px]"><option value="PLANNED">План</option><option value="DUE">Ожидает</option><option value="PAID">Оплачен</option><option value="OVERDUE">Просрочен</option><option value="CANCELLED">Отменён</option></select></td></tr>)}</tbody></table><div className="mt-2 flex justify-between border-t border-[#f0eee8] pt-2 text-[10px]"><span className="text-[#98a2b3]">Итого по графику</span><span className="font-mono font-semibold text-[#344054]">{money(String(total), currency)}</span></div></div>}
+  </div></section>;
+}
