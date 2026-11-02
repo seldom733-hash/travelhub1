@@ -83,10 +83,18 @@ export default function DayTariffsPanel({
       ? t("offer.phone_invalid", locale)
       : null;
   const emailError =
-    trimmedEmail !== "" && !isValidEmailLocal(trimmedEmail)
-      ? t("offer.email_invalid", locale)
-      : null;
-  const canSubmit = trimmedPhone !== "" && phoneError === null && emailError === null;
+    trimmedEmail === ""
+      ? "Введите email."
+      : !isValidEmailLocal(trimmedEmail)
+        ? t("offer.email_invalid", locale)
+        : null;
+  const canSubmit =
+    firstName.trim() !== "" &&
+    lastName.trim() !== "" &&
+    trimmedPhone !== "" &&
+    trimmedEmail !== "" &&
+    phoneError === null &&
+    emailError === null;
 
   const customer: OfferCustomer = canSubmit
     ? {

@@ -43,6 +43,7 @@ import { PhotoReviewService } from "./catalog/photo-review.service";
 import { PublicSupplierController } from "./public-supplier.controller";
 import { KompasCaptchaController } from "./kompas/kompas-captcha.controller";
 import { TourRequestService } from "./tour-request.service";
+import { TestSupplierAdapter } from "./test-supplier.adapter";
 import { CrmModule } from "../crm/crm.module";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { EventBusModule } from "../../eventbus/eventbus.module";
@@ -105,6 +106,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
     VoyagerHotelSyncService,
     SupplierProvisioningService,
     TourRequestService,
+    TestSupplierAdapter,
     AzalAdapter,
     AzalHttpService,
     AzalLocationsService,
@@ -128,6 +130,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
           flightRegistry: FlightSupplierRegistry,
           azal: AzalAdapter,
           aviasales: AviasalesAdapter,
+          testSupplier: TestSupplierAdapter,
 		) => {
         registry.register(summertour, {
           code: "SUMMERTOUR",
@@ -387,6 +390,25 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
           circuitBreakerOpenMs: 120_000,
         });
 
+        registry.register(testSupplier, {
+          code: "TEST",
+          name: "Navitravel Test Supplier",
+          serviceTypes: ["tours", "hotels"],
+          enabled: true,
+          searchEnabled: true,
+          livePriceEnabled: true,
+          availabilityEnabled: true,
+          maxConcurrency: 10,
+          requestsPerMinute: 100,
+          timeoutMs: 30_000,
+          searchCacheTtlMs: 60_000,
+          priceCacheTtlMs: 60_000,
+          availabilityCacheTtlMs: 60_000,
+          detailCacheTtlMs: 60_000,
+          circuitBreakerThreshold: 10,
+          circuitBreakerOpenMs: 30_000,
+        });
+
         flightRegistry.register(azal);
         // Second live flight price source. Registering it makes every
         // /supplier/azal/search call fan out over both suppliers; failures
@@ -408,6 +430,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
         FlightSupplierRegistry,
         AzalAdapter,
         AviasalesAdapter,
+        TestSupplierAdapter,
       ],
     },
   ],

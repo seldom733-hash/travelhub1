@@ -108,6 +108,7 @@ export default function OfferRow({
         tourIncValue: offer.tourIncValue || undefined,
         tourIncName: offer.tourIncName || undefined,
         customer,
+        source: "UNIVERSAL_SEARCH",
       });
 
       // Captcha challenge (4.8): surfaced as a 200 payload — show the

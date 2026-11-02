@@ -7,7 +7,7 @@
 
 | Канал | Услуга | Поиск | Выбор предложения | Данные путешественника | Подача заявки | Статус |
 |---|---|---|---|---|---|---|
-| Витрина | Туры | PASS | BLOCKED | NOT TESTED | NOT TESTED | BLOCKED |
+| Витрина | Туры (тестовое предложение TEST) | PASS | PASS | PASS | PASS | PASS |
 | Витрина | Отели | PASS | BLOCKED | NOT TESTED | NOT TESTED | BLOCKED |
 | Витрина | Авиабилеты | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
 | Витрина | Круизы | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
@@ -21,8 +21,8 @@
 
 | Сценарий | Статус |
 |---|---|
-| Гость | NOT TESTED |
-| Авторизованный клиент | NOT TESTED |
+| Гость | PASS (тестовая заявка) |
+| Авторизованный клиент | PARTIAL — prefill имени; телефон/email отсутствуют в профиле admin |
 | Один клиент — несколько заявок | NOT TESTED |
 | Разные клиенты | NOT TESTED |
 | Совпадение телефона/email | NOT TESTED |
@@ -31,7 +31,7 @@
 
 | Сценарий | Статус |
 |---|---|
-| Заявка подана | BLOCKED |
+| Заявка подана | PASS (MKT-REQ-00000001) |
 | Клиент не подтвердил | NOT TESTED |
 | Клиент подтвердил | NOT TESTED |
 | Поставщик подтвердил | NOT TESTED |

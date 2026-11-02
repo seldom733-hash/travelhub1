@@ -79,15 +79,27 @@ export default function OfferModal({
 
   const trimmedPhone = phone.trim();
   const trimmedEmail = email.trim();
+  const nameError =
+    firstName.trim() === "" || lastName.trim() === ""
+      ? "Введите имя и фамилию."
+      : null;
   const phoneError =
     trimmedPhone !== "" && !isValidPhoneLocal(trimmedPhone)
       ? t("offer.phone_invalid", locale)
       : null;
   const emailError =
-    trimmedEmail !== "" && !isValidEmailLocal(trimmedEmail)
-      ? t("offer.email_invalid", locale)
-      : null;
-  const canSubmit = trimmedPhone !== "" && phoneError === null && emailError === null;
+    trimmedEmail === ""
+      ? "Введите email."
+      : !isValidEmailLocal(trimmedEmail)
+        ? t("offer.email_invalid", locale)
+        : null;
+  const canSubmit =
+    firstName.trim() !== "" &&
+    lastName.trim() !== "" &&
+    trimmedPhone !== "" &&
+    trimmedEmail !== "" &&
+    phoneError === null &&
+    emailError === null;
 
   const customer: OfferCustomer = canSubmit
     ? {
@@ -185,6 +197,7 @@ export default function OfferModal({
               lastName={lastName}
               phone={phone}
               email={email}
+              nameError={nameError}
               phoneError={phoneError}
               emailError={emailError}
               onFirstName={setFirstName}
@@ -208,6 +221,7 @@ export function TravelerFields({
   lastName,
   phone,
   email,
+  nameError,
   phoneError,
   emailError,
   onFirstName,
@@ -219,6 +233,7 @@ export function TravelerFields({
   lastName: string;
   phone: string;
   email: string;
+  nameError?: string | null;
   phoneError: string | null;
   emailError: string | null;
   onFirstName: (v: string) => void;
@@ -242,8 +257,9 @@ export function TravelerFields({
           autoComplete="given-name"
           value={firstName}
           onChange={(e) => onFirstName(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+          className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 ${nameError ? "border-red-300" : "border-slate-300"}`}
         />
+        {nameError && <p role="alert" className="mt-1 text-xs text-red-600">{nameError}</p>}
       </div>
       <div>
         <label
@@ -258,7 +274,7 @@ export function TravelerFields({
           autoComplete="family-name"
           value={lastName}
           onChange={(e) => onLastName(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+          className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 ${nameError ? "border-red-300" : "border-slate-300"}`}
         />
       </div>
       <div>

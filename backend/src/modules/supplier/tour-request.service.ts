@@ -319,6 +319,7 @@ export class TourRequestService {
           // reads productSnapshot.productType ?? "SERVICE").
           productType: service === "hotels" ? "HOTEL" : "TOUR",
           type: service === "hotels" ? "HOTEL" : "TOUR",
+          supplierCode: dto.supplierCode,
           // §6: offer facts live in the product snapshot (existing JSON
           // location), NOT in pinnedRequirements.
           offer: offerSnapshot,

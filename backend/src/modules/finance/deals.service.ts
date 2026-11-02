@@ -231,6 +231,7 @@ export class DealsService {
       const product = request.productId ? productById.get(request.productId) : undefined;
       const snapshot = (request.productSnapshot ?? {}) as Record<string, unknown>;
       const snapCustomer = (snapshot.customer ?? {}) as Record<string, unknown>;
+      const snapOffer = (snapshot.offer ?? {}) as Record<string, unknown>;
       const commercial = (order?.commercialSnapshot ?? request.commercialSnapshot ?? {}) as Record<string, unknown>;
       const clientPayments = order ? paymentsByOrder.get(order.id) ?? [] : [];
       const clientRefunds = order ? refundsByOrder.get(order.id) ?? [] : [];
@@ -311,10 +312,12 @@ export class DealsService {
         supplierId: product?.partnerId ?? request.partnerId ?? null,
         supplierCode: typeof snapshot.supplierCode === "string"
           ? snapshot.supplierCode
-          : partnerById.get(product?.partnerId ?? request.partnerId ?? "")?.code
-            ?? partnerById.get(product?.partnerId ?? request.partnerId ?? "")?.name
-            ?? request.partnerId
-            ?? null,
+          : typeof snapOffer.supplierCode === "string"
+            ? snapOffer.supplierCode
+            : partnerById.get(product?.partnerId ?? request.partnerId ?? "")?.code
+              ?? partnerById.get(product?.partnerId ?? request.partnerId ?? "")?.name
+              ?? request.partnerId
+              ?? null,
         manager: order?.createdBy ?? null,
         travelerCount: request.travelerCount ?? null,
         serviceDate: dateOrNull(request.requestedServiceDate),
