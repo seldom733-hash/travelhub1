@@ -31,10 +31,17 @@ interface CalcResult {
   currency: string;
 }
 
+interface CommissionMatrix {
+  services: string[];
+  suppliers: Array<{ code: string; name: string; enabled: boolean }>;
+  cells: Array<{ supplierCode: string; serviceType: string; state: string; commissionType: string; rate: string | null; fixedAmount: string | null; calculationBase: string; ruleCode: string | null }>;
+}
+
 export default function CommissionRulesPanel() {
   const canManage = useCan("pricing.markup.manage");
   const [tab, setTab] = useState<"rules" | "calculator">("rules");
   const [rules, setRules] = useState<CommissionRule[]>([]);
+  const [matrix, setMatrix] = useState<CommissionMatrix | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ supplierCode: "", serviceType: "tours", commissionType: "PERCENT", rate: "0.05", fixedAmount: "", fixedCurrency: "AZN", calculationBase: "SUPPLIER_BASE", effectiveFrom: "", effectiveTo: "" });
@@ -43,8 +50,12 @@ export default function CommissionRulesPanel() {
 
   const load = useCallback(async () => {
     try {
-      const data = await api.get<{ items: CommissionRule[] }>("/pricing/commission-rules?pageSize=100");
+      const [data, matrixData] = await Promise.all([
+        api.get<{ items: CommissionRule[] }>("/pricing/commission-rules?pageSize=100"),
+        api.get<CommissionMatrix>("/pricing/commission-matrix"),
+      ]);
       setRules(data.items ?? []);
+      setMatrix(matrixData);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -114,20 +125,33 @@ export default function CommissionRulesPanel() {
           )}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-2 py-2">Код</th><th className="px-2 py-2">Поставщик</th><th className="px-2 py-2">Категория</th><th className="px-2 py-2">Тип</th><th className="px-2 py-2">Значение</th><th className="px-2 py-2">База</th><th className="px-2 py-2">Период</th><th className="px-2 py-2">Статус</th><th className="px-2 py-2" /></tr></thead>
+              <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-3 py-2.5">Поставщик</th>
+                  {(matrix?.services ?? []).map((service) => <th key={service} className="px-3 py-2.5">{service}</th>)}
+                </tr>
+              </thead>
               <tbody>
-                {rules.length === 0 && <tr><td colSpan={9} className="px-2 py-6 text-center text-slate-400">Комиссионных правил нет</td></tr>}
-                {rules.map((rule) => (
-                  <tr key={rule.id} className="border-b border-slate-50">
-                    <td className="px-2 py-2 font-mono">{rule.code}</td><td className="px-2 py-2">{rule.supplierCode}</td><td className="px-2 py-2">{rule.serviceType}</td>
-                    <td className="px-2 py-2">{rule.commissionType}</td><td className="px-2 py-2">{rule.commissionType === "FIXED" ? `${rule.fixedAmount} ${rule.fixedCurrency ?? ""}` : `${Number(rule.rate ?? 0) * 100}%`}</td>
-                    <td className="px-2 py-2">{rule.calculationBase}</td><td className="px-2 py-2">{rule.effectiveFrom.slice(0, 10)} — {rule.effectiveTo?.slice(0, 10) ?? "∞"}</td><td className="px-2 py-2">{rule.status}</td>
-                    <td className="px-2 py-2">{canManage && rule.status === "DRAFT" && <button type="button" onClick={() => void activate(rule.code)} className="text-blue-600">Активировать</button>}</td>
+                {(matrix?.suppliers ?? []).map((supplier) => (
+                  <tr key={supplier.code} className="border-b border-slate-50 hover:bg-slate-50/60">
+                    <td className="px-3 py-2"><div className="font-mono font-semibold text-slate-800">{supplier.code}</div><div className="text-slate-400">{supplier.name}</div></td>
+                    {(matrix?.services ?? []).map((service) => {
+                      const cell = matrix?.cells.find((c) => c.supplierCode === supplier.code && c.serviceType === service);
+                      return (
+                        <td key={service} className="px-3 py-2">
+                          <button type="button" onClick={() => { setForm({ ...form, supplierCode: supplier.code, serviceType: service }); }} className={`w-full rounded-lg border px-2 py-2 text-left ${cell?.state === "CONFIGURED" ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}>
+                            <span className="block font-medium">{cell?.state === "CONFIGURED" ? (cell.commissionType === "FIXED" ? `${cell.fixedAmount} ${cell.calculationBase === "STOREFRONT" ? "storefront" : ""}` : `${Number(cell.rate ?? 0) * 100}%`) : "Не установлена"}</span>
+                            <span className="block text-[10px] text-slate-400">{cell?.ruleCode ?? "нажмите для правила"}</span>
+                          </button>
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {rules.length > 0 && <p className="mt-2 text-[11px] text-slate-400">Правил комиссии: {rules.length}. Нажмите ячейку, чтобы заполнить поставщика и категорию в форме выше.</p>}
         </div>
       ) : (
         <div className="grid gap-4 p-4 lg:grid-cols-2">

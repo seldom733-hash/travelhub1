@@ -18,6 +18,7 @@ import { Injectable } from "@nestjs/common";
 import { SupplierAdapterRegistry } from "../supplier/adapter/supplier-adapter.registry";
 import { FlightSupplierRegistry } from "../supplier/flight-supplier.registry";
 import { SupplierPricingService } from "./supplier-pricing.service";
+import { SupplierCommissionService } from "./supplier-commission.service";
 
 /** Сервис FlightSupplierRegistry (реестр живёт вне adapter-реестра). */
 export const FLIGHTS_SERVICE = "flights";
@@ -28,6 +29,18 @@ export interface MarkupMatrixCell {
   state: "CONFIGURED" | "NOT_CONFIGURED";
   /** Decimal-строка: "0" для NOT_CONFIGURED, иначе активный rate (0.05 = 5%). */
   rate: string;
+  ruleCode: string | null;
+  ruleVersion: number | null;
+}
+
+export interface CommissionMatrixCell {
+  supplierCode: string;
+  serviceType: string;
+  state: "CONFIGURED" | "NOT_CONFIGURED";
+  commissionType: string;
+  rate: string | null;
+  fixedAmount: string | null;
+  calculationBase: string;
   ruleCode: string | null;
   ruleVersion: number | null;
 }
@@ -62,6 +75,7 @@ export class MarkupMatrixService {
     private readonly pricing: SupplierPricingService,
     private readonly adapters: SupplierAdapterRegistry,
     private readonly flights: FlightSupplierRegistry,
+    private readonly commissions: SupplierCommissionService,
   ) {}
 
   async build(at: Date = new Date()): Promise<MarkupMatrix> {
@@ -128,5 +142,26 @@ export class MarkupMatrixService {
     }
 
     return { at: at.toISOString(), services, suppliers, cells };
+  }
+
+  /** Same Supplier × Service matrix, but cells are commission agreements. */
+  async buildCommission(at: Date = new Date()) {
+    const markupMatrix = await this.build(at);
+    const cells: CommissionMatrixCell[] = [];
+    for (const cell of markupMatrix.cells) {
+      const resolved = await this.commissions.resolveActive(cell.supplierCode, cell.serviceType, at);
+      cells.push({
+        supplierCode: cell.supplierCode,
+        serviceType: cell.serviceType,
+        state: resolved ? "CONFIGURED" : "NOT_CONFIGURED",
+        commissionType: resolved?.commissionType ?? "NONE",
+        rate: resolved?.rate?.toString() ?? null,
+        fixedAmount: resolved?.fixedAmount?.toString() ?? null,
+        calculationBase: resolved?.calculationBase ?? "SUPPLIER_BASE",
+        ruleCode: resolved?.ruleCode ?? null,
+        ruleVersion: resolved?.ruleVersion ?? null,
+      });
+    }
+    return { at: markupMatrix.at, services: markupMatrix.services, suppliers: markupMatrix.suppliers, cells };
   }
 }

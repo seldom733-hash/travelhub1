@@ -1,11 +1,21 @@
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import { SupplierCommissionService } from "./supplier-commission.service";
+import { MarkupMatrixService } from "./markup-matrix.service";
 import { calculateSupplierPricing } from "./commission-calculator";
 
 @Controller("pricing")
 export class CommissionPricingController {
-  constructor(private readonly commissions: SupplierCommissionService) {}
+  constructor(
+    private readonly commissions: SupplierCommissionService,
+    private readonly matrix: MarkupMatrixService,
+  ) {}
+
+  @Get("commission-matrix")
+  @RequirePermissions("pricing.markup.read")
+  commissionMatrix() {
+    return this.matrix.buildCommission();
+  }
 
   @Get("commission-rules")
   @RequirePermissions("pricing.markup.read")
