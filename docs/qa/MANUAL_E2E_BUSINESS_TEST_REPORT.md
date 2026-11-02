@@ -917,6 +917,17 @@ clientDebt       0.00
 
 Создан один возврат; дубликата нет.
 
+После конкурентного возврата settlement закрыт отдельным ручным действием:
+
+```text
+MKT-REQ-00000018
+financialStatus = FINANCIALLY_SETTLED_FULL_REFUND
+clientReceived 300.00
+clientRefunded 300.00
+clientDebt       0.00
+expectedIncome   0.00
+```
+
 ## 16. Сверка денежных остатков — PASS
 
 Сверка реестра с Ledger на текущих данных:
