@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { t, useLocale } from "@/lib/i18n";
 import Price from "@/components/public/Price";
+import { useCurrentUserStatus } from "@/lib/use-user";
 import {
   refreshSupplierPrice,
   refreshSupplierAvailability,
@@ -34,6 +35,11 @@ export default function OfferDetailsModal({
 }) {
   const locale = useLocale();
   const supplierLabels = useSupplierLabels("tours");
+  const { user } = useCurrentUserStatus();
+  const [customer, setCustomer] = useState({ firstName: "", lastName: "", phone: "", email: "" });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const prefilled = useRef(false);
+  const idempotencyKey = useRef(`REQ-${offer.supplierCode}-${offer.externalOfferId}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const [checking, setChecking] = useState(false);
   const [revalidated, setRevalidated] = useState(false);
   const [priceChange, setPriceChange] = useState<{ from: number; to: number } | null>(null);
@@ -57,8 +63,37 @@ export default function OfferDetailsModal({
     return dt.toISOString().slice(0, 10);
   })();
 
+  useEffect(() => {
+    if (prefilled.current || !user) return;
+    prefilled.current = true;
+    const parts = (user.fullName ?? "").trim().split(/\s+/).filter(Boolean);
+    setCustomer({
+      firstName: parts[0] ?? "",
+      lastName: parts.slice(1).join(" ") ?? "",
+      phone: user.phone ?? "",
+      email: user.email ?? "",
+    });
+  }, [user]);
+
+  const normalizePhone = (value: string) => value.replace(/[\s()\-]/g, "").replace(/^00/, "+");
+  const validateCustomer = () => {
+    const next: Record<string, string> = {};
+    if (!customer.firstName.trim()) next.firstName = "Введите имя.";
+    if (!customer.lastName.trim()) next.lastName = "Введите фамилию.";
+    if (!/^\+[1-9]\d{7,14}$/.test(normalizePhone(customer.phone))) next.phone = "Введите корректный номер телефона с международным кодом.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email.trim())) next.email = "Введите корректный адрес электронной почты.";
+    setFieldErrors(next);
+    return Object.keys(next).length === 0;
+  };
+  const isCustomerValid = () =>
+    customer.firstName.trim() !== "" &&
+    customer.lastName.trim() !== "" &&
+    /^\+[1-9]\d{7,14}$/.test(normalizePhone(customer.phone)) &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email.trim());
+
   /** §9: revalidate before booking — never book a stale or gone offer. */
   const handleBook = async () => {
+    if (!validateCustomer()) return;
     setError(null);
     setBooking(true);
     try {
@@ -145,6 +180,15 @@ export default function OfferDetailsModal({
         departureCity,
         tourIncValue: offer.tourIncValue,
         tourIncName: offer.tourIncName,
+        searchId,
+        idempotencyKey: idempotencyKey.current,
+        source: "UNIVERSAL_SEARCH",
+        customer: {
+          firstName: customer.firstName.trim(),
+          lastName: customer.lastName.trim(),
+          phone: normalizePhone(customer.phone),
+          email: customer.email.trim(),
+        },
       });
       setBooked({ referenceNumber: res.referenceNumber });
     } catch (e) {
@@ -209,6 +253,39 @@ export default function OfferDetailsModal({
           </dd>
         </dl>
 
+        <div className="mt-5 border-t border-white/10 pt-4">
+          <h4 className="text-sm font-semibold text-white">Данные путешественника</h4>
+          {user && (
+            <p className="mt-1 text-xs text-neutral-400">Используем данные вашего аккаунта. Проверьте их корректность.</p>
+          )}
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {[
+              { key: "firstName", label: "Имя", type: "text", autoComplete: "given-name" },
+              { key: "lastName", label: "Фамилия", type: "text", autoComplete: "family-name" },
+              { key: "phone", label: "Телефон", type: "tel", autoComplete: "tel", placeholder: "+994501234567" },
+              { key: "email", label: "Email", type: "email", autoComplete: "email", placeholder: "name@example.com" },
+            ].map((field) => (
+              <label key={field.key} className="block text-xs text-neutral-300">
+                <span>{field.label} *</span>
+                <input
+                  type={field.type}
+                  autoComplete={field.autoComplete}
+                  placeholder={field.placeholder}
+                  value={customer[field.key as keyof typeof customer]}
+                  onChange={(e) => {
+                    setCustomer((prev) => ({ ...prev, [field.key]: e.target.value }));
+                    setFieldErrors((prev) => ({ ...prev, [field.key]: "" }));
+                  }}
+                  onBlur={() => validateCustomer()}
+                  aria-invalid={Boolean(fieldErrors[field.key])}
+                  className={`mt-1 w-full rounded-lg border bg-white/5 px-3 py-2 text-sm text-white outline-none ${fieldErrors[field.key] ? "border-red-500/60" : "border-white/15 focus:border-emerald-500/60"}`}
+                />
+                {fieldErrors[field.key] && <span className="mt-1 block text-[11px] text-red-400">{fieldErrors[field.key]}</span>}
+              </label>
+            ))}
+          </div>
+        </div>
+
         {/* §9: price changed → ask confirmation */}
         {priceChange && (
           <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
@@ -242,7 +319,10 @@ export default function OfferDetailsModal({
           {t("offer.details_hint", locale)}
         </p>
 
-        <div className="mt-6 flex items-center justify-end gap-3">
+        <div className="mt-6 flex flex-col items-stretch justify-end gap-3 sm:flex-row sm:items-center">
+          {!isCustomerValid() && (
+            <span className="text-left text-[11px] text-amber-300 sm:mr-auto">Заполните данные путешественника, чтобы подать заявку.</span>
+          )}
           <button
             onClick={onClose}
             className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-neutral-300 transition-colors hover:bg-white/10"
@@ -252,16 +332,16 @@ export default function OfferDetailsModal({
           {!booked && !gone && (
             <button
               onClick={handleBook}
-              disabled={booking || checking}
-              className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
+              disabled={booking || checking || !isCustomerValid()}
+              className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {checking
                 ? t("tourSearch.checking", locale)
                 : booking
-                  ? t("tourSearch.booking", locale)
+                  ? "Отправляем…"
                   : priceChange
-                    ? t("tourSearch.confirm_book", locale)
-                    : t("tourSearch.book", locale)}
+                    ? "Подтвердить и подать заявку"
+                    : "Подать заявку"}
             </button>
           )}
         </div>

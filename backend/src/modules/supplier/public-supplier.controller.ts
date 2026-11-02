@@ -335,6 +335,9 @@ export class PublicSupplierController {
       country?: string;
       tourIncValue?: string;
       tourIncName?: string;
+      searchId?: string;
+      idempotencyKey?: string;
+      source?: string;
       customer?: {
         phone?: string;
         email?: string;

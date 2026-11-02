@@ -317,7 +317,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "offer.request_success": { ru: "\u0417\u0430\u043f\u0440\u043e\u0441 \u0441\u043e\u0437\u0434\u0430\u043d", az: "Sor\u0131\u015f yarad\u0131ld\u0131", en: "Request created" },
   "offer.request_success_detail": { ru: "\u0412\u0430\u0448 \u0437\u0430\u043f\u0440\u043e\u0441 \u043d\u0430 \u0442\u0443\u0440 \u0443\u0441\u043f\u0435\u0448\u043d\u043e \u0441\u043e\u0437\u0434\u0430\u043d. \u041c\u0435\u043d\u0435\u0434\u0436\u0435\u0440 \u0441\u0432\u044f\u0436\u0435\u0442\u0441\u044f \u0441 \u0432\u0430\u043c\u0438.", az: "Tur sor\u0131\u015f\u0131n\u0131z uğurla yarad\u0131ld\u0131. Menecer sizinl\u0259 \u0259laq\u0259 saxlayacaq.", en: "Your tour request has been created successfully. A manager will contact you." },
 
-  "offer.details_hint": { ru: "Чтобы подать заявку, нажмите «Оформить заказ»: мы перепроверим цену у поставщика, при изменении цены попросим подтверждение, затем создадим заявку.", az: "Müraciət göndərmək üçün «Sifarişi rəsmiləşdir» düyməsini basın: qiyməti təchizatçı ilə yoxlayacağıq, dəyişsə təsdiq istəyəcəyik, sonra sorğu yaradacağıq.", en: "To submit a request, click «Place order»: we re-check the price with the supplier, ask for confirmation if it changed, then create the request." },
+  "offer.details_hint": { ru: "Заполните данные путешественника и нажмите «Подать заявку»: мы перепроверим цену у поставщика и создадим заявку без заказа и бронирования.", az: "Səyahətçi məlumatlarını doldurun və «Müraciət göndər» düyməsini basın.", en: "Fill in the traveler details and click «Submit request»." },
   "offer.request_title": { ru: "Подать заявку", az: "Müraciət göndərmək", en: "Submit a request" },
   "offer.variants_title": { ru: "Варианты размещения и цены", az: "Yerləşmə variantları və qiymətlər", en: "Room options and prices" },
   "offer.customer_title": { ru: "Данные путешественника", az: "Səyahətçi məlumatları", en: "Traveler details" },
@@ -3115,7 +3115,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "tourSearch.shown_first": { ru: "Показаны первые", az: "İlk göstərilən", en: "Showing first" },
   "tourSearch.offer_adults": { ru: "Взрослые", az: "Yetkinlər", en: "Adults" },
   "tourSearch.offer_children": { ru: "Дети (возраст)", az: "Uşaqlar (yaş)", en: "Children (ages)" },
-  "tourSearch.book": { ru: "Оформить заказ", az: "Sifarişi rəsmiləşdir", en: "Place order" },
+  "tourSearch.book": { ru: "Подать заявку", az: "Müraciət göndər", en: "Submit request" },
   "tourSearch.booking": { ru: "Оформляем...", az: "Rəsmiləşdirilir...", en: "Booking..." },
   "tourSearch.confirm_book": { ru: "Подтвердить бронирование", az: "Rezervi təsdiqlə", en: "Confirm booking" },
   "tourSearch.checking": { ru: "Проверяем актуальность...", az: "Aktuallıq yoxlanılır...", en: "Revalidating..." },

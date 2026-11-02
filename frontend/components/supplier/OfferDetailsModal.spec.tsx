@@ -30,6 +30,10 @@ vi.mock("@/lib/supplier-registry", () => ({
   useSupplierLabels: vi.fn(() => ({ KOMPAS: "Kompas" })),
 }));
 
+vi.mock("@/lib/use-user", () => ({
+  useCurrentUserStatus: () => ({ user: null, ready: true }),
+}));
+
 const createTourRequestMock = createTourRequest as Mock;
 const refreshSupplierPriceMock = refreshSupplierPrice as Mock;
 const refreshSupplierAvailabilityMock = refreshSupplierAvailability as Mock;
@@ -66,6 +70,13 @@ function renderModal(departureCity?: string) {
   );
 }
 
+function fillCustomer() {
+  fireEvent.change(screen.getByLabelText("Имя *"), { target: { value: "Aysel" } });
+  fireEvent.change(screen.getByLabelText("Фамилия *"), { target: { value: "Mammadova" } });
+  fireEvent.change(screen.getByLabelText("Телефон *"), { target: { value: "+994501234567" } });
+  fireEvent.change(screen.getByLabelText("Email *"), { target: { value: "aysel@example.com" } });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   refreshSupplierPriceMock.mockResolvedValue({
@@ -80,17 +91,19 @@ beforeEach(() => {
 });
 
 describe("OfferDetailsModal — request hint + contract fields (Phase 4)", () => {
-  it("shows an explicit hint on how to submit a request from this window", () => {
+  it("shows the traveler form and the «Подать заявку» action", () => {
     renderModal();
 
     expect(screen.getByText(/перепроверим цену у поставщика/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Оформить заказ" })).toBeTruthy();
+    expect(screen.getByText("Данные путешественника")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Подать заявку" })).toBeTruthy();
   });
 
-  it("«Оформить заказ» → re-check + create carry country/program/departureCity context", async () => {
+  it("«Подать заявку» → re-check + create carry customer + country/program/departureCity context", async () => {
     renderModal("Baku");
+    fillCustomer();
 
-    fireEvent.click(screen.getByRole("button", { name: "Оформить заказ" }));
+    fireEvent.click(screen.getByRole("button", { name: "Подать заявку" }));
 
     await waitFor(() => expect(refreshSupplierPriceMock).toHaveBeenCalled());
     expect(refreshSupplierPriceMock).toHaveBeenCalledWith(
@@ -118,7 +131,20 @@ describe("OfferDetailsModal — request hint + contract fields (Phase 4)", () =>
         tourIncValue: "15614",
         tourIncName: "TR: Antalya 2026",
         price: 1050,
+        source: "UNIVERSAL_SEARCH",
+        searchId: "SRCH-1",
+        customer: {
+          firstName: "Aysel",
+          lastName: "Mammadova",
+          phone: "+994501234567",
+          email: "aysel@example.com",
+        },
       }),
     );
+  });
+
+  it("blocks submission until required customer fields are valid", () => {
+    renderModal();
+    expect((screen.getByRole("button", { name: "Подать заявку" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

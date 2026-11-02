@@ -431,6 +431,10 @@ export interface TourRequestInput {
   country?: string;
   tourIncValue?: string;
   tourIncName?: string;
+  /** Universal-search context: exact search session and retry key. */
+  searchId?: string;
+  idempotencyKey?: string;
+  source?: string;
   /** §4.8: traveler identity — phone required (E.164), email optional-but-valid. */
   customer?: {
     phone: string;

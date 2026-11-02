@@ -63,6 +63,10 @@ export class TourRequestService {
     country?: string;
     tourIncValue?: string;
     tourIncName?: string;
+    /** Universal-search context: exact search session and retry key. */
+    searchId?: string;
+    idempotencyKey?: string;
+    source?: "UNIVERSAL_SEARCH" | string;
     customer?: {
       phone?: string;
       email?: string;
@@ -76,6 +80,21 @@ export class TourRequestService {
     // Validated BEFORE the supplier re-check: invalid input never spends a
     // supplier call nor issues a captcha challenge. Resolution links the
     // request to a Customer (reuse by phone/email, create when unmatched).
+    const universal = dto.source === "UNIVERSAL_SEARCH";
+    if (universal) {
+      const firstName = dto.customer?.firstName?.trim() ?? "";
+      const lastName = dto.customer?.lastName?.trim() ?? "";
+      const email = dto.customer?.email?.trim() ?? "";
+      if (!firstName || !lastName) throw new ValidationDomainError("First name and last name are required");
+      if (!email || !isEmail(email)) throw new ValidationDomainError("A valid email address is required");
+    }
+    if (dto.idempotencyKey) {
+      const existing = await (this.prisma as any).request.findFirst({
+        where: { productSnapshot: { path: ["offer", "idempotencyKey"], equals: dto.idempotencyKey } },
+        select: { id: true, code: true, referenceNumber: true, status: true, displayedPrice: true, displayedCurrency: true, createdAt: true },
+      });
+      if (existing) return existing;
+    }
     let customerId: string | null = null;
     if (dto.customer) {
       const region = dto.customer.country?.trim().toUpperCase() || undefined;
@@ -262,6 +281,16 @@ export class TourRequestService {
         destination: dto.destination,
         departureCity: dto.departureCity,
         country: dto.country ?? null,
+        searchId: dto.searchId ?? null,
+        idempotencyKey: dto.idempotencyKey ?? null,
+        customer: dto.customer
+          ? {
+              firstName: dto.customer.firstName?.trim() || null,
+              lastName: dto.customer.lastName?.trim() || null,
+              phone: dto.customer.phone ?? null,
+              email: dto.customer.email?.trim() || null,
+            }
+          : null,
       }),
     ) as Record<string, unknown>;
 

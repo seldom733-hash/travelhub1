@@ -75,6 +75,7 @@ function makeHarness(): Harness {
   const prisma = {
     product: { findFirst: jest.fn().mockResolvedValue(null) },
     request: {
+      findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({
         id: "r1",
         code: "REQ-1",
@@ -775,6 +776,33 @@ describe("TourRequestService — data-shape fix: pinnedRequirements = TravelerFu
     expect((data.productSnapshot as Record<string, any>).offer).toMatchObject({
       hotel: "Rixos",
       externalOfferId: "35000",
+    });
+  });
+
+  it("universal-search request requires first name, last name and valid email before supplier call", async () => {
+    const h = makeHarness();
+    await expect(
+      h.service.createTourRequest({ ...DTO, source: "UNIVERSAL_SEARCH", customer: { phone: "+994501234567", firstName: "A", lastName: "" } }),
+    ).rejects.toThrow(ValidationDomainError);
+    expect(h.offerService.refreshPrice).not.toHaveBeenCalled();
+    expect(h.prisma.request.create).not.toHaveBeenCalled();
+  });
+
+  it("universal-search request stores customer contact and search id in the offer snapshot", async () => {
+    const h = makeHarness();
+    const customer = { phone: "+994501234567", email: "guest@example.com", firstName: "Aysel", lastName: "Mammadova" };
+    await h.service.createTourRequest({
+      ...DTO,
+      source: "UNIVERSAL_SEARCH",
+      searchId: "search-42",
+      idempotencyKey: "retry-1",
+      customer,
+    });
+    const data = created(h);
+    expect(data.productSnapshot.offer).toMatchObject({
+      searchId: "search-42",
+      idempotencyKey: "retry-1",
+      customer,
     });
   });
 });
