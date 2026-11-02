@@ -23,13 +23,13 @@ class SettlementPreviewDto {
 
   @IsOptional()
   @IsString()
-  @Matches(/^(PENDING|CONFIRMED|WAIVED)$/)
-  clientPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
+  @Matches(/^(PENDING|CONFIRMED|WITHHELD|RECEIVED|WAIVED)$/)
+  clientPenaltyStatus?: "PENDING" | "CONFIRMED" | "WITHHELD" | "RECEIVED" | "WAIVED";
 
   @IsOptional()
   @IsString()
-  @Matches(/^(PENDING|CONFIRMED|WAIVED)$/)
-  supplierPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
+  @Matches(/^(PENDING|CONFIRMED|WITHHELD|RECEIVED|WAIVED)$/)
+  supplierPenaltyStatus?: "PENDING" | "CONFIRMED" | "WITHHELD" | "RECEIVED" | "WAIVED";
 
   @IsOptional()
   @IsString()
@@ -65,13 +65,13 @@ class SettlementConfirmDto {
 
   @IsOptional()
   @IsString()
-  @Matches(/^(PENDING|CONFIRMED|WAIVED)$/)
-  clientPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
+  @Matches(/^(PENDING|CONFIRMED|WITHHELD|RECEIVED|WAIVED)$/)
+  clientPenaltyStatus?: "PENDING" | "CONFIRMED" | "WITHHELD" | "RECEIVED" | "WAIVED";
 
   @IsOptional()
   @IsString()
-  @Matches(/^(PENDING|CONFIRMED|WAIVED)$/)
-  supplierPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
+  @Matches(/^(PENDING|CONFIRMED|WITHHELD|RECEIVED|WAIVED)$/)
+  supplierPenaltyStatus?: "PENDING" | "CONFIRMED" | "WITHHELD" | "RECEIVED" | "WAIVED";
 
   @IsOptional()
   @IsString()
@@ -115,4 +115,5 @@ export class OrderFinancialSettlementController {
     return this.settlements.confirm(id, dto, user);
   }
 }
+
 

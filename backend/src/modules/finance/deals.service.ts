@@ -293,10 +293,10 @@ export class DealsService {
       const clientDebt = settlement
         ? money(settlement.remainingToPay)
         : order?.status === "CANCELLED" ? 0 : Math.max(0, sales - captured);
-      const clientPenalty = settlement?.clientPenaltyStatus === "CONFIRMED"
+      const clientPenalty = ["CONFIRMED", "WITHHELD", "RECEIVED"].includes(settlement?.clientPenaltyStatus ?? "")
         ? money(settlement?.clientPenaltyAmount)
         : 0;
-      const supplierPenalty = settlement?.supplierPenaltyStatus === "CONFIRMED"
+      const supplierPenalty = ["CONFIRMED", "WITHHELD", "RECEIVED"].includes(settlement?.supplierPenaltyStatus ?? "")
         ? money(settlement?.supplierPenaltyShare)
         : 0;
       const penaltyClosed = cancelled || settlement?.status === "FINANCIALLY_SETTLED_WITH_PENALTY";

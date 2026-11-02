@@ -136,11 +136,15 @@ export default function OrderFinancialSettlementPanel({
           <input value={form.clientPenaltyAmount} onChange={(e) => setForm({ ...form, clientPenaltyAmount: e.target.value })} placeholder="Штраф клиента" className="rounded-lg border border-slate-200 px-2 py-2 text-xs" />
           <select value={form.clientPenaltyStatus} onChange={(e) => setForm({ ...form, clientPenaltyStatus: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-2 text-xs">
             <option value="CONFIRMED">Клиент: подтверждён</option>
+            <option value="WITHHELD">Клиент: удержан</option>
+            <option value="RECEIVED">Клиент: получен</option>
             <option value="PENDING">Клиент: ожидает</option>
             <option value="WAIVED">Клиент: отменён</option>
           </select>
           <select value={form.supplierPenaltyStatus} onChange={(e) => setForm({ ...form, supplierPenaltyStatus: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-2 text-xs">
             <option value="CONFIRMED">Поставщик: подтверждён</option>
+            <option value="WITHHELD">Поставщик: удержан</option>
+            <option value="RECEIVED">Поставщик: получен</option>
             <option value="PENDING">Поставщик: ожидает</option>
             <option value="WAIVED">Поставщик: отменён</option>
           </select>

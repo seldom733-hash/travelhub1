@@ -20,8 +20,8 @@ export interface CancellationSettlementInput {
   finalCustomerLiability: string | null;
   penaltyAmount: string;
   clientPenaltyAmount?: string;
-  clientPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
-  supplierPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
+  clientPenaltyStatus?: "PENDING" | "CONFIRMED" | "WITHHELD" | "RECEIVED" | "WAIVED";
+  supplierPenaltyStatus?: "PENDING" | "CONFIRMED" | "WITHHELD" | "RECEIVED" | "WAIVED";
   platformPenaltyShare: string;
   supplierPenaltyShare: string;
   penaltyReason: string | null;
@@ -44,8 +44,8 @@ export interface CancellationSettlementResult {
   finalCustomerLiability: string | null;
   penaltyAmount: string;
   clientPenaltyAmount: string;
-  clientPenaltyStatus: "PENDING" | "CONFIRMED" | "WAIVED";
-  supplierPenaltyStatus: "PENDING" | "CONFIRMED" | "WAIVED";
+  clientPenaltyStatus: "PENDING" | "CONFIRMED" | "WITHHELD" | "RECEIVED" | "WAIVED";
+  supplierPenaltyStatus: "PENDING" | "CONFIRMED" | "WITHHELD" | "RECEIVED" | "WAIVED";
   platformPenaltyShare: string;
   supplierPenaltyShare: string;
   annulledUnpaidAmount: string;

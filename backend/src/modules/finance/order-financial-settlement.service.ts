@@ -16,8 +16,8 @@ export interface SettlementConfirmInput {
   finalCustomerLiability?: string | null;
   penaltyAmount?: string | null;
   clientPenaltyAmount?: string | null;
-  clientPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
-  supplierPenaltyStatus?: "PENDING" | "CONFIRMED" | "WAIVED";
+  clientPenaltyStatus?: "PENDING" | "CONFIRMED" | "WITHHELD" | "RECEIVED" | "WAIVED";
+  supplierPenaltyStatus?: "PENDING" | "CONFIRMED" | "WITHHELD" | "RECEIVED" | "WAIVED";
   platformPenaltyShare?: string | null;
   supplierPenaltyShare?: string | null;
   reason?: string;
@@ -134,10 +134,10 @@ export class OrderFinancialSettlementService {
       if (Number(result.annulledUnpaidAmount) > 0) {
         adjustmentSpecs.push({ type: "UNPAID_WRITE_OFF", amount: result.annulledUnpaidAmount });
       }
-      if (result.clientPenaltyStatus === "CONFIRMED" && Number(result.platformPenaltyShare) > 0) {
+      if (["CONFIRMED", "WITHHELD", "RECEIVED"].includes(result.clientPenaltyStatus) && Number(result.platformPenaltyShare) > 0) {
         adjustmentSpecs.push({ type: "PLATFORM_PENALTY_SHARE", amount: result.platformPenaltyShare });
       }
-      if (result.supplierPenaltyStatus === "CONFIRMED" && Number(result.supplierPenaltyShare) > 0) {
+      if (["CONFIRMED", "WITHHELD", "RECEIVED"].includes(result.supplierPenaltyStatus) && Number(result.supplierPenaltyShare) > 0) {
         adjustmentSpecs.push({ type: "SUPPLIER_PENALTY_SHARE", amount: result.supplierPenaltyShare });
       }
 
