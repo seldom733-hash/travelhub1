@@ -5,6 +5,7 @@ import { IdsService } from "../../shared/ids.service";
 import { SecurityService } from "../../security/security.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { LedgerService } from "./ledger.service";
+import { RefundService } from "./refund.service";
 import {
   calculateCancellationSettlement,
   type CancellationSettlementResult,
@@ -52,6 +53,7 @@ export class OrderFinancialSettlementService {
     private readonly ids: IdsService,
     private readonly security: SecurityService,
     private readonly ledger: LedgerService,
+    private readonly refunds: RefundService,
   ) {}
 
   async get(orderId: string): Promise<Record<string, unknown> | null> {
@@ -201,6 +203,123 @@ export class OrderFinancialSettlementService {
     });
 
     return this.toDto(created);
+  }
+
+  async cancelPenalty(
+    orderId: string,
+    input: { client?: boolean; supplier?: boolean; reason: string },
+    actor: { id: string; username: string },
+  ): Promise<Record<string, unknown>> {
+    const settlement = await this.prisma.orderFinancialSettlement.findUnique({ where: { orderId } });
+    if (!settlement) throw new NotFoundError(`Financial settlement for order ${orderId} not found`);
+    const recognized = new Set(["CONFIRMED", "WITHHELD", "RECEIVED"]);
+    const cancelClient = Boolean(input.client) && recognized.has(settlement.clientPenaltyStatus);
+    const cancelSupplier = Boolean(input.supplier) && recognized.has(settlement.supplierPenaltyStatus);
+    if (!cancelClient && !cancelSupplier) {
+      throw new ValidationDomainError("At least one recognised penalty must be selected for cancellation");
+    }
+
+    const clientAmount = cancelClient ? settlement.clientPenaltyAmount : new Prisma.Decimal(0);
+    const supplierAmount = cancelSupplier ? settlement.supplierPenaltyShare : new Prisma.Decimal(0);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`order-settlement:${orderId}`}))`;
+      const specs: Array<{ type: string; amount: Prisma.Decimal }> = [];
+      if (cancelClient && !clientAmount.isZero()) specs.push({ type: "PLATFORM_PENALTY_SHARE_REVERSAL", amount: clientAmount });
+      if (cancelSupplier && !supplierAmount.isZero()) specs.push({ type: "SUPPLIER_PENALTY_SHARE_REVERSAL", amount: supplierAmount });
+
+      for (const [index, spec] of specs.entries()) {
+        const code = await this.ids.nextCode(tx, "FAD");
+        const adjustment = await tx.orderFinancialAdjustment.create({
+          data: {
+            code,
+            orderId,
+            settlementId: settlement.id,
+            type: spec.type,
+            amount: spec.amount,
+            currency: settlement.currency,
+            reason: input.reason,
+            actorId: actor.id,
+            actorName: actor.username,
+            occurredAt: new Date(),
+            idempotencyKey: `${orderId}:${spec.type}:1:${index}`,
+          },
+        });
+        const ledgerRow = await this.ledger.createInTransaction(tx, {
+          amount: spec.amount.toString(),
+          currency: settlement.currency,
+          type: spec.type,
+          sourceType: "ORDER_FINANCIAL_ADJUSTMENT",
+          sourceId: adjustment.id,
+          businessRef: adjustment.code,
+          occurredAt: new Date().toISOString(),
+        });
+        await tx.orderFinancialAdjustment.update({
+          where: { id: adjustment.id },
+          data: { ledgerTransactionId: String(ledgerRow.id ?? "") || null },
+        });
+      }
+
+      const finalLiability = Prisma.Decimal.max(new Prisma.Decimal(0), settlement.finalCustomerLiability.minus(clientAmount));
+      const remainingToRefund = settlement.remainingToRefund.add(clientAmount);
+      const nextStatus = remainingToRefund.greaterThan(0) ? "PENDING_SETTLEMENT" : "FINANCIALLY_SETTLED";
+      const row = await tx.orderFinancialSettlement.update({
+        where: { id: settlement.id },
+        data: {
+          clientPenaltyStatus: cancelClient ? "WAIVED" : settlement.clientPenaltyStatus,
+          supplierPenaltyStatus: cancelSupplier ? "WAIVED" : settlement.supplierPenaltyStatus,
+          finalCustomerLiability: finalLiability,
+          remainingToRefund,
+          status: nextStatus,
+          version: { increment: 1 },
+        },
+      });
+      await tx.order.update({
+        where: { id: orderId },
+        data: { financialStatus: nextStatus as OrderFinancialStatus },
+      });
+      await this.security.audit(tx, {
+        action: "finance.order_settlement.penalty_cancelled",
+        resource: "OrderFinancialSettlement",
+        resourceId: settlement.id,
+        details: {
+          orderId,
+          client: cancelClient,
+          supplier: cancelSupplier,
+          clientAmount: clientAmount.toString(),
+          supplierAmount: supplierAmount.toString(),
+          reason: input.reason,
+        },
+      });
+      return row;
+    });
+
+    let finalSettlement = updated;
+    if (cancelClient && clientAmount.greaterThan(0)) {
+      const payment = await this.prisma.payment.findFirst({
+        where: { orderId, status: "CAPTURED" },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      if (payment) {
+        const refund = await this.refunds.createRefund(
+          { paymentId: payment.id, amount: clientAmount.toString(), reason: input.reason },
+          actor,
+        );
+        await this.refunds.approveRefund(String(refund.code), actor);
+        await this.refunds.processRefund(String(refund.code), actor);
+        finalSettlement = await this.prisma.orderFinancialSettlement.update({
+          where: { id: settlement.id },
+          data: { remainingToRefund: new Prisma.Decimal(0), status: "FINANCIALLY_SETTLED", version: { increment: 1 } },
+        });
+        await this.prisma.order.update({
+          where: { id: orderId },
+          data: { financialStatus: "FINANCIALLY_SETTLED" },
+        });
+      }
+    }
+
+    return this.toDto(finalSettlement);
   }
 
   private async loadContext(orderId: string): Promise<SettlementContext> {

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post } from "@nestjs/common";
-import { IsOptional, IsString, Matches, MaxLength, MinLength } from "class-validator";
+import { IsBoolean, IsOptional, IsString, Matches, MaxLength, MinLength } from "class-validator";
 import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import { OrderFinancialSettlementService } from "./order-financial-settlement.service";
 
@@ -89,6 +89,21 @@ class SettlementConfirmDto {
   reason!: string;
 }
 
+class PenaltyCancelDto {
+  @IsOptional()
+  @IsBoolean()
+  client?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  supplier?: boolean;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1000)
+  reason!: string;
+}
+
 @Controller("orders")
 export class OrderFinancialSettlementController {
   constructor(private readonly settlements: OrderFinancialSettlementService) {}
@@ -113,6 +128,16 @@ export class OrderFinancialSettlementController {
     @CurrentUser() user: { id: string; username: string },
   ) {
     return this.settlements.confirm(id, dto, user);
+  }
+
+  @Post(":id/financial-settlement/cancel-penalty")
+  @RequirePermissions("finance.settlement.manage")
+  cancelPenalty(
+    @Param("id") id: string,
+    @Body() dto: PenaltyCancelDto,
+    @CurrentUser() user: { id: string; username: string },
+  ) {
+    return this.settlements.cancelPenalty(id, dto, user);
   }
 }
 

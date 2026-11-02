@@ -106,6 +106,25 @@ export default function OrderFinancialSettlementPanel({
     }
   };
 
+  const cancelPenalty = async (kind: "client" | "supplier") => {
+    if (!settlement) return;
+    if (!window.confirm(`Отменить штраф (${kind === "client" ? "клиент" : "поставщик"})?`)) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await financeCenterApi.cancelOrderPenalty(orderId, {
+        [kind]: true,
+        reason: form.reason.trim() || "Отмена начисленного штрафа",
+      });
+      setSettlement(result);
+      setPreview(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const shown = settlement ?? preview;
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -126,6 +145,26 @@ export default function OrderFinancialSettlementPanel({
           <div><div className="text-slate-400">Штраф</div><div className="font-semibold">{formatPrice(shown.penaltyAmount, shown.currency, locale)}</div></div>
           <div><div className="text-slate-400">Аннулировано</div><div className="font-semibold text-slate-700">{formatPrice(shown.annulledUnpaidAmount, shown.currency, locale)}</div></div>
           <div><div className="text-slate-400">К оплате / к возврату</div><div className="font-semibold">{formatPrice(shown.remainingToPay, shown.currency, locale)} / {formatPrice(shown.remainingToRefund, shown.currency, locale)}</div></div>
+        </div>
+      )}
+
+      {settlement && canManage && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {["CONFIRMED", "WITHHELD", "RECEIVED"].includes(settlement.clientPenaltyStatus) && Number(settlement.clientPenaltyAmount) > 0 && (
+            <button type="button" disabled={busy} onClick={() => void cancelPenalty("client")} className="rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">
+              Отменить штраф клиента
+            </button>
+          )}
+          {["CONFIRMED", "WITHHELD", "RECEIVED"].includes(settlement.supplierPenaltyStatus) && Number(settlement.supplierPenaltyShare) > 0 && (
+            <button type="button" disabled={busy} onClick={() => void cancelPenalty("supplier")} className="rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">
+              Отменить штраф поставщика
+            </button>
+          )}
+          {Number(settlement.remainingToRefund) > 0 && (
+            <button type="button" disabled={busy} onClick={() => void refundClient()} className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-semibold text-rose-700 disabled:opacity-50">
+              Вернуть клиенту {settlement.remainingToRefund} {settlement.currency}
+            </button>
+          )}
         </div>
       )}
 

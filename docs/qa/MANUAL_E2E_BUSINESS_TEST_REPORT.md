@@ -1073,7 +1073,51 @@ supplierPenalty   240.00
 
 Проверка: созданные заявки MKT-REQ-00000019 и MKT-REQ-00000020 больше не увеличивают «Сумму продаж» до конвертации в заказ.
 
-## 19. Исправленные дефекты
+## 19. Отмена начисленного штрафа — PASS
+
+Сделка:
+
+```text
+MKT-REQ-00000015
+clientPenaltyStatus WITHHELD
+clientPenaltyAmount 30.00
+clientRefunded 270.00
+```
+
+В UI нажато:
+
+```text
+«Отменить штраф клиента»
+```
+
+Результат:
+
+```text
+RFD-00000026 PROCESSED 30.00
+clientRefunded 300.00
+clientPenalty    0.00
+financialStatus FINANCIALLY_SETTLED
+```
+
+Ledger:
+
+```text
+PLATFORM_PENALTY_SHARE_REVERSAL 1 / 30.00
+```
+
+KPI после отмены:
+
+```text
+salesAmount      2260.00
+costAmount       1840.00
+grossMargin       420.00
+expectedIncome    420.00
+clientPenalty     260.00
+```
+
+Штраф снят, клиенту доплатили 30 AZN, reversal-проводка создана.
+
+## 20. Исправленные дефекты
 
 | ID | Ð”ÐµÑ„ÐµÐºÑ‚ | Ð˜ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¸Ðµ |
 |---|---|---|
@@ -1097,15 +1141,15 @@ supplierPenalty   240.00
 
 | DEF-016 | Заявки попадали в KPI «Сумма продаж» до конвертации | KPI продаж считается только по ORDER/BOOKING |
 
-## 20. Ограничения
+## 21. Ограничения
 
 1. Штрафы pending/waived не входят в KPI; confirmed, withheld и received входят.
-2. Cancelled-штраф после первоначального начисления не проверен.
+2. Cancelled-штраф после начисления проверен: возврат 30, reversal-проводка.
 3. Универсальный поиск авиабилетов заблокирован внешними источниками.
 4. В каталоге 11 135 продуктов, все типа TOUR; отели/авиа/круизы/трансферы как отдельные услуги не проверены.
 5. Конкурентные платёж, settlement и создание Refund проверены; конкурентное подтверждение Refund — нет.
 
-## 21. Следующий этап
+## 22. Следующий этап
 
 1. Проверить cancelled-штраф после начисления.
 2. Проверить конкурентное подтверждение Refund.
@@ -1117,3 +1161,5 @@ supplierPenalty   240.00
 
 
 Подробные доказательства BLOCKED: [MANUAL_E2E_REMAINING_CHECKS.md](MANUAL_E2E_REMAINING_CHECKS.md).
+
+

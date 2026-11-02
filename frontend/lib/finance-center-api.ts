@@ -356,6 +356,10 @@ export const financeCenterApi = {
     return api.post(`/orders/${encodeURIComponent(orderId)}/financial-settlement/confirm`, input);
   },
 
+  cancelOrderPenalty(orderId: string, input: { client?: boolean; supplier?: boolean; reason: string }): Promise<OrderFinancialSettlement> {
+    return api.post(`/orders/${encodeURIComponent(orderId)}/financial-settlement/cancel-penalty`, input);
+  },
+
   listOrderPayments(orderId: string): Promise<{ items: Array<{ id: string; code: string; amount: string; status: string; currency: string }> }> {
     return api.get(`${BASE}/payments?orderId=${encodeURIComponent(orderId)}&pageSize=100`);
   },
