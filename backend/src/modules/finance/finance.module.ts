@@ -21,6 +21,8 @@ import { FinanceOverviewService } from "./finance-overview.service";
 import { LedgerPostingConsumer } from "./ledger-posting.consumer";
 import { OrderFinancialSettlementController } from "./order-financial-settlement.controller";
 import { OrderFinancialSettlementService } from "./order-financial-settlement.service";
+import { DealsController } from "./deals.controller";
+import { DealsService } from "./deals.service";
 import { S3ObjectStorageService } from "../catalog/media/storage/s3-storage.service";
 
 /**
@@ -39,8 +41,8 @@ import { S3ObjectStorageService } from "../catalog/media/storage/s3-storage.serv
  */
 @Module({
   imports: [PaymentProviderModule],
-  controllers: [FinanceController, OrderFinancialSettlementController],
-  providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService, CommissionPolicyService, CommissionService, CommissionAccrualConsumer, SupplierFxRateService, SupplierObligationService, SupplierPaymentService, SupplierPaymentEvidenceService, SupplierDebtReportService, SupplierPaymentTermsService, { provide: "ObjectStorageService", useClass: S3ObjectStorageService }, SupplierObligationConsumer, FinanceOverviewService, LedgerPostingConsumer, OrderFinancialSettlementService],
+  controllers: [FinanceController, OrderFinancialSettlementController, DealsController],
+  providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService, CommissionPolicyService, CommissionService, CommissionAccrualConsumer, SupplierFxRateService, SupplierObligationService, SupplierPaymentService, SupplierPaymentEvidenceService, SupplierDebtReportService, SupplierPaymentTermsService, { provide: "ObjectStorageService", useClass: S3ObjectStorageService }, SupplierObligationConsumer, FinanceOverviewService, LedgerPostingConsumer, OrderFinancialSettlementService, DealsService],
   /** Step 2.12E: CommissionPolicyService экспортируется для Sales/Order
    *  freeze-time read (ADR-0013 D1: read by Sales/Order at freeze boundary,
    *  READ-only cross-domain). CommissionService/Consumer — Finance-internal.

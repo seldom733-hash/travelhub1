@@ -1240,6 +1240,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "fx.history.actor": { ru: "Кто", az: "Kim", en: "By" },
   // ── Finance Center (Phase 4) — nav + overview KPI + supplier obligations ──
   "nav.finance_overview": { ru: "Обзор финансов", az: "Maliyyə baxışı", en: "Finance overview" },
+  "nav.finance_deals": { ru: "Реестр продаж и взаиморасчётов", az: "Satış və hesablaşmalar reyestri", en: "Sales & settlements registry" },
   "nav.supplier_obligations": { ru: "Обязательства поставщиков", az: "Təchizatçı öhdəlikləri", en: "Supplier obligations" },
   "nav.supplier_payments": { ru: "Платежи поставщикам", az: "Təchizatçılara ödənişlər", en: "Supplier payments" },
   "nav.supplier_debt_report": { ru: "Задолженность на дату", az: "Tarixə görə borc", en: "Debt as of date" },
