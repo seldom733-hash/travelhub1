@@ -250,6 +250,16 @@ export class DealsService {
       const supplierPenalty = money(settlement?.supplierPenaltyShare);
       const stage = booking ? "BOOKING" : order ? "ORDER" : "REQUEST";
       const status = booking?.status ?? order?.status ?? request.status;
+      const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(status);
+      const penaltyClosed = cancelled || settlement?.status === "FINANCIALLY_SETTLED_WITH_PENALTY";
+      // A cancelled deal has no remaining upside: expected income is the
+      // retained penalty spread, never the catalogue-margin expectation.
+      const expectedIncome = penaltyClosed ? clientPenalty - supplierPenalty : sales - cost;
+      const currentIncome = penaltyClosed
+        ? clientPenalty - supplierPenalty
+        : settlement
+          ? Math.max(0, money(settlement.finalCustomerLiability) - supplierPaid + supplierRefunded)
+          : Math.max(0, captured - refunded - supplierPaid + supplierRefunded);
       return {
         sequence: request.commerceSequence,
         requestId: request.id,
@@ -259,7 +269,7 @@ export class DealsService {
         bookingId: booking?.id ?? null,
         bookingCode: booking?.referenceNumber ?? null,
         stage,
-        stageLabel: stage === "BOOKING" ? "Бронь" : stage === "ORDER" ? "Заказ" : "Заявка",
+        stageLabel: cancelled ? "Отменена" : stage === "BOOKING" ? "Бронь" : stage === "ORDER" ? "Заказ" : "Заявка",
         status,
         statusLabel: status,
         customerId: customer?.id ?? null,
@@ -287,10 +297,8 @@ export class DealsService {
         supplierRefunded: fixed(supplierRefunded),
         clientPenalty: fixed(clientPenalty),
         supplierPenalty: fixed(supplierPenalty),
-        expectedIncome: fixed(sales - cost),
-        currentIncome: settlement
-          ? fixed(Math.max(0, money(settlement.finalCustomerLiability) - supplierPaid + supplierRefunded))
-          : fixed(Math.max(0, captured - refunded - supplierPaid + supplierRefunded)),
+        expectedIncome: fixed(expectedIncome),
+        currentIncome: fixed(currentIncome),
         currency: order?.currency ?? request.confirmedCurrency ?? request.displayedCurrency ?? "AZN",
         financialStatus: settlement?.status ?? order?.financialStatus ?? "OPEN",
         paymentStatus: captured <= 0 ? "UNPAID" : captured >= sales ? "PAID" : "PARTIALLY_PAID",

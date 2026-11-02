@@ -24,13 +24,13 @@ function money(value: string, currency: string) {
   return formatPrice(value, currency, "ru") ?? value;
 }
 
-function StageBlock({ title, code, active, completed, detail }: { title: string; code: string | null; active: boolean; completed: boolean; detail: string }) {
+function StageBlock({ title, code, active, completed, cancelled, detail }: { title: string; code: string | null; active: boolean; completed: boolean; cancelled?: boolean; detail: string }) {
   return (
-    <div className={`flex-1 rounded-xl border p-4 ${active ? "border-blue-400 bg-blue-50/60" : completed ? "border-emerald-200 bg-emerald-50/40" : "border-slate-200 bg-slate-50"}`}>
+    <div className={`flex-1 rounded-xl border p-4 ${cancelled ? "border-rose-300 bg-rose-50/60" : active ? "border-blue-400 bg-blue-50/60" : completed ? "border-emerald-200 bg-emerald-50/40" : "border-slate-200 bg-slate-50"}`}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</span>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] ${active ? "bg-blue-600 text-white" : completed ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"}`}>
-          {active ? "Активен" : completed ? "Завершён" : "Не начат"}
+        <span className={`rounded-full px-2 py-0.5 text-[10px] ${cancelled ? "bg-rose-600 text-white" : active ? "bg-blue-600 text-white" : completed ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"}`}>
+          {cancelled ? "Отменена" : active ? "Активен" : completed ? "Завершён" : "Не начат"}
         </span>
       </div>
       <div className="mt-2 font-mono text-sm font-semibold text-slate-800">{code ?? "—"}</div>
@@ -60,6 +60,7 @@ export default function DealDetailPage() {
   if (error || !deal) return <div className="p-6 text-sm text-rose-600">Сделка не найдена: {error}</div>;
 
   const stageIndex = deal.stage === "BOOKING" ? 2 : deal.stage === "ORDER" ? 1 : 0;
+  const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(deal.status);
   const tabs = TABS;
   return (
     <div>
@@ -79,11 +80,11 @@ export default function DealDetailPage() {
         </div>
 
         <div className="flex flex-col gap-2 lg:flex-row">
-          <StageBlock title="Заявка" code={deal.requestCode} active={stageIndex === 0} completed={stageIndex > 0} detail={`${deal.customerName} · ${new Date(deal.createdAt).toLocaleDateString("ru-RU")}`} />
+          <StageBlock title="Заявка" code={deal.requestCode} active={!cancelled && stageIndex === 0} completed={stageIndex > 0} cancelled={cancelled && stageIndex === 0} detail={`${deal.customerName} · ${new Date(deal.createdAt).toLocaleDateString("ru-RU")}`} />
           <div className="flex items-center justify-center text-slate-300">→</div>
-          <StageBlock title="Заказ" code={deal.orderCode} active={stageIndex === 1} completed={stageIndex > 1} detail={deal.orderCode ? `${money(deal.salesAmount, deal.currency)} · ${deal.manager ?? "—"}` : "Не создан"} />
+          <StageBlock title="Заказ" code={deal.orderCode} active={!cancelled && stageIndex === 1} completed={stageIndex > 1} cancelled={cancelled && stageIndex === 1} detail={deal.orderCode ? `${money(deal.salesAmount, deal.currency)} · ${deal.manager ?? "—"}` : "Не создан"} />
           <div className="flex items-center justify-center text-slate-300">→</div>
-          <StageBlock title="Бронь" code={deal.bookingCode} active={stageIndex === 2} completed={false} detail={deal.bookingCode ? `Статус: ${deal.status}` : "Не создана"} />
+          <StageBlock title="Бронь" code={deal.bookingCode} active={!cancelled && stageIndex === 2} completed={false} cancelled={cancelled && stageIndex === 2} detail={deal.bookingCode ? `Статус: ${deal.status}` : "Не создана"} />
         </div>
 
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
