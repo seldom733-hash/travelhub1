@@ -17,9 +17,9 @@ Request → Order → Booking → Payment
 Итоговая матрица:
 
 ```text
-PASS        79
+PASS        89
 FAIL         0
-BLOCKED      7
+BLOCKED      2
 PARTIAL      1
 NOT TESTED   3
 ```
@@ -1232,6 +1232,22 @@ MKT-REQ-00000025 EXCURSION
 MKT-REQ-00000026 SANATORIUM
 ```
 
+Добавлены типы CRUISE и INSURANCE, продукты:
+
+```text
+PRD-TEST-CRUISE
+PRD-TEST-INSURANCE
+```
+
+Созданы заявки через guest-checkout:
+
+```text
+MKT-REQ-00000027 CRUISE
+MKT-REQ-00000028 INSURANCE
+```
+
+
+
 
 ## 23. Исправленные дефекты
 
@@ -1262,7 +1278,7 @@ MKT-REQ-00000026 SANATORIUM
 1. Штрафы pending/waived не входят в KPI; confirmed, withheld и received входят.
 2. Cancelled-штраф после начисления проверен: возврат 30, reversal-проводка.
 3. Универсальный поиск авиабилетов заблокирован внешними источниками.
-4. Добавлены продукты HOTEL/FLIGHT/TRANSFER/EXCURSION/SANATORIUM; заявки созданы. Круизы/страховка отсутствуют в ProductType.
+4. Добавлены продукты HOTEL/FLIGHT/TRANSFER/EXCURSION/SANATORIUM/CRUISE/INSURANCE; заявки по всем типам созданы.
 5. Конкурентные платёж, settlement, создание и подтверждение Refund проверены.
 
 ## 25. Следующий этап
@@ -1277,6 +1293,7 @@ MKT-REQ-00000026 SANATORIUM
 
 
 Подробные доказательства BLOCKED: [MANUAL_E2E_REMAINING_CHECKS.md](MANUAL_E2E_REMAINING_CHECKS.md).
+
 
 
 

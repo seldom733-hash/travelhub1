@@ -11,7 +11,8 @@
 | Витрина | Отели | PASS | PASS | PASS | PASS — MKT-REQ-00000021 | PASS — NEW |
 | Витрина | Авиабилеты | PASS | PASS | PASS | PASS — MKT-REQ-00000023 | PASS — NEW |
 | Витрина | Трансферы / экскурсии / санатории | PASS | PASS | PASS | PASS — MKT-REQ-00000024..26 | PASS — NEW |
-| Витрина | Круизы / страховка | BLOCKED | BLOCKED | BLOCKED | BLOCKED | BLOCKED |
+| Витрина | Круизы | PASS | PASS | PASS | PASS — MKT-REQ-00000027 | PASS — NEW |
+| Витрина | Страховка | PASS | PASS | PASS | PASS — MKT-REQ-00000028 | PASS — NEW |
 | Универсальный поиск | Туры | PASS | PASS | PASS | PASS — MKT-REQ-00000020 | PASS — NEW |
 | Универсальный поиск | Авиабилеты | BLOCKED | NOT TESTED | NOT TESTED | NOT TESTED | BLOCKED |
 

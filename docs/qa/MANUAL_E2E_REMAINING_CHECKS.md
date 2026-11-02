@@ -29,9 +29,9 @@ eventId evt-qa-002 → CAPTURED, duplicate=false
 
 Повторной проводки/захвата нет.
 
-## 4. Тестовые продукты других типов — PASS (кроме круизов/страховки)
+## 4. Тестовые продукты всех типов — PASS
 
-Добавлены продукты `HOTEL`, `FLIGHT`, `TRANSFER`, `EXCURSION`, `SANATORIUM`.
+Добавлены типы и продукты `HOTEL`, `FLIGHT`, `TRANSFER`, `EXCURSION`, `SANATORIUM`, `CRUISE`, `INSURANCE`.
 
 Созданы заявки:
 
@@ -41,6 +41,6 @@ MKT-REQ-00000023 FLIGHT
 MKT-REQ-00000024 TRANSFER
 MKT-REQ-00000025 EXCURSION
 MKT-REQ-00000026 SANATORIUM
+MKT-REQ-00000027 CRUISE
+MKT-REQ-00000028 INSURANCE
 ```
-
-Круизы и страховка: таких типов нет в `ProductType`, BLOCKED.

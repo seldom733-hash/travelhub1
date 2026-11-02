@@ -285,6 +285,8 @@ enum ProductType {
   EXCURSION
   GUIDE
   TRANSFER
+  CRUISE
+  INSURANCE
   PHOTOGRAPHER
 
   @@schema("catalog")
