@@ -29,6 +29,8 @@ export interface DealRow {
   costAmount: string;
   grossMargin: string;
   supplierBasePrice: string;
+  supplierBaseCurrency: string;
+  supplierBasePriceAzn: string;
   markupAmount: string;
   commissionAmount: string;
   clientReceived: string;

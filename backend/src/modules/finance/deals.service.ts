@@ -51,6 +51,8 @@ type DealRow = {
   grossMargin: string;
   settlementStatus: string | null;
   supplierBasePrice: string;
+  supplierBaseCurrency: string;
+  supplierBasePriceAzn: string;
   markupAmount: string;
   commissionAmount: string;
   clientReceived: string;
@@ -358,6 +360,8 @@ export class DealsService {
         grossMargin: fixed(sales - cost),
         settlementStatus: settlement?.status ?? null,
         supplierBasePrice: fixed(money(commercial.supplierPrice as number | string | undefined) || cost),
+        supplierBaseCurrency: String(commercial.supplierCurrency ?? order?.currency ?? request.confirmedCurrency ?? "AZN"),
+        supplierBasePriceAzn: fixed(money(fx?.aznAmount as number | string | undefined) || cost),
         markupAmount: fixed(money(commercial.markupAmount as number | string | undefined)),
         commissionAmount: fixed(money(commercial.commissionAmount as number | string | undefined)),
         clientReceived: fixed(captured),

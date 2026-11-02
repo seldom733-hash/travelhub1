@@ -240,7 +240,7 @@ function DealTableRow({ row, expanded, onToggle, columns }: { row: DealRow; expa
         <tr className="border-b border-slate-200 bg-slate-50/60">
           <td colSpan={16} className="px-4 py-3">
             <div className="grid gap-3 text-xs sm:grid-cols-3 lg:grid-cols-5">
-              <div><div className="text-slate-400">База поставщика</div><div>{fmt(row.supplierBasePrice, row.currency)}</div></div>
+              <div><div className="text-slate-400">База поставщика</div><div>{fmt(row.supplierBasePrice, row.supplierBaseCurrency)}</div>{row.supplierBaseCurrency !== "AZN" && <div className="text-[11px] text-slate-400">≈ {fmt(row.supplierBasePriceAzn, "AZN")}</div>}</div>
               <div><div className="text-slate-400">Наценка</div><div>{fmt(row.markupAmount, row.currency)}</div></div>
               <div><div className="text-slate-400">Комиссия</div><div>{fmt(row.commissionAmount, row.currency)}</div></div>
               <div><div className="text-slate-400">Финансовый статус</div><div className="font-semibold">{row.financialStatus}</div></div>
