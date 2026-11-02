@@ -51,10 +51,12 @@ export class OrderFinancialSettlementService {
     private readonly ledger: LedgerService,
   ) {}
 
-  async get(orderId: string): Promise<Record<string, unknown>> {
+  async get(orderId: string): Promise<Record<string, unknown> | null> {
     const existing = await this.prisma.orderFinancialSettlement.findUnique({ where: { orderId } });
-    if (existing) return this.toDto(existing);
-    return this.preview(orderId, {});
+    // No stored settlement yet: return null so the UI shows the editable
+    // preview form. Returning a calculated preview here made the panel treat
+    // it as an already-confirmed settlement and hide the confirm controls.
+    return existing ? this.toDto(existing) : null;
   }
 
   async preview(orderId: string, input: SettlementConfirmInput): Promise<Record<string, unknown>> {

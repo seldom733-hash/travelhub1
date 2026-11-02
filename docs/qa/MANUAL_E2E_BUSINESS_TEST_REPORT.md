@@ -172,6 +172,39 @@ supplierRefunded 300.00
 
 После обнаружения добавлен защитный гейт: прямая отмена Booking при родительском Order в статусе `FULFILLED`/`CLOSED` теперь блокируется с 409 и требует refund/settlement flow. Историческая несогласованная сделка MKT-ORD-00000001 сохранена как доказательство дефекта.
 
+### Проверка отмены Order с оплатой 300 AZN
+
+Создана сделка:
+
+```text
+MKT-REQ-00000004
+MKT-ORD-00000004
+Оплата клиента 300 AZN CAPTURED
+```
+
+Заказ отменён через UI. Панель финансового расчёта появилась, но:
+
+```text
+confirm settlement → 409 REMAINING_TO_REFUND
+```
+
+Причина: перед закрытием settlement требуется фактический Refund на 300 AZN. В интерфейсе отсутствует действие создания возврата клиенту.
+
+Фактическое состояние:
+
+```text
+Order           CANCELLED
+clientReceived   300.00
+clientDebt         0.00
+clientRefunded     0.00
+supplierPaid       0.00
+supplierDebt       0.00
+```
+
+То есть 300 AZN удержаны без штрафа и без возврата. Это **CRITICAL FAIL**.
+
+Исправлен вспомогательный дефект: `GET financial-settlement` возвращал расчётный preview как уже существующий settlement и скрывал форму подтверждения. Теперь при отсутствии записи возвращается `null`, и форма отображается.
+
 ## 7. Фактическое состояние первой сделки
 
 ```text
@@ -235,6 +268,7 @@ CONFIRMED
 | DEF-005 | Форма туров разрешала отправку без имени/email | обязательные поля и inline-ошибки |
 | DEF-006 | Отменённая сделка без obligation показывала supplierDebt 800 | для cancelled без obligation supplierDebt = 0 |
 | DEF-007 | Отмена Booking у FULFILLED Order оставляла финансовую несогласованность | прямая отмена при FULFILLED/CLOSED теперь блокируется 409 |
+| DEF-008 | После отмены Order с оплатой нет UI-создания Refund; settlement блокируется REMAINING_TO_REFUND | OPEN — требуется refund action/UI |
 
 ## 9. Ограничения
 
