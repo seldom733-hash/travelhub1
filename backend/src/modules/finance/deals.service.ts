@@ -122,6 +122,11 @@ export class DealsService {
     // (not yet confirmed) penalties stay in the settlement workflow and are
     // excluded from recognised financial KPIs.
     const cancelledStatuses = new Set(["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"]);
+    // A request is pipeline, not a sale. Only ORDER/BOOKING rows contribute to
+    // sales/cost/gross and recognized income KPI.
+    const salesRows = rows.filter((row) => row.stage !== "REQUEST");
+    const salesSum = (field: keyof DealRow) =>
+      salesRows.reduce((total, row) => total + Number(row[field] ?? 0), 0);
     const recognisedPenaltyStatuses = new Set(["FINANCIALLY_SETTLED_WITH_PENALTY"]);
     const kpiSales = (row: DealRow) =>
       cancelledStatuses.has(row.status)
@@ -131,8 +136,8 @@ export class DealsService {
       cancelledStatuses.has(row.status)
         ? (recognisedPenaltyStatuses.has(row.settlementStatus ?? "") ? Number(row.supplierPenalty) : 0)
         : Number(row.costAmount);
-    const kpiSalesTotal = rows.reduce((total, row) => total + kpiSales(row), 0);
-    const kpiCostTotal = rows.reduce((total, row) => total + kpiCost(row), 0);
+    const kpiSalesTotal = salesRows.reduce((total, row) => total + kpiSales(row), 0);
+    const kpiCostTotal = salesRows.reduce((total, row) => total + kpiCost(row), 0);
     return {
       salesAmount: fixed(kpiSalesTotal),
       costAmount: fixed(kpiCostTotal),
@@ -145,8 +150,8 @@ export class DealsService {
       supplierRefunded: fixed(sum("supplierRefunded")),
       clientPenalty: fixed(sum("clientPenalty")),
       supplierPenalty: fixed(sum("supplierPenalty")),
-      expectedIncome: fixed(sum("expectedIncome")),
-      currentIncome: fixed(sum("currentIncome")),
+      expectedIncome: fixed(salesSum("expectedIncome")),
+      currentIncome: fixed(salesSum("currentIncome")),
       currency: rows[0]?.currency ?? "AZN",
       count: rows.length,
     };

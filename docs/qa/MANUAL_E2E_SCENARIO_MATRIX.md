@@ -80,6 +80,7 @@
 | SupplierObligation | PASS |
 | Expected/current income | PASS — 200 AZN на второй сделке |
 | KPI SENT_TO_BOOKING | PASS — 1 при статусе SENT_TO_BOOKING |
+| Заявки не входят в KPI продаж | PASS — только ORDER/BOOKING |
 | Полная сверка с Ledger | PASS — payments/refunds/payouts/supplier refunds сходятся |
 | Денежные остатки | PASS — clientReceived 6010, refunded 3110, supplierPaid 1400, refunded 600 |
 
