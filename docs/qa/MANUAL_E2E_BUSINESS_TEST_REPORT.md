@@ -17,11 +17,11 @@ Request → Order → Booking → Payment
 Итоговая матрица:
 
 ```text
-PASS        56
+PASS        75
 FAIL         0
-BLOCKED      3
+BLOCKED      7
 PARTIAL      1
-NOT TESTED  23
+NOT TESTED   7
 ```
 
 Ключевые исправленные дефекты:
@@ -1271,6 +1271,7 @@ status = NEW
 
 
 Подробные доказательства BLOCKED: [MANUAL_E2E_REMAINING_CHECKS.md](MANUAL_E2E_REMAINING_CHECKS.md).
+
 
 
 
