@@ -27,6 +27,7 @@ export interface DealRow {
   createdAt: string;
   salesAmount: string;
   costAmount: string;
+  grossMargin: string;
   supplierBasePrice: string;
   markupAmount: string;
   commissionAmount: string;
@@ -50,7 +51,7 @@ export interface DealRow {
 }
 
 export interface DealKpi {
-  salesAmount: string; costAmount: string; clientReceived: string; clientDebt: string;
+  salesAmount: string; costAmount: string; grossMargin: string; clientReceived: string; clientDebt: string;
   clientRefunded: string; supplierPaid: string; supplierDebt: string; supplierRefunded: string;
   clientPenalty: string; supplierPenalty: string; expectedIncome: string; currentIncome: string;
   currency: string; count: number;

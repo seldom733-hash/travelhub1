@@ -48,6 +48,7 @@ type DealRow = {
   createdAt: string;
   salesAmount: string;
   costAmount: string;
+  grossMargin: string;
   supplierBasePrice: string;
   markupAmount: string;
   commissionAmount: string;
@@ -117,6 +118,7 @@ export class DealsService {
     return {
       salesAmount: fixed(sum("salesAmount")),
       costAmount: fixed(sum("costAmount")),
+      grossMargin: fixed(sum("salesAmount") - sum("costAmount")),
       clientReceived: fixed(sum("clientReceived")),
       clientDebt: fixed(sum("clientDebt")),
       clientRefunded: fixed(sum("clientRefunded")),
@@ -326,6 +328,7 @@ export class DealsService {
         createdAt: request.createdAt.toISOString(),
         salesAmount: fixed(sales),
         costAmount: fixed(cost),
+        grossMargin: fixed(sales - cost),
         supplierBasePrice: fixed(money(commercial.supplierPrice as number | string | undefined) || cost),
         markupAmount: fixed(money(commercial.markupAmount as number | string | undefined)),
         commissionAmount: fixed(money(commercial.commissionAmount as number | string | undefined)),

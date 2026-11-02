@@ -9,6 +9,7 @@ import { dealsApi, type DealKpi, type DealList, type DealQuery, type DealRow } f
 const KPI: Array<{ key: keyof DealKpi; label: string; color: string }> = [
   { key: "salesAmount", label: "Сумма продаж", color: "text-blue-600" },
   { key: "costAmount", label: "Себестоимость", color: "text-violet-600" },
+  { key: "grossMargin", label: "Валовая разница", color: "text-slate-700" },
   { key: "clientReceived", label: "Получено от клиентов", color: "text-emerald-600" },
   { key: "clientDebt", label: "Долги клиентов", color: "text-amber-600" },
   { key: "clientRefunded", label: "Возвращено клиентам", color: "text-rose-600" },
@@ -17,13 +18,12 @@ const KPI: Array<{ key: keyof DealKpi; label: string; color: string }> = [
   { key: "supplierRefunded", label: "Возврат от поставщика", color: "text-sky-600" },
   { key: "clientPenalty", label: "Штрафы клиентам", color: "text-rose-600" },
   { key: "supplierPenalty", label: "Штрафы от поставщика", color: "text-violet-600" },
-  { key: "expectedIncome", label: "Ожидаемый доход", color: "text-emerald-600" },
-  { key: "currentIncome", label: "Текущий доход", color: "text-emerald-700" },
+  { key: "expectedIncome", label: "Ожидаемый доход", color: "text-emerald-600" },  { key: "currentIncome", label: "Текущий доход", color: "text-emerald-700" },
 ];
 
 const PAGE_SIZE = 20;
 const EMPTY_KPI: DealKpi = {
-  salesAmount: "0", costAmount: "0", clientReceived: "0", clientDebt: "0", clientRefunded: "0",
+  salesAmount: "0", costAmount: "0", grossMargin: "0", clientReceived: "0", clientDebt: "0", clientRefunded: "0",
   supplierPaid: "0", supplierDebt: "0", supplierRefunded: "0", clientPenalty: "0",
   supplierPenalty: "0", expectedIncome: "0", currentIncome: "0", currency: "AZN", count: 0,
 };
@@ -119,7 +119,7 @@ export default function DealsRegistryPage() {
       <div className="space-y-4 p-4 lg:p-6">
         <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
           {KPI.map((card) => (
-            <button key={card.key} type="button" onClick={() => setSelectedKpi(card)} className="rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-300">
+            <button key={card.key} type="button" title={card.key === "expectedIncome" ? "Доход по правилам признания: активные/завершённые — маржа, отменённые — штрафы" : card.key === "grossMargin" ? "Сумма продаж − себестоимость по всем сделкам, включая отменённые" : undefined} onClick={() => setSelectedKpi(card)} className="rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-300">
               <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{card.label}</span>
               <span className={`mt-1 block font-mono text-lg font-semibold ${card.color}`}>{fmt(String(kpi[card.key] ?? "0"), kpi.currency)}</span>
             </button>
