@@ -79,6 +79,30 @@ export default function OrderFinancialSettlementPanel({
     }
   };
 
+  const refundClient = async () => {
+    if (!shown || Number(shown.remainingToRefund) <= 0) return;
+    setBusy(true);
+    setError("");
+    try {
+      const payments = await financeCenterApi.listOrderPayments(orderId);
+      const captured = payments.items.find((p) => p.status === "CAPTURED");
+      if (!captured) throw new Error("Нет CAPTURED-платежа для возврата");
+      const refund = await financeCenterApi.createRefund({
+        paymentId: captured.id,
+        amount: shown.remainingToRefund,
+        reason: form.reason.trim() || "Возврат при отмене заказа",
+      });
+      await financeCenterApi.approveRefund(refund.code);
+      await financeCenterApi.processRefund(refund.code);
+      setPreview(null);
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const shown = settlement ?? preview;
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -112,6 +136,11 @@ export default function OrderFinancialSettlementPanel({
           <div className="flex gap-2 sm:col-span-2">
             <button type="button" onClick={() => void runPreview()} disabled={busy} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600">Рассчитать</button>
             <button type="button" onClick={() => void confirm()} disabled={busy || !form.reason.trim()} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Подтвердить закрытие</button>
+            {shown && Number(shown.remainingToRefund) > 0 && (
+              <button type="button" onClick={() => void refundClient()} disabled={busy} className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-semibold text-rose-700 disabled:opacity-50">
+                Вернуть клиенту {shown.remainingToRefund} {shown.currency}
+              </button>
+            )}
           </div>
         </div>
       )}

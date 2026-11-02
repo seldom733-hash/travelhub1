@@ -350,6 +350,22 @@ export const financeCenterApi = {
     return api.post(`/orders/${encodeURIComponent(orderId)}/financial-settlement/confirm`, input);
   },
 
+  listOrderPayments(orderId: string): Promise<{ items: Array<{ id: string; code: string; amount: string; status: string; currency: string }> }> {
+    return api.get(`${BASE}/payments?orderId=${encodeURIComponent(orderId)}&pageSize=100`);
+  },
+
+  createRefund(input: { paymentId: string; amount: string; reason: string }): Promise<{ code: string; status: string }> {
+    return api.post(`${BASE}/refunds`, input);
+  },
+
+  approveRefund(code: string): Promise<{ code: string; status: string }> {
+    return api.post(`${BASE}/refunds/${encodeURIComponent(code)}/approve`, {});
+  },
+
+  processRefund(code: string): Promise<{ code: string; status: string }> {
+    return api.post(`${BASE}/refunds/${encodeURIComponent(code)}/process`, {});
+  },
+
   listPayouts(query: { obligationCode?: string; page?: number; pageSize?: number } = {}): Promise<{ items: SupplierPayout[]; total: number; page: number; pageSize: number }> {
     return api.get(`${BASE}/payouts${qs(query)}`);
   },
