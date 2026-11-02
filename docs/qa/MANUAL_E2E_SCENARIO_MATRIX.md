@@ -8,6 +8,7 @@
 | Канал | Услуга | Поиск | Выбор | Данные | Заявка | Статус |
 |---|---|---|---|---|---|---|
 | Витрина | Туры (TEST) | PASS | PASS | PASS | PASS | PASS |
+| Витрина | Отели / авиа / круизы / трансферы | NOT TESTED — в каталоге только TOUR |
 | Витрина | Отели | PASS | BLOCKED | NOT TESTED | NOT TESTED | BLOCKED |
 | Витрина | Авиабилеты | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
 | Витрина | Круизы / трансферы / страховка | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
