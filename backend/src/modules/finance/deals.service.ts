@@ -262,17 +262,19 @@ export class DealsService {
       const cost = useObligationCost
         ? obligationCost
         : costFromSnapshot || costFromProduct;
-      const supplierDebt = useObligationCost && obligationDebt <= cost
-        ? obligationDebt
-        : Math.max(0, cost - supplierPaid + supplierRefunded);
+      const stage = booking ? "BOOKING" : order ? "ORDER" : "REQUEST";
+      const status = booking?.status ?? order?.status ?? request.status;
+      const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(status);
+      const supplierDebt = cancelled && supplierObligations.length === 0
+        ? 0
+        : useObligationCost && obligationDebt <= cost
+          ? obligationDebt
+          : Math.max(0, cost - supplierPaid + supplierRefunded);
       const clientDebt = settlement
         ? money(settlement.remainingToPay)
         : order?.status === "CANCELLED" ? 0 : Math.max(0, sales - captured);
       const clientPenalty = money(settlement?.penaltyAmount);
       const supplierPenalty = money(settlement?.supplierPenaltyShare);
-      const stage = booking ? "BOOKING" : order ? "ORDER" : "REQUEST";
-      const status = booking?.status ?? order?.status ?? request.status;
-      const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(status);
       const penaltyClosed = cancelled || settlement?.status === "FINANCIALLY_SETTLED_WITH_PENALTY";
       // A cancelled deal has no remaining upside: expected income is the
       // retained penalty spread, never the catalogue-margin expectation.

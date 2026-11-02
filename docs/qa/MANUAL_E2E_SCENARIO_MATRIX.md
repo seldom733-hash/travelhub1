@@ -21,7 +21,7 @@
 | Гость | PASS |
 | Авторизованный клиент | PARTIAL — prefill имени; профиль admin без телефона/email |
 | Один клиент — несколько заявок | PASS — Aysel, REQ-1 и REQ-2 |
-| Разные клиенты | NOT TESTED |
+| Разные клиенты | PASS — Aysel Mammadova и Elvin Quliyev |
 | Совпадение контактов | NOT TESTED |
 
 ## Жизненный цикл
@@ -50,7 +50,7 @@
 
 | Сценарий | Статус |
 |---|---|
-| Отмена без штрафа | NOT TESTED |
+| Отмена без штрафа | PASS — до оплаты |
 | Отмена со штрафом | NOT TESTED |
 | Частичный / полный возврат | NOT TESTED |
 | Возврат от поставщика | NOT TESTED |
@@ -68,6 +68,7 @@
 | supplierPaid / supplierDebt | PASS |
 | SupplierObligation | PASS |
 | Expected/current income | PASS — 200 AZN на второй сделке |
+| KPI SENT_TO_BOOKING | PASS — 1 при статусе SENT_TO_BOOKING |
 | Полная сверка с Ledger | NOT TESTED |
 
 ## Роли и защита
