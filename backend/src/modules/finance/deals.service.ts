@@ -192,7 +192,7 @@ export class DealsService {
       this.prisma.supplierObligation.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { orderId: true, aznAmount: true, remainingAmount: true } }),
       this.prisma.orderFinancialSettlement.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { orderId: true, status: true, penaltyAmount: true, supplierPenaltyShare: true, remainingToPay: true, remainingToRefund: true, finalCustomerLiability: true } }),
       this.prisma.customer.findMany({ where: { id: { in: requests.map((r) => r.customerId).filter((id): id is string => Boolean(id)) } }, select: { id: true, firstName: true, lastName: true, companyName: true, phone: true, email: true } }),
-      this.prisma.product.findMany({ where: { id: { in: requests.map((r) => r.productId).filter((id): id is string => Boolean(id)) } }, select: { id: true, title: true, type: true, partnerId: true } }),
+      this.prisma.product.findMany({ where: { id: { in: requests.map((r) => r.productId).filter((id): id is string => Boolean(id)) } }, select: { id: true, title: true, type: true, partnerId: true, attributes: true } }),
     ]);
     const partnerIds = [...new Set([
       ...requests.map((r) => r.partnerId).filter((id): id is string => Boolean(id)),
@@ -241,11 +241,28 @@ export class DealsService {
       const fx = commercial.fx as Record<string, unknown> | undefined;
       const supplierPrice = money(commercial.supplierPrice as number | string | undefined);
       const costFromSnapshot = supplierPrice > 0 ? money((fx?.aznAmount as number | string | undefined) ?? supplierPrice) : 0;
-      const cost = supplierObligations.reduce((sum, o) => sum + money(o.aznAmount), 0) || costFromSnapshot;
+      const productAttributes = (product?.attributes ?? {}) as Record<string, unknown>;
+      const costFromProduct = money(
+        (productAttributes.priceLocal as number | string | undefined)
+          ?? (productAttributes.convertedPrice as number | string | undefined)
+          ?? (productAttributes.startingPrice as number | string | undefined)
+          ?? 0,
+      );
+      const obligationCost = supplierObligations.reduce((sum, o) => sum + money(o.aznAmount), 0);
+      const obligationDebt = supplierObligations.reduce((sum, o) => sum + money(o.remainingAmount), 0);
+      // A supplier obligation equal to the customer sale is a legacy/demo
+      // projection (auto-created from booking amount), not a cost. Use the
+      // product's supplier price in that case.
+      const useObligationCost = obligationCost > 0 && obligationCost < sales;
+      const cost = useObligationCost
+        ? obligationCost
+        : costFromSnapshot || costFromProduct;
+      const supplierDebt = useObligationCost && obligationDebt <= cost
+        ? obligationDebt
+        : Math.max(0, cost - supplierPaid + supplierRefunded);
       const clientDebt = settlement
         ? money(settlement.remainingToPay)
         : order?.status === "CANCELLED" ? 0 : Math.max(0, sales - captured);
-      const supplierDebt = supplierObligations.reduce((sum, o) => sum + money(o.remainingAmount), 0) || Math.max(0, cost - supplierPaid + supplierRefunded);
       const clientPenalty = money(settlement?.penaltyAmount);
       const supplierPenalty = money(settlement?.supplierPenaltyShare);
       const stage = booking ? "BOOKING" : order ? "ORDER" : "REQUEST";
@@ -255,11 +272,17 @@ export class DealsService {
       // A cancelled deal has no remaining upside: expected income is the
       // retained penalty spread, never the catalogue-margin expectation.
       const expectedIncome = penaltyClosed ? clientPenalty - supplierPenalty : sales - cost;
+      const completed = ["FULFILLED", "CLOSED"].includes(order?.status ?? "") || status === "COMPLETED";
+      // Revenue is recognized only for a completed deal. For an active
+      // partially paid deal, current income is not cash-in; it stays 0 until
+      // the service is completed (or the cancellation settlement is confirmed).
       const currentIncome = penaltyClosed
         ? clientPenalty - supplierPenalty
-        : settlement
-          ? Math.max(0, money(settlement.finalCustomerLiability) - supplierPaid + supplierRefunded)
-          : Math.max(0, captured - refunded - supplierPaid + supplierRefunded);
+        : completed
+          ? sales - cost
+          : settlement
+            ? Math.max(0, money(settlement.finalCustomerLiability) - supplierPaid + supplierRefunded)
+            : 0;
       return {
         sequence: request.commerceSequence,
         requestId: request.id,
