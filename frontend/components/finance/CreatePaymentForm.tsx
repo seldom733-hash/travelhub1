@@ -244,7 +244,7 @@ export default function CreatePaymentForm({
   const availableForValidation =
     direction === "EXPENSE"
       ? displayedPaid.toFixed(2)
-      : displayedDue.toFixed(2);
+      : (availableToCreate(financials) ?? displayedDue.toFixed(2));
   // Пустое поле допустимо: amount опционален сервер-side (платёж на весь
   // остаток); блокируем только НЕКОРРЕКТНОЕ непустое значение.
   const amountValid =

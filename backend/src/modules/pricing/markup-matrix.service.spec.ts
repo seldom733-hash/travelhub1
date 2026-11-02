@@ -12,6 +12,7 @@ import { MarkupMatrixService } from "./markup-matrix.service";
 import type { SupplierPricingService, ResolvedMarkup } from "./supplier-pricing.service";
 import type { SupplierAdapterRegistry } from "../supplier/adapter/supplier-adapter.registry";
 import type { FlightSupplierRegistry } from "../supplier/flight-supplier.registry";
+import type { SupplierCommissionService } from "./supplier-commission.service";
 
 const NOT_CONFIGURED: ResolvedMarkup = {
   state: "NOT_CONFIGURED",
@@ -52,7 +53,8 @@ function makeService(
     get: (code: string) => ({ code, name: flightNames[code] ?? code }),
   } as unknown as FlightSupplierRegistry;
   const pricing = { resolve } as unknown as SupplierPricingService;
-  return { matrix: new MarkupMatrixService(pricing, registry, flights), resolve, adapters, flightCodes, flightNames };
+  const commissions = { resolveActive: jest.fn().mockResolvedValue(null) } as unknown as SupplierCommissionService;
+  return { matrix: new MarkupMatrixService(pricing, registry, flights, commissions), resolve, adapters, flightCodes, flightNames };
 }
 
 describe("MarkupMatrixService (§4.1)", () => {

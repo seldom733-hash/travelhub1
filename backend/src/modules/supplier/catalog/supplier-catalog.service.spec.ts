@@ -218,7 +218,7 @@ describe("SupplierCatalogService.buildPlan", () => {
     const prisma = {
       supplierCatalogCountry: {
         findMany: jest.fn().mockResolvedValue([
-          { supplierCode: "VOYAGER", serviceType: "tours", countryKey: "JP", countryLabel: "Япония" },
+          { supplierCode: "VOYAGER", serviceType: "tours", countryKey: "JP", countryLabel: "Япония", isActive: true },
         ]),
       },
       partner: {

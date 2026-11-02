@@ -111,6 +111,7 @@ function requestBody(overrides: Record<string, unknown> = {}) {
     tripType: "OW",
     passengers: PASSENGERS,
     fareFamily: "ECONOMY",
+    customer: { firstName: "Test", lastName: "User", phone: "+994501112233", email: "test@example.com" },
     price: 999999, // client's stale number — must be ignored
     currency: "USD",
     segments: [segment("J2123", "2026-11-01T08:00", "2026-11-01T11:00")],

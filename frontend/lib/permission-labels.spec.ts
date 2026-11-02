@@ -19,7 +19,7 @@ function backendPermissionCodes(): string[] {
 describe("permission labels", () => {
   it("covers every backend permission with a human-readable Russian name", () => {
     const codes = [...new Set(backendPermissionCodes())];
-    expect(codes.length).toBe(184);
+    expect(codes.length).toBe(185);
     const missing = codes.filter((code) => !PERMISSION_LABELS[code]?.ru);
     expect(missing).toEqual([]);
     for (const code of codes) {

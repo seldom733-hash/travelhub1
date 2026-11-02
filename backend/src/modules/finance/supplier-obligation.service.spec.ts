@@ -146,6 +146,7 @@ function makeService(opts: { obligation?: ObligationRow | null; payoutByProvider
     supplierPayout: {
       findUnique: jest.fn().mockResolvedValue(opts.payoutByProviderRef ?? null),
       findMany: jest.fn().mockResolvedValue([]),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { aznAmount: null } }),
       create: jest.fn().mockImplementation(async ({ data }: { data: Record<string, unknown> }) =>
         payout({ id: "pay-new", code: "SPO-00000009", ...data } as Partial<PayoutRow>)),
       count: jest.fn().mockResolvedValue(0),
@@ -398,7 +399,7 @@ describe("SupplierObligationService (UNIFIED FINANCE CENTER Phase 2)", () => {
 
     it("paid > 0 → 409 (reverse payouts first)", async () => {
       const h = makeService({ obligation: ob({ paidAmount: DEC("100")! }) });
-      await expect(h.service.cancelObligation("SBO-00000001", null, ACTOR)).rejects.toThrow(/already paid/);
+      await expect(h.service.cancelObligation("SBO-00000001", null, ACTOR)).rejects.toThrow(/net paid/);
     });
 
     it("not found → 404", async () => {

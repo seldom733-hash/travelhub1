@@ -252,6 +252,7 @@ export default function PaymentsTable({
           <col style={{ width: "15%" }} />
           {ledger && <col style={{ width: "15%" }} />}
           <col style={{ width: ledger ? "15%" : "19%" }} />
+          {!ledger && <col style={{ width: "14%" }} />}
           <col style={{ width: "14%" }} />
         </colgroup>
         <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">

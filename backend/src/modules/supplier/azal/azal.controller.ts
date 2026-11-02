@@ -198,6 +198,7 @@ export class AzalController {
     try {
       authoritative = await this.deriveAuthoritativePrice(body);
     } catch (e) {
+      if (e instanceof HttpException) throw e;
       if (!(Number(body.price) > 0) || !body.currency) throw e;
       this.logger.warn(`[FlightRequest] re-check unavailable — saving submitted offer pending verification: ${(e as Error).message}`);
       authoritative = {

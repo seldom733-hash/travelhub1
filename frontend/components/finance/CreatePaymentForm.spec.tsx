@@ -288,8 +288,8 @@ describe("CreatePaymentForm — reserved: активные платежи уме
 
   function mockFinancials(f: typeof FINANCIALS) {
     getMock.mockImplementation((url: string) => {
-      if (url === "/orders?pageSize=100") return Promise.resolve(ordersResponse());
       if (url.startsWith("/orders/")) return Promise.resolve(f);
+      if (url.startsWith("/orders?")) return Promise.resolve(ordersResponse());
       return Promise.resolve(ordersResponse());
     });
   }

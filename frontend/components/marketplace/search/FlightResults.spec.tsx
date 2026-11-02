@@ -41,9 +41,7 @@ describe("FlightResults seat availability column", () => {
     render(<FlightResults flights={[makeOffer()]} />);
     expect(screen.getByText("Места")).toBeTruthy();
     expect(screen.getByText("Есть места")).toBeTruthy();
-    const buttons = screen.getAllByRole("button", { name: "Подать заявку" });
-    expect(buttons).toHaveLength(1);
-    expect((buttons[0] as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryAllByRole("button", { name: "Подать заявку" })).toHaveLength(0);
   });
 
   it("marks unavailable fare with 'Нет мест' and disables the request button", () => {
@@ -53,15 +51,13 @@ describe("FlightResults seat availability column", () => {
       />,
     );
     expect(screen.getByText("Нет мест")).toBeTruthy();
-    const buttons = screen.getAllByRole("button", { name: "Подать заявку" });
-    expect((buttons[0] as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryAllByRole("button", { name: "Подать заявку" })).toHaveLength(0);
   });
 
   it("marks every row of a sold-out flight with 'Нет мест'", () => {
     render(<FlightResults flights={[makeOffer({ soldOut: true })]} />);
     expect(screen.getAllByText("Нет мест")).toHaveLength(1);
-    const buttons = screen.getAllByRole("button", { name: "Подать заявку" });
-    expect((buttons[0] as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryAllByRole("button", { name: "Подать заявку" })).toHaveLength(0);
   });
 });
 

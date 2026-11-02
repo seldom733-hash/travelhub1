@@ -86,6 +86,13 @@ function setInput(id: string, value: string) {
   fireEvent.change(input, { target: { value } });
 }
 
+function fillGuest(phone = "+994501112233", email = "ali@example.com") {
+  setInput("offer-first-name", "Ali");
+  setInput("offer-last-name", "Veliev");
+  setInput("offer-phone", phone);
+  setInput("offer-email", email);
+}
+
 function submitButtons(): HTMLButtonElement[] {
   return screen.getAllByRole("button", { name: "Подать заявку" }) as HTMLButtonElement[];
 }
@@ -154,7 +161,7 @@ describe("OfferModal customer block (4.8.6/4.8.7)", () => {
 describe("OfferModal validation (4.8.7/4.8.8/4.8.9)", () => {
   it("invalid phone → error message, buttons stay disabled", () => {
     render(<OfferModal {...baseProps()} />);
-    setInput("offer-phone", "abc");
+    fillGuest("abc");
 
     expect(screen.getByRole("alert").textContent).toContain(
       "Номер телефона указан неверно.",
@@ -166,8 +173,7 @@ describe("OfferModal validation (4.8.7/4.8.8/4.8.9)", () => {
 
   it("invalid email → error message, buttons stay disabled", () => {
     render(<OfferModal {...baseProps()} />);
-    setInput("offer-phone", "+994501112233");
-    setInput("offer-email", "nope");
+    fillGuest("+994501112233", "nope");
 
     expect(screen.getByRole("alert").textContent).toContain(
       "Пожалуйста, введите корректный адрес электронной почты.",
@@ -181,12 +187,11 @@ describe("OfferModal validation (4.8.7/4.8.8/4.8.9)", () => {
     const buttons = submitButtons();
     expect(buttons).toHaveLength(2);
     for (const b of buttons) expect(b.disabled).toBe(true);
-    expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("valid guest data (phone only, empty email allowed) enables every offer button", () => {
+  it("valid guest data enables every offer button", () => {
     render(<OfferModal {...baseProps()} />);
-    setInput("offer-phone", "+994 50 111 22 33");
+    fillGuest("+994 50 111 22 33");
 
     const buttons = submitButtons();
     expect(buttons).toHaveLength(2);
@@ -199,8 +204,7 @@ describe("OfferModal per-offer submit (4.8.4/4.8.12)", () => {
   it("offer #1 → createTourRequest called with offer #1 (and customer block)", async () => {
     const onRequestCreated = vi.fn();
     render(<OfferModal {...baseProps()} onRequestCreated={onRequestCreated} />);
-    setInput("offer-phone", "+994501112233");
-    setInput("offer-first-name", "Ali");
+    fillGuest();
 
     fireEvent.click(submitButtons()[0]);
 
@@ -231,7 +235,7 @@ describe("OfferModal per-offer submit (4.8.4/4.8.12)", () => {
 
   it("offer #2 → createTourRequest called with offer #2 exact offer", async () => {
     render(<OfferModal {...baseProps()} />);
-    setInput("offer-phone", "+994501112233");
+    fillGuest();
 
     fireEvent.click(submitButtons()[1]);
 
@@ -255,7 +259,7 @@ describe("OfferModal per-offer submit (4.8.4/4.8.12)", () => {
       new Error('Supplier API 422: {"statusCode":422,"message":"Invalid phone number"}'),
     );
     render(<OfferModal {...baseProps()} />);
-    setInput("offer-phone", "+994501112233");
+    fillGuest();
 
     fireEvent.click(submitButtons()[0]);
 

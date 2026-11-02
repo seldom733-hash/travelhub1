@@ -160,8 +160,8 @@ describe("UI-C4 EntityAuditHistory — source integration on the three detail pa
   });
 
   it("D7 financial history stays a separate section on Order (audit before finance, no merge)", () => {
-    expect(ord).toContain('t("finance.history", locale)');
-    expect(ord.indexOf("<EntityAuditHistory")).toBeLessThan(ord.indexOf('t("finance.history"'));
+    expect(ord).toContain('t("finance.client_payments", locale)');
+    expect(ord.indexOf("<EntityAuditHistory")).toBeLessThan(ord.indexOf('t("finance.client_payments"'));
   });
 
   it("request/order/booking action mappers exist in the shared label module and resolve in RU/AZ/EN", () => {

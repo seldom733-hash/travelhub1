@@ -25,7 +25,7 @@ describe("AC-10 — Order detail: + Создать платеж с текущи�
   it("кнопка присутствует и гейтится finance.payment.create", () => {
     expect(ORDER_PAGE).toContain('data-testid="order-create-payment-button"');
     expect(ORDER_PAGE).toContain('useCan("finance.payment.create")');
-    expect(ORDER_PAGE).toContain("{canCreatePayment && (");
+    expect(ORDER_PAGE).toContain("canCreatePayment &&");
   });
 
   it("presetOrder = текущий Order (нельзя случайно заменить)", () => {

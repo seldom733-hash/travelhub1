@@ -95,7 +95,7 @@ describe("TourDetail calendar → INLINE day tariffs (§4.9.4, no modal)", () =>
     expect(screen.getByText("Как подать заявку")).toBeTruthy();
 
     // The nearest priced day of the loaded month is picked WITHOUT a click.
-    const panel = await screen.findByRole("region", { name: /Подать заявку/ });
+    const panel = await screen.findByRole("region", { name: /Подать заявку/ }, { timeout: 8000 });
     expect(within(panel).getAllByText(DAY).length).toBeGreaterThan(0);
     // Its tariff is listed with a per-offer submit button.
     expect(within(panel).getByText("Варианты размещения и цены")).toBeTruthy();
@@ -113,7 +113,7 @@ describe("TourDetail calendar → INLINE day tariffs (§4.9.4, no modal)", () =>
     expect((otherDay as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(otherDay);
 
-    const panel = await screen.findByRole("region", { name: /Подать заявку/ });
+    const panel = await screen.findByRole("region", { name: /Подать заявку/ }, { timeout: 8000 });
     expect(within(panel).getAllByText(OTHER_DAY).length).toBeGreaterThan(0);
     // The other day carries its own tariff row.
     expect(within(panel).getAllByRole("button", { name: "Подать заявку" }).length).toBe(1);

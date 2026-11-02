@@ -2,7 +2,7 @@
 
 **Ð”Ð°Ñ‚Ð°:** 2026-11-02  
 **Ð¡Ñ€ÐµÐ´Ð°:** production `travelhub` (Ð¿Ð¾ Ð¿Ñ€ÑÐ¼Ð¾Ð¼Ñƒ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ð¸ÑŽ Ð¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÐµÐ»Ñ)  
-**Backup Ð´Ð¾ Ð¾Ñ‡Ð¸ÑÑ‚ÐºÐ¸:** `reports/backups/travelhub_before_full_e2e_clear_20261102.dump`
+**Backup Ð´Ð¾ Ð¾Ñ‡Ð¸ÑÑ‚ÐºÐ¸:** `rreports/backups/travelhub_before_full_e2e_clear_20261102.dump`
 
 ## 0. Итог аудита
 
@@ -17,10 +17,10 @@ Request → Order → Booking → Payment
 Итоговая матрица:
 
 ```text
-PASS        89
+PASS        90
 FAIL         0
 BLOCKED      2
-PARTIAL      1
+PARTIAL      0
 NOT TESTED   3
 ```
 
@@ -1210,7 +1210,7 @@ PRD-TEST-EXCURSION  EXCURSION
 PRD-TEST-SANATORIUM SANATORIUM
 ```
 
-SQL: `reports/backups/seed_test_types.sql`.
+SQL: `rreports/backups/seed_test_types.sql`.
 
 ### Отель — PASS
 
@@ -1298,6 +1298,35 @@ MKT-REQ-00000028 INSURANCE
 
 
 
+
+
+
+
+
+## 25. Полный regression
+
+Backend:
+
+```text
+suites  183 passed / 183
+tests   2882 passed / 2882
+build   passed
+```
+
+Frontend:
+
+```text
+test files  77 passed / 77
+tests       1123 passed / 1123
+tsc        passed
+build      passed
+```
+
+Логи: reports/rregression-backend-tests2.log, reports/rregression-frontend-tests4.log; сборки — regression-backend-build.log, regression-frontend-build.log (или общий build log).
+
+## 26. Решение по тестовым данным
+
+Production в этом проходе не очищался. Решение: сохранить текущий набор как доказательную базу аудита; очистку выполнять отдельно, на копии/в окне обслуживания, после review отчётов. Backup до очистки: reports/backups/travelhub_before_full_e2e_clear_20261102.dump.
 
 
 

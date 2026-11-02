@@ -118,6 +118,7 @@ export const PERMISSION_LABELS: Record<string, PermissionLabel> = {
   "finance.ledger.read": { ru: "Просмотр финансовых проводок" },
   "finance.provider_fee.read": { ru: "Просмотр комиссий провайдеров" },
   "finance.settlement.read": { ru: "Просмотр расчётов" },
+  "finance.settlement.manage": { ru: "Управление расчётами и закрытием сделок" },
   "finance.payout.read": { ru: "Просмотр выплат" },
   "pricing.markup.read": { ru: "Просмотр правил наценки и матрицы наценок" },
   "pricing.markup.manage": { ru: "Управление правилами наценки" },
