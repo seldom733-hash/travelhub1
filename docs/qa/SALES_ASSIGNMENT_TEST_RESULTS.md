@@ -73,3 +73,6 @@ Elvira → 1 заявка
 - Один доступный менеджер: Natalya/Ulviyye TEMP_UNAVAILABLE, заявка назначена Elvira.
 - participates=false у Elvira: заявка назначена Natalya; участие восстановлено.
 - Read-on-open: MKT-REQ-00000026 осталась NEW, firstOpenedAt установлен.
+
+- Start processing: MKT-REQ-00000021 → CHECKING, processingStartedAt установлен, история PROCESSING_STARTED.
+- Два директора: первый reassign с expectedManagerId OK, второй со старым expected → 409, потерянного обновления нет.
