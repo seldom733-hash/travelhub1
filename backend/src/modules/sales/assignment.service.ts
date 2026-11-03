@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 
@@ -123,10 +123,14 @@ export class AssignmentService {
     });
   }
 
-  async reassign(requestId: string, managerId: string, reason: string, actor: { id: string; username: string }) {
+  async reassign(requestId: string, managerId: string, reason: string, actor: { id: string; username: string }, expectedManagerId?: string) {
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "order"."Request" WHERE id = ${requestId} FOR UPDATE`;
       const request = await tx.request.findUnique({ where: { id: requestId }, select: { id: true, assignedManagerId: true } });
       if (!request) throw new NotFoundException("Request not found");
+      if (expectedManagerId !== undefined && request.assignedManagerId !== expectedManagerId) {
+        throw new ConflictException("Request was reassigned by another user");
+      }
       const user = await tx.user.findFirst({ where: { id: managerId, status: "ACTIVE", role: { code: "SALES_MANAGER" } }, select: { id: true, fullName: true, username: true } });
       if (!user) throw new NotFoundException("Manager not found or inactive");
       const now = new Date();

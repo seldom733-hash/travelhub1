@@ -265,6 +265,12 @@ export class RequestController {
     return this.requestService.createRequest(body, { id: user.id, username: user.username });
   }
 
+  @Post(":id/start")
+  @RequirePermissions("order.edit_noncritical")
+  start(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.requestService.startProcessing(id, { id: actor.id, username: actor.username });
+  }
+
   @Post(":id/confirm-price")
   @RequirePermissions("order.edit_noncritical")
   confirmPrice(

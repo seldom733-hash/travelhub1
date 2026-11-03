@@ -38,8 +38,8 @@ export class AssignmentController {
 
   @Post(":requestId/reassign")
   @RequirePermissions("request.assignment.reassign")
-  reassign(@CurrentUser() user: AuthedRequest["user"], @Param("requestId") requestId: string, @Body() body: { managerId: string; reason?: string }) {
-    return this.assignment.reassign(requestId, body.managerId, body.reason ?? "", { id: user.id, username: user.username });
+  reassign(@CurrentUser() user: AuthedRequest["user"], @Param("requestId") requestId: string, @Body() body: { managerId: string; reason?: string; expectedManagerId?: string }) {
+    return this.assignment.reassign(requestId, body.managerId, body.reason ?? "", { id: user.id, username: user.username }, body.expectedManagerId);
   }
 
   @Post(":requestId/assign")

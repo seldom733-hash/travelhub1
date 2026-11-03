@@ -137,6 +137,20 @@ export default function RequestDetailPage() {
   const params = useParams();
   const id = params?.id as string;
   const user = useCurrentUser();
+  const [startBusy, setStartBusy] = useState(false);
+  const canStart = Boolean(user?.permissions.includes("order.edit_noncritical"));
+  async function startProcessing() {
+    if (!request) return;
+    setStartBusy(true);
+    try {
+      await api.post(`/requests/${request.id}/start`, {});
+      window.location.reload();
+    } catch (e) {
+      setActionMsg((e as Error).message);
+    } finally {
+      setStartBusy(false);
+    }
+  }
   const [request, setRequest] = useState<RequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -309,14 +323,21 @@ export default function RequestDetailPage() {
           lifecycleStatus={<StatusBadge status={r.status} />}
           actions={
             user ? (
-              <RequestActionBar
-                locale={locale}
-                availableActions={actions}
-                busyAction={busy === null ? null : (busy.split("/").pop() ?? null)}
-                onRun={runAction}
-                onPropose={propose}
-                onValidationMessage={(m) => setActionMsg(m)}
-              />
+              <>
+                {r.status === "NEW" && canStart && (
+                  <button type="button" disabled={startBusy} onClick={() => void startProcessing()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+                    {startBusy ? "Запуск…" : "Начать обработку"}
+                  </button>
+                )}
+                <RequestActionBar
+                  locale={locale}
+                  availableActions={actions}
+                  busyAction={busy === null ? null : (busy.split("/").pop() ?? null)}
+                  onRun={runAction}
+                  onPropose={propose}
+                  onValidationMessage={(m) => setActionMsg(m)}
+                />
+              </>
             ) : null
           }
         >

@@ -241,6 +241,17 @@ export class RequestService {
     private readonly assignment: AssignmentService,
   ) {}
 
+  async startProcessing(requestId: string, actor: { id: string; username: string }) {
+    const request = await this.prisma.request.findUnique({ where: { id: requestId }, select: { id: true, status: true, firstOpenedAt: true } });
+    if (!request) throw new NotFoundException("Request not found");
+    if (request.status !== "NEW") throw new BadRequestException("Only NEW request can start processing");
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.request.update({ where: { id: requestId }, data: { status: "CHECKING", firstOpenedAt: request.firstOpenedAt ?? new Date(), processingStartedAt: new Date() } });
+      await tx.requestHistory.create({ data: { requestId, action: "PROCESSING_STARTED", from: "NEW", to: "CHECKING", actorId: actor.id, actorName: actor.username, comment: "Manager started processing" } });
+      return updated;
+    });
+  }
+
   /**
    * Create a new Request with shared commerceSequence.
    * Customer clicks [Book] → Request created → Supplier Response SLA starts.
