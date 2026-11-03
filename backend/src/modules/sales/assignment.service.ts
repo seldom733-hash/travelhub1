@@ -137,6 +137,12 @@ export class AssignmentService {
       await tx.request.update({ where: { id: requestId }, data: { assignedManagerId: managerId, assignedAt: now, assignmentType: "MANUAL", assignmentState: "ASSIGNED", slaDueAt: new Date(now.getTime() + 30 * 60_000), assignmentVersion: { increment: 1 } } });
       await tx.salesManagerProfile.updateMany({ where: { userId: managerId }, data: { lastAssignedAt: now } });
       await tx.requestHistory.create({ data: { requestId, action: "REASSIGNED", from: request.assignedManagerId ?? undefined, to: managerId, actorId: actor.id, actorName: actor.username, comment: reason || "Manual reassignment" } });
+      if (request.assignedManagerId && request.assignedManagerId !== managerId) {
+        await tx.userNotification.updateMany({
+          where: { recipientId: request.assignedManagerId, entityType: "Request", entityId: requestId, type: { in: ["REQUEST_ASSIGNED", "REQUEST_REASSIGNED"] }, readAt: null },
+          data: { readAt: now },
+        });
+      }
       await tx.userNotification.create({ data: { recipientId: managerId, type: "REQUEST_REASSIGNED", entityType: "Request", entityId: requestId, title: "Заявка переназначена вам", body: reason || "Откройте заявку для обработки.", dedupeKey: `request-reassigned:${requestId}:${managerId}:${now.getTime()}`, payload: { requestId, from: request.assignedManagerId } } });
       return { ok: true, manager: user.fullName ?? user.username };
     });

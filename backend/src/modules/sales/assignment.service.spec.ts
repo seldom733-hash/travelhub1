@@ -21,7 +21,7 @@ function makeTx() {
       update: jest.fn().mockResolvedValue({}),
     },
     requestHistory: { create: jest.fn().mockResolvedValue({}) },
-    userNotification: { create: jest.fn().mockResolvedValue({}) },
+    userNotification: { create: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
   };
   return tx;
 }
@@ -73,6 +73,7 @@ describe("AssignmentService", () => {
     expect(tx.request.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ assignedManagerId: "u2", assignmentType: "MANUAL" }) }));
     expect(tx.requestHistory.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "REASSIGNED", from: "u1", to: "u2" }) }));
     expect(tx.userNotification.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ recipientId: "u2", type: "REQUEST_REASSIGNED" }) }));
+    expect(tx.userNotification.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ recipientId: "u1", entityId: "r1" }) }));
   });
 
   it("queues when every manager reached maxActiveRequests", async () => {
