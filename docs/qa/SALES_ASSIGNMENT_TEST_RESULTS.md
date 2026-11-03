@@ -62,5 +62,5 @@ Elvira → 1 заявка
 - SLA-поля загрузки возвращаются: `overdue`, `slaSoon`, `openedNotStarted`.
 - Платёжный бейдж: создан `PAY-00000036` (`PENDING`) → `payments=1`; после `confirm` → `CAPTURED`, `payments=0`.
 - Две сессии Elvira: после reassign бейдж `1` в обеих; после открытия заявки в первой сессии через polling бейдж `0` в обеих.
-- Роли: `director` — load 200, reassign OK, 30 заявок; `finance` — load 403, reassign 403; `admin` — load 200.
+- Роли: `director` — load 200, reassign OK, 30 заявок; `finance` — load 403, reassign 403; `admin` — load 200; `operator` — load 403, reassign 403, 30 заявок.
 
