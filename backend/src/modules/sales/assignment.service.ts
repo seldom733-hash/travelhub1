@@ -89,6 +89,7 @@ export class AssignmentService {
         },
       });
       await tx.salesManagerProfile.update({ where: { userId: chosen.id }, data: { lastAssignedAt: now } });
+      await tx.userNotification.updateMany({ where: { entityType: "Request", entityId: requestId, type: "REQUEST_UNASSIGNED", readAt: null }, data: { readAt: now } });
       await tx.requestHistory.create({
         data: { requestId, action: "ASSIGNED", to: chosen.id, actorId: actor?.id ?? null, actorName: actor?.username ?? "SYSTEM", comment: "Auto-distribution" },
       });
@@ -111,7 +112,7 @@ export class AssignmentService {
   private async queue(tx: Prisma.TransactionClient, requestId: string, reason: string) {
     await tx.request.update({ where: { id: requestId }, data: { assignmentState: "QUEUED" } });
     const recipients = await tx.user.findMany({
-      where: { status: "ACTIVE", role: { code: { in: ["ADMIN", "DIRECTOR"] } } },
+      where: { status: "ACTIVE", role: { code: { in: ["ADMIN", "DIRECTOR", "SALES_HEAD"] } } },
       select: { id: true },
     });
     for (const r of recipients) {
@@ -127,6 +128,24 @@ export class AssignmentService {
   async getMyStatus(userId: string) {
     const profile = await this.prisma.salesManagerProfile.findUnique({ where: { userId } });
     return { availability: profile?.availability ?? "FREE" };
+  }
+
+  async selfAssign(requestId: string, actor: { id: string; username: string }) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "order"."Request" WHERE id = ${requestId} FOR UPDATE`;
+      const request = await tx.request.findUnique({ where: { id: requestId }, select: { id: true, assignedManagerId: true, status: true } });
+      if (!request) throw new NotFoundException("Request not found");
+      if (request.assignedManagerId && request.assignedManagerId !== actor.id) throw new ConflictException("Request is already assigned");
+      if (request.assignedManagerId === actor.id) return { ok: true, managerId: actor.id };
+      const profile = await tx.salesManagerProfile.findUnique({ where: { userId: actor.id } });
+      if (profile?.availability === "ABSENT") throw new BadRequestException("Manager is absent");
+      const now = new Date();
+      await tx.request.update({ where: { id: requestId }, data: { assignedManagerId: actor.id, assignedAt: now, assignmentType: "SELF", assignmentState: "ASSIGNED", slaDueAt: new Date(now.getTime() + 30 * 60_000), assignmentVersion: { increment: 1 } } });
+      await tx.salesManagerProfile.upsert({ where: { userId: actor.id }, create: { userId: actor.id, availability: "BUSY", lastAssignedAt: now }, update: { lastAssignedAt: now } });
+      await tx.userNotification.updateMany({ where: { entityType: "Request", entityId: requestId, type: "REQUEST_UNASSIGNED", readAt: null }, data: { readAt: now } });
+      await tx.requestHistory.create({ data: { requestId, action: "SELF_ASSIGNED", to: actor.id, actorId: actor.id, actorName: actor.username, comment: "Manager took request" } });
+      return { ok: true, managerId: actor.id };
+    });
   }
 
   async setMyStatus(userId: string, status: string) {
@@ -177,6 +196,7 @@ export class AssignmentService {
       const now = new Date();
       await tx.request.update({ where: { id: requestId }, data: { assignedManagerId: managerId, assignedAt: now, assignmentType: "MANUAL", assignmentState: "ASSIGNED", slaDueAt: new Date(now.getTime() + 30 * 60_000), assignmentVersion: { increment: 1 } } });
       await tx.salesManagerProfile.updateMany({ where: { userId: managerId }, data: { lastAssignedAt: now } });
+      await tx.userNotification.updateMany({ where: { entityType: "Request", entityId: requestId, type: "REQUEST_UNASSIGNED", readAt: null }, data: { readAt: now } });
       await tx.requestHistory.create({ data: { requestId, action: "REASSIGNED", from: request.assignedManagerId ?? undefined, to: managerId, actorId: actor.id, actorName: actor.username, comment: reason || "Manual reassignment" } });
       if (request.assignedManagerId && request.assignedManagerId !== managerId) {
         await tx.userNotification.updateMany({

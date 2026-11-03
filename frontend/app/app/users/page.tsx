@@ -23,6 +23,7 @@ const ROLES: { code: string; titleKey: string }[] = [
   { code: "ANALYST", titleKey: "user.role.ANALYST" },
   { code: "MODERATOR", titleKey: "user.role.MODERATOR" },
   { code: "SALES_MANAGER", titleKey: "user.role.SALES_MANAGER" },
+  { code: "SALES_HEAD", titleKey: "user.role.SALES_HEAD" },
   { code: "OPERATOR", titleKey: "user.role.OPERATOR" },
   { code: "PARTNER", titleKey: "user.role.PARTNER" },
   { code: "BUYER", titleKey: "user.role.BUYER" },
@@ -328,6 +329,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               <option value="ADMIN">{t("user.role.ADMIN", locale)}</option>
               <option value="DIRECTOR">{t("user.role.DIRECTOR", locale)}</option>
               <option value="SALES_MANAGER">{t("user.role.SALES_MANAGER", locale)}</option>
+              <option value="SALES_HEAD">{t("user.role.SALES_HEAD", locale)}</option>
               <option value="OPERATOR">{t("user.role.OPERATOR", locale)}</option>
               <option value="FINANCE">{t("user.role.FINANCE", locale)}</option>
               <option value="ANALYST">{t("user.role.ANALYST", locale)}</option>

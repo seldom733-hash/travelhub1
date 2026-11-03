@@ -64,6 +64,12 @@ export class AssignmentController {
     return this.assignment.reassign(requestId, body.managerId, body.reason ?? "", { id: user.id, username: user.username }, body.expectedManagerId);
   }
 
+  @Post(":requestId/self-assign")
+  @RequirePermissions("request.assignment.self_assign")
+  selfAssign(@CurrentUser() user: AuthedRequest["user"], @Param("requestId") requestId: string) {
+    return this.assignment.selfAssign(requestId, { id: user.id, username: user.username });
+  }
+
   @Post(":requestId/assign")
   @RequirePermissions("request.assignment.manage")
   assign(@CurrentUser() user: AuthedRequest["user"], @Param("requestId") requestId: string) {

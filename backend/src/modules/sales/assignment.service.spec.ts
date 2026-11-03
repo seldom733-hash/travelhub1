@@ -115,4 +115,13 @@ describe("AssignmentService", () => {
     await expect(service.assign("r1", undefined, { respectMode: true })).resolves.toEqual({ assigned: false, queued: true, reason: "MANUAL_MODE" });
     expect(tx.request.update).toHaveBeenCalledWith({ where: { id: "r1" }, data: { assignmentState: "QUEUED" } });
   });
+  it("manager can self-assign an unassigned request", async () => {
+    const tx = makeTx();
+    tx.request.findUnique = jest.fn().mockResolvedValue({ id: "r1", assignedManagerId: null, status: "NEW" });
+    tx.salesManagerProfile.upsert = jest.fn().mockResolvedValue({});
+    const prisma: any = { $transaction: (fn: any) => fn(tx) };
+    const service = new AssignmentService(prisma);
+    await expect(service.selfAssign("r1", { id: "u1", username: "one" })).resolves.toEqual({ ok: true, managerId: "u1" });
+    expect(tx.request.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ assignedManagerId: "u1", assignmentType: "SELF" }) }));
+  });
 });

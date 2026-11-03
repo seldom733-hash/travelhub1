@@ -138,7 +138,21 @@ export default function RequestDetailPage() {
   const id = params?.id as string;
   const user = useCurrentUser();
   const [startBusy, setStartBusy] = useState(false);
+  const [selfBusy, setSelfBusy] = useState(false);
   const canStart = Boolean(user?.permissions.includes("order.edit_noncritical"));
+  const canSelfAssign = Boolean(user?.permissions.includes("request.assignment.self_assign"));
+  async function selfAssign() {
+    if (!request) return;
+    setSelfBusy(true);
+    try {
+      await api.post(`/sales/assignment/${request.id}/self-assign`, {});
+      window.location.reload();
+    } catch (e) {
+      setActionMsg((e as Error).message);
+    } finally {
+      setSelfBusy(false);
+    }
+  }
   async function startProcessing() {
     if (!request) return;
     setStartBusy(true);
@@ -324,6 +338,11 @@ export default function RequestDetailPage() {
           actions={
             user ? (
               <>
+                {r.status === "NEW" && canSelfAssign && (
+                  <button type="button" disabled={selfBusy} onClick={() => void selfAssign()} className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 disabled:opacity-50">
+                    {selfBusy ? "Назначение…" : "Взять себе"}
+                  </button>
+                )}
                 {r.status === "NEW" && canStart && (
                   <button type="button" disabled={startBusy} onClick={() => void startProcessing()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
                     {startBusy ? "Запуск…" : "Начать обработку"}

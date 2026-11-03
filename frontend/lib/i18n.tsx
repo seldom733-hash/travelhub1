@@ -2331,6 +2331,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "user.role.ANALYST": { ru: "Аналитик", az: "Analitik", en: "Analyst" },
   "user.role.MODERATOR": { ru: "Модератор", az: "Moderator", en: "Moderator" },
   "user.role.SALES_MANAGER": { ru: "Менеджер продаж", az: "Satış meneceri", en: "Sales manager" },
+  "user.role.SALES_HEAD": { ru: "Начальник отдела продаж", az: "Satış şöbəsinin müdiri", en: "Head of sales" },
   "user.role.OPERATOR": { ru: "Оператор", az: "Operator", en: "Operator" },
   "user.role.PARTNER": { ru: "Партнёр", az: "Tərəfdaş", en: "Partner" },
   "user.role.BUYER": { ru: "Покупатель", az: "Alıcı", en: "Buyer" },

@@ -943,6 +943,7 @@ const ROLE_TITLES: Record<RoleCode, string> = {
   ANALYST: "Аналитик",
   MODERATOR: "Модератор",
   SALES_MANAGER: "Менеджер продаж",
+  SALES_HEAD: "Начальник отдела продаж",
   OPERATOR: "Оператор",
   PARTNER: "Партнёр",
   BUYER: "Покупатель",

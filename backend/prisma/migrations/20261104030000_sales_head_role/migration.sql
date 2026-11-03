@@ -1,0 +1,1 @@
+ALTER TYPE "security"."RoleCode" ADD VALUE IF NOT EXISTS 'SALES_HEAD';
