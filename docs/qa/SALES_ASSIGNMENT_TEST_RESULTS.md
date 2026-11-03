@@ -61,4 +61,5 @@ Elvira → 1 заявка
 - Elvira переведена в `TEMP_UNAVAILABLE`; новая заявка назначена Ulviyye (Elvira исключена). После проверки Elvira возвращена в `AVAILABLE`.
 - SLA-поля загрузки возвращаются: `overdue`, `slaSoon`, `openedNotStarted`.
 - Платёжный бейдж: создан `PAY-00000036` (`PENDING`) → `payments=1`; после `confirm` → `CAPTURED`, `payments=0`.
+- Две сессии Elvira: после reassign бейдж `1` в обеих; после открытия заявки в первой сессии через polling бейдж `0` в обеих.
 
