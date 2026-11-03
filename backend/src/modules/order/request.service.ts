@@ -181,6 +181,7 @@ import {
 } from "./request-travelers";
 
 import { OrderService } from "./order.service";
+import { AssignmentService } from "../sales/assignment.service";
 import { Prisma } from "../../generated/prisma/client";
 import { assertValidRequestSort, buildRequestOrderBy } from "./request-sort";
 import { parseDateParam } from "../../shared/date-param";
@@ -235,6 +236,7 @@ export class RequestService {
     private readonly security: SecurityService,
     private readonly eventBus: EventBusService,
     private readonly orders: OrderService,
+    private readonly assignment: AssignmentService,
   ) {}
 
   /**
@@ -341,6 +343,14 @@ export class RequestService {
         comment: "Заявка создана (Shared Commerce Sequence)",
       },
     });
+
+    // Auto-distribution must never lose the request: a failure leaves it QUEUED
+    // and visible to the supervisor; the request itself is already persisted.
+    try {
+      await this.assignment.assign(request.id);
+    } catch {
+      // Assignment telemetry is captured by the notification/queue path.
+    }
 
     // Two-stage §4: состав Request-стадии (FIO + birthDate) — позиции 1..N.
     if (requestTravelers.length > 0) {
