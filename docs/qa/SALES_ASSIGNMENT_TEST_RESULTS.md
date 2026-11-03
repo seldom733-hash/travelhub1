@@ -66,3 +66,6 @@ Elvira → 1 заявка
 - Повторный вход: после reassign Elvira повторно вошла и получила `unread-count requests=2` — уведомления сохраняются между сессиями.
 - SLA-граница: `slaDueAt = UTC now + 5 минут`, `firstContactAt = null` → `slaSoon=1`; значение восстановлено на +30 минут.
 
+
+- Reconnect numeric: badge 4 -> offline 4 -> online 5; no reset, polling recovered.
+
