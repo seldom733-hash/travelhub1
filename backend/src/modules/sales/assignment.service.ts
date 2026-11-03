@@ -134,9 +134,10 @@ export class AssignmentService {
     const rows = await Promise.all(users.map(async (u) => {
       const counts = await this.prisma.request.groupBy({ by: ["status"], where: { assignedManagerId: u.id }, _count: { _all: true } });
       const overdue = await this.prisma.request.count({ where: { assignedManagerId: u.id, status: { in: ACTIVE as never }, slaDueAt: { lt: new Date() }, firstContactAt: null } });
+      const openedNotStarted = await this.prisma.request.count({ where: { assignedManagerId: u.id, status: "NEW", firstOpenedAt: { not: null } } });
       const by = Object.fromEntries(counts.map((c) => [c.status, c._count._all]));
       const active = Object.entries(by).filter(([s]) => ACTIVE.includes(s)).reduce((sum, [, n]) => sum + n, 0);
-      return { userId: u.id, name: u.fullName ?? u.username, availability: profileByUser.get(u.id)?.availability ?? "INACTIVE", participates: profileByUser.get(u.id)?.participatesInAutoDistribution ?? false, new: by.NEW ?? 0, processing: (by.CHECKING ?? 0) + (by.CONFIRMED ?? 0), overdue, active, total: counts.reduce((s, c) => s + c._count._all, 0) };
+      return { userId: u.id, name: u.fullName ?? u.username, availability: profileByUser.get(u.id)?.availability ?? "INACTIVE", participates: profileByUser.get(u.id)?.participatesInAutoDistribution ?? false, new: by.NEW ?? 0, processing: (by.CHECKING ?? 0) + (by.CONFIRMED ?? 0), overdue, openedNotStarted, active, total: counts.reduce((s, c) => s + c._count._all, 0) };
     }));
     return rows;
   }
@@ -162,5 +163,8 @@ export class AssignmentService {
 
   async markByEntity(userId: string, entityType: string, entityId: string) {
     await this.prisma.userNotification.updateMany({ where: { recipientId: userId, entityType, entityId, readAt: null }, data: { readAt: new Date() } });
+    if (entityType === "Request") {
+      await this.prisma.request.updateMany({ where: { id: entityId, assignedManagerId: userId, firstOpenedAt: null }, data: { firstOpenedAt: new Date() } });
+    }
   }
 }

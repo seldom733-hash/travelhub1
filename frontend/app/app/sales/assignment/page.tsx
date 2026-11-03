@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/api";
 
-type Manager = { userId: string; name: string; availability: string; participates: boolean; new: number; processing: number; overdue: number; active: number; total: number };
+type Manager = { userId: string; name: string; availability: string; participates: boolean; new: number; processing: number; overdue: number; openedNotStarted: number; active: number; total: number };
 type Unassigned = { id: string; referenceNumber: string; status: string; assignmentState: string; createdAt: string };
 
 export default function AssignmentPage() {
@@ -35,8 +35,8 @@ export default function AssignmentPage() {
       {error && <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
       <section className="overflow-hidden rounded-xl border border-line bg-white">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">Менеджер</th><th>Новые</th><th>В обработке</th><th>Просрочено</th><th>Всего активных</th><th>Доступность</th><th>Участие</th></tr></thead>
-          <tbody>{managers.map((m) => <tr key={m.userId} className="border-t border-line/60"><td className="px-3 py-2 font-medium">{m.name}</td><td className="font-mono">{m.new}</td><td className="font-mono">{m.processing}</td><td className={`font-mono ${m.overdue > 0 ? "font-semibold text-rose-700" : ""}`}>{m.overdue}</td><td className="font-mono">{m.active}</td><td>{m.availability}</td><td>{m.participates ? "Да" : "Нет"}</td></tr>)}</tbody>
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">Менеджер</th><th>Новые</th><th>Прочитано, не взято</th><th>В обработке</th><th>Просрочено</th><th>Всего активных</th><th>Доступность</th><th>Участие</th></tr></thead>
+          <tbody>{managers.map((m) => <tr key={m.userId} className="border-t border-line/60"><td className="px-3 py-2 font-medium">{m.name}</td><td className="font-mono">{m.new}</td><td className={`font-mono ${m.openedNotStarted > 0 ? "font-semibold text-amber-700" : ""}`}>{m.openedNotStarted}</td><td className="font-mono">{m.processing}</td><td className={`font-mono ${m.overdue > 0 ? "font-semibold text-rose-700" : ""}`}>{m.overdue}</td><td className="font-mono">{m.active}</td><td>{m.availability}</td><td>{m.participates ? "Да" : "Нет"}</td></tr>)}</tbody>
         </table>
       </section>
       <section className="overflow-hidden rounded-xl border border-line bg-white">

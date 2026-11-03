@@ -94,7 +94,8 @@ describe("AssignmentService", () => {
 
   it("marks only the current user's unread notification for the opened request", async () => {
     const updateMany = jest.fn().mockResolvedValue({ count: 1 });
-    const prisma: any = { userNotification: { updateMany } };
+    const requestUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const prisma: any = { userNotification: { updateMany }, request: { updateMany: requestUpdateMany } };
     const service = new AssignmentService(prisma);
     await service.markByEntity("u1", "Request", "r1");
     expect(updateMany).toHaveBeenCalledWith({
