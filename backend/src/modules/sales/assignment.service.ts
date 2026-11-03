@@ -100,6 +100,20 @@ export class AssignmentService {
     return { assigned: false, queued: true, reason };
   }
 
+  async setManagerSettings(userId: string, input: { availability?: string; participates?: boolean; maxActiveRequests?: number | null }) {
+    const user = await this.prisma.user.findFirst({ where: { id: userId, role: { code: "SALES_MANAGER" } }, select: { id: true } });
+    if (!user) throw new NotFoundException("Manager not found");
+    return this.prisma.salesManagerProfile.upsert({
+      where: { userId },
+      create: { userId, availability: input.availability ?? "AVAILABLE", participatesInAutoDistribution: input.participates ?? true, maxActiveRequests: input.maxActiveRequests ?? null },
+      update: {
+        ...(input.availability ? { availability: input.availability } : {}),
+        ...(input.participates !== undefined ? { participatesInAutoDistribution: input.participates } : {}),
+        ...(input.maxActiveRequests !== undefined ? { maxActiveRequests: input.maxActiveRequests } : {}),
+      },
+    });
+  }
+
   async unassigned() {
     return this.prisma.request.findMany({
       where: { assignedManagerId: null, status: { in: ACTIVE as never } },
@@ -134,10 +148,11 @@ export class AssignmentService {
     const rows = await Promise.all(users.map(async (u) => {
       const counts = await this.prisma.request.groupBy({ by: ["status"], where: { assignedManagerId: u.id }, _count: { _all: true } });
       const overdue = await this.prisma.request.count({ where: { assignedManagerId: u.id, status: { in: ACTIVE as never }, slaDueAt: { lt: new Date() }, firstContactAt: null } });
+      const slaSoon = await this.prisma.request.count({ where: { assignedManagerId: u.id, status: { in: ACTIVE as never }, slaDueAt: { gte: new Date(), lte: new Date(Date.now() + 10 * 60_000) }, firstContactAt: null } });
       const openedNotStarted = await this.prisma.request.count({ where: { assignedManagerId: u.id, status: "NEW", firstOpenedAt: { not: null } } });
       const by = Object.fromEntries(counts.map((c) => [c.status, c._count._all]));
       const active = Object.entries(by).filter(([s]) => ACTIVE.includes(s)).reduce((sum, [, n]) => sum + n, 0);
-      return { userId: u.id, name: u.fullName ?? u.username, availability: profileByUser.get(u.id)?.availability ?? "INACTIVE", participates: profileByUser.get(u.id)?.participatesInAutoDistribution ?? false, new: by.NEW ?? 0, processing: (by.CHECKING ?? 0) + (by.CONFIRMED ?? 0), overdue, openedNotStarted, active, total: counts.reduce((s, c) => s + c._count._all, 0) };
+      return { userId: u.id, name: u.fullName ?? u.username, availability: profileByUser.get(u.id)?.availability ?? "INACTIVE", participates: profileByUser.get(u.id)?.participatesInAutoDistribution ?? false, maxActiveRequests: profileByUser.get(u.id)?.maxActiveRequests ?? null, new: by.NEW ?? 0, processing: (by.CHECKING ?? 0) + (by.CONFIRMED ?? 0), overdue, slaSoon, openedNotStarted, active, total: counts.reduce((s, c) => s + c._count._all, 0) };
     }));
     return rows;
   }

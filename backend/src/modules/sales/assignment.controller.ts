@@ -26,6 +26,12 @@ export class AssignmentController {
     return this.assignment.markByEntity(user.id, body.entityType, body.entityId);
   }
 
+  @Post("managers/:userId/settings")
+  @RequirePermissions("request.assignment.manage")
+  managerSettings(@Param("userId") userId: string, @Body() body: { availability?: string; participates?: boolean; maxActiveRequests?: number | null }) {
+    return this.assignment.setManagerSettings(userId, body);
+  }
+
   @Get("unassigned")
   @RequirePermissions("request.assignment.read")
   unassigned() { return this.assignment.unassigned(); }
