@@ -218,10 +218,11 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
     setNotice("");
     try {
       await api.patch(`/users/${pwdUser.id}/password`, { password: pwdValue });
-      setNotice(t("admin.form.reset_done", locale));
+      setNotice(`${t("admin.form.reset_done", locale)} @${pwdUser.username}`);
       setPwdUser(null);
       setPwdValue("");
-      await load(page, search, sortBy, sortDirection, statusFilter, roleFilter, dateFrom, dateTo);
+      // Список пользователей не меняется от смены пароля. Перезагрузка списка
+      // здесь приводила к сбросу текущей страницы/фильтров и ложному «1 пользователь».
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -544,6 +545,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
             </div>
 
             <button
+              type="button"
               onClick={() => void resetPassword()}
               disabled={pwdBusy || pwdValue.length < 8}
               className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"

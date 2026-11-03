@@ -24,7 +24,7 @@ export default function PanelFrame({
           <div className="text-lg font-bold text-slate-900">{title}</div>
           {subtitle && <div className="text-xs text-slate-400">{subtitle}</div>}
         </div>
-        <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100" aria-label="Закрыть">
+        <button type="button" onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100" aria-label="Закрыть">
           ✕
         </button>
       </div>
