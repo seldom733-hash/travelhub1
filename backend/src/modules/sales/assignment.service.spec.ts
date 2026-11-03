@@ -47,4 +47,16 @@ describe("AssignmentService", () => {
     await expect(service.assign("r1")).resolves.toEqual({ assigned: false, managerId: "u1" });
     expect(tx.request.update).not.toHaveBeenCalled();
   });
+
+  it("queues the request and notifies supervisors when no manager is eligible", async () => {
+    const tx = makeTx();
+    tx.salesManagerProfile.findMany.mockResolvedValue([]);
+    tx.userNotification = { create: jest.fn(), upsert: jest.fn().mockResolvedValue({}) };
+    const prisma: any = { $transaction: (fn: any) => fn(tx) };
+    const service = new AssignmentService(prisma);
+    const result = await service.assign("r1");
+    expect(result).toEqual({ assigned: false, queued: true, reason: "NO_AVAILABLE_MANAGERS" });
+    expect(tx.request.update).toHaveBeenCalledWith({ where: { id: "r1" }, data: { assignmentState: "QUEUED" } });
+    expect(tx.userNotification.upsert).toHaveBeenCalled();
+  });
 });
