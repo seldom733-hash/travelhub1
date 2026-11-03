@@ -309,6 +309,11 @@ export class DealsService {
     const customerById = new Map(customers.map((c) => [c.id, c]));
     const productById = new Map(products.map((p) => [p.id, p]));
     const partnerById = new Map(partners.map((p) => [p.id, p]));
+    const managerIds = [...new Set(requests.map((r) => r.assignedManagerId).filter((id): id is string => Boolean(id)))];
+    const managers = managerIds.length > 0
+      ? await this.prisma.user.findMany({ where: { id: { in: managerIds } }, select: { id: true, fullName: true, username: true } })
+      : [];
+    const managerById = new Map(managers.map((m) => [m.id, m]));
 
     return requests.map((request) => {
       const order = request.convertedOrderId ? orders.find((o) => o.id === request.convertedOrderId) : orderBySequence.get(request.commerceSequence);
@@ -428,7 +433,7 @@ export class DealsService {
               ?? partnerById.get(product?.partnerId ?? request.partnerId ?? "")?.name
               ?? request.partnerId
               ?? null,
-        manager: order?.createdBy ?? null,
+        manager: (request.assignedManagerId ? (managerById.get(request.assignedManagerId)?.fullName ?? managerById.get(request.assignedManagerId)?.username) : null) ?? order?.createdBy ?? null,
         travelerCount: request.travelerCount ?? null,
         serviceDate: dateOrNull(request.requestedServiceDate),
         createdAt: request.createdAt.toISOString(),
