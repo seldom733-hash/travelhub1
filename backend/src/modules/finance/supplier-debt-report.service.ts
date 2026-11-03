@@ -102,6 +102,8 @@ export class SupplierDebtReportService {
         {
           OR: [
             { code: { contains: search, mode: "insensitive" } },
+            { referenceNumber: { contains: search, mode: "insensitive" } },
+            { commerceSequence: { contains: search, mode: "insensitive" } },
             { invoiceNumber: { contains: search, mode: "insensitive" } },
             { orderCode: { contains: search, mode: "insensitive" } },
             { bookingCode: { contains: search, mode: "insensitive" } },
@@ -195,8 +197,8 @@ export class SupplierDebtReportService {
         invoiceNumber: obligation.invoiceNumber,
         supplierCode: obligation.supplierCode,
         partnerCode: obligation.partnerId ? (partnerCodes.get(obligation.partnerId) ?? null) : null,
-        orderCode: obligation.orderCode,
-        bookingCode: obligation.bookingCode,
+        orderCode: obligation.commerceSequence ? `MKT-ORD-${obligation.commerceSequence}` : obligation.orderCode,
+        bookingCode: obligation.commerceSequence && obligation.bookingCode ? `MKT-BKG-${obligation.commerceSequence}` : obligation.bookingCode,
         sourceAmount: toMoney2(obligation.sourceAmount, "sourceAmount").toString(),
         sourceCurrency: obligation.sourceCurrency,
         aznAmount: amount == null ? null : amount.toString(),
