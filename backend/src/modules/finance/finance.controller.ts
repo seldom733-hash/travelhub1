@@ -707,6 +707,12 @@ export class FinanceController {
     return res.send(csv);
   }
 
+  @Get("payments/pending-count")
+  @RequirePermissions("finance.payment.read")
+  async pendingPaymentsCount() {
+    return this.payments.pendingConfirmationCount();
+  }
+
   @Get("payments/:code")
   @RequirePermissions("finance.payment.read")
   async getPayment(@Param("code") code: string) {

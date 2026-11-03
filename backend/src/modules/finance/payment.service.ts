@@ -458,6 +458,11 @@ export class PaymentService {
   // status is exposed server-authoritatively (zero-count included); money stays
   // currency-scoped (no cross-currency totals). D7 financial authority untouched.
 
+  async pendingConfirmationCount(): Promise<{ count: number }> {
+    const count = await this.prisma.payment.count({ where: { status: "PENDING" } });
+    return { count };
+  }
+
   async list(query: {
     orderId?: string;
     status?: string;

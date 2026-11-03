@@ -148,6 +148,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const locale = useLocale();
   const [mounted, setMounted] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [pendingPayments, setPendingPayments] = useState(0);
   const collapsedRef = useRef(false);
   const { brandName } = useGlobalBranding();
 
@@ -168,6 +169,20 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     collapsedRef.current = collapsed;
   }, [collapsed]);
+
+  // Финансист видит, сколько платежей ждут подтверждения. Опрашиваем при
+  // переходе по разделам и раз в 30 секунд; менеджеру бейдж не нужен, если
+  // у него нет права подтверждения (но read есть — показываем только счётчик).
+  useEffect(() => {
+    if (!user?.permissions.includes("finance.payment.read")) { setPendingPayments(0); return; }
+    let alive = true;
+    const load = () => api.get<{ count: number }>("/finance/payments/pending-count")
+      .then((res) => { if (alive) setPendingPayments(Number(res.count) || 0); })
+      .catch(() => { if (alive) setPendingPayments(0); });
+    void load();
+    const timer = window.setInterval(load, 30000);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, [user?.id, pathname]);
 
   const toggleCollapse = useCallback(() => {
     setCollapsed((prev) => {
@@ -287,6 +302,14 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                     >
                       <span className="w-5 shrink-0 text-center text-base">{item.icon}</span>
                       {!collapsed && <span className="truncate">{label}</span>}
+                      {!collapsed && item.href === "/app/payments" && pendingPayments > 0 && (
+                        <span className="ml-auto inline-flex min-w-5 animate-pulse items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-900" title={`${pendingPayments} платежей ждут подтверждения`}>
+                          {pendingPayments}
+                        </span>
+                      )}
+                      {collapsed && item.href === "/app/payments" && pendingPayments > 0 && (
+                        <span className="absolute right-1 top-1 size-2 animate-pulse rounded-full bg-amber-400" />
+                      )}
                       {collapsed && (
                         <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                           {label}
