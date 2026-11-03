@@ -59,4 +59,18 @@ describe("AssignmentService", () => {
     expect(tx.request.update).toHaveBeenCalledWith({ where: { id: "r1" }, data: { assignmentState: "QUEUED" } });
     expect(tx.userNotification.upsert).toHaveBeenCalled();
   });
+
+  it("reassigns, records history and notifies the new manager", async () => {
+    const tx = makeTx();
+    tx.request.findUnique = jest.fn().mockResolvedValue({ id: "r1", assignedManagerId: "u1" });
+    tx.user.findFirst = jest.fn().mockResolvedValue({ id: "u2", fullName: "Two", username: "two" });
+    tx.salesManagerProfile.updateMany = jest.fn().mockResolvedValue({});
+    const prisma: any = { $transaction: (fn: any) => fn(tx) };
+    const service = new AssignmentService(prisma);
+    const result = await service.reassign("r1", "u2", "Перегрузка", { id: "admin", username: "admin" });
+    expect(result).toEqual({ ok: true, manager: "Two" });
+    expect(tx.request.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ assignedManagerId: "u2", assignmentType: "MANUAL" }) }));
+    expect(tx.requestHistory.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "REASSIGNED", from: "u1", to: "u2" }) }));
+    expect(tx.userNotification.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ recipientId: "u2", type: "REQUEST_REASSIGNED" }) }));
+  });
 });
