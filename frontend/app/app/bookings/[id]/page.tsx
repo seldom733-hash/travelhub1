@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -74,7 +74,7 @@ interface BookingDetail {
   linkedRequest?: { id: string; referenceNumber: string; status: string } | null;
 }
 
-// UI-C9 Â§11: narrow frontend views of server-provided finance objects (D7) â€”
+// UI-C9 §11: narrow frontend views of server-provided finance objects (D7) —
 // presentation typing only, no runtime/business change.
 interface FinancialSummaryView {
   totalAmount?: string;
@@ -115,7 +115,7 @@ interface HistoryRow {
   createdAt: string;
 }
 
-// Business timeline â€” NOT audit history (milestones vs immutable who-what-when).
+// Business timeline — NOT audit history (milestones vs immutable who-what-when).
 function buildMilestones(b: BookingDetail, locale: Locale): Array<{ key: string; label: string; timestamp: string | null }> {
   return [
     { key: "created", label: t("booking.milestone.created", locale), timestamp: b.createdAt },
@@ -142,16 +142,16 @@ export default function BookingDetailPage() {
   const [executing, setExecuting] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Prompt Â§5: + Ð¡Ð¾Ð·Ð´Ð°Ñ‚ÑŒ Ð¿Ð»Ð°Ñ‚ÐµÐ¶ Ð¸Ð· Booking detail. Payment Ð¿Ñ€Ð¸Ð½Ð°Ð´Ð»ÐµÐ¶Ð¸Ñ‚ Order â€”
-  // payload ÑÑ‚Ñ€Ð¾Ð¸Ñ‚ÑÑ Ð¸Ð· linkedOrder.id (bookingId ÐÐ˜ÐšÐžÐ“Ð”Ð Ð½Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÑÐµÑ‚ÑÑ).
+  // Prompt §5: + Создать платеж из Booking detail. Payment принадлежит Order —
+  // payload строится из linkedOrder.id (bookingId НИКОГДА не отправляется).
   const canCreatePayment = useCan("finance.payment.create");
   const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
   const [supplierPaymentOpen, setSupplierPaymentOpen] = useState(false);
   const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
   const [supplierObligations, setSupplierObligations] = useState<SupplierObligation[]>([]);
 
-  // MULTI/PARTIAL Â§7: Ð¿Ð»Ð°Ñ‚ÐµÐ¶Ð¸ linked Order Ð² Booking detail (permission-tolerant:
-  // 403/404 Ð½Ð° financial-history â†’ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° Ð¿Ñ€Ð¾ÑÑ‚Ð¾ Ð½Ðµ Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°ÐµÑ‚ÑÑ, ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¶Ð¸Ð²Ñ‘Ñ‚).
+  // MULTI/PARTIAL §7: платежи linked Order в Booking detail (permission-tolerant:
+  // 403/404 на financial-history → таблица просто не показывается, страница живёт).
   const [orderPaymentRows, setOrderPaymentRows] = useState<PaymentsTableRow[]>([]);
   const [paymentsUnavailable, setPaymentsUnavailable] = useState(false);
 
@@ -161,7 +161,7 @@ export default function BookingDetailPage() {
       setError("");
       const detail = await api.get<BookingDetail>(`/bookings/${id}`);
       setBooking(detail);
-      // Load history (non-blocking â€” audit must not break the page)
+      // Load history (non-blocking — audit must not break the page)
       setHistoryLoading(true);
       setHistoryError(null);
       try {
@@ -181,7 +181,7 @@ export default function BookingDetailPage() {
 
   useEffect(() => { void loadBooking(); }, [loadBooking]);
 
-  // Payments linked-Order: Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€ÑÐµÐ¼ Ð¿Ð¾ÑÐ»Ðµ ÐºÐ°Ð¶Ð´Ð¾Ð³Ð¾ loadBooking (action/create).
+  // Payments linked-Order: повторяем после каждого loadBooking (action/create).
   useEffect(() => {
     if (!booking?.orderId) return;
     let cancelled = false;
@@ -274,7 +274,7 @@ export default function BookingDetailPage() {
 
   const income = clientFinance.paid - supplierFinance.paid + supplierFinance.refunded;
 
-  // UI-C9: action errors surface in an inline header banner â€” the page content
+  // UI-C9: action errors surface in an inline header banner — the page content
   // and its centered load/not-found state remain untouched.
   const executeAction = useCallback(async (action: string) => {
     if (!booking) return;
@@ -298,7 +298,7 @@ export default function BookingDetailPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <div className="text-sm text-red-500">{error || t("crm.not_found", locale)}</div>
-        <Link href="/app/bookings" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">â† {t("crm.back_to_list", locale)}</Link>
+        <Link href="/app/bookings" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">← {t("crm.back_to_list", locale)}</Link>
       </div>
     );
   }
@@ -330,9 +330,9 @@ export default function BookingDetailPage() {
       }
     >
       <EntityDetailLayout>
-        {/* MAIN â€” primary + secondary business content */}
+        {/* MAIN — primary + secondary business content */}
         <EntityDetailMain>
-          {/* PRIMARY: Ð£ÑÐ»ÑƒÐ³Ð° / ÐžÐ±Ð·Ð¾Ñ€ Ð±Ñ€Ð¾Ð½Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ñ */}
+          {/* PRIMARY: Услуга / Обзор бронирования */}
           <EntitySectionCard title={t("bookings.service", locale)}>
             <EntityFieldGrid>
               <EntityField label={t("crm.col.order", locale)} value={
@@ -345,7 +345,7 @@ export default function BookingDetailPage() {
                   {booking.productTitle ?? booking.productId.slice(0, 8)}
                 </EntityLink>
               } />
-              {/* Service date is a service attribute â€” lives in Service, not Finance */}
+              {/* Service date is a service attribute — lives in Service, not Finance */}
               <EntityField label={t("crm.detail.service_date", locale)} value={fmtTs(booking.serviceDate)} />
               {booking.acquisitionSource && (
                 <EntityField label={t("bookings.acquisition_source", locale)} value={booking.acquisitionSource} />
@@ -353,11 +353,11 @@ export default function BookingDetailPage() {
             </EntityFieldGrid>
           </EntitySectionCard>
 
-          {/* SECONDARY: Finance â€” split client and supplier money */}
+          {/* SECONDARY: Finance — split client and supplier money */}
           {booking.returnedToOrder ? (
             <EntitySectionCard title={t("bookings.financial", locale)}>
               <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                Ð‘Ñ€Ð¾Ð½Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ðµ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰ÐµÐ½Ð¾ Ð² Ð·Ð°ÐºÐ°Ð·. Ð¤Ð¸Ð½Ð°Ð½ÑÑ‹ Ð¸ Ð¿Ð»Ð°Ñ‚ÐµÐ¶Ð¸ Ð²ÐµÐ´ÑƒÑ‚ÑÑ Ð² ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐµ Ð·Ð°ÐºÐ°Ð·Ð°{" "}
+                Бронирование возвращено в заказ. Финансы и платежи ведутся в карточке заказа{" "}
                 <Link href={`/app/orders/${booking.orderId}`} className="font-semibold underline">
                   {booking.orderReference ?? booking.orderCode}
                 </Link>
@@ -367,26 +367,26 @@ export default function BookingDetailPage() {
           ) : (
           <EntitySectionCard title={t("bookings.financial", locale)}>
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              ÐžÐ¿Ð»Ð°Ñ‚Ñ‹ ÐºÐ»Ð¸ÐµÐ½Ñ‚Ð°
+              Оплаты клиента
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <EntityFinanceCell label={t("crm.detail.total_amount", locale)} value={formatPrice(booking.amount, booking.currency, locale)} tone="neutral" />
-              <EntityFinanceCell label="ÐžÐ¿Ð»Ð°Ñ‡ÐµÐ½Ð¾ ÐºÐ»Ð¸ÐµÐ½Ñ‚Ð¾Ð¼" value={formatPrice(clientFinance.paid.toFixed(2), booking.currency ?? "AZN", locale)} tone="positive" />
-              <EntityFinanceCell label="Ðš Ð¾Ð¿Ð»Ð°Ñ‚Ðµ ÐºÐ»Ð¸ÐµÐ½Ñ‚Ð¾Ð¼" value={formatPrice(clientFinance.due.toFixed(2), booking.currency ?? "AZN", locale)} tone="warning" />
+              <EntityFinanceCell label="Оплачено клиентом" value={formatPrice(clientFinance.paid.toFixed(2), booking.currency ?? "AZN", locale)} tone="positive" />
+              <EntityFinanceCell label="К оплате клиентом" value={formatPrice(clientFinance.due.toFixed(2), booking.currency ?? "AZN", locale)} tone="warning" />
             </div>
 
             <div className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              ÐžÐ¿Ð»Ð°Ñ‚Ñ‹ Ð¿Ð¾ÑÑ‚Ð°Ð²Ñ‰Ð¸ÐºÑƒ
+              Оплаты поставщику
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              <EntityFinanceCell label="Ð¡ÐµÐ±ÐµÑÑ‚Ð¾Ð¸Ð¼Ð¾ÑÑ‚ÑŒ" value={formatPrice(supplierFinance.cost.toFixed(2), "AZN", locale)} tone="neutral" />
-              <EntityFinanceCell label="ÐžÐ¿Ð»Ð°Ñ‡ÐµÐ½Ð¾ Ð¿Ð¾ÑÑ‚Ð°Ð²Ñ‰Ð¸ÐºÑƒ" value={formatPrice(supplierFinance.paid.toFixed(2), "AZN", locale)} tone="positive" />
-              <EntityFinanceCell label="ÐžÑÑ‚Ð°Ð»Ð¾ÑÑŒ Ð¾Ð¿Ð»Ð°Ñ‚Ð¸Ñ‚ÑŒ" value={formatPrice(supplierFinance.remaining.toFixed(2), "AZN", locale)} tone="warning" />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <EntityFinanceCell label="Себестоимость" value={formatPrice(supplierFinance.cost.toFixed(2), "AZN", locale)} tone="neutral" />
+              <EntityFinanceCell label="Оплачено поставщику" value={formatPrice(supplierFinance.paid.toFixed(2), "AZN", locale)} tone="positive" />
+              <EntityFinanceCell label="Осталось оплатить" value={formatPrice(supplierFinance.remaining.toFixed(2), "AZN", locale)} tone="warning" />
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-3">
-              <EntityFinanceCell label="Ð’Ð¾Ð·Ð²Ñ€Ð°Ñ‰ÐµÐ½Ð¾ Ð¾Ñ‚ Ð¿Ð¾ÑÑ‚Ð°Ð²Ñ‰Ð¸ÐºÐ°" value={formatPrice(supplierFinance.refunded.toFixed(2), "AZN", locale)} tone="info" />
-              <EntityFinanceCell label="Ð”Ð¾Ñ…Ð¾Ð´" value={formatPrice(income.toFixed(2), "AZN", locale)} tone={income >= 0 ? "positive" : "negative"} />
+              <EntityFinanceCell label="Возвращено от поставщика" value={formatPrice(supplierFinance.refunded.toFixed(2), "AZN", locale)} tone="info" />
+              <EntityFinanceCell label="Доход" value={formatPrice(income.toFixed(2), "AZN", locale)} tone={income >= 0 ? "positive" : "negative"} />
               {financialSummary?.paymentStatus && (
                 <EntityFinanceCell label={t("crm.detail.payment_status", locale)} value={<StatusBadge status={financialSummary.paymentStatus} />} tone="neutral" />
               )}
@@ -394,7 +394,7 @@ export default function BookingDetailPage() {
 
             {activePayment && (
               <div className="mt-3 flex flex-wrap gap-4 border-t border-slate-100 pt-3 text-xs text-slate-500">
-                <span>{t("finance.payment_method", locale)}: {activePayment.paymentMethod ?? "â€”"}</span>
+                <span>{t("finance.payment_method", locale)}: {activePayment.paymentMethod ?? "—"}</span>
                 <span>{t("crm.detail.payment_status", locale)}: <StatusBadge status={activePayment.status ?? ""} /></span>
               </div>
             )}
@@ -411,14 +411,14 @@ export default function BookingDetailPage() {
                   onClick={() => setCreatePaymentOpen(true)}
                   className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                 >
-                  ÐŸÐ»Ð°Ñ‚Ñ‘Ð¶ ÐºÐ»Ð¸ÐµÐ½Ñ‚Ð°
+                  Платёж клиента
                 </button>
                 <button
                   type="button"
                   onClick={() => setSupplierPaymentOpen(true)}
                   className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
                 >
-                  ÐŸÐ»Ð°Ñ‚Ñ‘Ð¶ Ð¿Ð¾ÑÑ‚Ð°Ð²Ñ‰Ð¸ÐºÑƒ
+                  Платёж поставщику
                 </button>
               </div>
             )}
@@ -432,7 +432,7 @@ export default function BookingDetailPage() {
                   <EntityRow key={p.id}>
                     <span className="font-medium text-slate-700">{i + 1}.</span>
                     <span className="text-slate-700">{p.firstName} {p.lastName}</span>
-                    {p.passportNumber && <span className="text-slate-400">â€¢â€¢â€¢â€¢{p.passportNumber.slice(-4)}</span>}
+                    {p.passportNumber && <span className="text-slate-400">••••{p.passportNumber.slice(-4)}</span>}
                     {p.dataCompleteness && <StatusBadge status={p.dataCompleteness === "COMPLETE" ? "CONFIRMED" : "WAITING_FOR_DATA"} />}
                   </EntityRow>
                 ))}
@@ -454,7 +454,7 @@ export default function BookingDetailPage() {
           )}
         </EntityDetailMain>
 
-        {/* ASIDE â€” context column: lifecycle timeline + compact details */}
+        {/* ASIDE — context column: lifecycle timeline + compact details */}
         <EntityDetailAside>
           <EntitySectionCard title={t("detail.sections.timeline", locale)}>
             <EntityTimeline items={milestones} />
@@ -472,7 +472,7 @@ export default function BookingDetailPage() {
           </EntitySectionCard>
         </EntityDetailAside>
 
-        {/* WIDE â€” relations: canonical Commerce Relation Chain (UI-C2) */}
+        {/* WIDE — relations: canonical Commerce Relation Chain (UI-C2) */}
         <EntityDetailWide>
           <EntitySectionCard title={t("detail.sections.relations", locale)}>
             <CommerceRelationChain
@@ -485,7 +485,7 @@ export default function BookingDetailPage() {
           </EntitySectionCard>
         </EntityDetailWide>
 
-        {/* WIDE â€” notes */}
+        {/* WIDE — notes */}
         <EntityDetailWide>
           {user && (
             <OperationalNotes
@@ -498,7 +498,7 @@ export default function BookingDetailPage() {
           )}
         </EntityDetailWide>
 
-        {/* WIDE â€” audit: immutable change history (UI-C4 shared presentation) */}
+        {/* WIDE — audit: immutable change history (UI-C4 shared presentation) */}
         <EntityDetailWide>
           <EntityAuditHistory
             items={history}
@@ -509,7 +509,7 @@ export default function BookingDetailPage() {
         </EntityDetailWide>
       </EntityDetailLayout>
 
-      {/* + Ð¡Ð¾Ð·Ð´Ð°Ñ‚ÑŒ Ð¿Ð»Ð°Ñ‚ÐµÐ¶ â€” ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚ Booking, orderId = linkedOrder.id (prompt Â§5) */}
+      {/* + Создать платеж — контекст Booking, orderId = linkedOrder.id (prompt §5) */}
       <CreatePaymentForm
         open={createPaymentOpen}
         onClose={() => setCreatePaymentOpen(false)}
@@ -523,7 +523,7 @@ export default function BookingDetailPage() {
           currency: financialSummary?.currency ?? booking.currency,
         }}
         onCreated={() => {
-          // AC-13: Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ financialSummary / activePayment (Ð¸Ð· detail-ÑÐ½Ð´Ð¿Ð¾Ð¸Ð½Ñ‚Ð°)
+          // AC-13: обновить financialSummary / activePayment (из detail-эндпоинта)
           void loadBooking();
         }}
       />
