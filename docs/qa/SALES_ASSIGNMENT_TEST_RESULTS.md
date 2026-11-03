@@ -64,4 +64,5 @@ Elvira → 1 заявка
 - Две сессии Elvira: после reassign бейдж `1` в обеих; после открытия заявки в первой сессии через polling бейдж `0` в обеих.
 - Роли: `director` — load 200, reassign OK, 30 заявок; `finance` — load 403, reassign 403; `admin` — load 200; `operator` — load 403, reassign 403, 30 заявок.
 - Повторный вход: после reassign Elvira повторно вошла и получила `unread-count requests=2` — уведомления сохраняются между сессиями.
+- SLA-граница: `slaDueAt = UTC now + 5 минут`, `firstContactAt = null` → `slaSoon=1`; значение восстановлено на +30 минут.
 
