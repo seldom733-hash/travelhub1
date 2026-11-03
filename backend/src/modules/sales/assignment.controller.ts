@@ -21,6 +21,12 @@ export class AssignmentController {
   @Get("notifications/unread-count")
   unreadCount(@CurrentUser() user: AuthedRequest["user"]) { return this.assignment.unread(user.id); }
 
+  @Post(":requestId/assign")
+  @RequirePermissions("request.assignment.manage")
+  assign(@CurrentUser() user: AuthedRequest["user"], @Param("requestId") requestId: string) {
+    return this.assignment.assign(requestId, { id: user.id, username: user.username });
+  }
+
   @Post("notifications/:id/read")
   read(@CurrentUser() user: AuthedRequest["user"], @Param("id") id: string) { return this.assignment.markRead(user.id, id); }
 }

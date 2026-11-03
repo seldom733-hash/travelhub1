@@ -329,6 +329,14 @@ export const PERMISSIONS = {
   "whatsapp.send.recover": "Recovery-отправка UNKNOWN-сообщений («Retry anyway», только ADMIN)",
   "whatsapp.manage": "Управление WhatsApp-интеграцией (link/unlink контактов, параметры)",
   "whatsapp.session.admin": "Администрирование WhatsApp-сессии (connect/disconnect/logout)",
+
+  "request.load.read": "Просмотр собственной нагрузки по заявкам",
+  "request.load.read.department": "Просмотр нагрузки отдела продаж",
+  "request.assignment.read": "Просмотр назначений заявок",
+  "request.assignment.manage": "Управление настройками распределения заявок",
+  "request.assignment.reassign": "Ручное переназначение заявок",
+  "request.assignment.self_assign": "Взять заявку себе",
+  "request.stats.read": "Статистика эффективности менеджеров",
 } as const;
 
 export type PermissionCode = keyof typeof PERMISSIONS;
@@ -420,6 +428,11 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "marketing.attribution.manage",
     // M1 WhatsApp: DIRECTOR читает статусы интеграции (решение владельца №7).
     "whatsapp.read",
+    "request.load.read",
+    "request.load.read.department",
+    "request.assignment.read",
+    "request.assignment.reassign",
+    "request.stats.read",
   ],
 
   FINANCE: [
@@ -678,6 +691,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // (решение владельца №7: whatsapp.read + whatsapp.send).
     "whatsapp.read",
     "whatsapp.send",
+    "request.load.read",
+    "request.assignment.self_assign",
   ],
 
   OPERATOR: [
