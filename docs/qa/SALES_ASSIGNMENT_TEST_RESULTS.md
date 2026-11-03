@@ -69,3 +69,7 @@ Elvira → 1 заявка
 
 - Reconnect numeric: badge 4 -> offline 4 -> online 5; no reset, polling recovered.
 
+
+- Один доступный менеджер: Natalya/Ulviyye TEMP_UNAVAILABLE, заявка назначена Elvira.
+- participates=false у Elvira: заявка назначена Natalya; участие восстановлено.
+- Read-on-open: MKT-REQ-00000026 осталась NEW, firstOpenedAt установлен.
