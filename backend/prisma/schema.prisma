@@ -2617,6 +2617,19 @@ model Request {
 
   status RequestStatus @default(NEW)
 
+  /// Sales assignment / first-contact SLA.
+  assignedManagerId   String?
+  assignedAt          DateTime?
+  /// AUTO | MANUAL | SELF
+  assignmentType      String?
+  /// ASSIGNED | UNASSIGNED | QUEUED
+  assignmentState     String    @default("UNASSIGNED")
+  firstOpenedAt       DateTime?
+  processingStartedAt DateTime?
+  firstContactAt      DateTime?
+  slaDueAt            DateTime?
+  assignmentVersion   Int       @default(1)
+
   // ── Service snapshot ──
   requestedServiceDate DateTime?
   quantity             Int       @default(1)
@@ -6587,4 +6600,42 @@ model OrderPaymentSchedule {
 
   @@index([orderId])
   @@schema("finance")
+}
+
+
+/// Настройки участия sales-менеджера в автоматическом распределении.
+model SalesManagerProfile {
+  id                             String    @id @default(uuid())
+  userId                         String    @unique
+  participatesInAutoDistribution Boolean   @default(true)
+  /// AVAILABLE | TEMP_UNAVAILABLE | INACTIVE
+  availability                   String    @default("AVAILABLE")
+  maxActiveRequests              Int?
+  allowedRequestTypes            Json?
+  lastAssignedAt                 DateTime?
+  createdAt                      DateTime  @default(now())
+  updatedAt                      DateTime  @updatedAt
+
+  @@index([availability, participatesInAutoDistribution])
+  @@schema("sales")
+}
+
+/// Единое персональное уведомление (заявки, платежи).
+model UserNotification {
+  id          String    @id @default(uuid())
+  recipientId String
+  /// REQUEST_ASSIGNED | REQUEST_REASSIGNED | PAYMENT_CONFIRMATION
+  type        String
+  entityType  String
+  entityId    String
+  title       String
+  body        String?
+  payload     Json?
+  dedupeKey   String    @unique
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([recipientId, readAt])
+  @@index([recipientId, type, readAt])
+  @@schema("security")
 }
