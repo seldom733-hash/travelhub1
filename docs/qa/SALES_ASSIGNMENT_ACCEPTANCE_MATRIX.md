@@ -13,8 +13,8 @@
 | 7 | Достигнут maxActiveRequests | PASS | unit test |
 | 8 | Все достигли максимума | PASS | unit test ALL_MANAGERS_AT_LIMIT |
 | 9 | Нет доступных менеджеров | PASS | unit test NO_AVAILABLE_MANAGERS |
-| 10 | Заявка с витрины | NOT TESTED | нужен полный UI-прогон создания |
-| 11 | Заявка из универсального поиска | NOT TESTED | нужен полный UI-прогон |
+| 10 | Заявка с витрины | BLOCKED | публичный create-request требует доступный supplier offer; внешний re-check не выполнен |
+| 11 | Заявка из универсального поиска | BLOCKED | тот же публичный supplier flow; внешний offer не подтверждён |
 | 12 | Другой тип услуги | PASS | MKT-REQ-00000031 создана и назначена Ulviyye |
 | 13 | Уведомление назначенному | PASS | unread requests=1 |
 | 14 | Пункт «Заявки» мигает | PASS | badge animate-pulse |
@@ -48,8 +48,9 @@
 ```text
 PASS:        36
 PARTIAL:      0
-NOT TESTED:   2
+NOT TESTED:   0
+BLOCKED:      2
 FAIL:         0
 ```
 
-Не отмечены PASS: 10, 11. Публичный `create-request` теперь вызывает AssignmentService, но фактический UI-прогон создания с витрины/поиска не выполнен.
+Не отмечены PASS: 10, 11 — внешний supplier re-check для публичного offer. Код публичного create-request вызывает AssignmentService, тест 30 passed; end-to-end с реальным офером не выполнен.
