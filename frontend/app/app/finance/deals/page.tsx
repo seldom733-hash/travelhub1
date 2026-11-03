@@ -19,8 +19,9 @@ const KPI: KpiCard[] = [
   { key: "supplierPenalty", label: "Штрафы от поставщика", icon: "⚑", tone: "bg-fuchsia-50 text-fuchsia-700" },
   { key: "expectedIncome", label: "Ожидаемый доход", icon: "↗", tone: "bg-emerald-50 text-emerald-700" },
   { key: "currentIncome", label: "Текущий доход", icon: "✓", tone: "bg-teal-50 text-teal-700" },
+  { key: "cancelledSalesAmount", label: "Отменённые продажи", icon: "⊘", tone: "bg-rose-50 text-rose-700" },
 ];
-const EMPTY: DealKpi = { salesAmount: "0", costAmount: "0", grossMargin: "0", clientReceived: "0", clientDebt: "0", clientRefunded: "0", supplierPaid: "0", supplierDebt: "0", supplierRefunded: "0", clientPenalty: "0", supplierPenalty: "0", expectedIncome: "0", currentIncome: "0", currency: "AZN", count: 0 };
+const EMPTY: DealKpi = { salesAmount: "0", costAmount: "0", grossMargin: "0", clientReceived: "0", clientDebt: "0", clientRefunded: "0", supplierPaid: "0", supplierDebt: "0", supplierRefunded: "0", clientPenalty: "0", supplierPenalty: "0", expectedIncome: "0", currentIncome: "0", cancelledSalesAmount: "0", lostIncome: "0", currency: "AZN", count: 0 };
 const label: Record<string, string> = {
   NEW: "Новая", CHECKING: "Проверка", SUPPLIER_TIMEOUT: "Поставщик не ответил", PRICE_CHANGED: "Цена изменилась",
   CUSTOMER_ACCEPTED: "Клиент согласовал", CONFIRMED: "Подтверждён", CONVERTED: "Сконвертирован", REJECTED: "Отклонён",
@@ -51,7 +52,7 @@ export default function DealsPage() {
   const [columns, setColumns] = useState({ customer: true, supplier: true, travelers: true, cost: true, currentIncome: true });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [periodOpen, setPeriodOpen] = useState(false);
-  const [query, setQuery] = useState({ search: "", stage: "", status: "", financialStatus: "", clientPayment: "", supplierPayment: "", serviceType: "", dateField: "createdAt", dateFrom: "", dateTo: "", supplierId: "", manager: "", sortBy: "createdAt", sortDirection: "desc" });
+  const [query, setQuery] = useState({ search: "", stage: "", status: "", statusGroup: "", financialStatus: "", clientPayment: "", supplierPayment: "", serviceType: "", dateField: "createdAt", dateFrom: "", dateTo: "", supplierId: "", manager: "", sortBy: "createdAt", sortDirection: "desc" });
   const apiQuery = useMemo<DealQuery>(() => ({ ...query, page, pageSize }), [query, page, pageSize]);
   const load = useCallback(async () => { setLoading(true); setError(""); try { const r = await dealsApi.list(apiQuery); setData(r); setKpi(r.kpi); } catch (e) { setError((e as Error).message); } finally { setLoading(false); } }, [apiQuery]);
   useEffect(() => { void load(); }, [load]);
@@ -83,11 +84,24 @@ export default function DealsPage() {
 
       <div className="space-y-4 p-4 lg:p-6">
         <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-          {KPI.map((c) => <button key={c.key} type="button" onClick={() => setModal(c)} className="flex items-start gap-2 rounded-xl border border-[#e5e2da] bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-semibold ${c.tone}`}>{c.icon}</span><span className="min-w-0"><span className="block truncate text-[10px] font-medium uppercase tracking-wide text-[#667085]">{c.label}</span><span className="mt-1 block font-mono text-[16px] font-semibold tabular-nums text-[#101828]">{fmt(String(kpi[c.key] ?? "0"), kpi.currency)}</span></span></button>)}
+          {KPI.map((c) => <button key={c.key} type="button" title={c.key === "cancelledSalesAmount" ? "Σ сумма продаж сделок со статусами CANCELLED / CANCELLED_BY_CUSTOMER / SUPPLIER_REJECTED / REJECTED за выбранный период. Не включает возвраты и штрафы — они показаны отдельно." : undefined} onClick={() => c.key === "cancelledSalesAmount" ? setFilter({ statusGroup: query.statusGroup === "cancelled" ? "" : "cancelled", status: "" }) : setModal(c)} className={`flex items-start gap-2 rounded-xl border bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${c.key === "cancelledSalesAmount" && query.statusGroup === "cancelled" ? "border-rose-300 ring-1 ring-rose-200" : "border-[#e5e2da]"}`}><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-semibold ${c.tone}`}>{c.icon}</span><span className="min-w-0"><span className="block truncate text-[10px] font-medium uppercase tracking-wide text-[#667085]">{c.label}</span><span className="mt-1 block font-mono text-[16px] font-semibold tabular-nums text-[#101828]">{fmt(String(kpi[c.key] ?? "0"), kpi.currency)}</span></span></button>)}
         </div>
 
+        {Number(kpi.lostIncome) > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-rose-700">Потери дохода от отмен</div>
+              <div className="text-[11px] text-rose-700/80">Маржа отменённых сделок минус удержанные штрафы. Возвраты и штрафы отдельно, без двойного счёта.</div>
+            </div>
+            <div className="text-right">
+              <div className="font-mono text-xl font-semibold text-rose-800">{fmt(kpi.lostIncome, kpi.currency)}</div>
+              <button type="button" onClick={() => setFilter({ statusGroup: query.statusGroup === "cancelled" ? "" : "cancelled", status: "" })} className="text-[10px] font-semibold underline">Показать отменённые сделки</button>
+            </div>
+          </div>
+        )}
+
         <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm">
-          <div className="flex flex-wrap items-center gap-2"><div className="relative min-w-[320px] flex-1"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">⌕</span><input value={query.search} onChange={(e) => setFilter({ search: e.target.value })} placeholder="Поиск по номеру/коду (заявка, заказ, бронь), ФИО клиента или телефону" className="w-full rounded-lg border border-[#e5e2da] bg-[#fbfaf7] py-2 pl-9 pr-3 text-xs outline-none focus:border-[#0f6b5f]" /></div><span className="text-[10px] text-[#98a2b3]">Например:</span>{["00000001", "mkt-ord-00000001", "Алиев Эльвин", "+994 50 123 45 67"].map((h) => <button key={h} type="button" onClick={() => setFilter({ search: h })} className="rounded-full border border-[#e5e2da] bg-[#fbfaf7] px-2 py-1 text-[10px] text-[#475467]">{h}</button>)}</div>
+          <div className="flex flex-wrap items-center gap-2"><div className="relative min-w-[320px] flex-1"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">⌕</span><input value={query.search} onChange={(e) => setFilter({ search: e.target.value })} placeholder="Поиск по номеру/коду (заявка, заказ, бронь), ФИО клиента или телефону" className="w-full rounded-lg border border-[#e5e2da] bg-[#fbfaf7] py-2 pl-9 pr-3 text-xs outline-none focus:border-[#0f6b5f]" /></div><span className="text-[10px] text-[#98a2b3]">Например:</span>{["00000001", "mkt-ord-00000001", "Алиев Эльвин", "+994 50 123 45 67"].map((h) => <button key={h} type="button" onClick={() => setFilter({ search: h })} className="rounded-full border border-[#e5e2da] bg-[#fbfaf7] px-2 py-1 text-[10px] text-[#475467]">{h}</button>)}<button type="button" onClick={() => setFilter({ statusGroup: query.statusGroup === "cancelled" ? "" : "cancelled", status: "" })} className={`rounded-full border px-2 py-1 text-[10px] ${query.statusGroup === "cancelled" ? "border-rose-300 bg-rose-50 text-rose-700" : "border-[#e5e2da] bg-[#fbfaf7] text-[#475467]"}`}>Только отмены</button></div>
           <div className="mt-2 grid gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
             <Sel label="Страна"><option>Все страны</option></Sel>
             <Sel label="Поставщик" value={query.supplierId} onChange={(v) => setFilter({ supplierId: v })}><option value="">Все поставщики</option></Sel>

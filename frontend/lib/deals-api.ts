@@ -46,6 +46,8 @@ export interface DealRow {
   supplierPenalty: string;
   expectedIncome: string;
   currentIncome: string;
+  cancelledSalesAmount: string;
+  lostIncome: string;
   currency: string;
   financialStatus: string;
   paymentStatus: string;
@@ -59,6 +61,7 @@ export interface DealKpi {
   salesAmount: string; costAmount: string; grossMargin: string; clientReceived: string; clientDebt: string;
   clientRefunded: string; supplierPaid: string; supplierDebt: string; supplierRefunded: string;
   clientPenalty: string; supplierPenalty: string; expectedIncome: string; currentIncome: string;
+  cancelledSalesAmount: string; lostIncome: string;
   currency: string; count: number;
 }
 

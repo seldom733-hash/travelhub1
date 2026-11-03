@@ -6,6 +6,7 @@ type DealQuery = {
   search?: string;
   stage?: string;
   status?: string;
+  statusGroup?: string;
   supplierId?: string;
   manager?: string;
   clientPayment?: string;
@@ -68,6 +69,8 @@ type DealRow = {
   supplierPenalty: string;
   expectedIncome: string;
   currentIncome: string;
+  cancelledSalesAmount: string;
+  lostIncome: string;
   currency: string;
   financialStatus: string;
   paymentStatus: string;
@@ -157,6 +160,8 @@ export class DealsService {
       supplierPenalty: fixed(sum("supplierPenalty")),
       expectedIncome: fixed(salesSum("expectedIncome")),
       currentIncome: fixed(salesSum("currentIncome")),
+      cancelledSalesAmount: fixed(rows.filter((row) => row.stage !== "REQUEST" && cancelledStatuses.has(row.status)).reduce((total, row) => total + Number(row.cancelledSalesAmount), 0)),
+      lostIncome: fixed(rows.filter((row) => row.stage !== "REQUEST" && cancelledStatuses.has(row.status)).reduce((total, row) => total + Number(row.lostIncome), 0)),
       currency: rows[0]?.currency ?? "AZN",
       count: rows.length,
     };
@@ -178,6 +183,7 @@ export class DealsService {
       }
       if (query.stage && row.stage !== query.stage) return false;
       if (query.status && row.status !== query.status) return false;
+      if (query.statusGroup === "cancelled" && !["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED", "REJECTED"].includes(row.status)) return false;
       if (query.supplierId && row.supplierId !== query.supplierId) return false;
       if (query.manager && row.manager !== query.manager) return false;
       if (query.clientPayment && row.paymentStatus !== query.clientPayment) return false;
@@ -374,6 +380,8 @@ export class DealsService {
           : settlement
             ? Math.max(0, money(settlement.finalCustomerLiability) - supplierPaid + supplierRefunded)
             : 0;
+      const cancelledSalesAmount = cancelled ? sales : 0;
+      const lostIncome = cancelled ? Math.max(0, sales - cost - (clientPenalty - supplierPenalty)) : 0;
       const attrs = productAttributes;
       const nights = Number(attrs.nights ?? snapOffer.nights ?? 0) || null;
       const country = typeof attrs.country === "string" ? attrs.country : typeof snapOffer.country === "string" ? snapOffer.country : null;
@@ -446,6 +454,8 @@ export class DealsService {
         supplierPenalty: fixed(Number(supplierPenalty)),
         expectedIncome: fixed(expectedIncome),
         currentIncome: fixed(currentIncome),
+        cancelledSalesAmount: fixed(cancelledSalesAmount),
+        lostIncome: fixed(lostIncome),
         currency: order?.currency ?? request.confirmedCurrency ?? request.displayedCurrency ?? "AZN",
         financialStatus: settlement?.status ?? order?.financialStatus ?? "OPEN",
         paymentStatus: captured <= 0 ? "UNPAID" : captured >= sales ? "PAID" : "PARTIALLY_PAID",

@@ -9,6 +9,7 @@ function queryFrom(raw: Record<string, string | undefined>) {
     search: raw.search,
     stage: raw.stage,
     status: raw.status,
+    statusGroup: raw.statusGroup,
     supplierId: raw.supplierId,
     manager: raw.manager,
     clientPayment: raw.clientPayment,
