@@ -193,7 +193,7 @@ export class SupplierDebtReportService {
       else status = "OPEN";
 
       return {
-        obligationCode: obligation.code,
+        obligationCode: obligation.referenceNumber ?? obligation.code,
         invoiceNumber: obligation.invoiceNumber,
         supplierCode: obligation.supplierCode,
         partnerCode: obligation.partnerId ? (partnerCodes.get(obligation.partnerId) ?? null) : null,
