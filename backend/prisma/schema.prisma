@@ -5375,6 +5375,10 @@ model Payout {
 model SupplierObligation {
   id              String    @id @default(uuid())
   code            String    @unique // SBO-########
+  /// Человекочитаемый номер внутри сделки: SBO-{commerceSequence}-{dealOrdinal}.
+  referenceNumber String?   @unique
+  commerceSequence String?
+  dealOrdinal     Int?
   /// Канонический booking-триггер (одна obligation на booking=item/service).
   bookingId       String    @unique
   bookingCode     String?
@@ -5420,6 +5424,7 @@ model SupplierObligation {
   allocations     SupplierPayoutAllocation[]
   events          SupplierObligationEvent[]
 
+  @@unique([commerceSequence, dealOrdinal])
   @@index([orderId])
   @@index([status])
   @@index([supplierCode])

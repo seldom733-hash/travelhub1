@@ -65,7 +65,7 @@ export class SupplierObligationConsumer implements OnModuleInit {
 
         const order = await tx.order.findUnique({
           where: { id: booking.orderId },
-          select: { id: true, code: true, currency: true, sellerPartnerId: true, commercialSnapshot: true },
+          select: { id: true, code: true, currency: true, sellerPartnerId: true, commercialSnapshot: true, commerceSequence: true },
         });
         if (!order) {
           await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });
@@ -83,6 +83,7 @@ export class SupplierObligationConsumer implements OnModuleInit {
             bookingCode: booking.code,
             orderId: order.id,
             orderCode: order.code,
+            commerceSequence: order.commerceSequence,
             orderItemId: booking.orderItemId,
             bookingAmount: booking.amount,
             bookingCurrency,

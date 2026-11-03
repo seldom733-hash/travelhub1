@@ -244,7 +244,7 @@ function ObligationsContent() {
               <tbody>
                 {(items ?? []).map((ob) => (
                   <tr key={ob.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                    <td className="px-4 py-2.5 font-mono text-xs font-semibold text-slate-900">{ob.code}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs font-semibold text-slate-900">{ob.referenceNumber ?? ob.code}<div className="text-[9px] font-normal text-slate-400">{ob.referenceNumber ? ob.code : ""}</div></td>
                     <td className="px-4 py-2.5 text-sm text-slate-900">{ob.partnerCode ?? ob.supplierCode ?? "—"}</td>
                     <td className="px-4 py-2.5 font-mono text-xs text-slate-700">{ob.invoiceNumber ?? "—"}</td>
                     <td className="px-4 py-2.5 text-xs">
@@ -298,7 +298,7 @@ function ObligationsContent() {
 
       {/* ── Detail panel ──────────────────────────────────────────────────── */}
       {detail && (
-        <PanelFrame title={detail.code} subtitle={detail.partnerCode ?? detail.supplierCode ?? undefined} onClose={() => setDetail(null)}>
+        <PanelFrame title={detail.referenceNumber ?? detail.code} subtitle={detail.partnerCode ?? detail.supplierCode ?? undefined} onClose={() => setDetail(null)}>
           <div className="space-y-4 p-4 text-sm">
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
               <div>

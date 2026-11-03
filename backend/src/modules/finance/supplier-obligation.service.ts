@@ -47,6 +47,7 @@ export interface Actor {
 export interface SupplierObligationDto {
   id: string;
   code: string;
+  referenceNumber: string | null;
   bookingId: string;
   bookingCode: string | null;
   orderId: string;
@@ -113,6 +114,9 @@ export interface SupplierPayoutDto {
 interface ObligationRow {
   id: string;
   code: string;
+  referenceNumber: string | null;
+  commerceSequence: string | null;
+  dealOrdinal: number | null;
   bookingId: string;
   bookingCode: string | null;
   orderId: string;
@@ -171,6 +175,7 @@ export class SupplierObligationService {
       bookingCode: string | null;
       orderId: string;
       orderCode: string | null;
+      commerceSequence?: string | null;
       orderItemId: string | null;
       /** Замороженная сумма брони (из Booking.amount, исходная валюта). */
       bookingAmount: Prisma.Decimal;
@@ -223,10 +228,27 @@ export class SupplierObligationService {
       : null;
 
     const code = await this.ids.nextCode(tx, "SBO");
+    const commerceSequence = input.commerceSequence?.trim() || null;
+    let dealOrdinal: number | null = null;
+    if (commerceSequence) {
+      // Сериализуем выдачу ordinal в рамках заказа/сделки: два BookingConfirmed
+      // по разным услугам не должны получить одинаковый суффикс.
+      await tx.$queryRaw`SELECT id FROM "order"."Order" WHERE id = ${input.orderId} FOR UPDATE`;
+      const last = await tx.supplierObligation.findFirst({
+        where: { commerceSequence },
+        orderBy: { dealOrdinal: "desc" },
+        select: { dealOrdinal: true },
+      });
+      dealOrdinal = (last?.dealOrdinal ?? 0) + 1;
+    }
+    const referenceNumber = commerceSequence && dealOrdinal ? `SBO-${commerceSequence}-${dealOrdinal}` : null;
     try {
       const row = await tx.supplierObligation.create({
         data: {
           code,
+          referenceNumber,
+          commerceSequence,
+          dealOrdinal,
           bookingId: input.bookingId,
           bookingCode: input.bookingCode,
           orderId: input.orderId,
@@ -889,6 +911,7 @@ export class SupplierObligationService {
     return {
       id: row.id,
       code: row.code,
+      referenceNumber: row.referenceNumber ?? null,
       bookingId: row.bookingId,
       bookingCode: row.bookingCode,
       orderId: row.orderId,

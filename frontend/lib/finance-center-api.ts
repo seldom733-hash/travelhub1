@@ -87,6 +87,7 @@ export interface SupplierPayout {
 export interface SupplierObligation {
   id: string;
   code: string;
+  referenceNumber: string | null;
   bookingId: string;
   bookingCode: string | null;
   orderId: string;
