@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
@@ -20,6 +20,11 @@ export class AssignmentController {
 
   @Get("notifications/unread-count")
   unreadCount(@CurrentUser() user: AuthedRequest["user"]) { return this.assignment.unread(user.id); }
+
+  @Post("notifications/read-entity")
+  readEntity(@CurrentUser() user: AuthedRequest["user"], @Body() body: { entityType: string; entityId: string }) {
+    return this.assignment.markByEntity(user.id, body.entityType, body.entityId);
+  }
 
   @Post(":requestId/assign")
   @RequirePermissions("request.assignment.manage")

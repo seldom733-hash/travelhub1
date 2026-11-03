@@ -196,6 +196,17 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     return () => { alive = false; window.clearInterval(timer); };
   }, [user?.id, pathname]);
 
+  // Opening a request marks its assignment notification read; the request
+  // business status is untouched (read ≠ processing started).
+  useEffect(() => {
+    const match = pathname.match(/^\/app\/requests\/([^/]+)/);
+    if (!match || !user) return;
+    void api.post("/sales/assignment/notifications/read-entity", { entityType: "Request", entityId: match[1] })
+      .then(() => api.get<{ requests: number }>("/sales/assignment/notifications/unread-count"))
+      .then((res) => setUnreadRequests(Number(res.requests) || 0))
+      .catch(() => undefined);
+  }, [pathname, user?.id]);
+
   const toggleCollapse = useCallback(() => {
     setCollapsed((prev) => {
       const next = !prev;
