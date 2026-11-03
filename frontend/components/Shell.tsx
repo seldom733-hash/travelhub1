@@ -180,7 +180,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     let alive = true;
     const load = () => api.get<{ payments: number }>("/sales/assignment/notifications/unread-count")
       .then((res) => { if (alive) setPendingPayments(Number(res.payments) || 0); })
-      .catch(() => { if (alive) setPendingPayments(0); });
+      .catch(() => undefined);
     void load();
     const timer = window.setInterval(load, 30000);
     return () => { alive = false; window.clearInterval(timer); };
@@ -191,7 +191,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     let alive = true;
     const load = () => api.get<{ requests: number }>("/sales/assignment/notifications/unread-count")
       .then((res) => { if (alive) setUnreadRequests(Number(res.requests) || 0); })
-      .catch(() => { if (alive) setUnreadRequests(0); });
+      .catch(() => undefined);
     void load();
     const timer = window.setInterval(load, 30000);
     return () => { alive = false; window.clearInterval(timer); };
