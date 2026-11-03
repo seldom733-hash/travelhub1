@@ -9,6 +9,7 @@ import { buildWorkingSnapshot } from "../pricing/commercial-snapshot";
 import { SupplierPricingService } from "../pricing/supplier-pricing.service";
 import { getEffectiveTravelerRequirements } from "../catalog/traveler-requirements";
 import { CrmService } from "../crm/crm.service";
+import { AssignmentService } from "../sales/assignment.service";
 import { resolveCustomer } from "../../shared/customer-resolver/customer-resolver";
 import { normalizePhoneE164 } from "../../shared/phone/phone";
 import { normalizeEmail } from "../../shared/field-validation";
@@ -36,6 +37,7 @@ export class TourRequestService {
     private readonly refNum: ReferenceNumberService,
     private readonly offerService: SupplierOfferService,
     private readonly crm: CrmService,
+    private readonly assignment: AssignmentService,
   ) {}
 
   async createTourRequest(dto: {
@@ -349,6 +351,12 @@ export class TourRequestService {
         convertedAt: null,
       },
     });
+
+    try {
+      await this.assignment.assign(request.id);
+    } catch {
+      // Assignment failure leaves the request persisted and visible in queue.
+    }
 
     this.logger.log(
       `Tour request created: ${referenceNumber} (offer=${dto.externalOfferId}, hotel=${dto.hotel}, price=${displayedPrice} ${displayedCurrency}, supplierRecheck=${recheck.amount} ${recheck.currency})`,
