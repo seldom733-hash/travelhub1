@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 
@@ -9,8 +9,25 @@ const ACTIVE = ["NEW", "CHECKING", "SUPPLIER_TIMEOUT", "PRICE_CHANGED", "CUSTOME
 export class AssignmentService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getSettings() {
+    return this.prisma.salesAssignmentSettings.upsert({
+      where: { id: "default" },
+      create: { id: "default", mode: "AUTO" },
+      update: {},
+    });
+  }
+
+  async updateSettings(mode: string, actor: { id: string; username: string }) {
+    const normalized = mode === "MANUAL" ? "MANUAL" : "AUTO";
+    return this.prisma.salesAssignmentSettings.upsert({
+      where: { id: "default" },
+      create: { id: "default", mode: normalized, updatedById: actor.id },
+      update: { mode: normalized, updatedById: actor.id },
+    });
+  }
+
   /** Атомарно назначает наименее загруженного SALES_MANAGER с Round Robin. */
-  async assign(requestId: string, actor?: { id: string; username: string }) {
+  async assign(requestId: string, actor?: { id: string; username: string }, options?: { respectMode?: boolean }) {
     return this.prisma.$transaction(async (tx) => {
       // Lock the request row: two concurrent creates/assignments cannot both win.
       const locked = await tx.$queryRaw<Array<{ id: string; assignedManagerId: string | null }>>`
@@ -20,8 +37,15 @@ export class AssignmentService {
       if (!current) throw new NotFoundException("Request not found");
       if (current.assignedManagerId) return { assigned: false, managerId: current.assignedManagerId };
 
+      if (options?.respectMode) {
+        const settings = await tx.salesAssignmentSettings.findUnique({ where: { id: "default" } });
+        if (settings?.mode === "MANUAL") {
+          return this.queue(tx, requestId, "MANUAL_MODE");
+        }
+      }
+
       const profiles = await tx.salesManagerProfile.findMany({
-        where: { participatesInAutoDistribution: true, availability: "AVAILABLE" },
+        where: { participatesInAutoDistribution: true, availability: "FREE" },
       });
       if (profiles.length === 0) return this.queue(tx, requestId, "NO_AVAILABLE_MANAGERS");
 
@@ -100,9 +124,24 @@ export class AssignmentService {
     return { assigned: false, queued: true, reason };
   }
 
+  async getMyStatus(userId: string) {
+    const profile = await this.prisma.salesManagerProfile.findUnique({ where: { userId } });
+    return { availability: profile?.availability ?? "FREE" };
+  }
+
+  async setMyStatus(userId: string, status: string) {
+    if (!["FREE", "BUSY", "ABSENT"].includes(status)) throw new BadRequestException("Unknown manager status");
+    return this.prisma.salesManagerProfile.upsert({
+      where: { userId },
+      create: { userId, availability: status },
+      update: { availability: status },
+    });
+  }
+
   async setManagerSettings(userId: string, input: { availability?: string; participates?: boolean; maxActiveRequests?: number | null }) {
     const user = await this.prisma.user.findFirst({ where: { id: userId, role: { code: "SALES_MANAGER" } }, select: { id: true } });
     if (!user) throw new NotFoundException("Manager not found");
+    if (input.availability && !["FREE", "BUSY", "ABSENT"].includes(input.availability)) throw new BadRequestException("Unknown manager status");
     return this.prisma.salesManagerProfile.upsert({
       where: { userId },
       create: { userId, availability: input.availability ?? "AVAILABLE", participatesInAutoDistribution: input.participates ?? true, maxActiveRequests: input.maxActiveRequests ?? null },
@@ -133,6 +172,8 @@ export class AssignmentService {
       }
       const user = await tx.user.findFirst({ where: { id: managerId, status: "ACTIVE", role: { code: "SALES_MANAGER" } }, select: { id: true, fullName: true, username: true } });
       if (!user) throw new NotFoundException("Manager not found or inactive");
+      const profile = await tx.salesManagerProfile.findUnique({ where: { userId: managerId } });
+      if (profile?.availability === "ABSENT") throw new BadRequestException("Manager is absent");
       const now = new Date();
       await tx.request.update({ where: { id: requestId }, data: { assignedManagerId: managerId, assignedAt: now, assignmentType: "MANUAL", assignmentState: "ASSIGNED", slaDueAt: new Date(now.getTime() + 30 * 60_000), assignmentVersion: { increment: 1 } } });
       await tx.salesManagerProfile.updateMany({ where: { userId: managerId }, data: { lastAssignedAt: now } });

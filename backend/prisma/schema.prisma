@@ -6608,8 +6608,8 @@ model SalesManagerProfile {
   id                             String    @id @default(uuid())
   userId                         String    @unique
   participatesInAutoDistribution Boolean   @default(true)
-  /// AVAILABLE | TEMP_UNAVAILABLE | INACTIVE
-  availability                   String    @default("AVAILABLE")
+  /// FREE | BUSY | ABSENT
+  availability                   String    @default("FREE")
   maxActiveRequests              Int?
   allowedRequestTypes            Json?
   lastAssignedAt                 DateTime?
@@ -6617,6 +6617,17 @@ model SalesManagerProfile {
   updatedAt                      DateTime  @updatedAt
 
   @@index([availability, participatesInAutoDistribution])
+  @@schema("sales")
+}
+
+/// Глобальный режим распределения заявок: AUTO | MANUAL.
+model SalesAssignmentSettings {
+  id          String   @id @default("default")
+  mode        String   @default("AUTO")
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
   @@schema("sales")
 }
 

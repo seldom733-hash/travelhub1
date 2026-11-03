@@ -4,9 +4,10 @@ function makeTx() {
   const tx: any = {
     $queryRaw: jest.fn().mockResolvedValue([{ id: "r1", assignedManagerId: null }]),
     salesManagerProfile: {
+      findUnique: jest.fn().mockResolvedValue({ availability: "FREE" }),
       findMany: jest.fn().mockResolvedValue([
-        { userId: "u1", participatesInAutoDistribution: true, availability: "AVAILABLE", maxActiveRequests: 5, lastAssignedAt: new Date("2026-01-01") },
-        { userId: "u2", participatesInAutoDistribution: true, availability: "AVAILABLE", maxActiveRequests: 5, lastAssignedAt: null },
+        { userId: "u1", participatesInAutoDistribution: true, availability: "FREE", maxActiveRequests: 5, lastAssignedAt: new Date("2026-01-01") },
+        { userId: "u2", participatesInAutoDistribution: true, availability: "FREE", maxActiveRequests: 5, lastAssignedAt: null },
       ]),
       update: jest.fn().mockResolvedValue({}),
     },
@@ -16,6 +17,7 @@ function makeTx() {
         { id: "u2", fullName: "Two", username: "two" },
       ]),
     },
+    salesAssignmentSettings: { findUnique: jest.fn().mockResolvedValue({ id: "default", mode: "AUTO" }) },
     request: {
       groupBy: jest.fn().mockResolvedValue([]),
       update: jest.fn().mockResolvedValue({}),
@@ -79,8 +81,8 @@ describe("AssignmentService", () => {
   it("queues when every manager reached maxActiveRequests", async () => {
     const tx = makeTx();
     tx.salesManagerProfile.findMany.mockResolvedValue([
-      { userId: "u1", participatesInAutoDistribution: true, availability: "AVAILABLE", maxActiveRequests: 1, lastAssignedAt: null },
-      { userId: "u2", participatesInAutoDistribution: true, availability: "AVAILABLE", maxActiveRequests: 1, lastAssignedAt: null },
+      { userId: "u1", participatesInAutoDistribution: true, availability: "FREE", maxActiveRequests: 1, lastAssignedAt: null },
+      { userId: "u2", participatesInAutoDistribution: true, availability: "FREE", maxActiveRequests: 1, lastAssignedAt: null },
     ]);
     tx.request.groupBy.mockResolvedValue([
       { assignedManagerId: "u1", _count: { _all: 1 } },
@@ -103,5 +105,14 @@ describe("AssignmentService", () => {
       where: { recipientId: "u1", entityType: "Request", entityId: "r1", readAt: null },
       data: { readAt: expect.any(Date) },
     });
+  });
+  it("manual mode queues a new request instead of auto-assigning", async () => {
+    const tx = makeTx();
+    tx.salesAssignmentSettings.findUnique.mockResolvedValue({ id: "default", mode: "MANUAL" });
+    tx.userNotification = { create: jest.fn(), upsert: jest.fn().mockResolvedValue({}) };
+    const prisma: any = { $transaction: (fn: any) => fn(tx) };
+    const service = new AssignmentService(prisma);
+    await expect(service.assign("r1", undefined, { respectMode: true })).resolves.toEqual({ assigned: false, queued: true, reason: "MANUAL_MODE" });
+    expect(tx.request.update).toHaveBeenCalledWith({ where: { id: "r1" }, data: { assignmentState: "QUEUED" } });
   });
 });

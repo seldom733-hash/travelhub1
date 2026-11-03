@@ -32,6 +32,28 @@ export class AssignmentController {
     return this.assignment.setManagerSettings(userId, body);
   }
 
+  @Get("settings")
+  @RequirePermissions("request.assignment.read")
+  settings() { return this.assignment.getSettings(); }
+
+  @Post("settings")
+  @RequirePermissions("request.assignment.manage")
+  updateSettings(@CurrentUser() user: AuthedRequest["user"], @Body() body: { mode: string }) {
+    return this.assignment.updateSettings(body.mode, { id: user.id, username: user.username });
+  }
+
+  @Get("me/status")
+  @RequirePermissions("request.load.read")
+  myStatusGet(@CurrentUser() user: AuthedRequest["user"]) {
+    return this.assignment.getMyStatus(user.id);
+  }
+
+  @Post("me/status")
+  @RequirePermissions("request.load.read")
+  myStatus(@CurrentUser() user: AuthedRequest["user"], @Body() body: { status: string }) {
+    return this.assignment.setMyStatus(user.id, body.status);
+  }
+
   @Get("unassigned")
   @RequirePermissions("request.assignment.read")
   unassigned() { return this.assignment.unassigned(); }

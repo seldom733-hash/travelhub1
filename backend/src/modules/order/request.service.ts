@@ -360,7 +360,7 @@ export class RequestService {
     // Auto-distribution must never lose the request: a failure leaves it QUEUED
     // and visible to the supervisor; the request itself is already persisted.
     try {
-      await this.assignment.assign(request.id);
+      await this.assignment.assign(request.id, undefined, { respectMode: true });
     } catch {
       // Assignment telemetry is captured by the notification/queue path.
     }

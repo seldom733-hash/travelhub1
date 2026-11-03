@@ -76,3 +76,6 @@ Elvira → 1 заявка
 
 - Start processing: MKT-REQ-00000021 → CHECKING, processingStartedAt установлен, история PROCESSING_STARTED.
 - Два директора: первый reassign с expectedManagerId OK, второй со старым expected → 409, потерянного обновления нет.
+
+- Статусы менеджера: Elvira BUSY → автоназначение новой заявки ушло Ulviyye; ручное назначение BUSY-менеджеру разрешено; ABSENT → ручное назначение 400; статус восстановлен FREE.
+- Ручной режим: settings MANUAL → новая заявка QUEUED без менеджера; назначение вручную выполнено; режим возвращён AUTO.

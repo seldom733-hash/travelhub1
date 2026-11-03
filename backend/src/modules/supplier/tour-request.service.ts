@@ -353,7 +353,7 @@ export class TourRequestService {
     });
 
     try {
-      await this.assignment.assign(request.id);
+      await this.assignment.assign(request.id, undefined, { respectMode: true });
     } catch {
       // Assignment failure leaves the request persisted and visible in queue.
     }
