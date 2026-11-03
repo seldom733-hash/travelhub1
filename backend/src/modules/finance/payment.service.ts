@@ -272,6 +272,31 @@ export class PaymentService {
           });
         }
 
+        // Notify finance staff through the same UserNotification channel used
+        // for request assignments. Idempotent per payment/recipient.
+        if (created.status === "PENDING") {
+          const recipients = await tx.user.findMany({
+            where: { status: "ACTIVE", role: { code: { in: ["ADMIN", "DIRECTOR", "FINANCE"] } } },
+            select: { id: true },
+          });
+          for (const recipient of recipients) {
+            await tx.userNotification.upsert({
+              where: { dedupeKey: `payment-pending:${created.id}:${recipient.id}` },
+              create: {
+                recipientId: recipient.id,
+                type: "PAYMENT_CONFIRMATION",
+                entityType: "Payment",
+                entityId: created.id,
+                title: "Платёж ждёт подтверждения",
+                body: `${created.code}: проверьте и подтвердите платёж.`,
+                dedupeKey: `payment-pending:${created.id}:${recipient.id}`,
+                payload: { paymentId: created.id, code: created.code, orderId: created.orderId },
+              },
+              update: {},
+            });
+          }
+        }
+
         return this.paymentDto(created);
       });
     } catch (err) {
