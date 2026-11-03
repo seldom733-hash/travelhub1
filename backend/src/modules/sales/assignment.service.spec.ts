@@ -1,0 +1,50 @@
+import { AssignmentService } from "./assignment.service";
+
+function makeTx() {
+  const tx: any = {
+    $queryRaw: jest.fn().mockResolvedValue([{ id: "r1", assignedManagerId: null }]),
+    salesManagerProfile: {
+      findMany: jest.fn().mockResolvedValue([
+        { userId: "u1", participatesInAutoDistribution: true, availability: "AVAILABLE", maxActiveRequests: 5, lastAssignedAt: new Date("2026-01-01") },
+        { userId: "u2", participatesInAutoDistribution: true, availability: "AVAILABLE", maxActiveRequests: 5, lastAssignedAt: null },
+      ]),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    user: {
+      findMany: jest.fn().mockResolvedValue([
+        { id: "u1", fullName: "One", username: "one" },
+        { id: "u2", fullName: "Two", username: "two" },
+      ]),
+    },
+    request: {
+      groupBy: jest.fn().mockResolvedValue([]),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    requestHistory: { create: jest.fn().mockResolvedValue({}) },
+    userNotification: { create: jest.fn().mockResolvedValue({}) },
+  };
+  return tx;
+}
+
+describe("AssignmentService", () => {
+  it("assigns the manager with the oldest lastAssignedAt (Round Robin) and creates notification", async () => {
+    const tx = makeTx();
+    const prisma: any = { $transaction: (fn: any) => fn(tx) };
+    const service = new AssignmentService(prisma);
+    const result = await service.assign("r1");
+    expect(result.assigned).toBe(true);
+    expect((result as any).managerId).toBe("u2");
+    expect(tx.request.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ assignedManagerId: "u2", assignmentState: "ASSIGNED" }) }));
+    expect(tx.requestHistory.create).toHaveBeenCalled();
+    expect(tx.userNotification.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ recipientId: "u2", type: "REQUEST_ASSIGNED" }) }));
+  });
+
+  it("does not reassign an already assigned request", async () => {
+    const tx = makeTx();
+    tx.$queryRaw.mockResolvedValue([{ id: "r1", assignedManagerId: "u1" }]);
+    const prisma: any = { $transaction: (fn: any) => fn(tx) };
+    const service = new AssignmentService(prisma);
+    await expect(service.assign("r1")).resolves.toEqual({ assigned: false, managerId: "u1" });
+    expect(tx.request.update).not.toHaveBeenCalled();
+  });
+});
