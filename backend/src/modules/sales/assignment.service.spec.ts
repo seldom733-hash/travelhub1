@@ -73,4 +73,21 @@ describe("AssignmentService", () => {
     expect(tx.requestHistory.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "REASSIGNED", from: "u1", to: "u2" }) }));
     expect(tx.userNotification.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ recipientId: "u2", type: "REQUEST_REASSIGNED" }) }));
   });
+
+  it("queues when every manager reached maxActiveRequests", async () => {
+    const tx = makeTx();
+    tx.salesManagerProfile.findMany.mockResolvedValue([
+      { userId: "u1", participatesInAutoDistribution: true, availability: "AVAILABLE", maxActiveRequests: 1, lastAssignedAt: null },
+      { userId: "u2", participatesInAutoDistribution: true, availability: "AVAILABLE", maxActiveRequests: 1, lastAssignedAt: null },
+    ]);
+    tx.request.groupBy.mockResolvedValue([
+      { assignedManagerId: "u1", _count: { _all: 1 } },
+      { assignedManagerId: "u2", _count: { _all: 1 } },
+    ]);
+    tx.userNotification = { create: jest.fn(), upsert: jest.fn().mockResolvedValue({}) };
+    const prisma: any = { $transaction: (fn: any) => fn(tx) };
+    const service = new AssignmentService(prisma);
+    await expect(service.assign("r1")).resolves.toEqual({ assigned: false, queued: true, reason: "ALL_MANAGERS_AT_LIMIT" });
+    expect(tx.request.update).toHaveBeenCalledWith({ where: { id: "r1" }, data: { assignmentState: "QUEUED" } });
+  });
 });
