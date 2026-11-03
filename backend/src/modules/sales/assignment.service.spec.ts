@@ -90,4 +90,15 @@ describe("AssignmentService", () => {
     await expect(service.assign("r1")).resolves.toEqual({ assigned: false, queued: true, reason: "ALL_MANAGERS_AT_LIMIT" });
     expect(tx.request.update).toHaveBeenCalledWith({ where: { id: "r1" }, data: { assignmentState: "QUEUED" } });
   });
+
+  it("marks only the current user's unread notification for the opened request", async () => {
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const prisma: any = { userNotification: { updateMany } };
+    const service = new AssignmentService(prisma);
+    await service.markByEntity("u1", "Request", "r1");
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { recipientId: "u1", entityType: "Request", entityId: "r1", readAt: null },
+      data: { readAt: expect.any(Date) },
+    });
+  });
 });
