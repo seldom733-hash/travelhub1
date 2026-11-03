@@ -26,6 +26,16 @@ export class AssignmentController {
     return this.assignment.markByEntity(user.id, body.entityType, body.entityId);
   }
 
+  @Get("unassigned")
+  @RequirePermissions("request.assignment.read")
+  unassigned() { return this.assignment.unassigned(); }
+
+  @Post(":requestId/reassign")
+  @RequirePermissions("request.assignment.reassign")
+  reassign(@CurrentUser() user: AuthedRequest["user"], @Param("requestId") requestId: string, @Body() body: { managerId: string; reason?: string }) {
+    return this.assignment.reassign(requestId, body.managerId, body.reason ?? "", { id: user.id, username: user.username });
+  }
+
   @Post(":requestId/assign")
   @RequirePermissions("request.assignment.manage")
   assign(@CurrentUser() user: AuthedRequest["user"], @Param("requestId") requestId: string) {

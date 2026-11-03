@@ -100,6 +100,30 @@ export class AssignmentService {
     return { assigned: false, queued: true, reason };
   }
 
+  async unassigned() {
+    return this.prisma.request.findMany({
+      where: { assignedManagerId: null, status: { in: ACTIVE as never } },
+      select: { id: true, referenceNumber: true, status: true, assignmentState: true, createdAt: true, customerId: true, productId: true },
+      orderBy: { createdAt: "asc" },
+      take: 100,
+    });
+  }
+
+  async reassign(requestId: string, managerId: string, reason: string, actor: { id: string; username: string }) {
+    return this.prisma.$transaction(async (tx) => {
+      const request = await tx.request.findUnique({ where: { id: requestId }, select: { id: true, assignedManagerId: true } });
+      if (!request) throw new NotFoundException("Request not found");
+      const user = await tx.user.findFirst({ where: { id: managerId, status: "ACTIVE", role: { code: "SALES_MANAGER" } }, select: { id: true, fullName: true, username: true } });
+      if (!user) throw new NotFoundException("Manager not found or inactive");
+      const now = new Date();
+      await tx.request.update({ where: { id: requestId }, data: { assignedManagerId: managerId, assignedAt: now, assignmentType: "MANUAL", assignmentState: "ASSIGNED", slaDueAt: new Date(now.getTime() + 30 * 60_000), assignmentVersion: { increment: 1 } } });
+      await tx.salesManagerProfile.updateMany({ where: { userId: managerId }, data: { lastAssignedAt: now } });
+      await tx.requestHistory.create({ data: { requestId, action: "REASSIGNED", from: request.assignedManagerId ?? undefined, to: managerId, actorId: actor.id, actorName: actor.username, comment: reason || "Manual reassignment" } });
+      await tx.userNotification.create({ data: { recipientId: managerId, type: "REQUEST_REASSIGNED", entityType: "Request", entityId: requestId, title: "Заявка переназначена вам", body: reason || "Откройте заявку для обработки.", dedupeKey: `request-reassigned:${requestId}:${managerId}:${now.getTime()}`, payload: { requestId, from: request.assignedManagerId } } });
+      return { ok: true, manager: user.fullName ?? user.username };
+    });
+  }
+
   async load() {
     const users = await this.prisma.user.findMany({
       where: { status: "ACTIVE", role: { code: "SALES_MANAGER" } },

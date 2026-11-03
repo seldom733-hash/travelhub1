@@ -69,6 +69,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/app/catalog", icon: "📚", labelKey: "nav.catalog", permission: "catalog.product.read" },
       { href: "/app/crm", icon: "🤝", labelKey: "nav.crm", permission: "crm.customer.read" },
+      { href: "/app/sales/assignment", icon: "🧭", labelKey: "nav.assignment", permission: "request.load.read" },
       { href: "/app/marketing", icon: "📣", labelKey: "nav.marketing", permission: "marketing.campaign.read" },
     ],
   },
