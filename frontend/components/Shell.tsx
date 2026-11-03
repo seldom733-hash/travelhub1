@@ -174,7 +174,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   // переходе по разделам и раз в 30 секунд; менеджеру бейдж не нужен, если
   // у него нет права подтверждения (но read есть — показываем только счётчик).
   useEffect(() => {
-    if (!user?.permissions.includes("finance.payment.read")) { setPendingPayments(0); return; }
+    if (!user?.permissions.includes("finance.payment.manage")) { setPendingPayments(0); return; }
     let alive = true;
     const load = () => api.get<{ count: number }>("/finance/payments/pending-count")
       .then((res) => { if (alive) setPendingPayments(Number(res.count) || 0); })
