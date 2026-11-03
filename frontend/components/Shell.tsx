@@ -149,6 +149,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [pendingPayments, setPendingPayments] = useState(0);
+  const [unreadRequests, setUnreadRequests] = useState(0);
   const collapsedRef = useRef(false);
   const { brandName } = useGlobalBranding();
 
@@ -179,6 +180,17 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     const load = () => api.get<{ count: number }>("/finance/payments/pending-count")
       .then((res) => { if (alive) setPendingPayments(Number(res.count) || 0); })
       .catch(() => { if (alive) setPendingPayments(0); });
+    void load();
+    const timer = window.setInterval(load, 30000);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, [user?.id, pathname]);
+
+  useEffect(() => {
+    if (!user) { setUnreadRequests(0); return; }
+    let alive = true;
+    const load = () => api.get<{ requests: number }>("/sales/assignment/notifications/unread-count")
+      .then((res) => { if (alive) setUnreadRequests(Number(res.requests) || 0); })
+      .catch(() => { if (alive) setUnreadRequests(0); });
     void load();
     const timer = window.setInterval(load, 30000);
     return () => { alive = false; window.clearInterval(timer); };
@@ -302,6 +314,12 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                     >
                       <span className="w-5 shrink-0 text-center text-base">{item.icon}</span>
                       {!collapsed && <span className="truncate">{label}</span>}
+                      {!collapsed && item.href === "/app/requests" && unreadRequests > 0 && (
+                        <span className="ml-auto inline-flex min-w-5 animate-pulse items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-900" title={`${unreadRequests} новых назначенных заявок`}>{unreadRequests}</span>
+                      )}
+                      {collapsed && item.href === "/app/requests" && unreadRequests > 0 && (
+                        <span className="absolute right-1 top-1 size-2 animate-pulse rounded-full bg-amber-400" />
+                      )}
                       {!collapsed && item.href === "/app/payments" && pendingPayments > 0 && (
                         <span className="ml-auto inline-flex min-w-5 animate-pulse items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-900" title={`${pendingPayments} платежей ждут подтверждения`}>
                           {pendingPayments}
