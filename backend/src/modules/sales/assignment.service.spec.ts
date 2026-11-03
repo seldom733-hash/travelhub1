@@ -46,6 +46,7 @@ describe("AssignmentService", () => {
     const service = new AssignmentService(prisma);
     await expect(service.assign("r1")).resolves.toEqual({ assigned: false, managerId: "u1" });
     expect(tx.request.update).not.toHaveBeenCalled();
+    expect(tx.userNotification.create).not.toHaveBeenCalled();
   });
 
   it("queues the request and notifies supervisors when no manager is eligible", async () => {
