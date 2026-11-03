@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res, UseGuard
 import { Response } from "express";
 import { RequestService } from "./request.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
+import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import { ExportService } from "../shared/export/export.service";
@@ -60,6 +61,7 @@ export class RequestController {
     @Query("dateTo") dateTo?: string,
     @Query("sortBy") sortBy?: string,
     @Query("sortDirection") sortDirection?: string,
+    @CurrentUser() actor?: AuthedRequest["user"],
   ) {
     return this.requestService.listRequests({
       status,
@@ -72,6 +74,8 @@ export class RequestController {
       dateTo,
       sortBy,
       sortDirection,
+      viewerId: actor?.id,
+      viewerRole: actor?.role,
     });
   }
 

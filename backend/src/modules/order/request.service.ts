@@ -225,6 +225,8 @@ interface ListRequestQuery {
   dateTo?: string;
   sortBy?: string;
   sortDirection?: string;
+  viewerId?: string;
+  viewerRole?: string;
 }
 
 @Injectable()
@@ -445,6 +447,9 @@ export class RequestService {
         },
       } : {}),
     };
+    if (query.viewerRole === "SALES_MANAGER" && query.viewerId) {
+      where.assignedManagerId = query.viewerId;
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.request.findMany({
