@@ -352,7 +352,15 @@ export class PaymentService {
   /** PENDING → CAPTURED (успех; money received, manual/provider-neutral
    *  подтверждение). Milestone paidAt (Step 2.10C DEFER → 2.12). */
   async confirmPayment(code: string, actor: Actor): Promise<Record<string, unknown>> {
-    return this.transition(code, PaymentStatus.CAPTURED, "paidAt", "captured", "finance.payment.captured", DomainEvents.PaymentCaptured, actor);
+    const result = await this.transition(code, PaymentStatus.CAPTURED, "paidAt", "captured", "finance.payment.captured", DomainEvents.PaymentCaptured, actor);
+    const payment = await this.prisma.payment.findUnique({ where: { code }, select: { id: true } });
+    if (payment) {
+      await this.prisma.userNotification.updateMany({
+        where: { entityType: "Payment", entityId: payment.id, type: "PAYMENT_CONFIRMATION", readAt: null },
+        data: { readAt: new Date() },
+      });
+    }
+    return result;
   }
 
   /** PENDING → FAILED (терминальное отклонение; повторная инициация легальна). */

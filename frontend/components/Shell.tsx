@@ -178,8 +178,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user?.permissions.includes("finance.payment.manage")) { setPendingPayments(0); return; }
     let alive = true;
-    const load = () => api.get<{ count: number }>("/finance/payments/pending-count")
-      .then((res) => { if (alive) setPendingPayments(Number(res.count) || 0); })
+    const load = () => api.get<{ payments: number }>("/sales/assignment/notifications/unread-count")
+      .then((res) => { if (alive) setPendingPayments(Number(res.payments) || 0); })
       .catch(() => { if (alive) setPendingPayments(0); });
     void load();
     const timer = window.setInterval(load, 30000);
