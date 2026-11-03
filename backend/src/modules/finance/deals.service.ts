@@ -8,6 +8,7 @@ type DealQuery = {
   status?: string;
   statusGroup?: string;
   supplierId?: string;
+  country?: string;
   manager?: string;
   clientPayment?: string;
   supplierPayment?: string;
@@ -96,6 +97,20 @@ export class DealsService {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     const start = (page - 1) * pageSize;
+    const facetRows = all.filter((row) => row.stage !== "REQUEST");
+    const countries = [...new Set(facetRows.map((row) => row.trip.country).filter((value): value is string => Boolean(value)))].sort();
+    const managers = [...new Set(facetRows.map((row) => row.manager).filter((value): value is string => Boolean(value)))].sort();
+    const managerUsers = await this.prisma.user.findMany({ where: { status: "ACTIVE", role: { code: "SALES_MANAGER" } }, select: { fullName: true, username: true } });
+    for (const user of managerUsers) {
+      const name = user.fullName ?? user.username;
+      if (!managers.includes(name)) managers.push(name);
+    }
+    managers.sort((a, b) => a.localeCompare(b));
+    const supplierMap = new Map<string, string>();
+    for (const row of facetRows) {
+      const key = row.supplierId ?? row.supplierCode;
+      if (key) supplierMap.set(key, row.supplierCode ?? key);
+    }
     return {
       items: sorted.slice(start, start + pageSize),
       total: sorted.length,
@@ -103,6 +118,11 @@ export class DealsService {
       pageSize,
       hasMore: start + pageSize < sorted.length,
       kpi: this.kpi(filtered),
+      facets: {
+        countries,
+        managers,
+        suppliers: [...supplierMap.entries()].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label)),
+      },
     };
   }
 
@@ -184,7 +204,8 @@ export class DealsService {
       if (query.stage && row.stage !== query.stage) return false;
       if (query.status && row.status !== query.status) return false;
       if (query.statusGroup === "cancelled" && !["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED", "REJECTED"].includes(row.status)) return false;
-      if (query.supplierId && row.supplierId !== query.supplierId) return false;
+      if (query.supplierId && row.supplierId !== query.supplierId && row.supplierCode !== query.supplierId) return false;
+      if (query.country && row.trip.country !== query.country) return false;
       if (query.manager && row.manager !== query.manager) return false;
       if (query.clientPayment && row.paymentStatus !== query.clientPayment) return false;
       if (query.supplierPayment && row.supplierPaymentStatus !== query.supplierPayment) return false;

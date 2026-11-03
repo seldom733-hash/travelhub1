@@ -11,6 +11,7 @@ function queryFrom(raw: Record<string, string | undefined>) {
     status: raw.status,
     statusGroup: raw.statusGroup,
     supplierId: raw.supplierId,
+    country: raw.country,
     manager: raw.manager,
     clientPayment: raw.clientPayment,
     supplierPayment: raw.supplierPayment,

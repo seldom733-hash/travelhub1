@@ -72,6 +72,7 @@ export interface DealList {
   pageSize: number;
   hasMore: boolean;
   kpi: DealKpi;
+  facets: { countries: string[]; managers: string[]; suppliers: Array<{ value: string; label: string }> };
 }
 
 export interface DealScheduleItem {
