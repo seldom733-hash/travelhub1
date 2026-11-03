@@ -233,6 +233,16 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
   /** Цикл статуса: ACTIVE → INACTIVE → LOCKED → ACTIVE (backend поддерживает LOCKED). */
   const nextStatus = (s: string): string => (s === "ACTIVE" ? "INACTIVE" : s === "INACTIVE" ? "LOCKED" : "ACTIVE");
 
+  const resetFilters = async () => {
+    setSearch("");
+    setStatusFilter(undefined);
+    setRoleFilter(undefined);
+    setDateFrom("");
+    setDateTo("");
+    setPage(1);
+    await load(1, "", sortBy, sortDirection, undefined, undefined, "", "");
+  };
+
   const createUser = async () => {
     setCreating(true);
     setError("");
@@ -246,8 +256,9 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
       });
       setShowCreate(false);
       setForm({ username: "", password: "", fullName: "", email: "", roleCode: "OPERATOR" });
-      await load(1, search, sortBy, sortDirection, statusFilter, roleFilter, dateFrom, dateTo);
-      setPage(1);
+      // Новый пользователь может не попасть в текущую выборку (поиск/роль/статус).
+      // Сбрасываем фильтры, чтобы созданная запись была видна.
+      await resetFilters();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -289,6 +300,10 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
 
           <div className="flex flex-wrap items-center gap-2">
             <input
+              type="search"
+              name="user-list-search"
+              autoComplete="off"
+              key={`user-search-${search}`}
               defaultValue={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder={t("admin.search.placeholder_users", locale)}
@@ -345,6 +360,15 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
 
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
           {notice && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">{notice}</div>}
+          {(search || statusFilter || roleFilter || dateFrom || dateTo) && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <span>Показана отфильтрованная выборка.</span>
+              {search && <span className="rounded-full bg-white px-2 py-0.5">Поиск: {search}</span>}
+              {statusFilter && <span className="rounded-full bg-white px-2 py-0.5">Статус: {statusFilter}</span>}
+              {roleFilter && <span className="rounded-full bg-white px-2 py-0.5">Роль: {roleFilter}</span>}
+              <button type="button" onClick={() => void resetFilters()} className="font-semibold underline">Сбросить фильтры</button>
+            </div>
+          )}
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>
@@ -468,6 +492,8 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("admin.form.password_label", locale)}</label>
               <input
                 type="password"
+                name="new-staff-password"
+                autoComplete="new-password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
@@ -532,6 +558,8 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("admin.form.password_label", locale)}</label>
               <input
                 type="password"
+                name="new-user-password"
+                autoComplete="new-password"
                 autoFocus
                 value={pwdValue}
                 onChange={(e) => setPwdValue(e.target.value)}
