@@ -274,6 +274,22 @@ export class FinanceController {
     return this.supplierPaymentTerms.upsert(dto, actor);
   }
 
+  @Get("reports/client-debt")
+  @RequirePermissions("finance.overview.read")
+  async clientDebtAsOf(
+    @Query("asOf") asOf?: string,
+    @Query("search") search?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+  ) {
+    return this.supplierDebtReport.clientDebtAsOf({
+      asOf,
+      search,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+    });
+  }
+
   @Get("reports/supplier-debt")
   @RequirePermissions("finance.obligation.read")
   async supplierDebtAsOf(

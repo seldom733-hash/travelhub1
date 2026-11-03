@@ -314,4 +314,90 @@ export class SupplierDebtReportService {
       details: { asOf, filters, actor: actor.username, actorId: actor.id },
     });
   }
+
+  /**
+   * Дебиторка клиентов на дату: сумма заказа минус подтверждённые поступления
+   * (CAPTURED) плюс обработанные возвраты, только по операциям <= asOf.
+   * Это отдельный разрез от задолженности поставщикам: заказ без брони
+   * создаёт долг клиента, но ещё не создаёт SupplierObligation.
+   */
+  async clientDebtAsOf(query: { asOf?: string; search?: string; page?: number; pageSize?: number }) {
+    const asOfInput = (query.asOf ?? new Date().toISOString().slice(0, 10)).trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(asOfInput)) throw new ValidationDomainError("asOf must be a date in YYYY-MM-DD format");
+    const end = endOfDayUtc(asOfInput);
+    const page = Math.max(1, Number(query.page ?? 1));
+    const pageSize = Math.min(200, Math.max(1, Number(query.pageSize ?? 50)));
+    const search = query.search?.trim().toLowerCase();
+
+    const orders = await this.prisma.order.findMany({
+      where: { createdAt: { lte: end }, status: { notIn: ["CANCELLED"] } },
+      select: { id: true, code: true, referenceNumber: true, commerceSequence: true, customerId: true, amount: true, currency: true, status: true, paymentStatus: true, createdAt: true, createdBy: true },
+      orderBy: { createdAt: "asc" },
+    });
+    if (orders.length === 0) return { asOf: asOfInput, generatedAt: new Date().toISOString(), items: [], total: 0, page, pageSize, totalsByCurrency: [] };
+
+    const orderIds = orders.map((o) => o.id);
+    const [payments, refunds, customers] = await Promise.all([
+      this.prisma.payment.findMany({
+        where: { orderId: { in: orderIds }, status: "CAPTURED", OR: [{ paidAt: { lte: end } }, { paidAt: null, createdAt: { lte: end } }] },
+        select: { orderId: true, amount: true },
+      }),
+      this.prisma.refund.findMany({
+        where: { orderId: { in: orderIds }, status: "PROCESSED", OR: [{ processedAt: { lte: end } }, { processedAt: null, createdAt: { lte: end } }] },
+        select: { orderId: true, amount: true },
+      }),
+      this.prisma.customer.findMany({ where: { id: { in: orders.map((o) => o.customerId).filter((id): id is string => Boolean(id)) } }, select: { id: true, firstName: true, lastName: true, companyName: true, phone: true } }),
+    ]);
+
+    const paid = new Map<string, number>();
+    for (const p of payments) paid.set(p.orderId, (paid.get(p.orderId) ?? 0) + Number(p.amount));
+    for (const r of refunds) paid.set(r.orderId, (paid.get(r.orderId) ?? 0) - Number(r.amount));
+    const customerById = new Map(customers.map((c) => [c.id, c]));
+
+    const rows = orders
+      .map((order) => {
+        const customer = order.customerId ? customerById.get(order.customerId) : undefined;
+        const amount = Number(order.amount);
+        const netPaid = paid.get(order.id) ?? 0;
+        const debt = Math.round((amount - netPaid) * 100) / 100;
+        return {
+          orderCode: order.code,
+          sequence: order.commerceSequence,
+          referenceNumber: order.referenceNumber,
+          customerName: customer ? [customer.firstName, customer.lastName].filter(Boolean).join(" ") || customer.companyName || "—" : "—",
+          customerPhone: customer?.phone ?? null,
+          manager: order.createdBy,
+          amount: amount.toFixed(2),
+          paid: netPaid.toFixed(2),
+          debt: debt.toFixed(2),
+          currency: order.currency,
+          status: order.status,
+          paymentStatus: order.paymentStatus,
+          createdAt: order.createdAt.toISOString(),
+        };
+      })
+      .filter((row) => Number(row.debt) > 0.005)
+      .filter((row) => {
+        if (!search) return true;
+        return [row.orderCode, row.sequence ?? "", row.referenceNumber, row.customerName, row.customerPhone ?? ""].join(" ").toLowerCase().includes(search);
+      });
+
+    const totals = new Map<string, { currency: string; count: number; amount: number; paid: number; debt: number }>();
+    for (const row of rows) {
+      const t = totals.get(row.currency) ?? { currency: row.currency, count: 0, amount: 0, paid: 0, debt: 0 };
+      t.count += 1; t.amount += Number(row.amount); t.paid += Number(row.paid); t.debt += Number(row.debt);
+      totals.set(row.currency, t);
+    }
+
+    const start = (page - 1) * pageSize;
+    return {
+      asOf: asOfInput,
+      generatedAt: new Date().toISOString(),
+      items: rows.slice(start, start + pageSize),
+      total: rows.length,
+      page,
+      pageSize,
+      totalsByCurrency: [...totals.values()].map((t) => ({ currency: t.currency, count: t.count, amount: t.amount.toFixed(2), paid: t.paid.toFixed(2), debt: t.debt.toFixed(2) })),
+    };
+  }
 }

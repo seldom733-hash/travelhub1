@@ -14,7 +14,7 @@ import PageHeader from "@/components/PageHeader";
 import Pagination from "@/components/Pagination";
 import TableExportButton from "@/components/TableExportButton";
 import { t, useLocale, formatPrice } from "@/lib/i18n";
-import { financeCenterApi, type DebtAsOfReport } from "@/lib/finance-center-api";
+import { financeCenterApi, type ClientDebtAsOfReport, type DebtAsOfReport } from "@/lib/finance-center-api";
 
 const PAGE_SIZE = 50;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -26,8 +26,17 @@ export default function SupplierDebtAsOfPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [report, setReport] = useState<DebtAsOfReport | null>(null);
+  const [clientReport, setClientReport] = useState<ClientDebtAsOfReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const loadClientDebt = useCallback(async () => {
+    try {
+      setClientReport(await financeCenterApi.clientDebtAsOf({ asOf: asOf || undefined, search: search || undefined, page: 1, pageSize: 100 }));
+    } catch {
+      setClientReport(null);
+    }
+  }, [asOf, search]);
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -51,7 +60,8 @@ export default function SupplierDebtAsOfPage() {
 
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadClientDebt();
+  }, [load, loadClientDebt]);
 
   const tone = (status: string) =>
     status === "OVERDUE" || status === "PARTIALLY_PAID"
@@ -158,6 +168,10 @@ export default function SupplierDebtAsOfPage() {
         )}
 
         <section className="overflow-hidden rounded-xl border border-line bg-white">
+          <div className="border-b border-line px-4 py-3">
+            <h2 className="text-sm font-semibold text-slate-900">Задолженность поставщикам</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Обязательства перед поставщиками, возникшие после подтверждения брони.</p>
+          </div>
           {busy && !report ? (
             <div className="h-40 animate-pulse bg-slate-100" />
           ) : report && report.items.length > 0 ? (
@@ -220,6 +234,54 @@ export default function SupplierDebtAsOfPage() {
         {report && report.total > PAGE_SIZE && (
           <Pagination page={page} pageSize={PAGE_SIZE} total={report.total} locale={locale} onPageChange={setPage} />
         )}
+
+        <section className="overflow-hidden rounded-xl border border-line bg-white">
+          <div className="border-b border-line px-4 py-3">
+            <h2 className="text-sm font-semibold text-slate-900">{t("finance.client_debt.title", locale)}</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Сумма заказа минус подтверждённые оплаты и возвраты на выбранную дату.</p>
+          </div>
+          {clientReport && clientReport.totalsByCurrency.length > 0 && (
+            <div className="grid gap-2 border-b border-line p-3 sm:grid-cols-3">
+              {clientReport.totalsByCurrency.map((total) => (
+                <div key={total.currency} className="rounded-lg bg-slate-50 p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-slate-500">{total.currency} · {total.count}</div>
+                  <div className="mt-1 font-mono text-lg font-semibold text-slate-900">{formatPrice(total.debt, total.currency, locale)}</div>
+                  <div className="text-[10px] text-slate-500">Из {formatPrice(total.amount, total.currency, locale)} оплачено {formatPrice(total.paid, total.currency, locale)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {clientReport && clientReport.items.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm text-slate-900">
+                <thead>
+                  <tr className="border-b border-line bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                    <th className="px-3 py-2">{t("finance.client_debt.col.order", locale)}</th>
+                    <th className="px-3 py-2">{t("finance.client_debt.col.customer", locale)}</th>
+                    <th className="px-3 py-2 text-right">{t("finance.client_debt.col.amount", locale)}</th>
+                    <th className="px-3 py-2 text-right">{t("finance.client_debt.col.paid", locale)}</th>
+                    <th className="px-3 py-2 text-right">{t("finance.client_debt.col.debt", locale)}</th>
+                    <th className="px-3 py-2">Статус</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clientReport.items.map((row) => (
+                    <tr key={row.orderCode} className="border-b border-line/60 hover:bg-slate-50">
+                      <td className="px-3 py-2 font-mono text-xs font-semibold">{row.sequence ?? row.orderCode}</td>
+                      <td className="px-3 py-2"><div>{row.customerName}</div><div className="text-[10px] text-slate-400">{row.customerPhone ?? "—"}</div></td>
+                      <td className="px-3 py-2 text-right font-mono">{formatPrice(row.amount, row.currency, locale)}</td>
+                      <td className="px-3 py-2 text-right font-mono text-emerald-700">{formatPrice(row.paid, row.currency, locale)}</td>
+                      <td className="px-3 py-2 text-right font-mono font-semibold text-rose-700">{formatPrice(row.debt, row.currency, locale)}</td>
+                      <td className="px-3 py-2 text-xs">{row.status} · {row.paymentStatus}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="py-8 text-center text-sm text-slate-500">{t("finance.client_debt.empty", locale)}</p>
+          )}
+        </section>
       </div>
     </div>
   );

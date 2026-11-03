@@ -312,6 +312,30 @@ export interface DebtAsOfReport {
   warnings: string[];
 }
 
+export interface ClientDebtAsOfReport {
+  asOf: string;
+  generatedAt: string;
+  items: Array<{
+    orderCode: string;
+    sequence: string | null;
+    referenceNumber: string;
+    customerName: string;
+    customerPhone: string | null;
+    manager: string | null;
+    amount: string;
+    paid: string;
+    debt: string;
+    currency: string;
+    status: string;
+    paymentStatus: string;
+    createdAt: string;
+  }>;
+  total: number;
+  page: number;
+  pageSize: number;
+  totalsByCurrency: Array<{ currency: string; count: number; amount: string; paid: string; debt: string }>;
+}
+
 function qs(params: Record<string, string | number | undefined>): string {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
@@ -513,6 +537,10 @@ export const financeCenterApi = {
     pageSize?: number;
   } = {}): Promise<DebtAsOfReport> {
     return api.get(`${BASE}/reports/supplier-debt${qs(query as Record<string, string | number | undefined>)}`);
+  },
+
+  clientDebtAsOf(query: { asOf?: string; search?: string; page?: number; pageSize?: number } = {}): Promise<ClientDebtAsOfReport> {
+    return api.get(`${BASE}/reports/client-debt${qs(query as Record<string, string | number | undefined>)}`);
   },
 };
 
