@@ -1,16 +1,16 @@
 /**
- * Supplier Markup (STRICT PROMPT Phase 2 §16) — TourRequestService is the
+ * Supplier Markup (STRICT PROMPT Phase 2 Â§16) â€” TourRequestService is the
  * server-authoritative boundary for public tour requests.
  *
  * Proves:
- *  - displayedPrice comes from the supplier re-check (refreshPrice → markup
+ *  - displayedPrice comes from the supplier re-check (refreshPrice â†’ markup
  *    boundary), NEVER from dto.price;
- *  - re-check returning amount <= 0 → PRICE_UNAVAILABLE, no request written;
+ *  - re-check returning amount <= 0 â†’ PRICE_UNAVAILABLE, no request written;
  *  - searchContext is rebuilt from the dto (hotel/room/meal/nights/dates);
- *  - Phase 3 §20: the working commercial snapshot is frozen at creation from
+ *  - Phase 3 Â§20: the working commercial snapshot is frozen at creation from
  *    the recheck pricing block (supplier price + fetchedAt/expiresAt TTL);
- *  - §4.8: traveler identity block — invalid phone/email → 422 before any
- *    supplier call, Customer resolution (reuse/create/unlinked), AMBIGUOUS →
+ *  - Â§4.8: traveler identity block â€” invalid phone/email â†’ 422 before any
+ *    supplier call, Customer resolution (reuse/create/unlinked), AMBIGUOUS â†’
  *    ConflictError (409).
  */
 import { TourRequestService } from "./tour-request.service";
@@ -34,16 +34,16 @@ const DTO = {
   children: 0,
   room: "DBL",
   meal: "AI",
-  price: 999999, // stale client number — must be ignored
+  price: 999999, // stale client number â€” must be ignored
   currency: "USD",
 };
 
 function snapshot(overrides: Partial<SupplierPriceSnapshot> = {}): SupplierPriceSnapshot {
   return {
     amount: 1050,
-    // UNIFIED FINANCE CENTER Phase 1: recheck возвращает AZN (management
-    // currency; USD-источник конвертируется на pricing-границе или gate
-    // блокирует request при отсутствии курса).
+    // UNIFIED FINANCE CENTER Phase 1: recheck Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ AZN (management
+    // currency; USD-Ð¸ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº ÐºÐ¾Ð½Ð²ÐµÑ€Ñ‚Ð¸Ñ€ÑƒÐµÑ‚ÑÑ Ð½Ð° pricing-Ð³Ñ€Ð°Ð½Ð¸Ñ†Ðµ Ð¸Ð»Ð¸ gate
+    // Ð±Ð»Ð¾ÐºÐ¸Ñ€ÑƒÐµÑ‚ request Ð¿Ñ€Ð¸ Ð¾Ñ‚ÑÑƒÑ‚ÑÑ‚Ð²Ð¸Ð¸ ÐºÑƒÑ€ÑÐ°).
     currency: "AZN",
     fetchedAt: new Date(),
     expiresAt: new Date(),
@@ -69,6 +69,7 @@ interface Harness {
   prisma: { product: { findFirst: jest.Mock }; request: { create: jest.Mock } };
   offerService: { refreshPrice: jest.Mock };
   crm: { createCustomer: jest.Mock };
+  assignment: { assign: jest.Mock };
 }
 
 function makeHarness(): Harness {
@@ -93,6 +94,7 @@ function makeHarness(): Harness {
     commerceRequestRef: jest.fn().mockReturnValue("R-1"),
   };
   const offerService = { refreshPrice: jest.fn().mockResolvedValue(snapshot()) };
+  const assignment = { assign: jest.fn().mockResolvedValue({}) };
   const crm = {
     createCustomer: jest.fn().mockResolvedValue({ customer: { id: "c-new" } }),
   };
@@ -110,11 +112,12 @@ function makeHarness(): Harness {
     refNum as never,
     offerService as never,
     crm as never,
+    assignment as never,
   );
-  return { service, prisma, offerService, crm };
+  return { service, prisma, offerService, crm, assignment };
 }
 
-describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §16)", () => {
+describe("TourRequestService â€” server-authoritative displayedPrice (Phase 2 Â§16)", () => {
   it("displayedPrice = re-check public amount; dto.price is never trusted", async () => {
     const h = makeHarness();
 
@@ -144,11 +147,12 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     expect(data.displayedCurrency).toBe("AZN");
     expect(data.displayedPrice).not.toBe(999999);
 
+    expect(h.assignment.assign).toHaveBeenCalledWith("r1");
     expect(out.displayedPrice).toBe(1050);
     expect(out.status).toBe("NEW");
   });
 
-  it("§SERVICE-PASSTHROUGH: dto.service selects the re-check adapter (hotels)", async () => {
+  it("Â§SERVICE-PASSTHROUGH: dto.service selects the re-check adapter (hotels)", async () => {
     const h = makeHarness();
 
     await h.service.createTourRequest({ ...DTO, service: "hotels" });
@@ -184,7 +188,7 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
 
     await h.service.createTourRequest({
       ...DTO,
-      destination: "Аль-Джаддаф",
+      destination: "ÐÐ»ÑŒ-Ð”Ð¶Ð°Ð´Ð´Ð°Ñ„",
       departureCity: "Baku",
       country: "Turkey",
       tourIncValue: "15614",
@@ -194,7 +198,7 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     expect(h.offerService.refreshPrice).toHaveBeenCalledWith(
       expect.objectContaining({
         searchContext: expect.objectContaining({
-          destination: "Аль-Джаддаф",
+          destination: "ÐÐ»ÑŒ-Ð”Ð¶Ð°Ð´Ð´Ð°Ñ„",
           departureCity: "Baku",
           country: "Turkey",
           tourIncValue: "15614",
@@ -204,7 +208,7 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     );
   });
 
-  it("re-check amount 0 → PRICE_UNAVAILABLE, no request row written", async () => {
+  it("re-check amount 0 â†’ PRICE_UNAVAILABLE, no request row written", async () => {
     const h = makeHarness();
     h.offerService.refreshPrice.mockResolvedValue(snapshot({ amount: 0 }));
 
@@ -213,7 +217,7 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     expect(h.prisma.product.findFirst).not.toHaveBeenCalled();
   });
 
-  it("re-check failure propagates — request is never created with a stale price", async () => {
+  it("re-check failure propagates â€” request is never created with a stale price", async () => {
     const h = makeHarness();
     h.offerService.refreshPrice.mockRejectedValue(new Error("PRICE_UNAVAILABLE: supplier dead"));
 
@@ -229,7 +233,7 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
 
     // Fix A: the lookup is supplier-scoped and maps the PLATFORM transport id
     // onto BOTH stored shapes: legacy hotelExternalId AND supplier-native
-    // hotelKey (real catalog shape — 3010/3010 SAMO-family Products).
+    // hotelKey (real catalog shape â€” 3010/3010 SAMO-family Products).
     expect(h.prisma.product.findFirst).toHaveBeenCalledWith({
       where: {
         AND: [
@@ -247,7 +251,7 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     const data = h.prisma.request.create.mock.calls[0][0].data;
     expect(data.productId).toBe("p1");
     expect(data.productSnapshot).toMatchObject({ productId: "p1", type: "TOUR", productType: "TOUR" });
-    // Data-shape fix §5/§6: the offer snapshot moved OUT of pinnedRequirements
+    // Data-shape fix Â§5/Â§6: the offer snapshot moved OUT of pinnedRequirements
     // into productSnapshot.offer; the pin itself is the canonical traveler map.
     expect((data.productSnapshot as Record<string, any>).offer).toMatchObject({
       supplierCode: "KOMPAS",
@@ -260,11 +264,11 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     });
   });
 
-  // Hotel Identity Fix A — Product lookup test matrix (V2 prompt §10).
+  // Hotel Identity Fix A â€” Product lookup test matrix (V2 prompt Â§10).
   describe("Product lookup matrix (supplier-native identity mapping)", () => {
     /** Simulates the REAL catalog read: the mock honours the actual where
      *  clause against realistic attribute shapes (the old mock accepted any
-     *  findFirst call — the audit's false-confidence pattern). */
+     *  findFirst call â€” the audit's false-confidence pattern). */
     function makeCatalogHarness(catalog: Array<Record<string, unknown>>) {
       const h = makeHarness();
       h.prisma.product.findFirst.mockImplementation(({ where }: { where: any }) => {
@@ -327,18 +331,18 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
       expect(data.productId).toBe("p-legacy");
     });
 
-    it("F: ANEX (no catalog Product) → productId stays NULL, request creation remains valid", async () => {
+    it("F: ANEX (no catalog Product) â†’ productId stays NULL, request creation remains valid", async () => {
       const h = makeCatalogHarness([]);
       await h.service.createTourRequest({ ...DTO, supplierCode: "ANEX", hotelExternalId: "5050" });
       const data = h.prisma.request.create.mock.calls[0][0].data;
       expect(data.productId).toBeNull();
-      // Frozen snapshot still written from the dto (product-less contract §12).
+      // Frozen snapshot still written from the dto (product-less contract Â§12).
       expect(data.productSnapshot).toMatchObject({ productType: "TOUR" });
     });
   });
 
   it("Phase 4: service params frozen (country/destination/party), productSnapshot ALWAYS written, supplier-confirmed price set", async () => {
-    const h = makeHarness(); // product lookup misses (findFirst → null)
+    const h = makeHarness(); // product lookup misses (findFirst â†’ null)
 
     await h.service.createTourRequest({
       ...DTO,
@@ -348,8 +352,8 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     });
 
     const data = h.prisma.request.create.mock.calls[0][0].data;
-    // Selected-service parameters (ночи, 2+0, страна, город) — frozen in
-    // productSnapshot.offer (data-shape fix §6), НЕ в pinnedRequirements.
+    // Selected-service parameters (Ð½Ð¾Ñ‡Ð¸, 2+0, ÑÑ‚Ñ€Ð°Ð½Ð°, Ð³Ð¾Ñ€Ð¾Ð´) â€” frozen in
+    // productSnapshot.offer (data-shape fix Â§6), ÐÐ• Ð² pinnedRequirements.
     expect((data.productSnapshot as Record<string, any>).offer).toMatchObject({
       country: "Turkey",
       destination: "Antalya",
@@ -358,7 +362,7 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
       adults: 2,
       children: 0,
     });
-    // §5: the pin carries ONLY the canonical traveler requirements map.
+    // Â§5: the pin carries ONLY the canonical traveler requirements map.
     expect(data.pinnedRequirements).toMatchObject({
       firstName: "REQUIRED",
       lastName: "REQUIRED",
@@ -366,8 +370,8 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     });
     expect(data.pinnedRequirements).not.toHaveProperty("country");
     expect(data.pinnedRequirements).not.toHaveProperty("nights");
-    // productSnapshot is written even when the product lookup misses — the
-    // «Услуга» cell falls back to the hotel name (productId stays unset).
+    // productSnapshot is written even when the product lookup misses â€” the
+    // Â«Ð£ÑÐ»ÑƒÐ³Ð°Â» cell falls back to the hotel name (productId stays unset).
     expect(data.productSnapshot).toMatchObject({
       productTitle: "Rixos",
       productType: "TOUR",
@@ -375,12 +379,12 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     });
     expect((data.productSnapshot as Record<string, unknown>).productId).toBeUndefined();
     expect(data.productId).toBeNull();
-    // «Подтв. цена» = server-authoritative re-check right after service selection
+    // Â«ÐŸÐ¾Ð´Ñ‚Ð². Ñ†ÐµÐ½Ð°Â» = server-authoritative re-check right after service selection
     expect(data.confirmedPrice).toBe(1050);
     expect(data.confirmedCurrency).toBe("AZN");
   });
 
-  it("Phase 3 §20: working commercial snapshot frozen at creation from the recheck pricing block", async () => {
+  it("Phase 3 Â§20: working commercial snapshot frozen at creation from the recheck pricing block", async () => {
     const h = makeHarness();
     const fetchedAt = new Date("2026-10-01T10:00:00Z");
     const expiresAt = new Date("2026-10-01T10:15:00Z");
@@ -411,7 +415,7 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     expect(data.displayedPrice).toBe(1050);
   });
 
-  it("recheck without pricing block → legacy request (no commercialSnapshot)", async () => {
+  it("recheck without pricing block â†’ legacy request (no commercialSnapshot)", async () => {
     const h = makeHarness();
     const raw = snapshot();
     delete (raw as { pricing?: unknown }).pricing;
@@ -422,19 +426,19 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     const data = h.prisma.request.create.mock.calls[0][0].data;
     expect(data.commercialSnapshot).toBeUndefined();
     expect(data.displayedPrice).toBe(1050);
-    // Product rule: «Подтв. цена» = принята́я цена витрины at card creation —
+    // Product rule: Â«ÐŸÐ¾Ð´Ñ‚Ð². Ñ†ÐµÐ½Ð°Â» = Ð¿Ñ€Ð¸Ð½ÑÑ‚Ð°ÌÑ Ñ†ÐµÐ½Ð° Ð²Ð¸Ñ‚Ñ€Ð¸Ð½Ñ‹ at card creation â€”
     // frozen unconditionally (money-gate sees confirmed === displayed anyway).
     expect(data.confirmedPrice).toBe(1050);
     expect(data.confirmedCurrency).toBe("AZN");
-    // …but the productSnapshot is still written for the «Услуга» cell
+    // â€¦but the productSnapshot is still written for the Â«Ð£ÑÐ»ÑƒÐ³Ð°Â» cell
     expect(data.productSnapshot).toMatchObject({ productTitle: "Rixos", productType: "TOUR" });
   });
 
-  it("Phase 1 FX strict gate: recheck в USD без fx-блока → controlled error (никогда не заявить AZN)", async () => {
+  it("Phase 1 FX strict gate: recheck Ð² USD Ð±ÐµÐ· fx-Ð±Ð»Ð¾ÐºÐ° â†’ controlled error (Ð½Ð¸ÐºÐ¾Ð³Ð´Ð° Ð½Ðµ Ð·Ð°ÑÐ²Ð¸Ñ‚ÑŒ AZN)", async () => {
     const h = makeHarness();
     const raw = snapshot();
-    // Поставщик вернул USD-деньги без fx-блока — курса нет, конвертировать
-    // нечем. Никогда не подменять 1 и не писать snapshot как AZN.
+    // ÐŸÐ¾ÑÑ‚Ð°Ð²Ñ‰Ð¸Ðº Ð²ÐµÑ€Ð½ÑƒÐ» USD-Ð´ÐµÐ½ÑŒÐ³Ð¸ Ð±ÐµÐ· fx-Ð±Ð»Ð¾ÐºÐ° â€” ÐºÑƒÑ€ÑÐ° Ð½ÐµÑ‚, ÐºÐ¾Ð½Ð²ÐµÑ€Ñ‚Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ
+    // Ð½ÐµÑ‡ÐµÐ¼. ÐÐ¸ÐºÐ¾Ð³Ð´Ð° Ð½Ðµ Ð¿Ð¾Ð´Ð¼ÐµÐ½ÑÑ‚ÑŒ 1 Ð¸ Ð½Ðµ Ð¿Ð¸ÑÐ°Ñ‚ÑŒ snapshot ÐºÐ°Ðº AZN.
     raw.currency = "USD";
     raw.pricing = {
       supplierAmount: 1000,
@@ -453,17 +457,17 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     expect(h.prisma.request.create).not.toHaveBeenCalled();
   });
 
-  it("Phase 1 FX: recheck в USD с fx-блоком → snapshot frozen в AZN с SOURCE-фактами", async () => {
+  it("Phase 1 FX: recheck Ð² USD Ñ fx-Ð±Ð»Ð¾ÐºÐ¾Ð¼ â†’ snapshot frozen Ð² AZN Ñ SOURCE-Ñ„Ð°ÐºÑ‚Ð°Ð¼Ð¸", async () => {
     const h = makeHarness();
     const raw = snapshot();
-    raw.currency = "AZN"; // snapshot-денежная цепочка в AZN после convert
+    raw.currency = "AZN"; // snapshot-Ð´ÐµÐ½ÐµÐ¶Ð½Ð°Ñ Ñ†ÐµÐ¿Ð¾Ñ‡ÐºÐ° Ð² AZN Ð¿Ð¾ÑÐ»Ðµ convert
     raw.amount = 1785;
     raw.pricing = {
       supplierAmount: 1000, // SOURCE USD
       currency: "USD",
       publicCurrency: "AZN",
       markupRate: "0.05",
-      markupAmount: 85, // 1700 × 5%
+      markupAmount: 85, // 1700 Ã— 5%
       publicAmount: 1785,
       markupRuleCode: "MKR-00000001",
       markupRuleVersion: 1,
@@ -495,7 +499,7 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     expect(data.displayedCurrency).toBe("AZN");
   });
 
-  it("legacy (no customer block) → request created unlinked, resolver untouched", async () => {
+  it("legacy (no customer block) â†’ request created unlinked, resolver untouched", async () => {
     const h = makeHarness();
 
     await h.service.createTourRequest(DTO);
@@ -507,7 +511,7 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
   });
 });
 
-describe("TourRequestService — §4.8 traveler identity (Request Modal contract)", () => {
+describe("TourRequestService â€” Â§4.8 traveler identity (Request Modal contract)", () => {
   const CUSTOMER = {
     phone: "+994501112233",
     email: "Traveler@Example.COM",
@@ -515,7 +519,7 @@ describe("TourRequestService — §4.8 traveler identity (Request Modal contract
     lastName: "Veliev",
   };
 
-  it("invalid phone → ValidationDomainError 422, no supplier re-check, no resolver", async () => {
+  it("invalid phone â†’ ValidationDomainError 422, no supplier re-check, no resolver", async () => {
     const h = makeHarness();
 
     await expect(
@@ -530,7 +534,7 @@ describe("TourRequestService — §4.8 traveler identity (Request Modal contract
     expect(h.prisma.request.create).not.toHaveBeenCalled();
   });
 
-  it("empty phone → ValidationDomainError 422 (phone is required within customer)", async () => {
+  it("empty phone â†’ ValidationDomainError 422 (phone is required within customer)", async () => {
     const h = makeHarness();
 
     await expect(
@@ -539,7 +543,7 @@ describe("TourRequestService — §4.8 traveler identity (Request Modal contract
     expect(h.offerService.refreshPrice).not.toHaveBeenCalled();
   });
 
-  it("invalid email format → ValidationDomainError 422 before the supplier call", async () => {
+  it("invalid email format â†’ ValidationDomainError 422 before the supplier call", async () => {
     const h = makeHarness();
 
     await expect(
@@ -551,7 +555,7 @@ describe("TourRequestService — §4.8 traveler identity (Request Modal contract
     expect(h.prisma.request.create).not.toHaveBeenCalled();
   });
 
-  it("matched by phone (empty email allowed) → links existing customerId, no create", async () => {
+  it("matched by phone (empty email allowed) â†’ links existing customerId, no create", async () => {
     const h = makeHarness();
     resolveCustomerMock.mockResolvedValue({
       status: "MATCHED",
@@ -577,7 +581,7 @@ describe("TourRequestService — §4.8 traveler identity (Request Modal contract
     expect(data.displayedPrice).toBe(1050);
   });
 
-  it("unmatched + email → creates Customer (normalized email, E.164 phone) and links", async () => {
+  it("unmatched + email â†’ creates Customer (normalized email, E.164 phone) and links", async () => {
     const h = makeHarness();
 
     await h.service.createTourRequest({ ...DTO, customer: CUSTOMER });
@@ -596,7 +600,7 @@ describe("TourRequestService — §4.8 traveler identity (Request Modal contract
     expect(data.customerId).toBe("c-new");
   });
 
-  it("unmatched + empty email → request stays unlinked (no fake identity data)", async () => {
+  it("unmatched + empty email â†’ request stays unlinked (no fake identity data)", async () => {
     const h = makeHarness();
 
     await h.service.createTourRequest({
@@ -609,7 +613,7 @@ describe("TourRequestService — §4.8 traveler identity (Request Modal contract
     expect(data.customerId).toBeNull();
   });
 
-  it("ambiguous phone → ConflictError (409), no re-check, no request row", async () => {
+  it("ambiguous phone â†’ ConflictError (409), no re-check, no request row", async () => {
     const h = makeHarness();
     resolveCustomerMock.mockResolvedValue({
       status: "AMBIGUOUS",
@@ -631,7 +635,7 @@ describe("TourRequestService — §4.8 traveler identity (Request Modal contract
     expect(h.prisma.request.create).not.toHaveBeenCalled();
   });
 
-  it("local phone format is normalized with country region hint (050… → +994…)", async () => {
+  it("local phone format is normalized with country region hint (050â€¦ â†’ +994â€¦)", async () => {
     const h = makeHarness();
 
     await h.service.createTourRequest({
@@ -651,7 +655,7 @@ describe("TourRequestService — §4.8 traveler identity (Request Modal contract
 });
 
 /**
- * TRAVELHUB_TRAVELER_REQUIREMENTS_DATA_SHAPE_FIX (§5/§6/§7/§15) — REGRESSION
+ * TRAVELHUB_TRAVELER_REQUIREMENTS_DATA_SHAPE_FIX (Â§5/Â§6/Â§7/Â§15) â€” REGRESSION
  * for the previously untested tour-offer path.
  *
  * Root defect: createTourRequest wrote the OFFER snapshot into
@@ -659,12 +663,12 @@ describe("TourRequestService — §4.8 traveler identity (Request Modal contract
  * TravelerCollectionPanel with ZERO input fields (fieldsFor filtered every key
  * out) and the D3 lifecycle was unreachable.
  *
- * Required assertions (§15):
+ * Required assertions (Â§15):
  *  - pin = canonical TOUR requirements (product-less AND product-backed);
  *  - hotel / room / meal / externalOfferId are NOT traveler requirement keys;
- *  - offer facts remain preserved in productSnapshot.offer (§6).
+ *  - offer facts remain preserved in productSnapshot.offer (Â§6).
  */
-describe("TourRequestService — data-shape fix: pinnedRequirements = TravelerFullRequirements", () => {
+describe("TourRequestService â€” data-shape fix: pinnedRequirements = TravelerFullRequirements", () => {
   const OFFER_KEYS = [
     "supplierCode",
     "externalOfferId",
@@ -695,8 +699,8 @@ describe("TourRequestService — data-shape fix: pinnedRequirements = TravelerFu
 
   const created = (h: Harness) => h.prisma.request.create.mock.calls[0][0].data;
 
-  it("product-less (productId = null) → canonical TOUR pin; offer facts in productSnapshot.offer", async () => {
-    const h = makeHarness(); // product.findFirst → null (ANEX-style, no catalog hit)
+  it("product-less (productId = null) â†’ canonical TOUR pin; offer facts in productSnapshot.offer", async () => {
+    const h = makeHarness(); // product.findFirst â†’ null (ANEX-style, no catalog hit)
 
     await h.service.createTourRequest({
       ...DTO,
@@ -709,15 +713,15 @@ describe("TourRequestService — data-shape fix: pinnedRequirements = TravelerFu
     const data = created(h);
     expect(data.productId).toBeNull();
 
-    // §7: requirements are NOT a Product prerequisite.
+    // Â§7: requirements are NOT a Product prerequisite.
     expect(data.pinnedRequirements).toEqual(TOUR_DEFAULTS);
 
-    // §15: no offer key may leak into the traveler requirements map.
+    // Â§15: no offer key may leak into the traveler requirements map.
     for (const key of OFFER_KEYS) {
       expect(data.pinnedRequirements).not.toHaveProperty(key);
     }
 
-    // §6: every offer fact survives in the existing product snapshot.
+    // Â§6: every offer fact survives in the existing product snapshot.
     expect((data.productSnapshot as Record<string, any>).offer).toMatchObject({
       supplierCode: "KOMPAS",
       externalOfferId: "35000",
@@ -736,7 +740,7 @@ describe("TourRequestService — data-shape fix: pinnedRequirements = TravelerFu
     });
   });
 
-  it("product-backed with Product.travelerRequirements → Product override wins over TOUR defaults", async () => {
+  it("product-backed with Product.travelerRequirements â†’ Product override wins over TOUR defaults", async () => {
     const h = makeHarness();
     h.prisma.product.findFirst.mockResolvedValue({
       id: "p1",
@@ -753,7 +757,7 @@ describe("TourRequestService — data-shape fix: pinnedRequirements = TravelerFu
 
     const data = created(h);
     expect(data.productId).toBe("p1");
-    // Two-stage §3: TOUR defaults строже — override обязан их перекрывать.
+    // Two-stage Â§3: TOUR defaults ÑÑ‚Ñ€Ð¾Ð¶Ðµ â€” override Ð¾Ð±ÑÐ·Ð°Ð½ Ð¸Ñ… Ð¿ÐµÑ€ÐµÐºÑ€Ñ‹Ð²Ð°Ñ‚ÑŒ.
     expect(data.pinnedRequirements).toEqual({
       ...TOUR_DEFAULTS,
       birthDate: "OPTIONAL",
@@ -764,7 +768,7 @@ describe("TourRequestService — data-shape fix: pinnedRequirements = TravelerFu
     expect(data.pinnedRequirements).not.toHaveProperty("externalOfferId");
   });
 
-  it("product-backed WITHOUT travelerRequirements → resolver defaults (no hand-written default object)", async () => {
+  it("product-backed WITHOUT travelerRequirements â†’ resolver defaults (no hand-written default object)", async () => {
     const h = makeHarness();
     h.prisma.product.findFirst.mockResolvedValue({ id: "p1", code: "PRD-1", title: "Rixos" });
 
@@ -772,7 +776,7 @@ describe("TourRequestService — data-shape fix: pinnedRequirements = TravelerFu
 
     const data = created(h);
     expect(data.pinnedRequirements).toEqual(TOUR_DEFAULTS);
-    // …and the offer facts still land in the snapshot (не теряются).
+    // â€¦and the offer facts still land in the snapshot (Ð½Ðµ Ñ‚ÐµÑ€ÑÑŽÑ‚ÑÑ).
     expect((data.productSnapshot as Record<string, any>).offer).toMatchObject({
       hotel: "Rixos",
       externalOfferId: "35000",
@@ -806,3 +810,4 @@ describe("TourRequestService — data-shape fix: pinnedRequirements = TravelerFu
     });
   });
 });
+
