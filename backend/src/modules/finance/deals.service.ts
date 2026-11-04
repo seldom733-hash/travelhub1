@@ -394,7 +394,7 @@ export class DealsService {
       const penaltyClosed = cancelled || settlement?.status === "FINANCIALLY_SETTLED_WITH_PENALTY";
       // A cancelled deal has no remaining upside: expected income is the
       // retained penalty spread, never the catalogue-margin expectation.
-      const expectedIncome = penaltyClosed ? clientPenalty - supplierPenalty : !order ? 0 : sales - cost;
+      const expectedIncome = penaltyClosed ? clientPenalty - supplierPenalty : sales - cost;
       const completed = ["FULFILLED", "CLOSED"].includes(order?.status ?? "") || status === "COMPLETED";
       // Revenue is recognized only for a completed deal. For an active
       // partially paid deal, current income is not cash-in; it stays 0 until

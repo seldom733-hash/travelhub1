@@ -135,8 +135,8 @@ export default function DealDetailPage() {
                 <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-[#0f6b5f]"><span>◔</span>Финансовый результат</div>
                 <FinRow label="Сумма продажи" value={money(deal.salesAmount, deal.currency)} />
                 <FinRow label="Себестоимость" value={money(deal.costAmount, deal.currency)} />
-                <FinRow label="Ожидаемый доход" value={money(deal.expectedIncome, deal.currency)} tone="text-emerald-700" />
-                <div className="mt-2 flex items-center justify-between rounded-lg bg-white/70 px-2 py-1.5"><span className="text-[10px] text-[#667085]">Текущий доход</span><span className="font-mono text-sm font-semibold text-emerald-700">{money(deal.currentIncome, deal.currency)}</span></div>
+                <FinRow label="Ожидаемый доход" value={money(deal.expectedIncome, deal.currency)} tone={Number(deal.expectedIncome) < 0 ? "text-rose-700" : "text-emerald-700"} />
+                <div className="mt-2 flex items-center justify-between rounded-lg bg-white/70 px-2 py-1.5"><span className="text-[10px] text-[#667085]">Текущий доход</span><span className={`font-mono text-sm font-semibold ${Number(deal.currentIncome) < 0 ? "text-rose-700" : "text-emerald-700"}`}>{money(deal.currentIncome, deal.currency)}</span></div>
               </div>
             </div>
 
