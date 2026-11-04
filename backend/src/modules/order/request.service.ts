@@ -786,8 +786,8 @@ export class RequestService {
     const partnerMap = partner ? new Map([[request.partnerId!, partner]]) : new Map();
     const dto = this.requestDto(request, customerMap, productMap, partnerMap) as any;
 
-    dto.customerEmail = customer?.email ?? null;
-    dto.customerPhone = customer?.phone ?? null;
+    dto.customerEmail = customer?.email ?? dto.customerEmail ?? null;
+    dto.customerPhone = customer?.phone ?? dto.customerPhone ?? null;
     dto.productType = product?.type ?? null;
     dto.partnerCountry = partner?.countryCode ?? null;
     // Request-only supplier context: a test/manual supplier may have no
@@ -1649,9 +1649,15 @@ export class RequestService {
     const cust = customerMap?.get(r.customerId);
     const prod = productMap?.get(r.productId);
     const part = partnerMap?.get(r.partnerId);
-    const customerName = cust ? `${cust.firstName ?? ""} ${cust.lastName ?? ""}`.trim() : null;
-    const pinned = (r.pinnedRequirements ?? null) as Record<string, any> | null;
     const snap = (r.productSnapshot ?? null) as Record<string, any> | null;
+    const snapOffer = (snap?.offer ?? null) as Record<string, any> | null;
+    const snapCustomer = (snap?.customer ?? snapOffer?.customer ?? null) as Record<string, any> | null;
+    const customerName = cust
+      ? `${cust.firstName ?? ""} ${cust.lastName ?? ""}`.trim()
+      : snapCustomer
+        ? `${snapCustomer.firstName ?? ""} ${snapCustomer.lastName ?? ""}`.trim() || String(snapCustomer.fullName ?? "") || null
+        : null;
+    const pinned = (r.pinnedRequirements ?? null) as Record<string, any> | null;
     const commercial = (r.commercialSnapshot ?? null) as Record<string, any> | null;
     // Data-shape fix §6: offer/search facts are frozen in productSnapshot.offer
     // (canonical location, producer-written at creation). `pinned` fallback
@@ -1679,6 +1685,8 @@ export class RequestService {
       referenceNumber: r.referenceNumber,
       customerId: r.customerId,
       customerName,
+      customerEmail: cust?.email ?? snapCustomer?.email ?? null,
+      customerPhone: cust?.phone ?? snapCustomer?.phone ?? null,
       customerCode: cust?.code ?? null,
       productId: r.productId,
       productName,
