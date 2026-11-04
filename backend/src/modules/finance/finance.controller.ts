@@ -735,6 +735,12 @@ export class FinanceController {
     return this.payments.getByCode(code);
   }
 
+  @Patch("payments/:code")
+  @RequirePermissions("finance.payment.manage")
+  async updatePayment(@Param("code") code: string, @Body() body: { amount?: string; paymentMethod?: string | null; paidAt?: string | null }, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.payments.updatePayment(code, body, { id: actor.id, username: actor.username });
+  }
+
   @Post("payments")
   @RequirePermissions("finance.payment.create")
   // Step 2.12H: payment-initiation boundary — защищённая операция (external

@@ -756,8 +756,39 @@ export class PaymentService {
     return { rows, total: rows.length };
   }
 
-  async getByCode(code: string): Promise<Record<string, unknown>> {
-    const row = await this.prisma.payment.findUnique({ where: { code } });
+  async updatePayment(code: string, input: { amount?: string; paymentMethod?: string | null; paidAt?: string | null }, actor: { id: string; username: string }) {
+    const payment = await this.prisma.payment.findUnique({ where: { code } });
+    if (!payment) throw new NotFoundError(`Payment ${code} not found`);
+    if (payment.status !== PaymentStatus.PENDING && payment.status !== PaymentStatus.CAPTURED) {
+      throw new ConflictError(`Payment ${code} is ${payment.status} and cannot be edited`);
+    }
+    const order = await this.prisma.order.findUnique({ where: { id: payment.orderId } });
+    if (!order) throw new NotFoundError(`Order ${payment.orderId} not found`);
+    const amount = input.amount != null ? new Prisma.Decimal(validatePaymentAmount(input.amount)) : payment.amount;
+    const refunded = await this.prisma.refund.aggregate({ where: { orderId: payment.orderId, status: RefundStatus.PROCESSED }, _sum: { amount: true } });
+    const refundedAmount = new Prisma.Decimal(refunded._sum.amount ?? 0);
+    if (amount.lessThanOrEqualTo(0) || amount.greaterThan(order.amount)) throw new ConflictError("Payment amount exceeds order amount");
+    if (payment.status === PaymentStatus.CAPTURED && amount.lessThan(refundedAmount)) throw new ConflictError("Payment amount cannot be less than processed refunds");
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          amount,
+          paymentMethod: input.paymentMethod !== undefined ? input.paymentMethod : payment.paymentMethod,
+          paidAt: input.paidAt !== undefined ? (input.paidAt ? new Date(input.paidAt) : null) : payment.paidAt,
+          version: { increment: 1 },
+        },
+      });
+      const captured = await tx.payment.aggregate({ where: { orderId: payment.orderId, status: { in: [PaymentStatus.CAPTURED, PaymentStatus.REFUNDED] } }, _sum: { amount: true } });
+      const paid = new Prisma.Decimal(captured._sum.amount ?? 0);
+      const paymentStatus = paid.isZero() ? "UNPAID" : paid.greaterThanOrEqualTo(order.amount) ? "PAID" : "PARTIALLY_PAID";
+      await tx.order.update({ where: { id: order.id }, data: { paidAmount: paid, paymentStatus } });
+      await tx.paymentHistory.create({ data: { paymentId: payment.id, action: "edited", from: payment.status, to: payment.status, actorId: actor.id, actorName: actor.username, comment: `Payment edited: amount=${amount.toString()}` } });
+      return this.paymentDto(updated);
+    });
+  }
+
+  async getByCode(code: string): Promise<Record<string, unknown>> {    const row = await this.prisma.payment.findUnique({ where: { code } });
     if (!row) throw new NotFoundError(`Payment ${code} not found`);
     // D4 F2 direct-read invisibility (согласовано с Order/Booking detail):
     // Storefront-платеж «не существует» для platform-контракта → 404-like.

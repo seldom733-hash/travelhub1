@@ -6,8 +6,12 @@ import { financeCenterApi } from "@/lib/finance-center-api";
 import { formatPrice, useLocale } from "@/lib/i18n";
 import { useCan } from "@/lib/use-can";
 
-interface PaymentRow { id: string; code: string; amount: string; status: string; currency: string; orderCode?: string }
-interface RefundRow { code: string; status: string; amount: string; currency: string; paymentCode?: string; orderCode?: string }
+interface PaymentRow { id: string; code: string; referenceNumber?: string | null; amount: string; status: string; currency: string; orderCode?: string }
+interface RefundRow { code: string; referenceNumber?: string | null; status: string; amount: string; currency: string; paymentCode?: string | null; orderCode?: string | null }
+
+function statusRu(status: string) {
+  return ({ REQUESTED: "Запрошен", APPROVED: "Подтверждён", PROCESSED: "Исполнен", FAILED: "Ошибка" } as Record<string, string>)[status] ?? status;
+}
 
 export default function RefundsPage() {
   const locale = useLocale();
@@ -85,8 +89,8 @@ export default function RefundsPage() {
           <h3 className="mb-3 text-sm font-semibold">Создать возврат</h3>
           <div className="grid gap-2 sm:grid-cols-4">
             <select value={paymentId} onChange={(e) => setPaymentId(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">
-              <option value="">Выберите CAPTURED-платёж</option>
-              {payments.map((p) => <option key={p.id} value={p.id}>{p.code} · {p.amount} {p.currency} · {p.orderCode ?? ""}</option>)}
+              <option value="">Выберите оплаченный платёж</option>
+              {payments.map((p) => <option key={p.id} value={p.id}>{p.referenceNumber ?? p.code} · {p.amount} {p.currency} · {p.orderCode ?? ""}</option>)}
             </select>
             <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Сумма" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
             <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Причина" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
@@ -98,16 +102,16 @@ export default function RefundsPage() {
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr><th className="px-3 py-2">Код</th><th className="px-3 py-2">Платёж</th><th className="px-3 py-2 text-right">Сумма</th><th className="px-3 py-2">Статус</th><th className="px-3 py-2">Действия</th></tr>
+            <tr><th className="px-3 py-2">Код</th><th className="px-3 py-2">Платёж</th><th className="px-3 py-2">Заказ</th><th className="px-3 py-2 text-right">Сумма</th><th className="px-3 py-2">Статус</th><th className="px-3 py-2">Действия</th></tr>
           </thead>
           <tbody>
-            {refunds.length === 0 && <tr><td colSpan={5} className="px-3 py-8 text-center text-slate-500">Возвратов нет</td></tr>}
+            {refunds.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-500">Возвратов нет</td></tr>}
             {refunds.map((r) => (
               <tr key={r.code} className="border-t border-slate-100">
-                <td className="px-3 py-2 font-mono text-xs">{r.code}</td>
-                <td className="px-3 py-2 font-mono text-xs">{r.paymentCode ?? "—"}</td>
+                <td className="px-3 py-2 font-mono text-xs">{r.referenceNumber ?? r.code}</td>
+                <td className="px-3 py-2 font-mono text-xs">{r.paymentCode ?? "—"}</td><td className="px-3 py-2 font-mono text-xs">{r.orderCode ?? "—"}</td>
                 <td className="px-3 py-2 text-right font-mono">{formatPrice(r.amount, r.currency, locale) ?? r.amount}</td>
-                <td className="px-3 py-2 text-xs">{r.status}</td>
+                <td className="px-3 py-2 text-xs">{statusRu(r.status)}</td>
                 <td className="px-3 py-2">
                   <div className="flex gap-2">
                     {canApprove && r.status === "REQUESTED" && <button type="button" disabled={busy} onClick={() => void act(r.code, "approve")} className="rounded border px-2 py-1 text-xs font-semibold disabled:opacity-50">Подтвердить</button>}

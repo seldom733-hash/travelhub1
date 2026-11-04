@@ -59,7 +59,7 @@ import OperationsCenterShell, {
 import { useLocale, t, LOCALE_TAGS, type Locale } from "@/lib/i18n";
 import { useCan } from "@/lib/use-can";
 import CreatePaymentForm from "@/components/finance/CreatePaymentForm";
-import PaymentsTable from "@/components/finance/PaymentsTable";
+import PaymentsTable, { type PaymentsTableRow } from "@/components/finance/PaymentsTable";
 
 // в”Ђв”Ђ Canonical enum arrays (source: backend payments-registry.ts) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
@@ -168,6 +168,7 @@ function PaymentsContent({
   // в”Ђв”Ђ Create payment (prompt В§1: + РЎРѕР·РґР°С‚СЊ РїР»Р°С‚РµР¶, RBAC finance.payment.create) в”Ђ
   const canCreatePayment = useCan("finance.payment.create");
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<PaymentsTableRow | null>(null);
 
   // в”Ђв”Ђ State в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
   const [data, setData] = useState<PaymentListResponse | null>(null);
@@ -502,6 +503,7 @@ function PaymentsContent({
                   orderLabel: p.orderReference ?? (p.orderId ? `${p.orderId.slice(0, 8)}вЂ¦` : null),
                 }))}
                 locale={locale}
+                onEdit={(row) => setEditingPayment(row)}
                 emptyMessage={t("payments.table.empty", locale)}
                 sortState={sortState}
                 onSort={handleSort}
@@ -544,6 +546,7 @@ function PaymentsContent({
       </div>
 
       {/* + РЎРѕР·РґР°С‚СЊ РїР»Р°С‚РµР¶ вЂ” modal (prompt В§1/В§2) */}
+      {editingPayment && <EditPaymentModal row={editingPayment} onClose={() => setEditingPayment(null)} onSaved={() => { setEditingPayment(null); void load(); }} />}
       <CreatePaymentForm
         open={createOpen}
         onClose={() => setCreateOpen(false)}
@@ -622,4 +625,20 @@ export default function PaymentsPage() {
       <PaymentsWithParams />
     </Suspense>
   );
+}
+
+function EditPaymentModal({ row, onClose, onSaved }: { row: PaymentsTableRow; onClose: () => void; onSaved: () => void }) {
+  const [amount, setAmount] = useState(row.amount);
+  const [method, setMethod] = useState(row.paymentMethod ?? "cash");
+  const [paidAt, setPaidAt] = useState(row.createdAt.slice(0, 10));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function save() {
+    setBusy(true); setError("");
+    try {
+      await api.patch(`/finance/payments/${row.code}`, { amount, paymentMethod: method, paidAt });
+      onSaved();
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}><div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}><h3 className="mb-1 text-base font-semibold">Редактировать платёж</h3><p className="mb-3 font-mono text-xs text-slate-500">{row.referenceNumber ?? row.code}</p><div className="grid gap-2"><label className="text-xs text-slate-500">Сумма<input value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" inputMode="decimal" /></label><label className="text-xs text-slate-500">Дата<input type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" /></label><label className="text-xs text-slate-500">Форма оплаты<select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"><option value="cash">Наличные</option><option value="card">Карта</option><option value="bank_transfer">Банковский перевод</option><option value="online">Онлайн</option></select></label>{error && <div className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700">{error}</div>}<div className="mt-2 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-3 py-2 text-xs">Отмена</button><button type="button" disabled={busy} onClick={() => void save()} className="rounded-lg bg-[#0f6b5f] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "Сохранение…" : "Сохранить"}</button></div></div></div></div>;
 }

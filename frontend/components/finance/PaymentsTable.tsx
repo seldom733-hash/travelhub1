@@ -178,6 +178,8 @@ interface PaymentsTableProps {
   statusHeaderExtra?: React.ReactNode;
   /** confirm/cancel успешен — родитель перезагружает данные (реестр/Order/Booking). */
   onActionCompleted?: () => void;
+  /** Finance registry: open edit modal for a client payment. */
+  onEdit?: (row: PaymentsTableRow) => void;
   /** Combined client/supplier ledger with income column. */
   ledger?: boolean;
 }
@@ -191,6 +193,7 @@ export default function PaymentsTable({
   amountHeaderExtra,
   statusHeaderExtra,
   onActionCompleted,
+  onEdit,
   ledger = false,
 }: PaymentsTableProps) {
   // Статусные действия — только finance.payment.manage (ADMIN/FINANCE).
@@ -335,6 +338,9 @@ export default function PaymentsTable({
                         {t("payments.action.cancel", locale)}
                       </button>
                     </div>
+                  )}
+                  {(!ledger || row.kind === "CLIENT") && canManage && row.kind !== "SUPPLIER" && row.kind !== "SUPPLIER_REFUND" && onEdit && (row.status === "PENDING" || row.status === "CAPTURED") && (
+                    <button type="button" onClick={() => onEdit(row)} className="mt-1.5 rounded border border-slate-300 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-slate-50">Редактировать</button>
                   )}
                   {(row.kind === "SUPPLIER" || row.kind === "SUPPLIER_REFUND") && canManageSupplier && row.status === "PENDING" && (
                     <div className="mt-1.5">

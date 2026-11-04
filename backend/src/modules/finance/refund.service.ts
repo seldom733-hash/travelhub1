@@ -356,13 +356,27 @@ export class RefundService {
       }),
       this.prisma.refund.count({ where }),
     ]);
-    return { items: items.map((r) => this.refundDto(r)), total, page, pageSize, hasMore: page * pageSize < total };
+    const paymentIds = [...new Set(items.map((r) => r.paymentId))];
+    const orderIds = [...new Set(items.map((r) => r.orderId))];
+    const [payments, orders] = await Promise.all([
+      this.prisma.payment.findMany({ where: { id: { in: paymentIds } }, select: { id: true, code: true, referenceNumber: true } }),
+      this.prisma.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, referenceNumber: true } }),
+    ]);
+    const paymentById = new Map(payments.map((p) => [p.id, p]));
+    const orderById = new Map(orders.map((o) => [o.id, o]));
+    return { items: items.map((r) => this.refundDto(r, paymentById.get(r.paymentId), orderById.get(r.orderId))), total, page, pageSize, hasMore: page * pageSize < total };
   }
 
   async getByCode(code: string): Promise<Record<string, unknown>> {
-    const row = await this.prisma.refund.findUnique({ where: { code } });
+    const row = await this.prisma.refund.findUnique({
+      where: { code },
+    });
     if (!row) throw new NotFoundError(`Refund ${code} not found`);
-    return this.refundDto(row);
+    const [payment, order] = await Promise.all([
+      this.prisma.payment.findUnique({ where: { id: row.paymentId }, select: { code: true, referenceNumber: true } }),
+      this.prisma.order.findUnique({ where: { id: row.orderId }, select: { referenceNumber: true } }),
+    ]);
+    return this.refundDto(row, payment, order);
   }
 
   // ── Whitelist DTO (без PII/secrets; money — Decimal strings) ───────────────
@@ -383,13 +397,15 @@ export class RefundService {
     approvedAt: Date | null;
     processedAt: Date | null;
     failedAt: Date | null;
-  }): Record<string, unknown> {
+  }, payment?: { code: string; referenceNumber: string | null } | null, order?: { referenceNumber: string } | null): Record<string, unknown> {
     return {
       id: r.id,
       code: r.code,
       referenceNumber: r.referenceNumber ?? null,
       paymentId: r.paymentId,
+      paymentCode: payment?.referenceNumber ?? payment?.code ?? null,
       orderId: r.orderId,
+      orderCode: order?.referenceNumber ?? null,
       amount: r.amount.toString(),
       currency: r.currency,
       status: r.status,
