@@ -6,6 +6,8 @@ import Link from "next/link";
 import { formatPrice } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import { dealsApi, type DealRow } from "@/lib/deals-api";
+import OperationalNotes from "@/components/OperationalNotes";
+import { useCurrentUser } from "@/lib/use-user";
 
 const TABS = [
   ["overview", "Общая информация"], ["services", "Услуги и расчёты"], ["client", "Платежи клиента"],
@@ -33,6 +35,7 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 export default function DealDetailPage() {
+  const user = useCurrentUser();
   const params = useParams<{ sequence: string }>();
   const sequence = params.sequence;
   const [deal, setDeal] = useState<DealRow | null>(null);
@@ -183,7 +186,7 @@ export default function DealDetailPage() {
           <aside className="space-y-3">
             <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span>✎</span>Статус и действия</div><div className="flex items-center justify-between rounded-lg border border-[#e5e2da] px-2 py-2 text-xs"><span className="text-[#667085]">Статус заказа</span><span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusTone(deal.status)}`}>{statusRu(deal.status)}</span></div>{actionError && <div className="mt-2 rounded bg-rose-50 px-2 py-1 text-[10px] text-rose-700">{actionError}</div>}<div className="mt-2 space-y-1.5">{availableActions.map((action, index) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runAction(action)} className={`block w-full rounded-lg px-3 py-2 text-center text-xs font-semibold disabled:opacity-50 ${/cancel|problem|suspend/.test(action) ? "border border-rose-200 text-rose-700" : index === 0 ? "bg-[#0f6b5f] text-white" : "border border-[#e5e2da] text-[#344054]"}`}>{actionBusy === action ? "Выполняется…" : ACTION_LABELS[action] ?? action}</button>)}<Link href="/app/finance/refunds" className="block rounded-lg border border-[#e5e2da] px-3 py-2 text-center text-xs font-semibold text-[#344054]">Создать возврат</Link></div></div>
             <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-[#667085]">История этапов</div><Timeline title="Заявка создана" code={deal.requestCode} date={new Date(deal.createdAt).toLocaleString("ru-RU")} tone="done" /><Timeline title="Заказ создан" code={deal.orderCode} date={deal.orderCode ? "Текущий этап" : "Ожидает"} tone={deal.orderCode ? "current" : "todo"} /><Timeline title="Бронь" code={deal.bookingCode ?? "ожидает создания"} date={deal.bookingCode ? "Создана" : "Ожидает"} tone={deal.bookingCode ? "done" : "todo"} /></div>
-            <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span>Заметки</span><button type="button" disabled className="text-[#98a2b3]">+ Добавить</button></div><div className="rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2 text-[11px] text-[#667085]">Заметки по сделке не загружены.</div></div>
+            {user ? <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><OperationalNotes entityType={deal.orderId ? "Order" : "Request"} entityId={deal.orderId ?? deal.requestId} permissions={user.permissions} currentUserId={user.id} currentRole={user.role} /></div> : null}
           </aside>
         </div>
       </div>

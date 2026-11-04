@@ -71,6 +71,20 @@ export default function DealsPage() {
   };
   const periodLabel = query.dateFrom || query.dateTo ? `${query.dateFrom ? displayDate(query.dateFrom) : "…"} — ${query.dateTo ? displayDate(query.dateTo) : "…"}` : "Весь период";
 
+
+  const exportSelected = () => {
+    const rows = (data?.items ?? []).filter((r) => selected.has(r.sequence));
+    const head = ["№", "Заявка", "Заказ", "Бронь", "Стадия", "Клиент", "Услуга", "Поставщик", "Менеджер", "Сумма продажи", "Себестоимость", "Доход", "Валюта"];
+    const body = rows.map((r) => [r.sequence, r.requestCode, r.orderCode ?? "", r.bookingCode ?? "", r.stageLabel, r.customerName ?? "", r.productTitle ?? "", r.supplierCode ?? "", r.manager ?? "", r.salesAmount, r.costAmount, r.expectedIncome, r.currency]);
+    const csv = [head, ...body].map((row) => row.map((v) => '"' + String(v ?? "").replaceAll('"', '""') + '"').join(";")).join("\n");
+    const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "deals-selected-" + new Date().toISOString().slice(0, 10) + ".csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-[#f6f4ef] font-sans">
       <div className="border-b border-[#e5e2da] bg-white px-4 py-3 lg:px-6">
@@ -117,6 +131,8 @@ export default function DealsPage() {
         </div>
 
         {error && <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
+        {selected.size > 0 && <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#d9e6e1] bg-[#f2faf7] px-3 py-2 text-xs text-[#344054]"><span className="font-semibold">Выбрано: {selected.size}</span><button type="button" onClick={exportSelected} className="rounded-lg bg-[#0f6b5f] px-3 py-1.5 text-[11px] font-semibold text-white">Экспорт выбранных</button><button type="button" onClick={() => setSelected(new Set())} className="rounded-lg border border-[#e5e2da] bg-white px-3 py-1.5 text-[11px]">Снять выбор</button></div>}
+
         <div className="overflow-hidden rounded-xl border border-[#e5e2da] bg-white shadow-sm">
           <div className="overflow-x-auto"><table className="w-full min-w-[1380px] text-left text-xs">
             <thead className="border-b border-[#e5e2da] bg-[#fbfaf7] text-[10px] uppercase tracking-wide text-[#667085]"><tr><th className="px-2 py-3"><input type="checkbox" checked={Boolean(data?.items.length) && data!.items.every((r) => selected.has(r.sequence))} onChange={() => setSelected(Boolean(data?.items.length) && data!.items.every((r) => selected.has(r.sequence)) ? new Set() : new Set(data?.items.map((r) => r.sequence) ?? []))} /></th><SortTh text="№" sortKey="sequence" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} /><SortTh text="Коды" sortKey="requestCode" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} /><SortTh text="Стадия" sortKey="stage" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} /><SortTh text="Дата создания заявки" sortKey="createdAt" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} /><SortTh text="Менеджер" sortKey="manager" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} />{columns.customer && <SortTh text="Клиент" sortKey="customerName" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} />}<SortTh text="Услуга" sortKey="productTitle" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} />{columns.supplier && <SortTh text="Поставщик" sortKey="supplierCode" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} />}{columns.travelers && <SortTh text="Туристы" sortKey="travelerCount" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} />}<SortTh text="Сумма продажи" sortKey="salesAmount" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} right />{columns.cost && <SortTh text="Цена поставщика" sortKey="costAmount" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} right />}<SortTh text="Оплата клиента" sortKey="clientReceived" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} right /><SortTh text="Оплата поставщику" sortKey="supplierPaid" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} right /><SortTh text="Ожидаемый доход" sortKey="expectedIncome" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} right />{columns.currentIncome && <SortTh text="Текущий доход" sortKey="currentIncome" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} right />}<SortTh text="Статус" sortKey="status" by={query.sortBy} direction={query.sortDirection} onSort={sortBy} /></tr></thead>
