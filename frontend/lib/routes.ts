@@ -19,6 +19,7 @@ export const INTERNAL_ROLES = [
   "ANALYST",
   "MODERATOR",
   "SALES_MANAGER",
+  "SALES_HEAD",
   "OPERATOR",
 ] as const;
 
