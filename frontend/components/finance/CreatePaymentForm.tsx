@@ -255,6 +255,16 @@ export default function CreatePaymentForm({
     !financialsLoading &&
     (trimmedAmount.length === 0 || isValidPaymentAmount(trimmedAmount, availableForValidation));
   const amountTouchedButInvalid = trimmedAmount.length > 0 && !isValidPaymentAmount(trimmedAmount, availableForValidation);
+  // Refund default = сумма фактически полученных платежей клиента, не остаток долга.
+  useEffect(() => {
+    if (!open || direction !== "EXPENSE") return;
+    const captured = clientPayments.filter((p) => p.status === "CAPTURED").reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    if (captured > 0) {
+      amountTouchedRef.current = false;
+      setAmount(captured.toFixed(2));
+    }
+  }, [open, direction, clientPayments]);
+
   const canSubmit =
     phase !== "submitting" &&
     phase !== "success" &&
