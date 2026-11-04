@@ -34,6 +34,18 @@ const ACTION_LABELS: Record<string, string> = {
   close: "Закрыть", cancel: "Отменить заказ", problem: "Проблема", suspend: "Приостановить",
   returnToRequest: "Вернуть в заявку",
 };
+const REQUEST_ACTION_LABELS: Record<string, string> = {
+  confirmPrice: "Подтвердить цену", proposePrice: "Изменить цену", reject: "Отклонить заявку",
+  unavailable: "Нет в наличии", customerAccept: "Клиент принял", customerDecline: "Клиент отказался",
+  convert: "Конвертировать в заказ",
+};
+const BOOKING_ACTION_LABELS: Record<string, string> = {
+  prepare: "Подготовить запрос", send: "Отправить поставщику", requestClarification: "Запросить уточнение",
+  resume: "Вернуть в работу", confirm: "Подтвердить бронь", reject: "Отклонить бронь",
+  service: "Начать обслуживание", requestChange: "Запросить изменение", resolveChange: "Согласовать изменение",
+  requestCancellation: "Запросить отмену", complete: "Завершить бронь", cancel: "Отменить бронь",
+  problem: "Проблема", returnToOrder: "Вернуть в заказ",
+};
 
 export default function DealDetailPage() {
   const user = useCurrentUser();
@@ -46,6 +58,8 @@ export default function DealDetailPage() {
   const [availableActions, setAvailableActions] = useState<string[]>([]);
   const [actionBusy, setActionBusy] = useState("");
   const [actionError, setActionError] = useState("");
+  const [requestActions, setRequestActions] = useState<Record<string, boolean>>({});
+  const [bookingActions, setBookingActions] = useState<string[]>([]);
   const [reload, setReload] = useState(0);
   const [editOpen, setEditOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -66,11 +80,48 @@ export default function DealDetailPage() {
     return () => { alive = false; };
   }, [deal?.orderId, reload]);
 
+  useEffect(() => {
+    if (!deal?.requestId) { setRequestActions({}); return; }
+    let alive = true;
+    api.get<{ availableActions?: Record<string, boolean> }>(`/requests/${deal.requestId}`)
+      .then((request) => { if (alive) setRequestActions(request.availableActions ?? {}); })
+      .catch(() => { if (alive) setRequestActions({}); });
+    return () => { alive = false; };
+  }, [deal?.requestId, reload]);
+
+  useEffect(() => {
+    if (!deal?.bookingId) { setBookingActions([]); return; }
+    let alive = true;
+    api.get<{ availableActions?: string[] }>(`/bookings/${deal.bookingId}`)
+      .then((booking) => { if (alive) setBookingActions(booking.availableActions ?? []); })
+      .catch(() => { if (alive) setBookingActions([]); });
+    return () => { alive = false; };
+  }, [deal?.bookingId, reload]);
+
   async function runAction(action: string) {
     if (!deal?.orderId) return;
     setActionBusy(action); setActionError("");
     try {
       await api.patch(`/orders/${deal.orderId}`, { action });
+      setReload((v) => v + 1);
+    } catch (e) { setActionError((e as Error).message); } finally { setActionBusy(""); }
+  }
+
+  async function runRequestAction(action: string) {
+    if (!deal?.requestId) return;
+    setActionBusy(action); setActionError("");
+    try {
+      const body = action === "proposePrice" ? { price: Number(window.prompt("Новая цена") ?? 0) } : {};
+      await api.post(`/requests/${deal.requestId}/${action === "proposePrice" ? "propose-price" : action === "confirmPrice" ? "confirm-price" : action === "customerAccept" ? "customer-accept" : action === "customerDecline" ? "customer-decline" : action === "convert" ? "convert" : action}`, body);
+      setReload((v) => v + 1);
+    } catch (e) { setActionError((e as Error).message); } finally { setActionBusy(""); }
+  }
+
+  async function runBookingAction(action: string) {
+    if (!deal?.bookingId) return;
+    setActionBusy(action); setActionError("");
+    try {
+      await api.patch(`/bookings/${deal.bookingId}`, { action });
       setReload((v) => v + 1);
     } catch (e) { setActionError((e as Error).message); } finally { setActionBusy(""); }
   }
@@ -192,7 +243,7 @@ export default function DealDetailPage() {
           </div>
 
           <aside className="space-y-3">
-            <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span>✎</span>Статус и действия</div><div className="flex items-center justify-between rounded-lg border border-[#e5e2da] px-2 py-2 text-xs"><span className="text-[#667085]">Статус заказа</span><span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusTone(deal.status)}`}>{statusRu(deal.status)}</span></div>{actionError && <div className="mt-2 rounded bg-rose-50 px-2 py-1 text-[10px] text-rose-700">{actionError}</div>}<div className="mt-2 space-y-1.5">{availableActions.map((action, index) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runAction(action)} className={`block w-full rounded-lg px-3 py-2 text-center text-xs font-semibold disabled:opacity-50 ${/cancel|problem|suspend/.test(action) ? "border border-rose-200 text-rose-700" : index === 0 ? "bg-[#0f6b5f] text-white" : "border border-[#e5e2da] text-[#344054]"}`}>{actionBusy === action ? "Выполняется…" : ACTION_LABELS[action] ?? action}</button>)}refundable ? <Link href="/app/finance/refunds" className="block rounded-lg border border-[#e5e2da] px-3 py-2 text-center text-xs font-semibold text-[#344054]">Создать возврат</Link> : <span className="block rounded-lg border border-[#e5e2da] px-3 py-2 text-center text-xs text-[#98a2b3]">Возврат недоступен</span>{deal.status === "CANCELLED" && Number(deal.supplierRefundDue) > 0 && <button type="button" onClick={() => setWriteOffOpen(true)} className="mt-2 w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Признать убытком и закрыть</button>}</div></div>
+            <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span>✎</span>Статус и действия</div><div className="flex items-center justify-between rounded-lg border border-[#e5e2da] px-2 py-2 text-xs"><span className="text-[#667085]">Статус заказа</span><span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusTone(deal.status)}`}>{statusRu(deal.status)}</span></div>{actionError && <div className="mt-2 rounded bg-rose-50 px-2 py-1 text-[10px] text-rose-700">{actionError}</div>}<div className="mt-2 space-y-1.5">{Object.entries(requestActions).filter(([, enabled]) => enabled).length > 0 && <div className="mb-2 space-y-1 rounded-lg border border-[#e5e2da] p-2"><div className="text-[9px] font-semibold uppercase tracking-wide text-[#98a2b3]">Заявка</div>{Object.entries(requestActions).filter(([, enabled]) => enabled).map(([action]) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runRequestAction(action)} className="block w-full rounded-lg border border-[#e5e2da] px-3 py-1.5 text-xs font-medium text-[#344054] disabled:opacity-50">{actionBusy === action ? "Выполняется…" : REQUEST_ACTION_LABELS[action] ?? action}</button>)}</div>}{bookingActions.length > 0 && <div className="mb-2 space-y-1 rounded-lg border border-[#e5e2da] p-2"><div className="text-[9px] font-semibold uppercase tracking-wide text-[#98a2b3]">Бронь</div>{bookingActions.map((action) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runBookingAction(action)} className="block w-full rounded-lg border border-[#e5e2da] px-3 py-1.5 text-xs font-medium text-[#344054] disabled:opacity-50">{actionBusy === action ? "Выполняется…" : BOOKING_ACTION_LABELS[action] ?? action}</button>)}</div>}{availableActions.map((action, index) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runAction(action)} className={`block w-full rounded-lg px-3 py-2 text-center text-xs font-semibold disabled:opacity-50 ${/cancel|problem|suspend/.test(action) ? "border border-rose-200 text-rose-700" : index === 0 ? "bg-[#0f6b5f] text-white" : "border border-[#e5e2da] text-[#344054]"}`}>{actionBusy === action ? "Выполняется…" : ACTION_LABELS[action] ?? action}</button>)}{refundable ? <Link href="/app/finance/refunds" className="block rounded-lg border border-[#e5e2da] px-3 py-2 text-center text-xs font-semibold text-[#344054]">Создать возврат</Link> : <span className="block rounded-lg border border-[#e5e2da] px-3 py-2 text-center text-xs text-[#98a2b3]">Возврат недоступен</span>}{deal.status === "CANCELLED" && Number(deal.supplierRefundDue) > 0 && <button type="button" onClick={() => setWriteOffOpen(true)} className="mt-2 w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Признать убытком и закрыть</button>}</div></div>
             <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-[#667085]">История этапов</div><Timeline title="Заявка создана" code={deal.requestCode} date={new Date(deal.createdAt).toLocaleString("ru-RU")} tone="done" /><Timeline title="Заказ создан" code={deal.orderCode} date={deal.orderCode ? "Текущий этап" : "Ожидает"} tone={deal.orderCode ? "current" : "todo"} /><Timeline title="Бронь" code={deal.bookingCode ?? "ожидает создания"} date={deal.bookingCode ? "Создана" : "Ожидает"} tone={deal.bookingCode ? "done" : "todo"} /></div>
             {user ? <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><OperationalNotes entityType={deal.orderId ? "Order" : "Request"} entityId={deal.orderId ?? deal.requestId} permissions={user.permissions} currentUserId={user.id} currentRole={user.role} /></div> : null}
           </aside>
