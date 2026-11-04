@@ -157,10 +157,20 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
     setError("");
     try {
       await api.patch(`/users/${id}/status`, { status });
+      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, status } : u)));
       await load(page, search, sortBy, sortDirection, statusFilter, roleFilter, dateFrom, dateTo);
     } catch (e) {
       setError((e as Error).message);
     }
+  };
+
+  const toggleStatus = async (user: PlatformUser) => {
+    const activate = user.status !== "ACTIVE";
+    const message = activate
+      ? t("admin.status.activate_confirm", locale).replace("{username}", user.username)
+      : t("admin.status.deactivate_confirm", locale).replace("{username}", user.username);
+    if (!window.confirm(message)) return;
+    await setStatus(user.id, activate ? "ACTIVE" : "INACTIVE");
   };
 
   /** Role assignments panel (hybrid RBAC). */
@@ -230,9 +240,6 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
       setPwdBusy(false);
     }
   };
-
-  /** Цикл статуса: ACTIVE → INACTIVE → LOCKED → ACTIVE (backend поддерживает LOCKED). */
-  const nextStatus = (s: string): string => (s === "ACTIVE" ? "INACTIVE" : s === "INACTIVE" ? "LOCKED" : "ACTIVE");
 
   const resetFilters = async () => {
     setSearch("");
@@ -435,11 +442,10 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
                       <div className="flex items-center gap-2">
                         <StatusBadge status={u.status} />
                         <button
-                          onClick={() => void setStatus(u.id, nextStatus(u.status))}
-                          title={`${t("admin.status.change_title", locale)}${u.status})`}
-                          className="rounded-md px-1.5 py-0.5 text-xs text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                          onClick={() => void toggleStatus(u)}
+                          className={`rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors ${u.status === "ACTIVE" ? "border-rose-200 text-rose-700 hover:bg-rose-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"}`}
                         >
-                          ↻
+                          {u.status === "ACTIVE" ? t("admin.table.deactivate", locale) : t("admin.table.activate", locale)}
                         </button>
                         <button
                           onClick={() => { setPwdUser(u); setPwdValue(""); setNotice(""); setError(""); }}
