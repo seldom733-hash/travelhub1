@@ -97,7 +97,7 @@ export class DealsService {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     const start = (page - 1) * pageSize;
-    const facetRows = all.filter((row) => row.stage !== "REQUEST");
+    const facetRows = all;
     const countries = [...new Set(facetRows.map((row) => row.trip.country).filter((value): value is string => Boolean(value)))].sort();
     const managers = [...new Set(facetRows.map((row) => row.manager).filter((value): value is string => Boolean(value)))].sort();
     const managerUsers = await this.prisma.user.findMany({ where: { status: "ACTIVE", role: { code: "SALES_MANAGER" } }, select: { fullName: true, username: true } });
