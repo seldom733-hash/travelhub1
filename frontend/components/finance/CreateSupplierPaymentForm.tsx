@@ -202,7 +202,7 @@ export default function CreateSupplierPaymentForm({
                 id="supplier-payment-supplier"
                 value={supplierCode}
                 onChange={(event) => setSupplierCode(event.target.value)}
-                disabled={busy || suppliers.length === 0}
+                disabled={busy || suppliers.length === 0 || obligations.length > 0}
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
               >
                 <option value="">Выберите поставщика</option>
