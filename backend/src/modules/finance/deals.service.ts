@@ -360,7 +360,7 @@ export class DealsService {
       const supplierObligations = order ? obligationsByOrder.get(order.id) ?? [] : [];
       const settlement = order ? settlementByOrder.get(order.id) : undefined;
       const captured = clientPayments.filter((p) => p.status === "CAPTURED" || p.status === "REFUNDED").reduce((sum, p) => sum + money(p.amount), 0);
-      const refunded = clientRefunds.filter((r) => r.status === "PROCESSED").reduce((sum, r) => sum + money(r.amount), 0);
+      const refunded = clientRefunds.filter((r) => r.status !== "FAILED").reduce((sum, r) => sum + money(r.amount), 0);
       const supplierPaid = supplierPayouts.filter((p) => p.direction !== "INCOMING" && p.status === "CONFIRMED").reduce((sum, p) => sum + money(p.amount), 0);
       const supplierRefunded = supplierPayouts.filter((p) => p.direction === "INCOMING" && p.status === "CONFIRMED").reduce((sum, p) => sum + money(p.amount), 0);
       const sales = order ? money(order.amount) : money(request.confirmedPrice ?? request.displayedPrice);
