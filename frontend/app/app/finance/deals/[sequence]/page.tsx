@@ -7,6 +7,8 @@ import { formatPrice } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import { dealsApi, type DealRow } from "@/lib/deals-api";
 import { documentsApi, type DocumentListItem } from "@/lib/documents-api";
+import CreatePaymentForm from "@/components/finance/CreatePaymentForm";
+import CreateSupplierPaymentForm from "@/components/finance/CreateSupplierPaymentForm";
 import OperationalNotes from "@/components/OperationalNotes";
 import { useCurrentUser } from "@/lib/use-user";
 
@@ -19,7 +21,7 @@ type Tab = (typeof TABS)[number][0];
 
 function money(value: string | null | undefined, currency: string) { return formatPrice(value ?? "0", currency, "ru") ?? value ?? "0"; }
 function statusRu(status: string) {
-  const map: Record<string, string> = { NEW: "Новая", CHECKING: "Проверка", CONFIRMED: "Подтверждён", PRICE_CHANGED: "Цена изменена", CUSTOMER_ACCEPTED: "Принят клиентом", CONVERTED: "Конвертирован в заказ", REJECTED: "Отклонён", UNAVAILABLE: "Недоступен", EXPIRED: "Истёк", CANCELLED_BY_CUSTOMER: "Отменён клиентом", SUPPLIER_TIMEOUT: "Поставщик не ответил", CUSTOMER_PAYMENT_TIMEOUT: "Клиент не оплатил", IN_PROCESSING: "В работе", READY_FOR_BOOKING: "Готова к брони", SENT_TO_BOOKING: "На бронировании", FULFILLED: "Завершён", COMPLETED: "Завершён", CANCELLED: "Отменён", PENDING: "Ожидает", CAPTURED: "Получен", PAID: "Оплачен", PLANNED: "План", DUE: "К оплате", OVERDUE: "Просрочен", REFUNDED: "Возвращён", PARTIALLY_REFUNDED: "Частичный возврат", FAILED: "Ошибка" };
+  const map: Record<string, string> = { NEW: "Новая", CHECKING: "Проверка", WAITING_FOR_DATA: "Ждём данные", PROBLEM: "Проблема", SUSPENDED: "Приостановлен", READY_TO_CLOSE: "Готов к закрытию", PARTIALLY_FULFILLED: "Частично исполнен", CONFIRMED: "Подтверждён", PRICE_CHANGED: "Цена изменена", CUSTOMER_ACCEPTED: "Принят клиентом", CONVERTED: "Конвертирован в заказ", REJECTED: "Отклонён", UNAVAILABLE: "Недоступен", EXPIRED: "Истёк", CANCELLED_BY_CUSTOMER: "Отменён клиентом", SUPPLIER_TIMEOUT: "Поставщик не ответил", CUSTOMER_PAYMENT_TIMEOUT: "Клиент не оплатил", IN_PROCESSING: "В работе", READY_FOR_BOOKING: "Готова к брони", SENT_TO_BOOKING: "На бронировании", FULFILLED: "Завершён", COMPLETED: "Завершён", CANCELLED: "Отменён", PENDING: "Ожидает", CAPTURED: "Получен", PAID: "Оплачен", PLANNED: "План", DUE: "К оплате", OVERDUE: "Просрочен", REFUNDED: "Возвращён", PARTIALLY_REFUNDED: "Частичный возврат", FAILED: "Ошибка" };
   return map[status] ?? status;
 }
 function statusTone(status: string) {
@@ -61,11 +63,14 @@ export default function DealDetailPage() {
   const [requestActions, setRequestActions] = useState<Record<string, boolean>>({});
   const [bookingActions, setBookingActions] = useState<string[]>([]);
   const [requestTravelers, setRequestTravelers] = useState<Array<{ id: string; position: number; firstName: string; lastName: string; birthDate: string }>>([]);
-  const [orderTravelers, setOrderTravelers] = useState<Array<{ id: string; firstName: string; lastName: string; birthDate: string | null; passportNumber: string | null; dataCompleteness: string }>>([]);
+  const [orderTravelers, setOrderTravelers] = useState<Array<{ id: string; firstName: string; lastName: string; birthDate: string | null; citizenship: string | null; passportSeries: string | null; passportNumber: string | null; passportExpiry: string | null; dataCompleteness: string }>>([]);
+  const [orderFinalConfirmedAt, setOrderFinalConfirmedAt] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [editOpen, setEditOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [writeOffOpen, setWriteOffOpen] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [supplierPaymentOpen, setSupplierPaymentOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -76,9 +81,9 @@ export default function DealDetailPage() {
   useEffect(() => {
     if (!deal?.orderId) { setAvailableActions([]); return; }
     let alive = true;
-    api.get<{ availableActions?: string[]; travelers?: typeof orderTravelers }>(`/orders/${deal.orderId}`)
-      .then((order) => { if (alive) { setAvailableActions(order.availableActions ?? []); setOrderTravelers(order.travelers ?? []); } })
-      .catch(() => { if (alive) { setAvailableActions([]); setOrderTravelers([]); } });
+    api.get<{ availableActions?: string[]; travelers?: typeof orderTravelers; finalConfirmedAt?: string | null }>(`/orders/${deal.orderId}`)
+      .then((order) => { if (alive) { setAvailableActions(order.availableActions ?? []); setOrderTravelers(order.travelers ?? []); setOrderFinalConfirmedAt(order.finalConfirmedAt ?? null); } })
+      .catch(() => { if (alive) { setAvailableActions([]); setOrderTravelers([]); setOrderFinalConfirmedAt(null); } });
     return () => { alive = false; };
   }, [deal?.orderId, reload]);
 
@@ -105,6 +110,15 @@ export default function DealDetailPage() {
     setActionBusy(action); setActionError("");
     try {
       await api.patch(`/orders/${deal.orderId}`, { action });
+      setReload((v) => v + 1);
+    } catch (e) { setActionError((e as Error).message); } finally { setActionBusy(""); }
+  }
+
+  async function finalConfirm() {
+    if (!deal?.orderId) return;
+    setActionBusy("final-confirm"); setActionError("");
+    try {
+      await api.post(`/orders/${deal.orderId}/final-confirm`, {});
       setReload((v) => v + 1);
     } catch (e) { setActionError((e as Error).message); } finally { setActionBusy(""); }
   }
@@ -159,14 +173,12 @@ export default function DealDetailPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link href="/app/finance/deals" className="rounded-lg border border-[#e5e2da] bg-white px-3 py-2 text-xs font-medium text-[#344054]">‹ К списку</Link>
-            {deal.orderId ? <Link href={`/app/orders/${deal.orderId}`} className="rounded-lg border border-[#e5e2da] bg-white px-3 py-2 text-xs font-medium text-[#344054]">Действия</Link> : <button type="button" disabled className="rounded-lg border border-[#e5e2da] bg-white px-3 py-2 text-xs font-medium text-[#98a2b3]">Действия</button>}
-            <Link href={deal.orderId ? `/app/orders/${deal.orderId}` : "/app/finance/deals"} className="rounded-lg bg-[#0f6b5f] px-3 py-2 text-xs font-semibold text-white">Открыть заказ</Link>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[#667085]">
-          <Link href={`/app/requests/${deal.requestId}`} className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f] underline-offset-2 hover:underline">Заявка · {deal.requestCode}</Link>
-          {deal.orderId ? <Link href={`/app/orders/${deal.orderId}`} className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f] underline-offset-2 hover:underline">Заказ · {deal.orderCode}</Link> : <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#98a2b3]">Заказ не создан</span>}
-          {deal.bookingId ? <Link href={`/app/bookings/${deal.bookingId}`} className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f] underline-offset-2 hover:underline">Бронь · {deal.bookingCode}</Link> : <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#98a2b3]">Бронь не создана</span>}
+          <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f]">Заявка · {deal.requestCode}</span>
+          <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f]">Заказ · {deal.orderCode ?? "не создан"}</span>
+          <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f]">Бронь · {deal.bookingCode ?? "не создана"}</span>
           <span className="ml-auto">Создано: {new Date(deal.createdAt).toLocaleString("ru-RU")}</span>
           <span>Менеджер: {deal.manager ?? "—"}</span>
         </div>
@@ -232,10 +244,10 @@ export default function DealDetailPage() {
             </section>
 
             <div className="grid gap-3 lg:grid-cols-2">
-              <Panel title="Платежи клиента" action={clientPayable ? <Link href={`/app/orders/${deal.orderId}`} className="text-[11px] font-semibold text-[#0f6b5f]">+ Добавить платёж</Link> : <span className="text-[10px] text-[#98a2b3]">{!deal.orderId ? "Заказ не создан" : financialLocked ? "Заказ закрыт" : "Долг закрыт"}</span>} totals={[["Всего получено", money(deal.clientReceived, deal.currency)], ["Возвращено", money(deal.clientRefunded, deal.currency)], ["Остаток к оплате", money(deal.clientDebt, deal.currency)]]}>
+              <Panel title="Платежи клиента" action={clientPayable ? <button type="button" onClick={() => setPaymentOpen(true)} className="text-[11px] font-semibold text-[#0f6b5f]">+ Добавить платёж</button> : <span className="text-[10px] text-[#98a2b3]">{!deal.orderId ? "Заказ не создан" : financialLocked ? "Заказ закрыт" : "Долг закрыт"}</span>} totals={[["Всего получено", money(deal.clientReceived, deal.currency)], ["Возвращено", money(deal.clientRefunded, deal.currency)], ["Остаток к оплате", money(deal.clientDebt, deal.currency)]]}>
                 {deal.payments.length === 0 ? <Empty text="Платежей клиента нет" /> : <SimpleRows rows={deal.payments.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.method ?? "Оплата", statusRu(p.status)])} head={["Дата", "Сумма", "Тип", "Статус"]} />}
               </Panel>
-              <Panel title="Расчёты с поставщиком" action={supplierPayable ? <Link href={`/app/orders/${deal.orderId}`} className="text-[11px] font-semibold text-[#0f6b5f]">+ Добавить платёж</Link> : <span className="text-[10px] text-[#98a2b3]">{!deal.orderId ? "Заказ не создан" : financialLocked ? "Заказ закрыт" : "Долг закрыт"}</span>} totals={[["Всего оплачено", money(deal.supplierPaid, deal.currency)], ["Возврат от поставщика", money(deal.supplierRefunded, deal.currency)], ["Остаток поставщику", money(deal.supplierDebt, deal.currency)]]}>
+              <Panel title="Расчёты с поставщиком" action={supplierPayable ? <button type="button" onClick={() => setSupplierPaymentOpen(true)} className="text-[11px] font-semibold text-[#0f6b5f]">+ Добавить платёж</button> : <span className="text-[10px] text-[#98a2b3]">{!deal.orderId ? "Заказ не создан" : financialLocked ? "Заказ закрыт" : "Долг закрыт"}</span>} totals={[["Всего оплачено", money(deal.supplierPaid, deal.currency)], ["Возврат от поставщика", money(deal.supplierRefunded, deal.currency)], ["Остаток поставщику", money(deal.supplierDebt, deal.currency)]]}>
                 {deal.payouts.length === 0 ? <Empty text="Расчётов с поставщиком нет" /> : <SimpleRows rows={deal.payouts.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.direction === "INCOMING" ? "Возврат" : "Оплата поставщику", statusRu(p.status)])} head={["Дата", "Сумма", "Тип", "Статус"]} />}
               </Panel>
             </div>
@@ -252,12 +264,14 @@ export default function DealDetailPage() {
           </div>
 
           <aside className="space-y-3">
-            <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span>✎</span>Статус и действия</div><div className="flex items-center justify-between rounded-lg border border-[#e5e2da] px-2 py-2 text-xs"><span className="text-[#667085]">{deal.stage === "REQUEST" ? "Статус заявки" : deal.stage === "BOOKING" ? "Статус брони" : "Статус заказа"}</span><span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusTone(deal.status)}`}>{statusRu(deal.status)}</span></div>{actionError && <div className="mt-2 rounded bg-rose-50 px-2 py-1 text-[10px] text-rose-700">{actionError}</div>}<div className="mt-2 space-y-1.5">{Object.entries(effectiveRequestActions).filter(([, enabled]) => enabled).length > 0 && <div className="mb-2 space-y-1 rounded-lg border border-[#e5e2da] p-2"><div className="text-[9px] font-semibold uppercase tracking-wide text-[#98a2b3]">Заявка</div>{Object.entries(effectiveRequestActions).filter(([, enabled]) => enabled).map(([action]) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runRequestAction(action)} className="block w-full rounded-lg border border-[#e5e2da] px-3 py-1.5 text-xs font-medium text-[#344054] disabled:opacity-50">{actionBusy === action ? "Выполняется…" : REQUEST_ACTION_LABELS[action] ?? action}</button>)}</div>}{effectiveBookingActions.length > 0 && <div className="mb-2 space-y-1 rounded-lg border border-[#e5e2da] p-2"><div className="text-[9px] font-semibold uppercase tracking-wide text-[#98a2b3]">Бронь</div>{effectiveBookingActions.map((action) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runBookingAction(action)} className="block w-full rounded-lg border border-[#e5e2da] px-3 py-1.5 text-xs font-medium text-[#344054] disabled:opacity-50">{actionBusy === action ? "Выполняется…" : BOOKING_ACTION_LABELS[action] ?? action}</button>)}</div>}{effectiveOrderActions.map((action, index) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runAction(action)} className={`block w-full rounded-lg px-3 py-2 text-center text-xs font-semibold disabled:opacity-50 ${/cancel|problem|suspend/.test(action) ? "border border-rose-200 text-rose-700" : index === 0 ? "bg-[#0f6b5f] text-white" : "border border-[#e5e2da] text-[#344054]"}`}>{actionBusy === action ? "Выполняется…" : ACTION_LABELS[action] ?? action}</button>)}{refundable ? <Link href="/app/finance/refunds" className="block rounded-lg border border-[#e5e2da] px-3 py-2 text-center text-xs font-semibold text-[#344054]">Создать возврат</Link> : <span className="block rounded-lg border border-[#e5e2da] px-3 py-2 text-center text-xs text-[#98a2b3]">Возврат недоступен</span>}{deal.status === "CANCELLED" && Number(deal.supplierRefundDue) > 0 && <button type="button" onClick={() => setWriteOffOpen(true)} className="mt-2 w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Признать убытком и закрыть</button>}</div></div>
+            <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span>✎</span>Статус и действия</div><div className="flex items-center justify-between rounded-lg border border-[#e5e2da] px-2 py-2 text-xs"><span className="text-[#667085]">{deal.stage === "REQUEST" ? "Статус заявки" : deal.stage === "BOOKING" ? "Статус брони" : "Статус заказа"}</span><span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusTone(deal.status)}`}>{statusRu(deal.status)}</span></div>{actionError && <div className="mt-2 rounded bg-rose-50 px-2 py-1 text-[10px] text-rose-700">{actionError}</div>}<div className="mt-2 space-y-1.5">{deal.orderId && ["IN_PROCESSING", "WAITING_FOR_DATA"].includes(deal.status) && orderTravelers.length > 0 && orderTravelers.every((traveler) => traveler.dataCompleteness === "COMPLETE" && Boolean(traveler.citizenship) && Boolean(traveler.passportSeries) && Boolean(traveler.passportNumber)) && !orderFinalConfirmedAt && !readOnly && <button type="button" disabled={Boolean(actionBusy)} onClick={() => void finalConfirm()} className="mb-2 block w-full rounded-lg bg-[#0f6b5f] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{actionBusy === "final-confirm" ? "Подтверждение…" : "Подтвердить данные туристов"}</button>}{Object.entries(effectiveRequestActions).filter(([, enabled]) => enabled).length > 0 && <div className="mb-2 space-y-1 rounded-lg border border-[#e5e2da] p-2"><div className="text-[9px] font-semibold uppercase tracking-wide text-[#98a2b3]">Заявка</div>{Object.entries(effectiveRequestActions).filter(([, enabled]) => enabled).map(([action]) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runRequestAction(action)} className="block w-full rounded-lg border border-[#e5e2da] px-3 py-1.5 text-xs font-medium text-[#344054] disabled:opacity-50">{actionBusy === action ? "Выполняется…" : REQUEST_ACTION_LABELS[action] ?? action}</button>)}</div>}{effectiveBookingActions.length > 0 && <div className="mb-2 space-y-1 rounded-lg border border-[#e5e2da] p-2"><div className="text-[9px] font-semibold uppercase tracking-wide text-[#98a2b3]">Бронь</div>{effectiveBookingActions.map((action) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runBookingAction(action)} className="block w-full rounded-lg border border-[#e5e2da] px-3 py-1.5 text-xs font-medium text-[#344054] disabled:opacity-50">{actionBusy === action ? "Выполняется…" : BOOKING_ACTION_LABELS[action] ?? action}</button>)}</div>}{effectiveOrderActions.map((action, index) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runAction(action)} className={`block w-full rounded-lg px-3 py-2 text-center text-xs font-semibold disabled:opacity-50 ${/cancel|problem|suspend/.test(action) ? "border border-rose-200 text-rose-700" : index === 0 ? "bg-[#0f6b5f] text-white" : "border border-[#e5e2da] text-[#344054]"}`}>{actionBusy === action ? "Выполняется…" : ACTION_LABELS[action] ?? action}</button>)}{refundable ? <Link href="/app/finance/refunds" className="block rounded-lg border border-[#e5e2da] px-3 py-2 text-center text-xs font-semibold text-[#344054]">Создать возврат</Link> : <span className="block rounded-lg border border-[#e5e2da] px-3 py-2 text-center text-xs text-[#98a2b3]">Возврат недоступен</span>}{deal.status === "CANCELLED" && Number(deal.supplierRefundDue) > 0 && <button type="button" onClick={() => setWriteOffOpen(true)} className="mt-2 w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Признать убытком и закрыть</button>}</div></div>
             <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-[#667085]">История этапов</div><Timeline title="Заявка создана" code={deal.requestCode} date={new Date(deal.createdAt).toLocaleString("ru-RU")} tone="done" /><Timeline title="Заказ создан" code={deal.orderCode} date={deal.orderCode ? "Текущий этап" : "Ожидает"} tone={deal.orderCode ? "current" : "todo"} /><Timeline title="Бронь" code={deal.bookingCode ?? "ожидает создания"} date={deal.bookingCode ? "Создана" : "Ожидает"} tone={deal.bookingCode ? "done" : "todo"} /></div>
             {user && !readOnly ? <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><OperationalNotes entityType={deal.orderId ? "Order" : "Request"} entityId={deal.orderId ?? deal.requestId} permissions={user.permissions} currentUserId={user.id} currentRole={user.role} /></div> : null}
           </aside>
         </div>
       </div>
+      {paymentOpen && deal.orderId && <CreatePaymentForm open onClose={() => setPaymentOpen(false)} presetOrder={{ id: deal.orderId, label: deal.orderCode ?? deal.sequence, amount: deal.clientDebt, currency: deal.currency }} onCreated={() => { setPaymentOpen(false); setReload((v) => v + 1); }} />}
+      {supplierPaymentOpen && deal.orderId && <CreateSupplierPaymentForm orderId={deal.orderId} orderCode={deal.orderCode ?? deal.sequence} bookingId={deal.bookingId ?? undefined} bookingCode={deal.bookingCode ?? undefined} fallbackCost={deal.supplierDebt} onClose={() => setSupplierPaymentOpen(false)} onCreated={() => { setSupplierPaymentOpen(false); setReload((v) => v + 1); }} />}
       {editOpen && <DealEditModal deal={deal} onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); setReload((v) => v + 1); }} />}
       {writeOffOpen && <WriteOffModal deal={deal} onClose={() => setWriteOffOpen(false)} onSaved={() => { setWriteOffOpen(false); setReload((v) => v + 1); }} />}
       {addOpen && <AddServiceModal deal={deal} onClose={() => setAddOpen(false)} onSaved={() => { setAddOpen(false); setReload((v) => v + 1); }} />}
@@ -405,7 +419,7 @@ function WriteOffModal({ deal, onClose, onSaved }: { deal: DealRow; onClose: () 
   </div></Modal>;
 }
 
-function TravelersTab({ deal, requestTravelers, orderTravelers, readOnly, onRefresh }: { deal: DealRow; requestTravelers: Array<{ id: string; position: number; firstName: string; lastName: string; birthDate: string; citizenship?: string | null; passportSeries?: string | null; passportNumber?: string | null; passportExpiry?: string | null }>; orderTravelers: Array<{ id: string; firstName: string; lastName: string; birthDate: string | null; passportNumber: string | null; dataCompleteness: string }>; readOnly: boolean; onRefresh: () => void }) {
+function TravelersTab({ deal, requestTravelers, orderTravelers, readOnly, onRefresh }: { deal: DealRow; requestTravelers: Array<{ id: string; position: number; firstName: string; lastName: string; birthDate: string; citizenship?: string | null; passportSeries?: string | null; passportNumber?: string | null; passportExpiry?: string | null }>; orderTravelers: Array<{ id: string; firstName: string; lastName: string; birthDate: string | null; citizenship: string | null; passportSeries: string | null; passportNumber: string | null; passportExpiry: string | null; dataCompleteness: string }>; readOnly: boolean; onRefresh: () => void }) {
   const [form, setForm] = React.useState({ firstName: "", lastName: "", phone: "", birthDate: "", passportSeries: "", passportNumber: "", passportExpiry: "", citizenship: "" });
   const [sameAsClient, setSameAsClient] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
@@ -419,7 +433,8 @@ function TravelersTab({ deal, requestTravelers, orderTravelers, readOnly, onRefr
     setForm((f) => ({ ...f, firstName: f.firstName || parts[0] || "", lastName: f.lastName || parts.slice(1).join(" ") || "", phone: f.phone || deal.customerPhone || "" }));
   }, [sameAsClient, deal.customerName, deal.customerPhone, requestTravelers.length]);
   if (isOrder) {
-    return <section className="rounded-xl border border-[#e5e2da] bg-white shadow-sm"><Header title={`Туристы (${orderTravelers.length})`} /><div className="space-y-2 p-3">{orderTravelers.length === 0 ? <Empty text="Туристы не заполнены" /> : orderTravelers.map((traveler) => <div key={traveler.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2 text-[11px]"><span className="font-semibold">{traveler.lastName} {traveler.firstName}</span><span>{traveler.birthDate ? new Date(traveler.birthDate).toLocaleDateString("ru-RU") : "Дата рождения не указана"}</span><span className={traveler.dataCompleteness === "COMPLETE" ? "text-emerald-700" : "text-amber-700"}>{traveler.dataCompleteness === "COMPLETE" ? "Данные полные" : "Нужны паспортные данные"}</span></div>)}<p className="text-[10px] text-[#98a2b3]">Паспортные данные и final-confirm заполняются в карточке заказа. <Link href={`/app/orders/${deal.orderId}`} className="font-semibold text-[#0f6b5f] underline">Открыть заказ</Link></p></div></section>;
+    const canEditOrder = deal.status === "WAITING_FOR_DATA" && !readOnly;
+    return <section className="rounded-xl border border-[#e5e2da] bg-white shadow-sm"><Header title={`Туристы (${orderTravelers.length})`} /><div className="space-y-2 p-3">{orderTravelers.length === 0 ? <Empty text="Туристы не заполнены" /> : canEditOrder ? <div className="space-y-2">{orderTravelers.map((traveler) => <OrderTravelerEditRow key={traveler.id} orderId={deal.orderId!} traveler={traveler} onSaved={onRefresh} />)}</div> : <div className="space-y-1">{orderTravelers.map((traveler) => <div key={traveler.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2 text-[11px]"><span className="font-semibold">{traveler.lastName} {traveler.firstName}</span><span>{traveler.citizenship ?? "—"}</span><span>{traveler.birthDate ? new Date(traveler.birthDate).toLocaleDateString("ru-RU") : "Дата рождения не указана"}</span><span className={traveler.dataCompleteness === "COMPLETE" ? "text-emerald-700" : "text-amber-700"}>{traveler.dataCompleteness === "COMPLETE" ? "Данные полные" : "Нужны паспортные данные"}</span></div>)}</div>}{canEditOrder ? <p className="text-[10px] text-amber-700">Заполните гражданство, дату рождения и паспортные данные. После сохранения появится подтверждение данных.</p> : <p className="text-[10px] text-[#98a2b3]">Редактирование доступно в статусе «Ждём данные».</p>}</div></section>;
   }
   async function add() {
     if (!form.firstName.trim() || !form.lastName.trim() || !form.birthDate) { setError("Заполните имя, фамилию и дату рождения"); return; }
@@ -453,4 +468,18 @@ function TravelersTab({ deal, requestTravelers, orderTravelers, readOnly, onRefr
       <p className="text-[10px] text-[#98a2b3]">Все туристы должны быть заполнены до конвертации заказа.</p>
     </div>
   </section>;
+}
+
+function OrderTravelerEditRow({ orderId, traveler, onSaved }: { orderId: string; traveler: { id: string; firstName: string; lastName: string; birthDate: string | null; citizenship: string | null; passportSeries: string | null; passportNumber: string | null; passportExpiry: string | null; dataCompleteness: string }; onSaved: () => void }) {
+  const [form, setForm] = React.useState({ firstName: traveler.firstName, lastName: traveler.lastName, birthDate: traveler.birthDate?.slice(0, 10) ?? "", citizenship: traveler.citizenship ?? "", passportSeries: traveler.passportSeries ?? "", passportNumber: traveler.passportNumber ?? "", passportExpiry: traveler.passportExpiry?.slice(0, 10) ?? "" });
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState("");
+  async function save() {
+    setBusy(true); setError("");
+    try {
+      await api.patch(`/orders/${orderId}/travelers/${traveler.id}`, form);
+      onSaved();
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  return <div className="rounded-lg border border-[#e5e2da] bg-[#fbfaf7] p-2"><div className="grid gap-2 sm:grid-cols-4"><input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} placeholder="Фамилия" className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} placeholder="Имя" className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><label className="grid gap-0.5 text-[9px] text-[#98a2b3]">Дата рождения<input type="date" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /></label><input value={form.citizenship} onChange={(e) => setForm({ ...form, citizenship: e.target.value })} placeholder="Гражданство" className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><input value={form.passportSeries} onChange={(e) => setForm({ ...form, passportSeries: e.target.value })} placeholder="Серия паспорта" className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><input value={form.passportNumber} onChange={(e) => setForm({ ...form, passportNumber: e.target.value })} placeholder="Номер паспорта" className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><label className="grid gap-0.5 text-[9px] text-[#98a2b3]">Срок паспорта<input type="date" value={form.passportExpiry} onChange={(e) => setForm({ ...form, passportExpiry: e.target.value })} className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /></label><button type="button" disabled={busy} onClick={() => void save()} className="rounded bg-[#0f6b5f] px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50">{busy ? "Сохранение…" : "Сохранить"}</button></div>{error && <div className="mt-1 text-[10px] text-rose-700">{error}</div>}</div>;
 }

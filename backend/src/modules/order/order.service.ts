@@ -1381,6 +1381,10 @@ export class OrderService {
     pinned: TravelerFullRequirements | null,
     values: Partial<Record<TravelerField, string | Date | null | undefined>>,
   ): "COMPLETE" | "INCOMPLETE" {
+    // Registry traveler block requires passport + citizenship for every order.
+    if (!String(values.citizenship ?? "").trim() || !String(values.passportSeries ?? "").trim() || !String(values.passportNumber ?? "").trim()) {
+      return "INCOMPLETE";
+    }
     if (!pinned) {
       const pn = values.passportNumber;
       return pn !== null && pn !== undefined && String(pn).trim().length > 0 ? "COMPLETE" : "INCOMPLETE";
