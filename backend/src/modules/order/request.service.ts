@@ -242,9 +242,9 @@ export class RequestService {
   ) {}
 
   async updateDealDetails(requestId: string, input: { customerId?: string | null; requestedServiceDate?: string | null; travelerCount?: number | null; tripCountry?: string | null; sourceChannel?: string | null }, actor: { id: string; username: string }) {
-    const request = await this.prisma.request.findUnique({ where: { id: requestId }, select: { id: true, status: true } });
+    const request = await this.prisma.request.findUnique({ where: { id: requestId }, select: { id: true, status: true, convertedOrderId: true } });
     if (!request) throw new NotFoundException("Request not found");
-    if (["CANCELLED", "CONVERTED", "COMPLETED"].includes(request.status)) throw new BadRequestException("Request can no longer be edited");
+    if (["CANCELLED", "COMPLETED"].includes(request.status)) throw new BadRequestException("Request can no longer be edited");
     const data: Record<string, unknown> = {};
     const changes: Record<string, unknown> = {};
     if (input.customerId !== undefined) { data.customerId = input.customerId || null; changes.customerId = data.customerId; }
@@ -266,6 +266,9 @@ export class RequestService {
     if (Object.keys(data).length === 0) throw new BadRequestException("No fields to update");
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.request.update({ where: { id: requestId }, data });
+      if (input.customerId !== undefined && request.convertedOrderId) {
+        await tx.order.update({ where: { id: request.convertedOrderId }, data: { customerId: input.customerId || null, version: { increment: 1 } } });
+      }
       await tx.requestHistory.create({ data: { requestId, action: "DETAILS_UPDATED", actorId: actor.id, actorName: actor.username, comment: JSON.stringify(changes) } });
       return updated;
     });
