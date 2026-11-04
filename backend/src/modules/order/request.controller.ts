@@ -265,6 +265,12 @@ export class RequestController {
     return this.requestService.createRequest(body, { id: user.id, username: user.username });
   }
 
+  @Patch(":id/details")
+  @RequirePermissions("order.edit_noncritical")
+  updateDetails(@Param("id") id: string, @Body() body: { customerId?: string | null; requestedServiceDate?: string | null; travelerCount?: number | null; tripCountry?: string | null; sourceChannel?: string | null }, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.requestService.updateDealDetails(id, body, { id: actor.id, username: actor.username });
+  }
+
   @Post(":id/start")
   @RequirePermissions("order.edit_noncritical")
   start(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {

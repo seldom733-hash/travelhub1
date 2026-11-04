@@ -2639,6 +2639,9 @@ model Request {
   displayedCurrency String?
   confirmedPrice    Decimal? @db.Decimal(12, 2) // supplier-confirmed price
   confirmedCurrency String?
+  /// Inline-editable deal facts (nullable = derive from product snapshot).
+  tripCountry       String?
+  sourceChannel     String?
 
   // ── Supplier Response SLA ──
   supplierResponseDeadline DateTime?

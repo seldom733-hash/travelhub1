@@ -289,6 +289,12 @@ export class OrderController {
     return { payments, refunds };
   }
 
+  @Post("orders/:id/items")
+  @RequirePermissions("order.edit_noncritical")
+  addOrderItem(@Param("id") id: string, @Body() body: { productId: string; quantity?: number; price?: number; serviceDate?: string }, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.orders.addItem(id, body, { id: actor.id, username: actor.username });
+  }
+
   @Patch("orders/:id")
   @RequirePermissions((req) => [ACTION_PERMISSIONS[req.body?.action as OrderAction] ?? "order.edit_noncritical"])
   orderAction(

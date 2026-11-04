@@ -241,6 +241,36 @@ export class RequestService {
     private readonly assignment: AssignmentService,
   ) {}
 
+  async updateDealDetails(requestId: string, input: { customerId?: string | null; requestedServiceDate?: string | null; travelerCount?: number | null; tripCountry?: string | null; sourceChannel?: string | null }, actor: { id: string; username: string }) {
+    const request = await this.prisma.request.findUnique({ where: { id: requestId }, select: { id: true, status: true } });
+    if (!request) throw new NotFoundException("Request not found");
+    if (["CANCELLED", "CONVERTED", "COMPLETED"].includes(request.status)) throw new BadRequestException("Request can no longer be edited");
+    const data: Record<string, unknown> = {};
+    const changes: Record<string, unknown> = {};
+    if (input.customerId !== undefined) { data.customerId = input.customerId || null; changes.customerId = data.customerId; }
+    if (input.requestedServiceDate !== undefined) {
+      if (input.requestedServiceDate) {
+        const date = new Date(`${input.requestedServiceDate}T00:00:00.000Z`);
+        if (Number.isNaN(date.getTime())) throw new BadRequestException("Invalid service date");
+        data.requestedServiceDate = date;
+      } else data.requestedServiceDate = null;
+      changes.requestedServiceDate = input.requestedServiceDate;
+    }
+    if (input.travelerCount !== undefined) {
+      if (input.travelerCount !== null && (!Number.isInteger(input.travelerCount) || input.travelerCount < 1)) throw new BadRequestException("travelerCount must be a positive integer");
+      data.travelerCount = input.travelerCount;
+      changes.travelerCount = input.travelerCount;
+    }
+    if (input.tripCountry !== undefined) { data.tripCountry = input.tripCountry?.trim() || null; changes.tripCountry = data.tripCountry; }
+    if (input.sourceChannel !== undefined) { data.sourceChannel = input.sourceChannel?.trim() || null; changes.sourceChannel = data.sourceChannel; }
+    if (Object.keys(data).length === 0) throw new BadRequestException("No fields to update");
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.request.update({ where: { id: requestId }, data });
+      await tx.requestHistory.create({ data: { requestId, action: "DETAILS_UPDATED", actorId: actor.id, actorName: actor.username, comment: JSON.stringify(changes) } });
+      return updated;
+    });
+  }
+
   async startProcessing(requestId: string, actor: { id: string; username: string }) {
     const request = await this.prisma.request.findUnique({ where: { id: requestId }, select: { id: true, status: true, firstOpenedAt: true } });
     if (!request) throw new NotFoundException("Request not found");

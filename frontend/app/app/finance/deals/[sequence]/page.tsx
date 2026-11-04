@@ -6,6 +6,7 @@ import Link from "next/link";
 import { formatPrice } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import { dealsApi, type DealRow } from "@/lib/deals-api";
+import { documentsApi, type DocumentListItem } from "@/lib/documents-api";
 import OperationalNotes from "@/components/OperationalNotes";
 import { useCurrentUser } from "@/lib/use-user";
 
@@ -46,6 +47,8 @@ export default function DealDetailPage() {
   const [actionBusy, setActionBusy] = useState("");
   const [actionError, setActionError] = useState("");
   const [reload, setReload] = useState(0);
+  const [editOpen, setEditOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -119,12 +122,12 @@ export default function DealDetailPage() {
             </div>
 
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-              <InfoCard title="Клиент" icon="👤" action={<button type="button" disabled title="Редактирование клиента в заказе" className="text-slate-400">✎</button>}>
+              <InfoCard title="Клиент" icon="👤" action={<button type="button" onClick={() => setEditOpen(true)} className="text-[#0f6b5f]" title="Редактировать">✎</button>}>
                 <div className="text-sm font-semibold text-[#101828]">{deal.customerName}</div>
                 <div className="mt-1 text-[11px] text-[#667085]">{deal.customerPhone ?? "—"}</div>
                 <div className="text-[11px] text-[#667085]">{deal.customerEmail ?? "—"}</div>
               </InfoCard>
-              <InfoCard title="Параметры поездки" icon="▦" action={<span className="text-slate-400">✎</span>}>
+              <InfoCard title="Параметры поездки" icon="▦" action={<button type="button" onClick={() => setEditOpen(true)} className="text-[#0f6b5f]" title="Редактировать">✎</button>}>
                 <div className="flex justify-between text-[11px]"><span className="text-[#98a2b3]">Страна</span><span className="font-medium text-[#344054]">{deal.trip.country ?? "—"}</span></div>
                 <div className="flex justify-between text-[11px]"><span className="text-[#98a2b3]">Даты</span><span className="font-medium text-[#344054]">{dateFrom} — {dateTo}</span></div>
                 <div className="flex justify-between text-[11px]"><span className="text-[#98a2b3]">Туристы</span><span className="font-medium text-[#344054]">{deal.travelerCount ?? "—"} чел. ({deal.trip.adults ?? "—"} взр., {deal.trip.children ?? 0} дет.)</span></div>
@@ -144,7 +147,7 @@ export default function DealDetailPage() {
             </div>
 
             <section className="rounded-xl border border-[#e5e2da] bg-white shadow-sm">
-              <Header title={`Услуги в заказе (${deal.services.length})`} right={<><button type="button" disabled title="Добавление услуги в backend пока не реализовано" className="rounded-lg border border-[#e5e2da] px-2 py-1 text-[11px] text-[#98a2b3]">+ Добавить услугу</button><span className="text-slate-400">•••</span></>} />
+              <Header title={`Услуги в заказе (${deal.services.length})`} right={<><button type="button" onClick={() => setAddOpen(true)} disabled={!deal.orderId} title={deal.orderId ? "Добавить услугу" : "Сначала создайте заказ"} className="rounded-lg border border-[#e5e2da] px-2 py-1 text-[11px] text-[#344054] disabled:text-[#98a2b3]">+ Добавить услугу</button><span className="text-slate-400">•••</span></>} />
               <div className="space-y-2 p-3">
                 {deal.services.map((service) => (
                   <div key={service.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2">
@@ -179,7 +182,7 @@ export default function DealDetailPage() {
 
             <section className="rounded-xl border border-[#e5e2da] bg-white shadow-sm">
               <div className="flex flex-wrap gap-1 border-b border-[#f0eee8] px-2 pt-2">{TABS.map(([key, label]) => <button key={key} type="button" onClick={() => setTab(key)} className={`border-b-2 px-2 py-2 text-[11px] font-medium ${tab === key ? "border-[#0f6b5f] text-[#0f6b5f]" : "border-transparent text-[#667085]"}`}>{label}</button>)}</div>
-              <div className="p-4 text-xs">{tab === "overview" && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><Info label="Общий номер" value={deal.sequence} /><Info label="Заявка" value={deal.requestCode} /><Info label="Заказ" value={deal.orderCode ?? "—"} /><Info label="Бронь" value={deal.bookingCode ?? "—"} /><Info label="Стадия" value={deal.stageLabel} /><Info label="Статус" value={statusRu(deal.status)} /><Info label="Дата услуги" value={dateFrom} /><Info label="Сумма продажи" value={money(deal.salesAmount, deal.currency)} /><Info label="Себестоимость" value={money(deal.costAmount, deal.currency)} /><Info label="Фин. статус" value={deal.financialStatus} /><Info label="Оплата клиента" value={deal.paymentStatus} /><Info label="Оплата поставщику" value={deal.supplierPaymentStatus} /></div>}{tab === "services" && <div className="space-y-2">{deal.services.map((s) => <div key={s.id} className="flex justify-between border-b border-[#f0eee8] py-2"><span>{s.title}</span><span className="font-mono">{money(s.clientPrice, deal.currency)} / {money(s.cost, deal.currency)}</span></div>)}</div>}{tab === "client" && <SimpleRows rows={deal.payments.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.method ?? "Оплата", statusRu(p.status)])} head={["Дата", "Сумма", "Тип", "Статус"]} />}{tab === "supplier" && <SimpleRows rows={deal.payouts.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.direction === "INCOMING" ? "Возврат" : "Оплата", statusRu(p.status)])} head={["Дата", "Сумма", "Тип", "Статус"]} />}{tab === "penalties" && <div className="space-y-2"><Info label="Штраф клиента" value={money(deal.clientPenalty, deal.currency)} /><Info label="Штраф поставщика" value={money(deal.supplierPenalty, deal.currency)} /><Info label="Возвращено клиенту" value={money(deal.clientRefunded, deal.currency)} /><Info label="Возврат поставщика" value={money(deal.supplierRefunded, deal.currency)} /></div>}{tab === "docs" && <Empty text="Документы не загружены" />}{tab === "communications" && <Empty text="Коммуникации не загружены" />}{tab === "history" && <Empty text="История доступна в карточках заявки, заказа и брони" />}</div>
+              <div className="p-4 text-xs">{tab === "overview" && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><Info label="Общий номер" value={deal.sequence} /><Info label="Заявка" value={deal.requestCode} /><Info label="Заказ" value={deal.orderCode ?? "—"} /><Info label="Бронь" value={deal.bookingCode ?? "—"} /><Info label="Стадия" value={deal.stageLabel} /><Info label="Статус" value={statusRu(deal.status)} /><Info label="Дата услуги" value={dateFrom} /><Info label="Сумма продажи" value={money(deal.salesAmount, deal.currency)} /><Info label="Себестоимость" value={money(deal.costAmount, deal.currency)} /><Info label="Фин. статус" value={deal.financialStatus} /><Info label="Оплата клиента" value={deal.paymentStatus} /><Info label="Оплата поставщику" value={deal.supplierPaymentStatus} /></div>}{tab === "services" && <div className="space-y-2">{deal.services.map((s) => <div key={s.id} className="flex justify-between border-b border-[#f0eee8] py-2"><span>{s.title}</span><span className="font-mono">{money(s.clientPrice, deal.currency)} / {money(s.cost, deal.currency)}</span></div>)}</div>}{tab === "client" && <SimpleRows rows={deal.payments.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.method ?? "Оплата", statusRu(p.status)])} head={["Дата", "Сумма", "Тип", "Статус"]} />}{tab === "supplier" && <SimpleRows rows={deal.payouts.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.direction === "INCOMING" ? "Возврат" : "Оплата", statusRu(p.status)])} head={["Дата", "Сумма", "Тип", "Статус"]} />}{tab === "penalties" && <div className="space-y-2"><Info label="Штраф клиента" value={money(deal.clientPenalty, deal.currency)} /><Info label="Штраф поставщика" value={money(deal.supplierPenalty, deal.currency)} /><Info label="Возвращено клиенту" value={money(deal.clientRefunded, deal.currency)} /><Info label="Возврат поставщика" value={money(deal.supplierRefunded, deal.currency)} /></div>}{tab === "docs" && <DocumentsTab deal={deal} />}{tab === "communications" && <CommunicationsTab deal={deal} />}{tab === "history" && <Empty text="История доступна в карточках заявки, заказа и брони" />}</div>
             </section>
           </div>
 
@@ -190,6 +193,8 @@ export default function DealDetailPage() {
           </aside>
         </div>
       </div>
+      {editOpen && <DealEditModal deal={deal} onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); setReload((v) => v + 1); }} />}
+      {addOpen && <AddServiceModal deal={deal} onClose={() => setAddOpen(false)} onSaved={() => { setAddOpen(false); setReload((v) => v + 1); }} />}
     </div>
   );
 }
@@ -233,4 +238,81 @@ function PaymentSchedule({ sequence, currency }: { sequence: string; currency: s
     {open && <div className="mb-3 grid gap-2 rounded-lg border border-[#d9e6e1] bg-[#f2faf7] p-2 sm:grid-cols-2"><input value={form.stage} onChange={(e) => setForm({ ...form, stage: e.target.value })} placeholder="Этап (например, Первоначальная оплата)" className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><input value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="Сумма" inputMode="decimal" className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><input value={form.percent} onChange={(e) => setForm({ ...form, percent: e.target.value })} placeholder="Процент, %" inputMode="numeric" className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><input value={form.condition} onChange={(e) => setForm({ ...form, condition: e.target.value })} placeholder="Условие / штраф" className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px] sm:col-span-2" /><button type="button" disabled={busy} onClick={() => void add()} className="rounded bg-[#0f6b5f] px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50 sm:col-span-2">Сохранить этап</button></div>}
     {items.length === 0 ? <div className="rounded-lg border border-dashed border-[#cfcabf] bg-[#fbfaf7] p-4 text-[11px] text-[#667085]"><div className="font-medium text-[#344054]">График не настроен</div><p className="mt-1">Добавьте этапы оплаты: срок, сумму, процент и условие штрафа.</p></div> : <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-[10px]"><thead className="text-[#98a2b3]"><tr><th className="py-1">Этап</th><th>Срок</th><th className="text-right">Сумма</th><th className="text-right">%</th><th>Условие</th><th>Статус</th></tr></thead><tbody>{items.map((item) => <tr key={item.id} className="border-t border-[#f0eee8]"><td className="py-2 font-medium text-[#344054]">{item.stage}</td><td>{new Date(item.dueDate).toLocaleDateString("ru-RU")}</td><td className="text-right font-mono">{money(item.amount, currency)}</td><td className="text-right">{item.percent ?? "—"}</td><td className="max-w-[180px] text-[#667085]">{item.condition ?? "—"}</td><td><select value={item.status} disabled={busy} onChange={(e) => void setStatus(item.id, e.target.value)} className="rounded border border-[#e5e2da] bg-white px-1 py-0.5 text-[10px]"><option value="PLANNED">План</option><option value="DUE">Ожидает</option><option value="PAID">Оплачен</option><option value="OVERDUE">Просрочен</option><option value="CANCELLED">Отменён</option></select></td></tr>)}</tbody></table><div className="mt-2 flex justify-between border-t border-[#f0eee8] pt-2 text-[10px]"><span className="text-[#98a2b3]">Итого по графику</span><span className="font-mono font-semibold text-[#344054]">{money(String(total), currency)}</span></div></div>}
   </div></section>;
+}
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={onClose}><div className="w-full max-w-lg rounded-xl border border-[#e5e2da] bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><Header title={title} right={<button type="button" onClick={onClose} className="text-lg leading-none text-[#98a2b3]">×</button>} /><div className="p-4">{children}</div></div></div>;
+}
+
+function DealEditModal({ deal, onClose, onSaved }: { deal: DealRow; onClose: () => void; onSaved: () => void }) {
+  const [customers, setCustomers] = React.useState<Array<{ id: string; firstName?: string | null; lastName?: string | null }>>([]);
+  const [form, setForm] = React.useState({ customerId: deal.customerId ?? "", tripCountry: deal.trip.country ?? "", sourceChannel: deal.channel ?? "", requestedServiceDate: deal.trip.dateFrom?.slice(0, 10) ?? "", travelerCount: deal.travelerCount ? String(deal.travelerCount) : "" });
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState("");
+  React.useEffect(() => { api.get<{ items: Array<{ id: string; firstName?: string | null; lastName?: string | null }> }>("/customers?pageSize=100").then((r) => setCustomers(r.items ?? [])).catch(() => undefined); }, []);
+  async function save() {
+    setBusy(true); setErr("");
+    try {
+      await api.patch(`/requests/${deal.requestId}/details`, { customerId: form.customerId || null, tripCountry: form.tripCountry || null, sourceChannel: form.sourceChannel || null, requestedServiceDate: form.requestedServiceDate || null, travelerCount: form.travelerCount ? Number(form.travelerCount) : null });
+      onSaved();
+    } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+  }
+  return <Modal title="Редактировать сделку" onClose={onClose}><div className="grid gap-3 text-xs">
+    <label className="grid gap-1">Клиент<select value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5"><option value="">— не выбран —</option>{customers.map((c) => <option key={c.id} value={c.id}>{[c.firstName, c.lastName].filter(Boolean).join(" ") || c.id}</option>)}</select></label>
+    <label className="grid gap-1">Страна<input value={form.tripCountry} onChange={(e) => setForm({ ...form, tripCountry: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" /></label>
+    <label className="grid gap-1">Дата услуги<input type="date" value={form.requestedServiceDate} onChange={(e) => setForm({ ...form, requestedServiceDate: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" /></label>
+    <label className="grid gap-1">Туристы<input type="number" min={1} value={form.travelerCount} onChange={(e) => setForm({ ...form, travelerCount: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" /></label>
+    <label className="grid gap-1">Канал<input value={form.sourceChannel} onChange={(e) => setForm({ ...form, sourceChannel: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" /></label>
+    {err && <div className="rounded bg-rose-50 px-2 py-1 text-rose-700">{err}</div>}
+    <button type="button" disabled={busy} onClick={() => void save()} className="rounded-lg bg-[#0f6b5f] px-3 py-2 font-semibold text-white disabled:opacity-50">{busy ? "Сохранение…" : "Сохранить"}</button>
+  </div></Modal>;
+}
+
+function AddServiceModal({ deal, onClose, onSaved }: { deal: DealRow; onClose: () => void; onSaved: () => void }) {
+  const [products, setProducts] = React.useState<Array<{ id: string; title: string }>>([]);
+  const [form, setForm] = React.useState({ productId: "", quantity: "1", price: "", serviceDate: "" });
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState("");
+  React.useEffect(() => { api.get<{ items: Array<{ id: string; title: string }> }>("/products?pageSize=100&status=PUBLISHED").then((r) => setProducts(r.items ?? [])).catch(() => undefined); }, []);
+  async function save() {
+    if (!form.productId || !Number(form.price)) { setErr("Выберите услугу и укажите цену"); return; }
+    setBusy(true); setErr("");
+    try {
+      await api.post(`/orders/${deal.orderId}/items`, { productId: form.productId, quantity: Number(form.quantity) || 1, price: Number(form.price), serviceDate: form.serviceDate || undefined });
+      onSaved();
+    } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+  }
+  return <Modal title="Добавить услугу в заказ" onClose={onClose}><div className="grid gap-3 text-xs">
+    <label className="grid gap-1">Услуга<select value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5"><option value="">— выберите —</option>{products.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}</select></label>
+    <div className="grid grid-cols-2 gap-2"><label className="grid gap-1">Количество<input type="number" min={1} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" /></label><label className="grid gap-1">Цена<input type="number" min={0} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" /></label></div>
+    <label className="grid gap-1">Дата услуги<input type="date" value={form.serviceDate} onChange={(e) => setForm({ ...form, serviceDate: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" /></label>
+    {err && <div className="rounded bg-rose-50 px-2 py-1 text-rose-700">{err}</div>}
+    <button type="button" disabled={busy} onClick={() => void save()} className="rounded-lg bg-[#0f6b5f] px-3 py-2 font-semibold text-white disabled:opacity-50">{busy ? "Добавление…" : "Добавить услугу"}</button>
+  </div></Modal>;
+}
+
+function DocumentsTab({ deal }: { deal: DealRow }) {
+  const [items, setItems] = React.useState<DocumentListItem[]>([]);
+  const [error, setError] = React.useState("");
+  React.useEffect(() => {
+    if (!deal.bookingCode) return;
+    documentsApi.list({ pageSize: 100 }).then((page) => setItems(page.items.filter((d) => d.bookingCode === deal.bookingCode))).catch((e) => setError((e as Error).message));
+  }, [deal.bookingCode]);
+  if (!deal.bookingCode) return <Empty text="Документы появятся после создания брони" />;
+  if (error) return <Empty text={error} />;
+  if (items.length === 0) return <Empty text="Документов по этой брони нет" />;
+  return <div className="space-y-2">{items.map((d) => <Link key={d.id} href={`/app/documents/${d.id}`} className="flex items-center justify-between rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2 text-[11px]"><span className="font-mono font-semibold text-[#0f6b5f]">{d.code}</span><span>{d.type}</span><span>{d.status}</span><span className="font-mono">{money(d.totalAmount, d.currency ?? "AZN")}</span></Link>)}</div>;
+}
+
+function CommunicationsTab({ deal }: { deal: DealRow }) {
+  const [items, setItems] = React.useState<Array<{ id: string; code: string; type: string; subject: string | null; body: string; occurredAt: string }>>([]);
+  const [error, setError] = React.useState("");
+  React.useEffect(() => {
+    if (!deal.orderId) return;
+    api.get<{ items: Array<{ id: string; code: string; type: string; subject: string | null; body: string; occurredAt: string }> }>(`/communications/context/ORDER/${deal.orderId}?pageSize=50`).then((r) => setItems(r.items ?? [])).catch((e) => setError((e as Error).message));
+  }, [deal.orderId]);
+  if (!deal.orderId) return <Empty text="Коммуникации появятся после создания заказа" />;
+  if (error) return <Empty text={error} />;
+  if (items.length === 0) return <Empty text="Коммуникаций по заказу нет" />;
+  return <div className="space-y-2">{items.map((c) => <div key={c.id} className="rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2 text-[11px]"><div className="flex justify-between"><span className="font-semibold">{c.subject ?? c.type}</span><span className="text-[#98a2b3]">{new Date(c.occurredAt).toLocaleString("ru-RU")}</span></div><div className="mt-1 text-[#667085]">{c.body}</div></div>)}</div>;
 }

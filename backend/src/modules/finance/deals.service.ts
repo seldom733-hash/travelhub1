@@ -410,12 +410,12 @@ export class DealsService {
       const lostIncome = cancelled ? Math.max(0, sales - cost - (clientPenalty - supplierPenalty)) : 0;
       const attrs = productAttributes;
       const nights = Number(attrs.nights ?? snapOffer.nights ?? 0) || null;
-      const country = typeof attrs.country === "string" ? attrs.country : typeof snapOffer.country === "string" ? snapOffer.country : null;
+      const country = request.tripCountry ?? (typeof attrs.country === "string" ? attrs.country : typeof snapOffer.country === "string" ? snapOffer.country : null);
       const dateFrom = request.requestedServiceDate ? request.requestedServiceDate.toISOString() : null;
       const dateTo = dateFrom && nights ? new Date(new Date(dateFrom).getTime() + nights * 86400000).toISOString() : null;
       const adults = Number(attrs.adults ?? 0) || null;
       const children = Number(attrs.children ?? 0) || null;
-      const channel = commercial.priceSource === "PUBLIC" ? "Сайт (универсальный поиск)" : String(commercial.priceSource ?? "Ручное создание");
+      const channel = request.sourceChannel ?? (commercial.priceSource === "PUBLIC" ? "Сайт (универсальный поиск)" : String(commercial.priceSource ?? "Ручное создание"));
       const itemRows = order?.items ?? [];
       const services = itemRows.length > 0
         ? itemRows.map((item) => {

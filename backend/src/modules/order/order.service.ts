@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Prisma } from "../../generated/prisma/client";
 import type { OrderStatus } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -2314,5 +2314,39 @@ export class OrderService {
     });
 
     return result;
+  }
+
+  async addItem(orderId: string, dto: { productId: string; quantity?: number; price?: number; serviceDate?: string }, actor: { id: string; username: string }) {
+    const quantity = dto.quantity ?? 1;
+    if (!Number.isInteger(quantity) || quantity < 1) throw new BadRequestException("quantity must be a positive integer");
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId }, select: { id: true, status: true, currency: true, amount: true } });
+      if (!order) throw new NotFoundException("Order not found");
+      if (["CANCELLED", "CLOSED", "FULFILLED"].includes(order.status)) throw new BadRequestException("Cannot add services to a closed order");
+      const product = await tx.product.findUnique({ where: { id: dto.productId }, select: { id: true, code: true, title: true, type: true, attributes: true } });
+      if (!product) throw new NotFoundException("Product not found");
+      const attributes = (product.attributes ?? {}) as Record<string, unknown>;
+      const price = dto.price ?? Number(attributes.priceLocal ?? attributes.startingPrice ?? 0);
+      if (!Number.isFinite(price) || price < 0) throw new BadRequestException("price must be a non-negative number");
+      const currency = order.currency;
+      const amount = Number((price * quantity).toFixed(2));
+      const item = await tx.orderItem.create({
+        data: {
+          orderId,
+          productId: product.id,
+          productCode: product.code,
+          title: product.title,
+          type: product.type,
+          quantity,
+          price,
+          currency,
+          amount,
+          serviceDate: dto.serviceDate ? new Date(dto.serviceDate) : null,
+        },
+      });
+      const updated = await tx.order.update({ where: { id: orderId }, data: { amount: { increment: amount }, version: { increment: 1 }, updatedBy: actor.id } });
+      await tx.orderHistory.create({ data: { orderId, action: "SERVICE_ADDED", to: item.id, source: "API", actorId: actor.id, actorName: actor.username, comment: `Добавлена услуга ${product.title}`, fields: { productId: product.id, amount } } });
+      return { item, orderAmount: updated.amount, currency: updated.currency };
+    });
   }
 }
