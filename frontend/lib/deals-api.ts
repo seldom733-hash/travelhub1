@@ -42,6 +42,7 @@ export interface DealRow {
   supplierPaid: string;
   supplierDebt: string;
   supplierRefunded: string;
+  supplierRefundDue: string;
   clientPenalty: string;
   supplierPenalty: string;
   expectedIncome: string;

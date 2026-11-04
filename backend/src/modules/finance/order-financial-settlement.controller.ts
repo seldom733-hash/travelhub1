@@ -104,6 +104,18 @@ class PenaltyCancelDto {
   reason!: string;
 }
 
+class WriteOffDto {
+  @IsOptional()
+  @IsString()
+  @Matches(MONEY)
+  amount?: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1000)
+  reason!: string;
+}
+
 @Controller("orders")
 export class OrderFinancialSettlementController {
   constructor(private readonly settlements: OrderFinancialSettlementService) {}
@@ -128,6 +140,12 @@ export class OrderFinancialSettlementController {
     @CurrentUser() user: { id: string; username: string },
   ) {
     return this.settlements.confirm(id, dto, user);
+  }
+
+  @Post(":id/financial-settlement/write-off-supplier")
+  @RequirePermissions("finance.settlement.manage")
+  writeOffSupplier(@Param("id") id: string, @Body() dto: WriteOffDto, @CurrentUser() user: { id: string; username: string }) {
+    return this.settlements.writeOffSupplier(id, dto, user);
   }
 
   @Post(":id/financial-settlement/cancel-penalty")

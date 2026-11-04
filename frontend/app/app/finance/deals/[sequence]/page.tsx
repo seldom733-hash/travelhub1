@@ -49,6 +49,7 @@ export default function DealDetailPage() {
   const [reload, setReload] = useState(0);
   const [editOpen, setEditOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [writeOffOpen, setWriteOffOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -191,13 +192,14 @@ export default function DealDetailPage() {
           </div>
 
           <aside className="space-y-3">
-            <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span>✎</span>Статус и действия</div><div className="flex items-center justify-between rounded-lg border border-[#e5e2da] px-2 py-2 text-xs"><span className="text-[#667085]">Статус заказа</span><span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusTone(deal.status)}`}>{statusRu(deal.status)}</span></div>{actionError && <div className="mt-2 rounded bg-rose-50 px-2 py-1 text-[10px] text-rose-700">{actionError}</div>}<div className="mt-2 space-y-1.5">{availableActions.map((action, index) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runAction(action)} className={`block w-full rounded-lg px-3 py-2 text-center text-xs font-semibold disabled:opacity-50 ${/cancel|problem|suspend/.test(action) ? "border border-rose-200 text-rose-700" : index === 0 ? "bg-[#0f6b5f] text-white" : "border border-[#e5e2da] text-[#344054]"}`}>{actionBusy === action ? "Выполняется…" : ACTION_LABELS[action] ?? action}</button>)}refundable ? <Link href="/app/finance/refunds" className="block rounded-lg border border-[#e5e2da] px-3 py-2 text-center text-xs font-semibold text-[#344054]">Создать возврат</Link> : <span className="block rounded-lg border border-[#e5e2da] px-3 py-2 text-center text-xs text-[#98a2b3]">Возврат недоступен</span></div></div>
+            <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span>✎</span>Статус и действия</div><div className="flex items-center justify-between rounded-lg border border-[#e5e2da] px-2 py-2 text-xs"><span className="text-[#667085]">Статус заказа</span><span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusTone(deal.status)}`}>{statusRu(deal.status)}</span></div>{actionError && <div className="mt-2 rounded bg-rose-50 px-2 py-1 text-[10px] text-rose-700">{actionError}</div>}<div className="mt-2 space-y-1.5">{availableActions.map((action, index) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runAction(action)} className={`block w-full rounded-lg px-3 py-2 text-center text-xs font-semibold disabled:opacity-50 ${/cancel|problem|suspend/.test(action) ? "border border-rose-200 text-rose-700" : index === 0 ? "bg-[#0f6b5f] text-white" : "border border-[#e5e2da] text-[#344054]"}`}>{actionBusy === action ? "Выполняется…" : ACTION_LABELS[action] ?? action}</button>)}refundable ? <Link href="/app/finance/refunds" className="block rounded-lg border border-[#e5e2da] px-3 py-2 text-center text-xs font-semibold text-[#344054]">Создать возврат</Link> : <span className="block rounded-lg border border-[#e5e2da] px-3 py-2 text-center text-xs text-[#98a2b3]">Возврат недоступен</span>{deal.status === "CANCELLED" && Number(deal.supplierRefundDue) > 0 && <button type="button" onClick={() => setWriteOffOpen(true)} className="mt-2 w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Признать убытком и закрыть</button>}</div></div>
             <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-[#667085]">История этапов</div><Timeline title="Заявка создана" code={deal.requestCode} date={new Date(deal.createdAt).toLocaleString("ru-RU")} tone="done" /><Timeline title="Заказ создан" code={deal.orderCode} date={deal.orderCode ? "Текущий этап" : "Ожидает"} tone={deal.orderCode ? "current" : "todo"} /><Timeline title="Бронь" code={deal.bookingCode ?? "ожидает создания"} date={deal.bookingCode ? "Создана" : "Ожидает"} tone={deal.bookingCode ? "done" : "todo"} /></div>
             {user ? <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><OperationalNotes entityType={deal.orderId ? "Order" : "Request"} entityId={deal.orderId ?? deal.requestId} permissions={user.permissions} currentUserId={user.id} currentRole={user.role} /></div> : null}
           </aside>
         </div>
       </div>
       {editOpen && <DealEditModal deal={deal} onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); setReload((v) => v + 1); }} />}
+      {writeOffOpen && <WriteOffModal deal={deal} onClose={() => setWriteOffOpen(false)} onSaved={() => { setWriteOffOpen(false); setReload((v) => v + 1); }} />}
       {addOpen && <AddServiceModal deal={deal} onClose={() => setAddOpen(false)} onSaved={() => { setAddOpen(false); setReload((v) => v + 1); }} />}
     </div>
   );
@@ -319,4 +321,26 @@ function CommunicationsTab({ deal }: { deal: DealRow }) {
   if (error) return <Empty text={error} />;
   if (items.length === 0) return <Empty text="Коммуникаций по заказу нет" />;
   return <div className="space-y-2">{items.map((c) => <div key={c.id} className="rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2 text-[11px]"><div className="flex justify-between"><span className="font-semibold">{c.subject ?? c.type}</span><span className="text-[#98a2b3]">{new Date(c.occurredAt).toLocaleString("ru-RU")}</span></div><div className="mt-1 text-[#667085]">{c.body}</div></div>)}</div>;
+}
+
+function WriteOffModal({ deal, onClose, onSaved }: { deal: DealRow; onClose: () => void; onSaved: () => void }) {
+  const [amount, setAmount] = React.useState(deal.supplierRefundDue);
+  const [reason, setReason] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState("");
+  async function submit() {
+    if (!reason.trim()) { setErr("Укажите причину"); return; }
+    setBusy(true); setErr("");
+    try {
+      await api.post(`/orders/${deal.orderId}/financial-settlement/write-off-supplier`, { amount, reason: reason.trim() });
+      onSaved();
+    } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+  }
+  return <Modal title="Признать убытком и закрыть" onClose={onClose}><div className="grid gap-3 text-xs">
+    <div className="rounded-lg bg-amber-50 p-2 text-amber-800">Поставщик не вернул {money(deal.supplierRefundDue, deal.currency)}. Сумма будет списана в убыток, клиентский штраф рассчитан по штрафу поставщика.</div>
+    <label className="grid gap-1">Сумма списания<input value={amount} onChange={(e) => setAmount(e.target.value)} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" inputMode="decimal" /></label>
+    <label className="grid gap-1">Причина<textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" placeholder="Почему поставщик не возвращает деньги" /></label>
+    {err && <div className="rounded bg-rose-50 px-2 py-1 text-rose-700">{err}</div>}
+    <button type="button" disabled={busy} onClick={() => void submit()} className="rounded-lg bg-amber-600 px-3 py-2 font-semibold text-white disabled:opacity-50">{busy ? "Списание…" : "Признать убытком и закрыть"}</button>
+  </div></Modal>;
 }

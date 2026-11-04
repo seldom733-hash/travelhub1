@@ -21,6 +21,8 @@ export interface SettlementConfirmInput {
   supplierPenaltyStatus?: "PENDING" | "CONFIRMED" | "WITHHELD" | "RECEIVED" | "WAIVED";
   platformPenaltyShare?: string | null;
   supplierPenaltyShare?: string | null;
+  writeOffAmount?: string | null;
+  writeOffReason?: string | null;
   reason?: string;
 }
 
@@ -124,6 +126,10 @@ export class OrderFinancialSettlementService {
           annulledUnpaidAmount: new Prisma.Decimal(result.annulledUnpaidAmount),
           remainingToPay: new Prisma.Decimal(result.remainingToPay),
           remainingToRefund: new Prisma.Decimal(result.remainingToRefund),
+          writeOffAmount: new Prisma.Decimal(input.writeOffAmount ?? "0"),
+          writeOffReason: input.writeOffAmount && Number(input.writeOffAmount) > 0 ? (input.writeOffReason?.trim() || reason) : null,
+          writeOffAt: input.writeOffAmount && Number(input.writeOffAmount) > 0 ? new Date() : null,
+          writeOffById: input.writeOffAmount && Number(input.writeOffAmount) > 0 ? actor.id : null,
           status: result.status as OrderFinancialStatus,
           reason,
           confirmedAt: new Date(),
@@ -182,6 +188,15 @@ export class OrderFinancialSettlementService {
           financiallySettledAt: new Date(),
         },
       });
+      if (input.writeOffAmount && Number(input.writeOffAmount) > 0) {
+        await tx.supplierObligation.updateMany({
+          where: { orderId, status: { in: ["OPEN", "PARTIALLY_PAID"] } },
+          data: { status: "CANCELLED", remainingAmount: new Prisma.Decimal(0) },
+        });
+        if (context.order.status === "CANCELLED") {
+          await tx.booking.updateMany({ where: { orderId, status: { notIn: ["CANCELLED", "COMPLETED"] } }, data: { status: "CANCELLED" } });
+        }
+      }
       await this.security.audit(tx, {
         userId: actor.id,
         username: actor.username,
@@ -203,6 +218,36 @@ export class OrderFinancialSettlementService {
     });
 
     return this.toDto(created);
+  }
+
+  async writeOffSupplier(orderId: string, input: { amount?: string | null; reason: string }, actor: Actor): Promise<Record<string, unknown>> {
+    const reason = input.reason?.trim();
+    if (!reason) throw new ValidationDomainError("Write-off reason is required");
+    const context = await this.loadContext(orderId);
+    if (context.terminalKind !== "CANCELLED") throw new ValidationDomainError("Supplier write-off is allowed only for a cancelled order");
+    const [outgoing, incoming] = await Promise.all([
+      this.prisma.supplierPayout.aggregate({ where: { orderId, status: "CONFIRMED", direction: { not: "INCOMING" } }, _sum: { amount: true } }),
+      this.prisma.supplierPayout.aggregate({ where: { orderId, status: "CONFIRMED", direction: "INCOMING" }, _sum: { amount: true } }),
+    ]);
+    const paid = new Prisma.Decimal(outgoing._sum.amount ?? 0);
+    const refunded = new Prisma.Decimal(incoming._sum.amount ?? 0);
+    const outstanding = Prisma.Decimal.max(new Prisma.Decimal(0), paid.minus(refunded));
+    if (outstanding.isZero()) throw new ConflictError("Supplier has no outstanding refund to write off");
+    const amount = input.amount ? new Prisma.Decimal(input.amount) : outstanding;
+    if (amount.lte(0) || amount.greaterThan(outstanding)) throw new ValidationDomainError("Write-off amount exceeds outstanding supplier refund");
+    const clientNet = Prisma.Decimal.max(new Prisma.Decimal(0), context.capturedAmount.minus(context.refundedAmount));
+    const clientPenalty = Prisma.Decimal.min(amount, clientNet);
+    return this.confirm(orderId, {
+      finalCustomerLiability: clientPenalty.toString(),
+      penaltyAmount: amount.toString(),
+      clientPenaltyAmount: clientPenalty.toString(),
+      clientPenaltyStatus: clientPenalty.greaterThan(0) ? "CONFIRMED" : "WAIVED",
+      supplierPenaltyShare: amount.toString(),
+      supplierPenaltyStatus: "CONFIRMED",
+      writeOffAmount: amount.toString(),
+      writeOffReason: reason,
+      reason,
+    }, actor);
   }
 
   async cancelPenalty(

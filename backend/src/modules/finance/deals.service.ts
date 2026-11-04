@@ -66,6 +66,7 @@ type DealRow = {
   supplierPaid: string;
   supplierDebt: string;
   supplierRefunded: string;
+  supplierRefundDue: string;
   clientPenalty: string;
   supplierPenalty: string;
   expectedIncome: string;
@@ -476,6 +477,7 @@ export class DealsService {
         supplierPaid: fixed(supplierPaid),
         supplierDebt: fixed(supplierDebt),
         supplierRefunded: fixed(supplierRefunded),
+        supplierRefundDue: fixed(cancelled ? Math.max(0, supplierPaid - supplierRefunded) : 0),
         clientPenalty: fixed(Number(clientPenalty)),
         supplierPenalty: fixed(Number(supplierPenalty)),
         expectedIncome: fixed(expectedIncome),

@@ -4642,6 +4642,11 @@ model OrderFinancialSettlement {
   annulledUnpaidAmount  Decimal               @db.Decimal(12, 2)
   remainingToPay        Decimal               @db.Decimal(12, 2)
   remainingToRefund     Decimal               @db.Decimal(12, 2)
+  /// Explicit write-off of unreturned supplier money (loss recognition).
+  writeOffAmount        Decimal               @default(0) @db.Decimal(12, 2)
+  writeOffReason        String?
+  writeOffAt            DateTime?
+  writeOffById          String?
   status                OrderFinancialStatus
   reason                String
   confirmedAt           DateTime
