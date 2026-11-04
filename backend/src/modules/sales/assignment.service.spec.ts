@@ -4,6 +4,7 @@ function makeTx() {
   const tx: any = {
     $queryRaw: jest.fn().mockResolvedValue([{ id: "r1", assignedManagerId: null }]),
     salesManagerProfile: {
+      createMany: jest.fn().mockResolvedValue({ count: 0 }),
       findUnique: jest.fn().mockResolvedValue({ availability: "FREE" }),
       findMany: jest.fn().mockResolvedValue([
         { userId: "u1", participatesInAutoDistribution: true, availability: "FREE", maxActiveRequests: 5, lastAssignedAt: new Date("2026-01-01") },

@@ -44,13 +44,17 @@ export class AssignmentService {
         }
       }
 
+      const heads = await tx.user.findMany({ where: { status: "ACTIVE", role: { code: "SALES_HEAD" } }, select: { id: true } });
+      if (heads.length > 0) {
+        await tx.salesManagerProfile.createMany({ data: heads.map((u) => ({ userId: u.id, availability: "FREE", participatesInAutoDistribution: true, maxActiveRequests: 20 })), skipDuplicates: true });
+      }
       const profiles = await tx.salesManagerProfile.findMany({
         where: { participatesInAutoDistribution: true, availability: "FREE" },
       });
       if (profiles.length === 0) return this.queue(tx, requestId, "NO_AVAILABLE_MANAGERS");
 
       const users = await tx.user.findMany({
-        where: { id: { in: profiles.map((p) => p.userId) }, status: "ACTIVE", role: { code: "SALES_MANAGER" } },
+        where: { id: { in: profiles.map((p) => p.userId) }, status: "ACTIVE", role: { code: { in: ["SALES_MANAGER", "SALES_HEAD"] } } },
         select: { id: true, fullName: true, username: true },
       });
       if (users.length === 0) return this.queue(tx, requestId, "NO_AVAILABLE_MANAGERS");
@@ -141,7 +145,7 @@ export class AssignmentService {
       if (profile?.availability === "ABSENT") throw new BadRequestException("Manager is absent");
       const now = new Date();
       await tx.request.update({ where: { id: requestId }, data: { assignedManagerId: actor.id, assignedAt: now, assignmentType: "SELF", assignmentState: "ASSIGNED", slaDueAt: new Date(now.getTime() + 30 * 60_000), assignmentVersion: { increment: 1 } } });
-      await tx.salesManagerProfile.upsert({ where: { userId: actor.id }, create: { userId: actor.id, availability: "BUSY", lastAssignedAt: now }, update: { lastAssignedAt: now } });
+      await tx.salesManagerProfile.upsert({ where: { userId: actor.id }, create: { userId: actor.id, availability: "FREE", lastAssignedAt: now }, update: { lastAssignedAt: now } });
       await tx.userNotification.updateMany({ where: { entityType: "Request", entityId: requestId, type: "REQUEST_UNASSIGNED", readAt: null }, data: { readAt: now } });
       await tx.requestHistory.create({ data: { requestId, action: "SELF_ASSIGNED", to: actor.id, actorId: actor.id, actorName: actor.username, comment: "Manager took request" } });
       return { ok: true, managerId: actor.id };
@@ -158,7 +162,7 @@ export class AssignmentService {
   }
 
   async setManagerSettings(userId: string, input: { availability?: string; participates?: boolean; maxActiveRequests?: number | null }) {
-    const user = await this.prisma.user.findFirst({ where: { id: userId, role: { code: "SALES_MANAGER" } }, select: { id: true } });
+    const user = await this.prisma.user.findFirst({ where: { id: userId, role: { code: { in: ["SALES_MANAGER", "SALES_HEAD"] } } }, select: { id: true } });
     if (!user) throw new NotFoundException("Manager not found");
     if (input.availability && !["FREE", "BUSY", "ABSENT"].includes(input.availability)) throw new BadRequestException("Unknown manager status");
     return this.prisma.salesManagerProfile.upsert({
@@ -189,7 +193,7 @@ export class AssignmentService {
       if (expectedManagerId !== undefined && request.assignedManagerId !== expectedManagerId) {
         throw new ConflictException("Request was reassigned by another user");
       }
-      const user = await tx.user.findFirst({ where: { id: managerId, status: "ACTIVE", role: { code: "SALES_MANAGER" } }, select: { id: true, fullName: true, username: true } });
+      const user = await tx.user.findFirst({ where: { id: managerId, status: "ACTIVE", role: { code: { in: ["SALES_MANAGER", "SALES_HEAD"] } } }, select: { id: true, fullName: true, username: true } });
       if (!user) throw new NotFoundException("Manager not found or inactive");
       const profile = await tx.salesManagerProfile.findUnique({ where: { userId: managerId } });
       if (profile?.availability === "ABSENT") throw new BadRequestException("Manager is absent");
@@ -211,9 +215,13 @@ export class AssignmentService {
 
   async load() {
     const users = await this.prisma.user.findMany({
-      where: { status: "ACTIVE", role: { code: "SALES_MANAGER" } },
+      where: { status: "ACTIVE", role: { code: { in: ["SALES_MANAGER", "SALES_HEAD"] } } },
       select: { id: true, fullName: true, username: true },
     });
+    const heads = await this.prisma.user.findMany({ where: { status: "ACTIVE", role: { code: "SALES_HEAD" } }, select: { id: true } });
+    if (heads.length > 0) {
+      await this.prisma.salesManagerProfile.createMany({ data: heads.map((u) => ({ userId: u.id, availability: "FREE", participatesInAutoDistribution: true, maxActiveRequests: 20 })), skipDuplicates: true });
+    }
     const profiles = await this.prisma.salesManagerProfile.findMany({ where: { userId: { in: users.map((u) => u.id) } } });
     const profileByUser = new Map(profiles.map((p) => [p.userId, p]));
     const rows = await Promise.all(users.map(async (u) => {
