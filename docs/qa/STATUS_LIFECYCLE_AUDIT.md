@@ -142,6 +142,7 @@
 - статус `PRICE_CHANGED` или `CONFIRMED`;
 - `customerActionDeadline` не истёк;
 - фиксируются `customerAcceptedAt`, итоговая цена, состав туристов;
+- **туристы на этом шаге не обязательны** — они заполняются в карточке реестра после принятия;
 - после этого возможна конвертация в заказ.
 
 #### `PRICE_CHANGED/CONFIRMED → CANCELLED_BY_CUSTOMER`
