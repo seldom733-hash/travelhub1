@@ -355,7 +355,7 @@ export class DealsService {
       const snapOffer = (snapshot.offer ?? {}) as Record<string, unknown>;
       const commercial = (order?.commercialSnapshot ?? request.commercialSnapshot ?? {}) as Record<string, unknown>;
       const clientPayments = order ? paymentsByOrder.get(order.id) ?? [] : [];
-      const clientRefunds = order ? refundsByOrder.get(order.id) ?? [] : [];
+      const clientRefunds = (order ? refundsByOrder.get(order.id) ?? [] : []).filter((r) => r.status === "PROCESSED");
       const supplierPayouts = order ? payoutsByOrder.get(order.id) ?? [] : [];
       const supplierObligations = order ? obligationsByOrder.get(order.id) ?? [] : [];
       const settlement = order ? settlementByOrder.get(order.id) : undefined;

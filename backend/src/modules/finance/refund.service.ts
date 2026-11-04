@@ -224,7 +224,7 @@ export class RefundService {
   ): Promise<string> {
     const order = await tx.order.findUnique({
       where: { id: payment.orderId },
-      select: { acquisitionSource: true, sellerPartnerId: true },
+      select: { acquisitionSource: true, sellerPartnerId: true, commerceSequence: true },
     });
     if (!order) return this.refNum.nextMarketplaceReference(tx, "REF");
     if (order.acquisitionSource === "PARTNER_STOREFRONT" && order.sellerPartnerId) {
@@ -232,9 +232,9 @@ export class RefundService {
         where: { partnerId: order.sellerPartnerId },
         select: { storefrontCode: true },
       });
-      if (sf) return this.refNum.nextStorefrontReference(tx, sf.storefrontCode, "REF");
+      if (sf) return order.commerceSequence ? `${sf.storefrontCode}-REF-${order.commerceSequence}` : this.refNum.nextStorefrontReference(tx, sf.storefrontCode, "REF");
     }
-    return this.refNum.nextMarketplaceReference(tx, "REF");
+    return order.commerceSequence ? `MKT-REF-${order.commerceSequence}` : this.refNum.nextMarketplaceReference(tx, "REF");
   }
 
   // ── Lifecycle transitions (единственный state-machine authority) ──────────
