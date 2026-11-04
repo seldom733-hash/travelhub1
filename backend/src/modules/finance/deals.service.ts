@@ -316,6 +316,7 @@ export class DealsService {
     const partnerIds = [...new Set([
       ...requests.map((r) => r.partnerId).filter((id): id is string => Boolean(id)),
       ...products.map((p) => p.partnerId).filter((id): id is string => Boolean(id)),
+      ...payouts.map((p) => p.partnerId).filter((id): id is string => Boolean(id)),
     ])];
     const partners = partnerIds.length > 0
       ? await this.prisma.partner.findMany({ where: { id: { in: partnerIds } }, select: { id: true, code: true, name: true } })
@@ -500,7 +501,7 @@ export class DealsService {
         supplierPaymentStatus: supplierPaid <= 0 ? "UNPAID" : supplierPaid >= cost ? "PAID" : "PARTIALLY_PAID",
         payments: clientPayments.map((p) => ({ id: p.id, code: p.code, amount: p.amount.toString(), currency: p.currency, status: p.status, method: p.paymentMethod, date: (p.paidAt ?? p.createdAt).toISOString() })),
         refunds: clientRefunds.map((r) => ({ id: r.id, code: r.code, amount: r.amount.toString(), currency: r.currency, status: r.status, date: (r.processedAt ?? r.createdAt).toISOString() })),
-        payouts: supplierPayouts.map((p) => ({ id: p.id, code: p.code, amount: p.amount.toString(), currency: p.currency, status: p.status, direction: p.direction, date: p.occurredAt.toISOString(), supplierCode: p.supplierCode ?? p.partnerId ?? null })),
+        payouts: supplierPayouts.map((p) => ({ id: p.id, code: p.code, amount: p.amount.toString(), currency: p.currency, status: p.status, direction: p.direction, date: p.occurredAt.toISOString(), supplierCode: p.supplierCode ?? p.partnerId ?? null, supplierName: (p.partnerId ? partnerById.get(p.partnerId)?.name : null) ?? p.supplierCode ?? p.partnerId ?? null })),
       };
     });
   }
