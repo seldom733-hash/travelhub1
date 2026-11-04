@@ -12,7 +12,7 @@ import { useCurrentUser } from "@/lib/use-user";
 
 const TABS = [
   ["overview", "Общая информация"], ["services", "Услуги и расчёты"], ["client", "Платежи клиента"],
-  ["supplier", "Расчёты с поставщиком"], ["penalties", "Штрафы и возвраты"], ["docs", "Документы"],
+  ["supplier", "Расчёты с поставщиком"], ["penalties", "Штрафы и возвраты"], ["travelers", "Туристы"], ["docs", "Документы"],
   ["communications", "Коммуникации"], ["history", "История изменений"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
@@ -60,6 +60,8 @@ export default function DealDetailPage() {
   const [actionError, setActionError] = useState("");
   const [requestActions, setRequestActions] = useState<Record<string, boolean>>({});
   const [bookingActions, setBookingActions] = useState<string[]>([]);
+  const [requestTravelers, setRequestTravelers] = useState<Array<{ id: string; position: number; firstName: string; lastName: string; birthDate: string }>>([]);
+  const [orderTravelers, setOrderTravelers] = useState<Array<{ id: string; firstName: string; lastName: string; birthDate: string | null; passportNumber: string | null; dataCompleteness: string }>>([]);
   const [reload, setReload] = useState(0);
   const [editOpen, setEditOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -74,18 +76,18 @@ export default function DealDetailPage() {
   useEffect(() => {
     if (!deal?.orderId) { setAvailableActions([]); return; }
     let alive = true;
-    api.get<{ availableActions?: string[] }>(`/orders/${deal.orderId}`)
-      .then((order) => { if (alive) setAvailableActions(order.availableActions ?? []); })
-      .catch(() => { if (alive) setAvailableActions([]); });
+    api.get<{ availableActions?: string[]; travelers?: typeof orderTravelers }>(`/orders/${deal.orderId}`)
+      .then((order) => { if (alive) { setAvailableActions(order.availableActions ?? []); setOrderTravelers(order.travelers ?? []); } })
+      .catch(() => { if (alive) { setAvailableActions([]); setOrderTravelers([]); } });
     return () => { alive = false; };
   }, [deal?.orderId, reload]);
 
   useEffect(() => {
     if (!deal?.requestId) { setRequestActions({}); return; }
     let alive = true;
-    api.get<{ availableActions?: Record<string, boolean> }>(`/requests/${deal.requestId}`)
-      .then((request) => { if (alive) setRequestActions(request.availableActions ?? {}); })
-      .catch(() => { if (alive) setRequestActions({}); });
+    api.get<{ availableActions?: Record<string, boolean>; travelers?: typeof requestTravelers }>(`/requests/${deal.requestId}`)
+      .then((request) => { if (alive) { setRequestActions(request.availableActions ?? {}); setRequestTravelers(request.travelers ?? []); } })
+      .catch(() => { if (alive) { setRequestActions({}); setRequestTravelers([]); } });
     return () => { alive = false; };
   }, [deal?.requestId, reload]);
 
@@ -238,7 +240,7 @@ export default function DealDetailPage() {
 
             <section className="rounded-xl border border-[#e5e2da] bg-white shadow-sm">
               <div className="flex flex-wrap gap-1 border-b border-[#f0eee8] px-2 pt-2">{TABS.map(([key, label]) => <button key={key} type="button" onClick={() => setTab(key)} className={`border-b-2 px-2 py-2 text-[11px] font-medium ${tab === key ? "border-[#0f6b5f] text-[#0f6b5f]" : "border-transparent text-[#667085]"}`}>{label}</button>)}</div>
-              <div className="p-4 text-xs">{tab === "overview" && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><Info label="Общий номер" value={deal.sequence} /><Info label="Заявка" value={deal.requestCode} /><Info label="Заказ" value={deal.orderCode ?? "—"} /><Info label="Бронь" value={deal.bookingCode ?? "—"} /><Info label="Стадия" value={deal.stageLabel} /><Info label="Статус" value={statusRu(deal.status)} /><Info label="Дата услуги" value={dateFrom} /><Info label="Сумма продажи" value={money(deal.salesAmount, deal.currency)} /><Info label="Себестоимость" value={money(deal.costAmount, deal.currency)} /><Info label="Фин. статус" value={deal.financialStatus} /><Info label="Оплата клиента" value={deal.paymentStatus} /><Info label="Оплата поставщику" value={deal.supplierPaymentStatus} /></div>}{tab === "services" && <div className="space-y-2">{deal.services.map((s) => <div key={s.id} className="flex justify-between border-b border-[#f0eee8] py-2"><span>{s.title}</span><span className="font-mono">{money(s.clientPrice, deal.currency)} / {money(s.cost, deal.currency)}</span></div>)}</div>}{tab === "client" && <SimpleRows rows={deal.payments.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.method ?? "Оплата", statusRu(p.status)])} head={["Дата", "Сумма", "Тип", "Статус"]} />}{tab === "supplier" && <SimpleRows rows={deal.payouts.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.direction === "INCOMING" ? "Возврат" : "Оплата", statusRu(p.status)])} head={["Дата", "Сумма", "Тип", "Статус"]} />}{tab === "penalties" && <div className="space-y-2"><Info label="Штраф клиента" value={money(deal.clientPenalty, deal.currency)} /><Info label="Штраф поставщика" value={money(deal.supplierPenalty, deal.currency)} /><Info label="Возвращено клиенту" value={money(deal.clientRefunded, deal.currency)} /><Info label="Возврат поставщика" value={money(deal.supplierRefunded, deal.currency)} /></div>}{tab === "docs" && <DocumentsTab deal={deal} />}{tab === "communications" && <CommunicationsTab deal={deal} />}{tab === "history" && <Empty text="История доступна в карточках заявки, заказа и брони" />}</div>
+              <div className="p-4 text-xs">{tab === "overview" && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><Info label="Общий номер" value={deal.sequence} /><Info label="Заявка" value={deal.requestCode} /><Info label="Заказ" value={deal.orderCode ?? "—"} /><Info label="Бронь" value={deal.bookingCode ?? "—"} /><Info label="Стадия" value={deal.stageLabel} /><Info label="Статус" value={statusRu(deal.status)} /><Info label="Дата услуги" value={dateFrom} /><Info label="Сумма продажи" value={money(deal.salesAmount, deal.currency)} /><Info label="Себестоимость" value={money(deal.costAmount, deal.currency)} /><Info label="Фин. статус" value={deal.financialStatus} /><Info label="Оплата клиента" value={deal.paymentStatus} /><Info label="Оплата поставщику" value={deal.supplierPaymentStatus} /></div>}{tab === "services" && <div className="space-y-2">{deal.services.map((s) => <div key={s.id} className="flex justify-between border-b border-[#f0eee8] py-2"><span>{s.title}</span><span className="font-mono">{money(s.clientPrice, deal.currency)} / {money(s.cost, deal.currency)}</span></div>)}</div>}{tab === "client" && <SimpleRows rows={deal.payments.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.method ?? "Оплата", statusRu(p.status)])} head={["Дата", "Сумма", "Тип", "Статус"]} />}{tab === "supplier" && <SimpleRows rows={deal.payouts.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.direction === "INCOMING" ? "Возврат" : "Оплата", statusRu(p.status)])} head={["Дата", "Сумма", "Тип", "Статус"]} />}{tab === "penalties" && <div className="space-y-2"><Info label="Штраф клиента" value={money(deal.clientPenalty, deal.currency)} /><Info label="Штраф поставщика" value={money(deal.supplierPenalty, deal.currency)} /><Info label="Возвращено клиенту" value={money(deal.clientRefunded, deal.currency)} /><Info label="Возврат поставщика" value={money(deal.supplierRefunded, deal.currency)} /></div>}{tab === "travelers" && <TravelersTab deal={deal} requestTravelers={requestTravelers} orderTravelers={orderTravelers} onRefresh={() => setReload((v) => v + 1)} />}{tab === "docs" && <DocumentsTab deal={deal} />}{tab === "communications" && <CommunicationsTab deal={deal} />}{tab === "history" && <Empty text="История доступна в карточках заявки, заказа и брони" />}</div>
             </section>
           </div>
 
@@ -394,4 +396,31 @@ function WriteOffModal({ deal, onClose, onSaved }: { deal: DealRow; onClose: () 
     {err && <div className="rounded bg-rose-50 px-2 py-1 text-rose-700">{err}</div>}
     <button type="button" disabled={busy} onClick={() => void submit()} className="rounded-lg bg-amber-600 px-3 py-2 font-semibold text-white disabled:opacity-50">{busy ? "Списание…" : "Признать убытком и закрыть"}</button>
   </div></Modal>;
+}
+
+function TravelersTab({ deal, requestTravelers, orderTravelers, onRefresh }: { deal: DealRow; requestTravelers: Array<{ id: string; position: number; firstName: string; lastName: string; birthDate: string }>; orderTravelers: Array<{ id: string; firstName: string; lastName: string; birthDate: string | null; passportNumber: string | null; dataCompleteness: string }>; onRefresh: () => void }) {
+  const [form, setForm] = React.useState({ firstName: "", lastName: "", birthDate: "" });
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const expected = deal.travelerCount ?? requestTravelers.length;
+  if (deal.orderId) {
+    return <div className="space-y-2">{orderTravelers.length === 0 ? <Empty text="Туристы не заполнены" /> : orderTravelers.map((traveler) => <div key={traveler.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2 text-[11px]"><span className="font-semibold">{traveler.lastName} {traveler.firstName}</span><span>{traveler.birthDate ? new Date(traveler.birthDate).toLocaleDateString("ru-RU") : "Дата рождения не указана"}</span><span className={traveler.dataCompleteness === "COMPLETE" ? "text-emerald-700" : "text-amber-700"}>{traveler.dataCompleteness === "COMPLETE" ? "Данные полные" : "Нужны паспортные данные"}</span></div>)}<p className="text-[10px] text-[#98a2b3]">Паспортные данные и final-confirm заполняются в карточке заказа. <Link href={`/app/orders/${deal.orderId}`} className="font-semibold text-[#0f6b5f] underline">Открыть заказ</Link></p></div>;
+  }
+  const editable = !["CONVERTED", "REJECTED"].includes(deal.status) && requestTravelers.length < expected;
+  async function add() {
+    if (!form.firstName.trim() || !form.lastName.trim() || !form.birthDate) { setError("Заполните имя, фамилию и дату рождения"); return; }
+    setBusy(true); setError("");
+    try {
+      await api.post(`/requests/${deal.requestId}/travelers`, { firstName: form.firstName.trim(), lastName: form.lastName.trim(), birthDate: form.birthDate, position: requestTravelers.length + 1 });
+      setForm({ firstName: "", lastName: "", birthDate: "" });
+      onRefresh();
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  return <div className="space-y-3">
+    <div className="flex items-center justify-between text-[11px]"><span className="font-semibold">Туристы заявки</span><span className={requestTravelers.length === expected ? "text-emerald-700" : "text-amber-700"}>{requestTravelers.length} из {expected}</span></div>
+    {requestTravelers.length === 0 ? <Empty text="Туристы ещё не заполнены" /> : <div className="space-y-1">{requestTravelers.map((traveler) => <div key={traveler.id} className="flex items-center justify-between rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2 text-[11px]"><span className="font-semibold">{traveler.position}. {traveler.lastName} {traveler.firstName}</span><span>{new Date(traveler.birthDate).toLocaleDateString("ru-RU")}</span></div>)}</div>}
+    {editable && <div className="grid gap-2 rounded-lg border border-[#d9e6e1] bg-[#f2faf7] p-2 sm:grid-cols-4"><input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} placeholder="Фамилия" className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} placeholder="Имя" className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><input type="date" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} className="rounded border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><button type="button" disabled={busy} onClick={() => void add()} className="rounded bg-[#0f6b5f] px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50">{busy ? "Сохранение…" : "Добавить"}</button></div>}
+    {error && <div className="rounded bg-rose-50 px-2 py-1 text-[10px] text-rose-700">{error}</div>}
+    <p className="text-[10px] text-[#98a2b3]">Туристы должны быть заполнены до принятия клиентом и конвертации в заказ.</p>
+  </div>;
 }
