@@ -7,6 +7,7 @@ import { IdsService } from "../../../shared/ids.service";
 import { ReferenceNumberService } from "../../../shared/reference-number.service";
 import { FlightSupplierRegistry } from "../flight-supplier.registry";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
+import { AssignmentService } from "../../sales/assignment.service";
 import type { FxRateInfo, ResolvedMarkup } from "../../pricing/supplier-pricing.service";
 import { buildWorkingSnapshot, type CommercialSnapshot } from "../../pricing/commercial-snapshot";
 import type { MarkupPricingJson } from "../../pricing/pricing.types";
@@ -92,6 +93,7 @@ export class AzalController {
     private readonly flightRegistry: FlightSupplierRegistry,
     private readonly locations: AzalLocationsService,
     private readonly pricing: SupplierPricingService,
+    private readonly assignment: AssignmentService,
   ) {}
 
   @Get("locations")
@@ -284,6 +286,11 @@ export class AzalController {
           birthDate: new Date(traveler.birthDate!),
         })),
       });
+    }
+    try {
+      await this.assignment.assign(request.id, undefined, { respectMode: true });
+    } catch {
+      // Assignment failure leaves the request persisted for manual distribution.
     }
     return { id: request.id, code: request.code, referenceNumber: request.referenceNumber, status: request.status, priceVerification: authoritative.verification };
   }
