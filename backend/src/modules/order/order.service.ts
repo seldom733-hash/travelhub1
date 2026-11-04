@@ -1377,6 +1377,25 @@ export class OrderService {
    *  - pinned нет (legacy pre-D3, bulk-контракт): полнота по passportNumber
    *    (историческое правило bulk PATCH — заказы вне D3-потока).
    */
+  private async assertOrderDebtsCleared(tx: Prisma.TransactionClient, orderId: string, code: string, amount: Prisma.Decimal) {
+    const [payments, refunds, pendingRefunds, obligations] = await Promise.all([
+      tx.payment.aggregate({ where: { orderId, status: { in: ["CAPTURED", "REFUNDED"] } }, _sum: { amount: true } }),
+      tx.refund.aggregate({ where: { orderId, status: "PROCESSED" }, _sum: { amount: true } }),
+      tx.refund.aggregate({ where: { orderId, status: { in: ["REQUESTED", "APPROVED"] } }, _sum: { amount: true } }),
+      tx.supplierObligation.aggregate({ where: { orderId, status: { in: ["OPEN", "PARTIALLY_PAID"] } }, _sum: { remainingAmount: true } }),
+    ]);
+    const captured = new Prisma.Decimal(payments._sum.amount ?? 0);
+    const refunded = new Prisma.Decimal(refunds._sum.amount ?? 0);
+    const pendingRefund = new Prisma.Decimal(pendingRefunds._sum.amount ?? 0);
+    const clientDebt = Prisma.Decimal.max(new Prisma.Decimal(0), new Prisma.Decimal(amount).minus(captured.minus(refunded)));
+    const supplierDebt = new Prisma.Decimal(obligations._sum.remainingAmount ?? 0);
+    if (!clientDebt.isZero() || !supplierDebt.isZero() || !pendingRefund.isZero()) {
+      throw new ConflictError(
+        `Order ${code} cannot be completed/closed: clientDebt=${clientDebt.toString()}, supplierDebt=${supplierDebt.toString()}, pendingRefund=${pendingRefund.toString()}`,
+      );
+    }
+  }
+
   private computeTravelerCompleteness(
     pinned: TravelerFullRequirements | null,
     values: Partial<Record<TravelerField, string | Date | null | undefined>>,
@@ -1532,6 +1551,7 @@ export class OrderService {
         where: { id: orderId },
         select: {
           id: true, code: true, customerId: true, status: true, version: true,
+          amount: true, currency: true,
           termsAcceptedAt: true, finalConfirmedAt: true, travelerCount: true,
           acquisitionSource: true,
           travelers: { select: { id: true, dataCompleteness: true } },
@@ -1545,6 +1565,10 @@ export class OrderService {
       }
       if (!transition.from.includes(order.status)) {
         throw new ConflictError(`Cannot ${action} order ${order.code} from status ${order.status}`);
+      }
+
+      if (action === "complete" || action === "close") {
+        await this.assertOrderDebtsCleared(tx, orderId, order.code, order.amount);
       }
 
       // Stage 1 (Order → Request): guards «назад» — только pre-send данные.
