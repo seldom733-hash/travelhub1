@@ -428,6 +428,71 @@ export class SupplierPaymentService {
    * в той же транзакции. Исходная запись и исходная проводка НЕ удаляются.
    * Повторная отмена идемпотентна; конкурентная — только один победитель CAS.
    */
+  /** Correct a confirmed payout amount/date with allocation-safe reversal + FIFO reallocation. */
+  async update(codeOrId: string, input: { amount: string; occurredAt?: string; method?: string | null; reason?: string | null }, actor: Actor): Promise<SupplierPaymentDto> {
+    const payment = await this.load(codeOrId);
+    if (payment.direction === "INCOMING") throw new ConflictError("Supplier refunds cannot be edited");
+    if (payment.status !== "CONFIRMED" && payment.status !== "PENDING") {
+      throw new ConflictError(`supplier payment ${payment.code} is ${payment.status} and cannot be edited`);
+    }
+    let newAmount: Prisma.Decimal;
+    try { newAmount = new Prisma.Decimal(input.amount); } catch { throw new ValidationDomainError("amount must be a valid number"); }
+    if (newAmount.lessThanOrEqualTo(0)) throw new ValidationDomainError("amount must be > 0");
+    const ratio = payment.amount.isZero() ? new Prisma.Decimal(1) : payment.aznAmount.div(payment.amount);
+    const newAzn = newAmount.mul(ratio);
+    await this.prisma.$transaction(async (tx) => {
+      const old = await tx.supplierPayoutAllocation.findMany({ where: { payoutId: payment.id, reversedAt: null } });
+      if (payment.status === "CONFIRMED") {
+        for (const allocation of old) await this.reverseAllocation(tx, payment.id, allocation as AllocationRow, actor);
+      } else {
+        await tx.supplierPayoutAllocation.updateMany({ where: { payoutId: payment.id, reversedAt: null }, data: { reversedAt: new Date(), reversedById: actor.id } });
+      }
+      await tx.supplierPayout.update({
+        where: { id: payment.id },
+        data: {
+          amount: newAmount,
+          aznAmount: newAzn,
+          occurredAt: input.occurredAt ? new Date(input.occurredAt) : payment.occurredAt,
+          method: input.method !== undefined ? input.method : payment.method,
+          version: { increment: 1 },
+        },
+      });
+      if (payment.orderId) {
+        const obligations = await tx.supplierObligation.findMany({
+          where: { orderId: payment.orderId, status: { in: ["OPEN", "PARTIALLY_PAID"] }, remainingAmount: { gt: 0 } },
+          orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }],
+        });
+        let left = newAzn;
+        for (const obligation of obligations) {
+          if (left.lessThanOrEqualTo(0)) break;
+          const remaining = obligation.remainingAmount ?? new Prisma.Decimal(0);
+          const part = Prisma.Decimal.min(left, remaining);
+          if (part.lessThanOrEqualTo(0)) continue;
+          await tx.supplierPayoutAllocation.create({
+            data: {
+              payoutId: payment.id,
+              obligationId: obligation.id,
+              amount: ratio.isZero() ? part : part.div(ratio),
+              aznAmount: part,
+              createdById: actor.id,
+            },
+          });
+          if (payment.status === "CONFIRMED") {
+            await this.applyAllocationToObligation(tx, payment.code, { obligationId: obligation.id, aznAmount: part });
+          }
+          left = left.minus(part);
+        }
+      }
+      await this.security.audit(tx, {
+        action: "finance.supplier_payment.edited",
+        resource: "SupplierPayout",
+        resourceId: payment.id,
+        details: { code: payment.code, fromAmount: payment.amount.toString(), toAmount: newAmount.toString(), fromAzn: payment.aznAmount.toString(), toAzn: newAzn.toString(), reason: input.reason ?? null },
+      });
+    });
+    return this.getByCodeOrId(payment.code);
+  }
+
   async cancel(codeOrId: string, reason: string | null, actor: Actor): Promise<SupplierPaymentDto> {
     const payment = await this.load(codeOrId);
     if (payment.status === "CANCELLED") return this.getByCodeOrId(payment.code);

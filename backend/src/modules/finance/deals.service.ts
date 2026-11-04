@@ -394,7 +394,7 @@ export class DealsService {
           : Math.max(0, cost - supplierPaid + supplierRefunded);
       const clientDebt = cancelled ? 0 : settlement
         ? money(settlement.remainingToPay)
-        : Math.max(0, sales - captured);
+        : Math.max(0, sales - captured + refunded);
       const clientPenalty = ["CONFIRMED", "WITHHELD", "RECEIVED"].includes(settlement?.clientPenaltyStatus ?? "")
         ? money(settlement?.clientPenaltyAmount)
         : 0;

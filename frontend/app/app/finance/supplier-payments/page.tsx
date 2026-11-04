@@ -20,6 +20,7 @@ import TableExportButton from "@/components/TableExportButton";
 import { t, useLocale, formatPrice, formatDate } from "@/lib/i18n";
 import { useCan } from "@/lib/use-can";
 import { financeFxApi, type FxSupplier } from "@/lib/finance-fx-api";
+import { api } from "@/lib/api";
 import {
   financeCenterApi,
   type FinanceOverview,
@@ -59,6 +60,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function SupplierPaymentsPage() {
   const locale = useLocale();
   const canManage = useCan("finance.supplier_payout.manage");
+  const [editingPayout, setEditingPayout] = useState<SupplierPayment | null>(null);
   const canConfirm = useCan("finance.supplier_payment.confirm");
 
   const [items, setItems] = useState<SupplierPayment[] | null>(null);
@@ -645,6 +647,7 @@ export default function SupplierPaymentsPage() {
                       )}
                     </td>
                     <td className="px-2 py-2">
+                      {canManage && p.status !== "CANCELLED" && <button type="button" onClick={() => setEditingPayout(p)} className="mr-2 text-xs font-medium text-slate-600 hover:underline">Редактировать</button>}
                       <button
                         type="button"
                         onClick={() => void openDetail(p.code)}
@@ -862,6 +865,20 @@ export default function SupplierPaymentsPage() {
           </div>
         </PanelFrame>
       )}
+      {editingPayout && <SupplierPayoutEditModal payout={editingPayout} onClose={() => setEditingPayout(null)} onSaved={() => { setEditingPayout(null); void load(); }} />}
     </div>
   );
+}
+
+function SupplierPayoutEditModal({ payout, onClose, onSaved }: { payout: SupplierPayment; onClose: () => void; onSaved: () => void }) {
+  const [amount, setAmount] = useState(payout.amount);
+  const [occurredAt, setOccurredAt] = useState(payout.occurredAt.slice(0, 10));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function save() {
+    setBusy(true); setError("");
+    try { await api.patch(`/finance/supplier-payments/${payout.code}`, { amount, occurredAt }); onSaved(); }
+    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}><div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}><h3 className="mb-1 text-base font-semibold">Редактировать расчёт с поставщиком</h3><p className="mb-3 font-mono text-xs text-slate-500">{payout.code}</p><div className="grid gap-2"><label className="text-xs text-slate-500">Сумма<input value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" inputMode="decimal" /></label><label className="text-xs text-slate-500">Дата<input type="date" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" /></label>{error && <div className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700">{error}</div>}<div className="mt-2 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-3 py-2 text-xs">Отмена</button><button type="button" disabled={busy} onClick={() => void save()} className="rounded-lg bg-[#0f6b5f] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "Сохранение…" : "Сохранить"}</button></div></div></div></div>;
 }

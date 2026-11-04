@@ -459,6 +459,12 @@ export class FinanceController {
     return this.supplierPayments.getByCodeOrId(code);
   }
 
+  @Patch("supplier-payments/:code")
+  @RequirePermissions("finance.supplier_payout.manage")
+  async updateSupplierPayment(@Param("code") code: string, @Body() body: { amount: string; occurredAt?: string; method?: string | null; reason?: string | null }, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.supplierPayments.update(code, body, { id: actor.id, username: actor.username });
+  }
+
   @Get("supplier-payments/:code/documents")
   @RequirePermissions("finance.supplier_payout.read")
   async listSupplierPaymentDocuments(@Param("code") code: string) {

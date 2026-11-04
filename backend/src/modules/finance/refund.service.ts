@@ -102,10 +102,6 @@ export class RefundService {
     if (payment.status !== "CAPTURED") {
       throw new ValidationDomainError(`Payment ${payment.code} is ${payment.status}; refund requires CAPTURED`);
     }
-    const refundOrder = await this.prisma.order.findUnique({ where: { id: payment.orderId }, select: { status: true } });
-    if (!refundOrder || refundOrder.status !== "CANCELLED") {
-      throw new ValidationDomainError("Refund is allowed only after the client refused the deal and the order was cancelled");
-    }
 
     const emitPayload = (refundId: string, code: string): RefundEventPayload => ({
       refundId,
