@@ -56,7 +56,7 @@ export interface DealRow {
   supplierPaymentStatus: string;
   payments: Array<{ id: string; code: string; amount: string; currency: string; status: string; method: string | null; date: string }>;
   refunds: Array<{ id: string; code: string; amount: string; currency: string; status: string; date: string }>;
-  payouts: Array<{ id: string; code: string; amount: string; currency: string; status: string; direction: string; date: string }>;
+  payouts: Array<{ id: string; code: string; amount: string; currency: string; status: string; direction: string; date: string; supplierCode: string | null }>;
 }
 
 export interface DealKpi {
