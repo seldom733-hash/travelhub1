@@ -2719,7 +2719,9 @@ model RequestTraveler {
   firstName String
   lastName  String
   birthDate DateTime
-
+  passportSeries String?
+  passportNumber String?
+  passportExpiry DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

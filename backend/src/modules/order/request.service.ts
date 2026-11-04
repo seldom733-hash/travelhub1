@@ -94,7 +94,6 @@ export function computeRequestAvailableActions(
     unavailable: canEdit && (request.status === "NEW" || request.status === "CHECKING"),
     customerAccept:
       canEdit &&
-      travelersReady &&
       withinCustomerAcceptWindow &&
       (request.status === "PRICE_CHANGED" || request.status === "CONFIRMED"),
     customerDecline: canEdit && (request.status === "PRICE_CHANGED" || request.status === "CONFIRMED"),
@@ -566,6 +565,9 @@ export class RequestService {
     firstName: string;
     lastName: string;
     birthDate: Date;
+    passportSeries?: string | null;
+    passportNumber?: string | null;
+    passportExpiry?: Date | null;
     createdAt: Date;
     updatedAt: Date;
   }) {
@@ -576,6 +578,9 @@ export class RequestService {
       firstName: row.firstName,
       lastName: row.lastName,
       birthDate: row.birthDate.toISOString(),
+      passportSeries: row.passportSeries ?? null,
+      passportNumber: row.passportNumber ?? null,
+      passportExpiry: row.passportExpiry?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -653,6 +658,9 @@ export class RequestService {
           firstName: normalized.firstName,
           lastName: normalized.lastName,
           birthDate: new Date(`${normalized.birthDate}T00:00:00.000Z`),
+          passportSeries: normalized.passportSeries,
+          passportNumber: normalized.passportNumber,
+          passportExpiry: normalized.passportExpiry ? new Date(`${normalized.passportExpiry}T00:00:00.000Z`) : null,
         },
       });
     } catch (err) {
@@ -693,6 +701,9 @@ export class RequestService {
       lastName: input.lastName !== undefined ? input.lastName : existing.lastName,
       birthDate:
         input.birthDate !== undefined ? input.birthDate : existing.birthDate.toISOString().slice(0, 10),
+      passportSeries: input.passportSeries !== undefined ? input.passportSeries : existing.passportSeries,
+      passportNumber: input.passportNumber !== undefined ? input.passportNumber : existing.passportNumber,
+      passportExpiry: input.passportExpiry !== undefined ? input.passportExpiry : existing.passportExpiry?.toISOString().slice(0, 10),
     });
     const expected = this.expectedTravelerCount(request);
     const requestedPosition = assertRequestTravelerPosition(input.position, expected);
@@ -705,6 +716,9 @@ export class RequestService {
           firstName: normalized.firstName,
           lastName: normalized.lastName,
           birthDate: new Date(`${normalized.birthDate}T00:00:00.000Z`),
+          passportSeries: normalized.passportSeries,
+          passportNumber: normalized.passportNumber,
+          passportExpiry: normalized.passportExpiry ? new Date(`${normalized.passportExpiry}T00:00:00.000Z`) : null,
           ...(requestedPosition != null ? { position: requestedPosition } : {}),
         },
       });
@@ -1152,10 +1166,8 @@ export class RequestService {
       throw new BadRequestException("Customer action deadline has expired");
     }
 
-    // Two-stage §6 (execution authority): acceptance — коммерческий шаг, он
-    // требует ПОЛНОГО состава Request-стадии (FIO + birthDate на каждого).
-    // Readiness пересчитывается здесь же, а не берётся из клиента.
-    await this.assertTravelersReadyForCommercialStep(request);
+    // Travelers are collected AFTER acceptance (registry traveler block);
+    // conversion still enforces the complete party via assertTravelersReadyForCommercialStep.
 
     // D3 §7: pin effective requirements в acceptance boundary. Продукт читается
     // ТОЛЬКО здесь (одна транзакция с acceptance) — позже не перечитывается.

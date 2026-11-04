@@ -107,6 +107,7 @@ function makeHarness(
     security as never,
     {} as never,
     {} as never,
+    {} as never,
   );
   return { service, prisma, security };
 }
@@ -348,42 +349,24 @@ describe("customerAccept — two-stage traveler readiness gate (§6)", () => {
     expect(updateData(h).status).toBe("CUSTOMER_ACCEPTED");
   });
 
-  it("count mismatch (travelerCount=2, rows=1) → 422, request not updated", async () => {
+  it("acceptance is allowed before travelers are complete (registry fills them after acceptance)", async () => {
     const h = makeHarness(requestRow({ travelerCount: 2 }), readyTravelers(1));
-
-    await expect(h.service.customerAccept("r1", ACTOR)).rejects.toThrow(
-      /traveler count mismatch/,
-    );
-    expect(h.prisma.request.update).not.toHaveBeenCalled();
-    expect(h.prisma.requestHistory.create).not.toHaveBeenCalled();
+    await h.service.customerAccept("r1", ACTOR);
+    expect(h.prisma.request.update).toHaveBeenCalledTimes(1);
+    expect(updateData(h).status).toBe("CUSTOMER_ACCEPTED");
   });
 
-  it("empty composition (no RequestTraveler rows) → 422, request not updated", async () => {
+  it("acceptance is allowed with no traveler rows yet", async () => {
     const h = makeHarness(requestRow({ travelerCount: 1 }), []);
-
-    await expect(h.service.customerAccept("r1", ACTOR)).rejects.toThrow(
-      /traveler count mismatch/,
-    );
-    expect(h.prisma.request.update).not.toHaveBeenCalled();
+    await h.service.customerAccept("r1", ACTOR);
+    expect(updateData(h).status).toBe("CUSTOMER_ACCEPTED");
   });
 
-  it("incomplete traveler (missing birthDate) → 422 «incomplete», request not updated", async () => {
-    const h = makeHarness(requestRow({ travelerCount: 1 }), [
-      { id: "t1", requestId: "r1", position: 1, firstName: "IVAN", lastName: "IVANOV", birthDate: null },
-    ]);
-
-    await expect(h.service.customerAccept("r1", ACTOR)).rejects.toThrow(
-      /travelers are incomplete/,
-    );
-    expect(h.prisma.request.update).not.toHaveBeenCalled();
-  });
-
-  it("readiness is checked BEFORE the money gate (422 traveller error, not money error)", async () => {
+  it("money gate still runs before acceptance is written", async () => {
     const zero = { ...workingSnapshot(), supplierPrice: 0 };
     const h = makeHarness(requestRow({ commercialSnapshot: zero, travelerCount: 1 }), []);
-
     await expect(h.service.customerAccept("r1", ACTOR)).rejects.toThrow(
-      /traveler count mismatch/,
+      /supplierPrice <= 0/,
     );
     expect(h.prisma.request.update).not.toHaveBeenCalled();
   });

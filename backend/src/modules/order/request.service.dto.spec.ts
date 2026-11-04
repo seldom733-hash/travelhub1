@@ -18,6 +18,7 @@ function makeService(): RequestService {
     {} as never,
     {} as never,
     {} as never,
+    {} as never,
   );
 }
 

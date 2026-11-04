@@ -62,6 +62,7 @@ function createService(capture: { findManyArgs?: unknown; countWhere?: unknown }
     {} as never,
     {} as never,
     {} as never,
+    {} as never,
   );
   return { service, prisma };
 }

@@ -92,6 +92,7 @@ function makeHarness(row: Record<string, unknown>): Harness {
     security as never,
     {} as never,
     {} as never,
+    {} as never,
   );
   return { service, prisma, security };
 }
