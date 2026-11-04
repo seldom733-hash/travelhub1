@@ -40,6 +40,10 @@ export default function FlightOfferModal({
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [sameAsClient, setSameAsClient] = useState(true);
+  const [travelerFirstName, setTravelerFirstName] = useState("");
+  const [travelerLastName, setTravelerLastName] = useState("");
+  const [travelerBirthDate, setTravelerBirthDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState("");
@@ -53,6 +57,12 @@ export default function FlightOfferModal({
     setEmail((v) => v || user.email || "");
   }, [user]);
 
+  useEffect(() => {
+    if (!sameAsClient) return;
+    setTravelerFirstName(firstName);
+    setTravelerLastName(lastName);
+  }, [sameAsClient, firstName, lastName]);
+
   const segments = (flight.segments ?? []) as FlightSegment[];
   const first = segments[0];
   const last = segments[segments.length - 1];
@@ -62,7 +72,10 @@ export default function FlightOfferModal({
     firstName.trim() !== "" &&
     lastName.trim() !== "" &&
     /^\+[1-9]\d{7,14}$/.test(normalizedPhone) &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) &&
+    travelerFirstName.trim() !== "" &&
+    travelerLastName.trim() !== "" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(travelerBirthDate);
 
   const from = first?.departure?.airport ?? flight.requested?.from ?? "";
   const to = last?.arrival?.airport ?? flight.requested?.to ?? "";
@@ -93,6 +106,11 @@ export default function FlightOfferModal({
           phone: normalizedPhone,
           email: email.trim(),
         },
+        travelers: [{
+          firstName: travelerFirstName.trim(),
+          lastName: travelerLastName.trim(),
+          birthDate: travelerBirthDate,
+        }],
       });
       setCreated(result.referenceNumber ?? result.code ?? "создана");
       onCreated?.(result.referenceNumber ?? result.code ?? "");
@@ -133,8 +151,8 @@ export default function FlightOfferModal({
           </section>
 
           <section>
-            <h4 className="mb-1 text-sm font-semibold text-slate-800">Данные путешественника</h4>
-            {user && <p className="mb-2 text-xs text-slate-500">Используем данные вашего аккаунта. Проверьте их корректность.</p>}
+            <h4 className="mb-1 text-sm font-semibold text-slate-800">Данные клиента</h4>
+            <p className="mb-2 text-xs text-slate-500">Клиент — тот, кто оформляет и оплачивает заявку. Турист может быть другим человеком.</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Имя *" value={firstName} onChange={setFirstName} autoComplete="given-name" />
               <Field label="Фамилия *" value={lastName} onChange={setLastName} autoComplete="family-name" />
@@ -143,11 +161,27 @@ export default function FlightOfferModal({
             </div>
           </section>
 
+          <section>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h4 className="text-sm font-semibold text-slate-800">Турист 1</h4>
+              <label className="flex items-center gap-2 text-xs text-slate-600">
+                <input type="checkbox" checked={sameAsClient} onChange={(e) => setSameAsClient(e.target.checked)} />
+                Клиент является туристом
+              </label>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Имя туриста *" value={travelerFirstName} onChange={setTravelerFirstName} autoComplete="off" disabled={sameAsClient} />
+              <Field label="Фамилия туриста *" value={travelerLastName} onChange={setTravelerLastName} autoComplete="off" disabled={sameAsClient} />
+              <Field label="Дата рождения *" value={travelerBirthDate} onChange={setTravelerBirthDate} autoComplete="bday" type="date" />
+            </div>
+            {sameAsClient && <p className="mt-2 text-xs text-emerald-700">Имя и фамилия подставлены из данных клиента. Дату рождения укажите вручную.</p>}
+          </section>
+
           {created && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">Заявка создана: {created}</div>}
           {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
           <div className="flex flex-col items-stretch justify-end gap-2 sm:flex-row sm:items-center">
-            {!valid && <span className="text-xs text-amber-600 sm:mr-auto">Заполните данные путешественника, чтобы подать заявку.</span>}
+            {!valid && <span className="text-xs text-amber-600 sm:mr-auto">Заполните данные клиента и туриста, чтобы подать заявку.</span>}
             <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600">Закрыть</button>
             <button type="button" onClick={() => void submit()} disabled={!valid || busy || !fare || !!created} className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
               {busy ? "Отправляем…" : "Подать заявку"}
@@ -159,11 +193,11 @@ export default function FlightOfferModal({
   );
 }
 
-function Field({ label, value, onChange, autoComplete, placeholder }: { label: string; value: string; onChange: (v: string) => void; autoComplete: string; placeholder?: string }) {
+function Field({ label, value, onChange, autoComplete, placeholder, disabled, type }: { label: string; value: string; onChange: (v: string) => void; autoComplete: string; placeholder?: string; disabled?: boolean; type?: string }) {
   return (
     <label className="block text-xs text-slate-600">
       <span>{label}</span>
-      <input value={value} onChange={(e) => onChange(e.target.value)} autoComplete={autoComplete} placeholder={placeholder} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500" />
+      <input type={type ?? "text"} value={value} onChange={(e) => onChange(e.target.value)} autoComplete={autoComplete} placeholder={placeholder} disabled={disabled} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 disabled:text-slate-500" />
     </label>
   );
 }

@@ -177,7 +177,7 @@ export class AzalController {
 
   @Post("request")
   @Public()
-  async createRequest(@Body() body: { from: string; to: string; departureDate: string; returnDate?: string; tripType: string; passengers: any; fareFamily: string; price: number; currency: string; segments: any[]; supplierCode?: string; customer?: { firstName?: string; lastName?: string; phone?: string; email?: string } }) {
+  async createRequest(@Body() body: { from: string; to: string; departureDate: string; returnDate?: string; tripType: string; passengers: any; fareFamily: string; price: number; currency: string; segments: any[]; supplierCode?: string; customer?: { firstName?: string; lastName?: string; phone?: string; email?: string }; travelers?: Array<{ firstName?: string; lastName?: string; birthDate?: string }> }) {
     const customer = body.customer;
     const normalizedPhone = (customer?.phone ?? "").replace(/[\s()\-]/g, "").replace(/^00/, "+");
     if (!customer?.firstName?.trim() || !customer?.lastName?.trim()) {
@@ -188,6 +188,11 @@ export class AzalController {
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email?.trim() ?? "")) {
       throw new HttpException({ error: "INVALID_EMAIL", message: "A valid email address is required" }, 400);
+    }
+    for (const traveler of body.travelers ?? []) {
+      if (!traveler.firstName?.trim() || !traveler.lastName?.trim() || !traveler.birthDate || Number.isNaN(new Date(traveler.birthDate).getTime())) {
+        throw new HttpException({ error: "INVALID_TRAVELER", message: "Traveler first name, last name and birth date are required" }, 400);
+      }
     }
     // Server-authoritative price (§16): body.price is NEVER trusted — the
     // displayed price is re-derived from a fresh search of the same query.
@@ -269,6 +274,17 @@ export class AzalController {
         supplierResponseDeadline: new Date(now.getTime() + 24*60*60*1000),
       },
     });
+    if (body.travelers && body.travelers.length > 0) {
+      await this.prisma.requestTraveler.createMany({
+        data: body.travelers.map((traveler, index) => ({
+          requestId: request.id,
+          position: index + 1,
+          firstName: traveler.firstName!.trim(),
+          lastName: traveler.lastName!.trim(),
+          birthDate: new Date(traveler.birthDate!),
+        })),
+      });
+    }
     return { id: request.id, code: request.code, referenceNumber: request.referenceNumber, status: request.status, priceVerification: authoritative.verification };
   }
 

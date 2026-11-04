@@ -148,7 +148,7 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
   (typeof window === "undefined" ? `${SERVER_API_BASE}/api/v1` : "/api/v1");
 
-export async function createFlightRequest(body: { from: string; to: string; departureDate: string; returnDate?: string; tripType: string; passengers: any; fareFamily: string; price: number; currency: string; segments: any[]; supplierCode?: string; customer?: { firstName: string; lastName: string; phone: string; email: string } }): Promise<any> {
+export async function createFlightRequest(body: { from: string; to: string; departureDate: string; returnDate?: string; tripType: string; passengers: any; fareFamily: string; price: number; currency: string; segments: any[]; supplierCode?: string; customer?: { firstName: string; lastName: string; phone: string; email: string }; travelers?: Array<{ firstName: string; lastName: string; birthDate: string }> }): Promise<any> {
   const res = await fetch(`${API_BASE}/supplier/azal/request`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!res.ok) {
     const payload = await res.json().catch(() => null);
