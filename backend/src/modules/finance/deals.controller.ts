@@ -40,6 +40,12 @@ export class DealsController {
     return this.deals.list({ ...queryFrom(query), viewerId: user.id });
   }
 
+  @Get(":sequence/history")
+  @RequirePermissions("finance.overview.read")
+  history(@Param("sequence") sequence: string) {
+    return this.deals.history(sequence);
+  }
+
   @Get("summary")
   @RequirePermissions("finance.overview.read")
   summary(@Query() query: Record<string, string | undefined>) {

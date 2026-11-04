@@ -95,6 +95,22 @@ const dateOrNull = (value: Date | null | undefined) => (value ? value.toISOStrin
 export class DealsService {
   constructor(private readonly prisma: PrismaService) {}
 
+
+  async history(sequence: string) {
+    const request = await this.prisma.request.findFirst({ where: { commerceSequence: sequence }, select: { id: true } });
+    const orders = await this.prisma.order.findMany({ where: { commerceSequence: sequence }, select: { id: true } });
+    const orderIds = orders.map((o) => o.id);
+    const [bookings, payments, refunds, payouts] = await Promise.all([
+      orderIds.length ? this.prisma.booking.findMany({ where: { orderId: { in: orderIds } }, select: { id: true } }) : [],
+      orderIds.length ? this.prisma.payment.findMany({ where: { orderId: { in: orderIds } }, select: { id: true } }) : [],
+      orderIds.length ? this.prisma.refund.findMany({ where: { orderId: { in: orderIds } }, select: { id: true } }) : [],
+      orderIds.length ? this.prisma.supplierPayout.findMany({ where: { orderId: { in: orderIds } }, select: { id: true } }) : [],
+    ]);
+    const ids = [request?.id, ...orderIds, ...bookings.map((b) => b.id), ...payments.map((p) => p.id), ...refunds.map((r) => r.id), ...payouts.map((p) => p.id)].filter((id): id is string => Boolean(id));
+    const audit = ids.length ? await this.prisma.auditLog.findMany({ where: { resourceId: { in: ids } }, orderBy: { createdAt: "desc" }, take: 500 }) : [];
+    return { items: audit.map((a) => ({ id: a.id, createdAt: a.createdAt.toISOString(), actorName: a.username, action: a.action, resource: a.resource, resourceId: a.resourceId, details: a.details })) };
+  }
+
   async list(query: DealQuery) {
     const all = await this.loadRows();
     const filtered = this.filter(all, query);
@@ -318,8 +334,9 @@ export class DealsService {
       ...products.map((p) => p.partnerId).filter((id): id is string => Boolean(id)),
       ...payouts.map((p) => p.partnerId).filter((id): id is string => Boolean(id)),
     ])];
-    const partners = partnerIds.length > 0
-      ? await this.prisma.partner.findMany({ where: { id: { in: partnerIds } }, select: { id: true, code: true, name: true } })
+    const supplierCodes = [...new Set(payouts.map((p) => p.supplierCode).filter((code): code is string => Boolean(code)))];
+    const partners = partnerIds.length > 0 || supplierCodes.length > 0
+      ? await this.prisma.partner.findMany({ where: { OR: [{ id: { in: partnerIds } }, { code: { in: supplierCodes } }] }, select: { id: true, code: true, name: true } })
       : [];
     const byOrder = <T extends { orderId: string | null }>(items: T[]) => {
       const map = new Map<string, T[]>();
@@ -340,6 +357,7 @@ export class DealsService {
     const customerById = new Map(customers.map((c) => [c.id, c]));
     const productById = new Map(products.map((p) => [p.id, p]));
     const partnerById = new Map(partners.map((p) => [p.id, p]));
+    const partnerByCode = new Map(partners.map((p) => [p.code, p]));
     const managerIds = [...new Set(requests.map((r) => r.assignedManagerId).filter((id): id is string => Boolean(id)))];
     const managers = managerIds.length > 0
       ? await this.prisma.user.findMany({ where: { id: { in: managerIds } }, select: { id: true, fullName: true, username: true } })
@@ -501,7 +519,7 @@ export class DealsService {
         supplierPaymentStatus: supplierPaid <= 0 ? "UNPAID" : supplierPaid >= cost ? "PAID" : "PARTIALLY_PAID",
         payments: clientPayments.map((p) => ({ id: p.id, code: p.code, amount: p.amount.toString(), currency: p.currency, status: p.status, method: p.paymentMethod, date: (p.paidAt ?? p.createdAt).toISOString() })),
         refunds: clientRefunds.map((r) => ({ id: r.id, code: r.code, amount: r.amount.toString(), currency: r.currency, status: r.status, date: (r.processedAt ?? r.createdAt).toISOString() })),
-        payouts: supplierPayouts.map((p) => ({ id: p.id, code: p.code, amount: p.amount.toString(), currency: p.currency, status: p.status, direction: p.direction, date: p.occurredAt.toISOString(), supplierCode: p.supplierCode ?? p.partnerId ?? null, supplierName: (p.partnerId ? partnerById.get(p.partnerId)?.name : null) ?? p.supplierCode ?? p.partnerId ?? null })),
+        payouts: supplierPayouts.map((p) => ({ id: p.id, code: p.code, amount: p.amount.toString(), currency: p.currency, status: p.status, direction: p.direction, date: p.occurredAt.toISOString(), supplierCode: p.supplierCode ?? p.partnerId ?? null, supplierName: (p.partnerId ? partnerById.get(p.partnerId)?.name : null) ?? (p.supplierCode ? partnerByCode.get(p.supplierCode)?.name : null) ?? p.supplierCode ?? p.partnerId ?? null })),
       };
     });
   }

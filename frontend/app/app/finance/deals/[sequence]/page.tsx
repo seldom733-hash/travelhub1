@@ -249,7 +249,7 @@ export default function DealDetailPage() {
 
             <div className="grid gap-3 lg:grid-cols-2">
               <Panel title="Платежи клиента" action={clientPayable ? <button type="button" onClick={() => setPaymentOpen(true)} className="text-[11px] font-semibold text-[#0f6b5f]">+ Добавить платёж</button> : <span className="text-[10px] text-[#98a2b3]">{!deal.orderId ? "Заказ не создан" : financialLocked ? "Заказ закрыт" : "Долг закрыт"}</span>} totals={[["Всего получено", money(deal.clientReceived, deal.currency)], ["Возвращено", money(deal.clientRefunded, deal.currency)], ["Остаток к оплате", money(deal.clientDebt, deal.currency)]]}>
-                {deal.payments.length + deal.refunds.length === 0 ? <Empty text="Платежей клиента нет" /> : <SimpleRows rows={[...deal.payments.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.method ?? "Оплата", statusRu(p.status), p.status !== "REFUNDED" ? <button type="button" onClick={() => setEditingClientPayment(p)} className="text-[10px] font-semibold text-[#0f6b5f]">✎</button> : null]), ...deal.refunds.map((r) => [new Date(r.date).toLocaleDateString("ru-RU"), `−${money(r.amount, r.currency)}`, "Возврат клиенту", statusRu(r.status), null])]} head={["Дата", "Сумма", "Тип", "Статус", ""]} />}
+                {deal.payments.length + deal.refunds.length === 0 ? <Empty text="Платежей клиента нет" /> : <SimpleRows rows={[...deal.payments.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.method ?? "Оплата", statusRu(p.status), p.status !== "REFUNDED" ? <button type="button" onClick={() => setEditingClientPayment(p)} className="text-[10px] font-semibold text-[#0f6b5f]">✎</button> : null]), ...deal.refunds.map((r) => [new Date(r.date).toLocaleDateString("ru-RU"), `−${money(r.amount, r.currency)}`, "Возврат клиенту", statusRu(r.status), null])]} head={["Дата", "Поставщик", "Сумма", "Тип", "Статус", ""]} />}
               </Panel>
               <Panel title="Расчёты с поставщиком" action={supplierPayable ? <button type="button" onClick={() => setSupplierPaymentOpen(true)} className="text-[11px] font-semibold text-[#0f6b5f]">+ Добавить платёж</button> : <span className="text-[10px] text-[#98a2b3]">{!deal.orderId ? "Заказ не создан" : financialLocked ? "Заказ закрыт" : "Долг закрыт"}</span>} totals={[["Всего оплачено", money(deal.supplierPaid, deal.currency)], ["Возврат от поставщика", money(deal.supplierRefunded, deal.currency)], ["Остаток поставщику", money(deal.supplierDebt, deal.currency)]]}>
                 {deal.payouts.length === 0 ? <Empty text="Расчётов с поставщиком нет" /> : <SimpleRows rows={deal.payouts.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), p.supplierName ?? p.supplierCode ?? "—", money(p.amount, p.currency), p.direction === "INCOMING" ? "Возврат" : "Оплата поставщику", statusRu(p.status), p.direction !== "INCOMING" && p.status !== "CANCELLED" ? <button type="button" onClick={() => setEditingPayout(p)} className="text-[10px] font-semibold text-[#0f6b5f]">✎</button> : null])} head={["Дата", "Сумма", "Тип", "Статус", ""]} />}
@@ -515,23 +515,26 @@ function EditSupplierPayoutModal({ payout, onClose, onSaved }: { payout: any; on
 function HistoryTab({ deal }: { deal: DealRow }) {
   const [items, setItems] = React.useState<Array<any>>([]);
   const [loading, setLoading] = React.useState(true);
+  const labels: Record<string, string> = {
+    "finance.payment.edited": "Платёж клиента изменён",
+    "finance.supplier_payment.edited": "Расчёт с поставщиком изменён",
+    "finance.supplier_payment.confirmed": "Расчёт с поставщиком подтверждён",
+    "finance.supplier_payment.allocation_reversed": "Распределение сторнировано",
+    "order.returned_to_request": "Заказ возвращён в заявку",
+    "order.updated": "Заказ изменён",
+    "request.updated": "Заявка изменена",
+  };
   React.useEffect(() => {
     let alive = true;
-    const calls: Array<Promise<any>> = [api.get(`/requests/${deal.requestId}/history`).catch(() => [])];
-    if (deal.orderId) calls.push(api.get(`/orders/${deal.orderId}/history?pageSize=100`).then((r: any) => r.items ?? r).catch(() => []));
-    if (deal.bookingId) calls.push(api.get(`/bookings/${deal.bookingId}/history`).then((r: any) => r.items ?? r).catch(() => []));
-    Promise.all(calls).then(([requestHistory, orderHistory, bookingHistory]) => {
+    api.get<any>(`/finance/deals/${deal.sequence}/history`).then((data) => {
       if (!alive) return;
-      const requestRows = (requestHistory ?? []).map((x: any) => ({ ...x, source: "Заявка" }));
-      const orderRows = (orderHistory ?? []).map((x: any) => ({ ...x, source: "Заказ" }));
-      const bookingRows = (bookingHistory ?? []).map((x: any) => ({ ...x, source: "Бронь" }));
-      setItems([...requestRows, ...orderRows, ...bookingRows].sort((a, b) => new Date(b.createdAt ?? b.occurredAt ?? 0).getTime() - new Date(a.createdAt ?? a.occurredAt ?? 0).getTime()));
-    }).finally(() => { if (alive) setLoading(false); });
+      setItems((data.items ?? []).map((x: any) => ({ ...x, label: labels[x.action] ?? x.action ?? "Изменение" })));
+    }).catch(() => { if (alive) setItems([]); }).finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [deal.requestId, deal.orderId, deal.bookingId]);
+  }, [deal.sequence]);
   if (loading) return <Empty text="Загрузка истории…" />;
   if (items.length === 0) return <Empty text="История изменений пуста" />;
-  return <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-[10px]"><thead className="text-[#98a2b3]"><tr>{["Дата и время", "Кто", "Этап", "Действие", "Изменение", "Комментарий"].map((h) => <th key={h} className="px-2 py-1 font-medium">{h}</th>)}</tr></thead><tbody>{items.map((x, i) => <tr key={x.id ?? i} className="border-t border-[#f0eee8] align-top"><td className="px-2 py-1.5 whitespace-nowrap">{x.createdAt || x.occurredAt ? new Date(x.createdAt ?? x.occurredAt).toLocaleString("ru-RU") : "—"}</td><td className="px-2 py-1.5">{x.actorName ?? x.createdByName ?? x.actorId ?? "Система"}</td><td className="px-2 py-1.5">{x.source}</td><td className="px-2 py-1.5 font-medium">{x.action ?? "—"}</td><td className="px-2 py-1.5">{x.from || x.to ? `${x.from ?? "—"} → ${x.to ?? "—"}` : x.fields ? JSON.stringify(x.fields) : "—"}</td><td className="px-2 py-1.5">{x.comment ?? x.reason ?? "—"}</td></tr>)}</tbody></table></div>;
+  return <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-[10px]"><thead className="text-[#98a2b3]"><tr>{["Дата и время", "Кто", "Действие", "Объект", "Детали"].map((h) => <th key={h} className="px-2 py-1 font-medium">{h}</th>)}</tr></thead><tbody>{items.map((x, i) => <tr key={x.id ?? i} className="border-t border-[#f0eee8] align-top"><td className="px-2 py-1.5 whitespace-nowrap">{x.createdAt ? new Date(x.createdAt).toLocaleString("ru-RU") : "—"}</td><td className="px-2 py-1.5">{x.actorName ?? "Система"}</td><td className="px-2 py-1.5 font-medium">{x.label}</td><td className="px-2 py-1.5">{x.resource ?? "—"}</td><td className="px-2 py-1.5 font-mono text-[9px]">{x.details ? JSON.stringify(x.details) : "—"}</td></tr>)}</tbody></table></div>;
 }
 
 function ClientChats({ deal }: { deal: DealRow }) {
@@ -546,5 +549,5 @@ function ClientChats({ deal }: { deal: DealRow }) {
     }).catch(() => { if (alive) setRows([]); }).finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [deal.customerPhone]);
-  return <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span>💬</span>Общение с клиентом</div>{loading ? <div className="text-[10px] text-[#98a2b3]">Загрузка диалогов…</div> : rows.length === 0 ? <div className="rounded-lg border border-dashed border-[#e5e2da] bg-[#fbfaf7] px-3 py-4 text-[10px] text-[#98a2b3]">Диалогов WhatsApp по номеру {deal.customerPhone ?? "—"} нет</div> : <div className="space-y-1">{rows.slice(0, 5).map((row) => <a key={row.id} href={`/app/whatsapp?conversation=${row.id}`} className="block rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2 hover:border-[#0f6b5f]"><div className="flex justify-between gap-2 text-[10px]"><span className="font-semibold text-[#344054]">{row.canonicalPhone ?? row.remoteJid}</span><span className="text-[#98a2b3]">{row.lastMessageAt ? new Date(row.lastMessageAt).toLocaleDateString("ru-RU") : "—"}</span></div><div className="mt-0.5 truncate text-[10px] text-[#667085]">{row.lastMessagePreview ?? "Нет сообщений"}</div>{row.unreadCount > 0 && <span className="mt-1 inline-block rounded-full bg-emerald-50 px-1.5 text-[9px] text-emerald-700">{row.unreadCount} новых</span>}</a>)}</div>}</div>;
+  return <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span>💬</span>Общение с клиентом</div>{loading ? <div className="text-[10px] text-[#98a2b3]">Загрузка диалогов…</div> : rows.length === 0 ? <div className="rounded-lg border border-dashed border-[#e5e2da] bg-[#fbfaf7] px-3 py-4 text-[10px] text-[#98a2b3]">Диалогов WhatsApp по номеру {deal.customerPhone ?? "—"} нет</div> : <div className="space-y-1">{rows.slice(0, 5).map((row) => <a key={row.id} href={`/app/whatsapp?conversation=${row.id}`} className="block rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2 hover:border-[#0f6b5f]"><div className="flex justify-between gap-2 text-[10px]"><span className="font-semibold text-[#344054]">{row.canonicalPhone ?? row.remoteJid}</span><span className="text-[#98a2b3]">{row.lastMessageAt ? new Date(row.lastMessageAt).toLocaleDateString("ru-RU") : "—"}</span></div><div className="mt-0.5 truncate text-[10px] text-[#667085]">{row.lastMessagePreview ?? "Нет сообщений"}</div></a>)}</div>}</div>;
 }

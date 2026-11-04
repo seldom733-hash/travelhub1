@@ -784,6 +784,7 @@ export class PaymentService {
       const paymentStatus = paid.isZero() ? "UNPAID" : paid.greaterThanOrEqualTo(order.amount) ? "PAID" : "PARTIALLY_PAID";
       await tx.order.update({ where: { id: order.id }, data: { paidAmount: paid, paymentStatus } });
       await tx.paymentHistory.create({ data: { paymentId: payment.id, action: "edited", from: payment.status, to: payment.status, actorId: actor.id, actorName: actor.username, comment: `Payment edited: amount=${amount.toString()}` } });
+      await this.security.audit(tx, { userId: actor.id, username: actor.username, action: "finance.payment.edited", resource: "Payment", resourceId: payment.id, details: { code: payment.code, fromAmount: payment.amount.toString(), toAmount: amount.toString() } });
       return this.paymentDto(updated);
     });
   }
