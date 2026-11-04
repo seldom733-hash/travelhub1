@@ -7,7 +7,7 @@ import { formatPrice, useLocale } from "@/lib/i18n";
 import { useCan } from "@/lib/use-can";
 
 interface PaymentRow { id: string; code: string; referenceNumber?: string | null; amount: string; status: string; currency: string; orderCode?: string }
-interface RefundRow { code: string; referenceNumber?: string | null; status: string; amount: string; currency: string; paymentCode?: string | null; orderCode?: string | null }
+interface RefundRow { code: string; referenceNumber?: string | null; status: string; amount: string; currency: string; paymentCode?: string | null; orderCode?: string | null; dealNumber?: string | null }
 
 function statusRu(status: string) {
   return ({ REQUESTED: "Запрошен", APPROVED: "Подтверждён", PROCESSED: "Исполнен", FAILED: "Ошибка" } as Record<string, string>)[status] ?? status;
@@ -102,14 +102,14 @@ export default function RefundsPage() {
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr><th className="px-3 py-2">Код</th><th className="px-3 py-2">Платёж</th><th className="px-3 py-2">Заказ</th><th className="px-3 py-2 text-right">Сумма</th><th className="px-3 py-2">Статус</th><th className="px-3 py-2">Действия</th></tr>
+            <tr><th className="px-3 py-2">Код</th><th className="px-3 py-2">Платёж</th><th className="px-3 py-2">Номер сделки</th><th className="px-3 py-2 text-right">Сумма</th><th className="px-3 py-2">Статус</th><th className="px-3 py-2">Действия</th></tr>
           </thead>
           <tbody>
             {refunds.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-500">Возвратов нет</td></tr>}
             {refunds.map((r) => (
               <tr key={r.code} className="border-t border-slate-100">
                 <td className="px-3 py-2 font-mono text-xs">{r.referenceNumber ?? r.code}</td>
-                <td className="px-3 py-2 font-mono text-xs">{r.paymentCode ?? "—"}</td><td className="px-3 py-2 font-mono text-xs">{r.orderCode ?? "—"}</td>
+                <td className="px-3 py-2 font-mono text-xs">{r.paymentCode ?? "—"}</td><td className="px-3 py-2 font-mono text-xs">{r.dealNumber ? `Сделка № ${r.dealNumber}` : (r.orderCode ?? "—")}</td>
                 <td className="px-3 py-2 text-right font-mono">{formatPrice(r.amount, r.currency, locale) ?? r.amount}</td>
                 <td className="px-3 py-2 text-xs">{statusRu(r.status)}</td>
                 <td className="px-3 py-2">

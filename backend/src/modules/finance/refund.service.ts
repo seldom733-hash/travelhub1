@@ -360,7 +360,7 @@ export class RefundService {
     const orderIds = [...new Set(items.map((r) => r.orderId))];
     const [payments, orders] = await Promise.all([
       this.prisma.payment.findMany({ where: { id: { in: paymentIds } }, select: { id: true, code: true, referenceNumber: true } }),
-      this.prisma.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, referenceNumber: true } }),
+      this.prisma.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, referenceNumber: true, commerceSequence: true } }),
     ]);
     const paymentById = new Map(payments.map((p) => [p.id, p]));
     const orderById = new Map(orders.map((o) => [o.id, o]));
@@ -374,7 +374,7 @@ export class RefundService {
     if (!row) throw new NotFoundError(`Refund ${code} not found`);
     const [payment, order] = await Promise.all([
       this.prisma.payment.findUnique({ where: { id: row.paymentId }, select: { code: true, referenceNumber: true } }),
-      this.prisma.order.findUnique({ where: { id: row.orderId }, select: { referenceNumber: true } }),
+      this.prisma.order.findUnique({ where: { id: row.orderId }, select: { referenceNumber: true, commerceSequence: true } }),
     ]);
     return this.refundDto(row, payment, order);
   }
@@ -397,7 +397,7 @@ export class RefundService {
     approvedAt: Date | null;
     processedAt: Date | null;
     failedAt: Date | null;
-  }, payment?: { code: string; referenceNumber: string | null } | null, order?: { referenceNumber: string } | null): Record<string, unknown> {
+  }, payment?: { code: string; referenceNumber: string | null } | null, order?: { referenceNumber: string; commerceSequence: string | null } | null): Record<string, unknown> {
     return {
       id: r.id,
       code: r.code,
@@ -406,6 +406,7 @@ export class RefundService {
       paymentCode: payment?.referenceNumber ?? payment?.code ?? null,
       orderId: r.orderId,
       orderCode: order?.referenceNumber ?? null,
+      dealNumber: order?.commerceSequence ?? null,
       amount: r.amount.toString(),
       currency: r.currency,
       status: r.status,

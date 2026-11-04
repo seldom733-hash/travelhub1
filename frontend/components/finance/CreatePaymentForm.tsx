@@ -65,12 +65,15 @@ export default function CreatePaymentForm({
   onClose,
   presetOrder,
   onCreated,
+  defaultDirection = "INCOME",
 }: {
   open: boolean;
   onClose: () => void;
   /** Фиксированный контекст заказа (Order/Booking detail); без него — селект. */
   presetOrder?: PaymentFormPresetOrder | null;
   onCreated?: (payment: CreatedPayment) => void;
+  /** Refund action opens the expense tab; regular payment opens income. */
+  defaultDirection?: "INCOME" | "EXPENSE";
 }) {
   const locale = useLocale();
 
@@ -80,7 +83,7 @@ export default function CreatePaymentForm({
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [orderId, setOrderId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
-  const [direction, setDirection] = useState<"INCOME" | "EXPENSE">("INCOME");
+  const [direction, setDirection] = useState<"INCOME" | "EXPENSE">(defaultDirection);
   const [refundPayments, setRefundPayments] = useState<Array<{ id: string; code: string; amount: string; status: string }>>([]);
   const [clientPayments, setClientPayments] = useState<Array<{ id: string; code: string; amount: string; status: string }>>([]);
   const [refundPaymentId, setRefundPaymentId] = useState("");
@@ -113,7 +116,7 @@ export default function CreatePaymentForm({
     setPhase("idle");
     setOrderId(presetId ?? "");
     setPaymentMethod("cash");
-    setDirection("INCOME");
+    setDirection(defaultDirection);
     setRefundPayments([]);
     setClientPayments([]);
     setRefundPaymentId("");
