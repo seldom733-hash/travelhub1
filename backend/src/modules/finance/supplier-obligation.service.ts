@@ -241,7 +241,11 @@ export class SupplierObligationService {
       });
       dealOrdinal = (last?.dealOrdinal ?? 0) + 1;
     }
-    const referenceNumber = commerceSequence && dealOrdinal ? `SBO-${commerceSequence}-${dealOrdinal}` : null;
+    const referenceNumber = commerceSequence && dealOrdinal
+      ? dealOrdinal === 1
+        ? `SBO-${commerceSequence}`
+        : `SBO-${commerceSequence}-${dealOrdinal}`
+      : null;
     try {
       const row = await tx.supplierObligation.create({
         data: {
