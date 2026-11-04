@@ -2719,6 +2719,7 @@ model RequestTraveler {
   firstName String
   lastName  String
   birthDate DateTime
+  citizenship String?
   passportSeries String?
   passportNumber String?
   passportExpiry DateTime?

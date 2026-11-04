@@ -16,6 +16,7 @@ export interface RequestTravelerInput {
   firstName?: unknown;
   lastName?: unknown;
   birthDate?: unknown;
+  citizenship?: unknown;
   passportSeries?: unknown;
   passportNumber?: unknown;
   passportExpiry?: unknown;
@@ -55,6 +56,7 @@ export function normalizeRequestTravelerInput(input: RequestTravelerInput): {
   firstName: string;
   lastName: string;
   birthDate: string;
+  citizenship: string | null;
   passportSeries: string | null;
   passportNumber: string | null;
   passportExpiry: string | null;
@@ -84,10 +86,11 @@ export function normalizeRequestTravelerInput(input: RequestTravelerInput): {
   if (parsed.getTime() > today) {
     throw new ValidationDomainError("invalid birthDate: cannot be in the future");
   }
+  const citizenship = typeof input.citizenship === "string" && input.citizenship.trim() ? input.citizenship.trim() : null;
   const passportSeries = typeof input.passportSeries === "string" && input.passportSeries.trim() ? input.passportSeries.trim() : null;
   const passportNumber = typeof input.passportNumber === "string" && input.passportNumber.trim() ? input.passportNumber.trim() : null;
   const passportExpiry = typeof input.passportExpiry === "string" && DATE_ONLY_RE.test(input.passportExpiry.trim()) ? input.passportExpiry.trim() : null;
-  return { firstName, lastName, birthDate: `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`, passportSeries, passportNumber, passportExpiry };
+  return { firstName, lastName, birthDate: `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`, citizenship, passportSeries, passportNumber, passportExpiry };
 }
 
 /** §4: позиция — целое ≥ 1; если задан явный лимит партии, не выше него. */

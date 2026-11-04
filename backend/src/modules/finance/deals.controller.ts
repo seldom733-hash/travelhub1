@@ -1,13 +1,16 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Res } from "@nestjs/common";
 import type { Response } from "express";
 import ExcelJS from "exceljs";
-import { RequirePermissions } from "../../security/auth/decorators";
+import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
+import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
 import { DealsService } from "./deals.service";
 
 function queryFrom(raw: Record<string, string | undefined>) {
   return {
     search: raw.search,
     stage: raw.stage,
+    scope: raw.scope,
+    state: raw.state,
     status: raw.status,
     statusGroup: raw.statusGroup,
     supplierId: raw.supplierId,
@@ -33,8 +36,8 @@ export class DealsController {
 
   @Get()
   @RequirePermissions("finance.overview.read")
-  list(@Query() query: Record<string, string | undefined>) {
-    return this.deals.list(queryFrom(query));
+  list(@Query() query: Record<string, string | undefined>, @CurrentUser() user: AuthedRequest["user"]) {
+    return this.deals.list({ ...queryFrom(query), viewerId: user.id });
   }
 
   @Get("summary")

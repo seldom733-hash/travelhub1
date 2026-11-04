@@ -785,6 +785,10 @@ export class OrderService {
         firstName: rt.firstName,
         lastName: rt.lastName,
         birthDate: rt.birthDate,
+        citizenship: rt.citizenship,
+        passportSeries: rt.passportSeries as string | null,
+        passportNumber: rt.passportNumber as string | null,
+        passportExpiry: rt.passportExpiry,
       };
       await tx.orderTraveler.create({
         data: {
@@ -794,6 +798,10 @@ export class OrderService {
           firstName: rt.firstName,
           lastName: rt.lastName,
           birthDate: rt.birthDate,
+          citizenship: rt.citizenship,
+          passportSeries: rt.passportSeries,
+          passportNumber: rt.passportNumber,
+          passportExpiry: rt.passportExpiry,
           dataCompleteness: this.computeTravelerCompleteness(pinnedForCompleteness, completenessValues),
           version: 1,
         },

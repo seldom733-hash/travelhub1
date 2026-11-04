@@ -5,6 +5,9 @@ import { PrismaService } from "../../prisma/prisma.service";
 type DealQuery = {
   search?: string;
   stage?: string;
+  scope?: string;
+  state?: string;
+  viewerId?: string;
   status?: string;
   statusGroup?: string;
   supplierId?: string;
@@ -45,6 +48,7 @@ type DealRow = {
   supplierId: string | null;
   supplierCode: string | null;
   manager: string | null;
+  managerId: string | null;
   travelerCount: number | null;
   serviceDate: string | null;
   createdAt: string;
@@ -205,6 +209,10 @@ export class DealsService {
       if (query.stage && row.stage !== query.stage) return false;
       if (query.status && row.status !== query.status) return false;
       if (query.statusGroup === "cancelled" && !["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED", "REJECTED"].includes(row.status)) return false;
+      if (query.scope === "my" && row.managerId !== query.viewerId) return false;
+      if (query.state === "open" && ["CLOSED", "COMPLETED", "FULFILLED", "CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED", "REJECTED", "UNAVAILABLE"].includes(row.status)) return false;
+      if (query.state === "closed" && !["CLOSED", "COMPLETED", "FULFILLED"].includes(row.status)) return false;
+      if (query.state === "cancelled" && !["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED", "REJECTED", "UNAVAILABLE"].includes(row.status)) return false;
       if (query.supplierId && row.supplierId !== query.supplierId && row.supplierCode !== query.supplierId) return false;
       if (query.country && row.trip.country !== query.country) return false;
       if (query.manager && row.manager !== query.manager) return false;
@@ -375,8 +383,9 @@ export class DealsService {
       const cost = useObligationCost
         ? obligationCost
         : costFromSnapshot || costFromProduct;
-      const stage = booking ? "BOOKING" : order ? "ORDER" : "REQUEST";
-      const status = booking?.status ?? order?.status ?? request.status;
+      const returnedToRequest = order?.status === "CANCELLED" && request.status !== "CONVERTED" && !["CANCELLED_BY_CUSTOMER", "REJECTED", "UNAVAILABLE", "EXPIRED"].includes(request.status);
+      const stage = returnedToRequest ? "REQUEST" : booking ? "BOOKING" : order ? "ORDER" : "REQUEST";
+      const status = returnedToRequest ? request.status : booking?.status ?? order?.status ?? request.status;
       const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(status);
       const supplierDebt = cancelled && supplierObligations.length === 0
         ? 0
@@ -455,6 +464,7 @@ export class DealsService {
               ?? partnerById.get(product?.partnerId ?? request.partnerId ?? "")?.name
               ?? request.partnerId
               ?? null,
+        managerId: request.assignedManagerId ?? null,
         manager: (request.assignedManagerId ? (managerById.get(request.assignedManagerId)?.fullName ?? managerById.get(request.assignedManagerId)?.username) : null) ?? order?.createdBy ?? null,
         travelerCount: request.travelerCount ?? null,
         serviceDate: dateOrNull(request.requestedServiceDate),

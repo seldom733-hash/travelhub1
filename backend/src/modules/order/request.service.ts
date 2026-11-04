@@ -565,6 +565,7 @@ export class RequestService {
     firstName: string;
     lastName: string;
     birthDate: Date;
+    citizenship?: string | null;
     passportSeries?: string | null;
     passportNumber?: string | null;
     passportExpiry?: Date | null;
@@ -578,6 +579,7 @@ export class RequestService {
       firstName: row.firstName,
       lastName: row.lastName,
       birthDate: row.birthDate.toISOString(),
+      citizenship: row.citizenship ?? null,
       passportSeries: row.passportSeries ?? null,
       passportNumber: row.passportNumber ?? null,
       passportExpiry: row.passportExpiry?.toISOString() ?? null,
@@ -658,6 +660,7 @@ export class RequestService {
           firstName: normalized.firstName,
           lastName: normalized.lastName,
           birthDate: new Date(`${normalized.birthDate}T00:00:00.000Z`),
+          citizenship: normalized.citizenship,
           passportSeries: normalized.passportSeries,
           passportNumber: normalized.passportNumber,
           passportExpiry: normalized.passportExpiry ? new Date(`${normalized.passportExpiry}T00:00:00.000Z`) : null,
@@ -702,6 +705,7 @@ export class RequestService {
       birthDate:
         input.birthDate !== undefined ? input.birthDate : existing.birthDate.toISOString().slice(0, 10),
       passportSeries: input.passportSeries !== undefined ? input.passportSeries : existing.passportSeries,
+      citizenship: input.citizenship !== undefined ? input.citizenship : existing.citizenship,
       passportNumber: input.passportNumber !== undefined ? input.passportNumber : existing.passportNumber,
       passportExpiry: input.passportExpiry !== undefined ? input.passportExpiry : existing.passportExpiry?.toISOString().slice(0, 10),
     });
@@ -716,6 +720,7 @@ export class RequestService {
           firstName: normalized.firstName,
           lastName: normalized.lastName,
           birthDate: new Date(`${normalized.birthDate}T00:00:00.000Z`),
+          citizenship: normalized.citizenship,
           passportSeries: normalized.passportSeries,
           passportNumber: normalized.passportNumber,
           passportExpiry: normalized.passportExpiry ? new Date(`${normalized.passportExpiry}T00:00:00.000Z`) : null,
@@ -1383,6 +1388,21 @@ export class RequestService {
     // commerce chain» — без этого гейта повторный convert падал бы P2002 (500).
     // Multi-order forward (новый Order поверх истории) — Booking→Order design pass.
     if (existing.convertedOrderId) {
+      const linked = await this.prisma.order.findUnique({ where: { id: existing.convertedOrderId } });
+      if (linked?.status === "CANCELLED" && existing.status === "CUSTOMER_ACCEPTED") {
+        const amount = existing.confirmedPrice ?? existing.displayedPrice ?? 0;
+        const currency = existing.confirmedCurrency ?? existing.displayedCurrency ?? linked.currency;
+        const reactivated = await this.prisma.$transaction(async (tx) => {
+          const order = await tx.order.update({ where: { id: linked.id }, data: { status: "NEW", amount, currency, cancelledAt: null, financialStatus: "OPEN", version: { increment: 1 } } });
+          await tx.request.update({ where: { id: requestId }, data: { status: "CONVERTED" } });
+          await tx.orderHistory.create({ data: { orderId: linked.id, action: "reactivated_from_request", from: "CANCELLED", to: "NEW", source: "API", actorId: actor.id, actorName: actor.username, comment: "Заказ повторно создан из возвращённой заявки" } });
+          return order;
+        });
+        const dto = this.requestDto(existing) as any;
+        dto.status = "CONVERTED";
+        dto.convertedOrder = { id: reactivated.id, referenceNumber: reactivated.referenceNumber, status: reactivated.status, amount: String(reactivated.amount), currency: reactivated.currency, createdAt: reactivated.createdAt?.toISOString() ?? null };
+        return dto;
+      }
       throw new ConflictException(
         `Request ${requestId} was already converted to order ${existing.convertedOrderId}; ` +
           `re-conversion is not supported (one Order per commerce sequence)`,
