@@ -45,9 +45,6 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     headingKey: "nav.group.operations",
     items: [
-      { href: "/app/requests", icon: "📋", labelKey: "nav.requests", permission: "order.read" },
-      { href: "/app/orders", icon: "🧾", labelKey: "nav.orders", permission: "order.read" },
-      { href: "/app/bookings", icon: "📑", labelKey: "nav.bookings", permission: "booking.read" },
       { href: "/app/documents", icon: "📄", labelKey: "nav.documents", permission: "documents.read" },
     ],
   },
@@ -327,10 +324,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                     >
                       <span className="w-5 shrink-0 text-center text-base">{item.icon}</span>
                       {!collapsed && <span className="truncate">{label}</span>}
-                      {!collapsed && item.href === "/app/requests" && unreadRequests > 0 && (
+                      {!collapsed && item.href === "/app/finance/deals" && unreadRequests > 0 && (
                         <span className="ml-auto inline-flex min-w-5 animate-pulse items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-900" title={`${unreadRequests} новых назначенных заявок`}>{unreadRequests}</span>
                       )}
-                      {collapsed && item.href === "/app/requests" && unreadRequests > 0 && (
+                      {collapsed && item.href === "/app/finance/deals" && unreadRequests > 0 && (
                         <span className="absolute right-1 top-1 size-2 animate-pulse rounded-full bg-amber-400" />
                       )}
                       {!collapsed && item.href === "/app/payments" && pendingPayments > 0 && (

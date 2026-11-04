@@ -670,6 +670,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // (create/update/revalidate/cancel + read).
     "sales.checkout.read",
     "sales.checkout.write",
+    "finance.overview.read",
     "finance.payment.read",
     "finance.refund.read",
     "finance.dispute.read",
@@ -755,6 +756,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "crm.customer.write",
     "crm.contact.write",
     "crm.partner.read",
+    "finance.overview.read",
     "order.read",
     "order.accept",
     "order.edit_noncritical",

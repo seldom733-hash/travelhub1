@@ -47,6 +47,7 @@ export default function FlightOfferModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState("");
+  const [createdSequence, setCreatedSequence] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -113,6 +114,7 @@ export default function FlightOfferModal({
         }],
       });
       setCreated(result.referenceNumber ?? result.code ?? "создана");
+      setCreatedSequence(String(result.commerceSequence ?? ""));
       onCreated?.(result.referenceNumber ?? result.code ?? "");
     } catch (e) {
       setError((e as Error).message);
@@ -177,7 +179,7 @@ export default function FlightOfferModal({
             {sameAsClient && <p className="mt-2 text-xs text-emerald-700">Имя и фамилия подставлены из данных клиента. Дату рождения укажите вручную.</p>}
           </section>
 
-          {created && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">Заявка создана: {created}</div>}
+          {created && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">Заявка создана: {created}{createdSequence && <a href={`/app/finance/deals/${createdSequence}`} className="ml-3 font-semibold underline">Открыть в реестре</a>}</div>}
           {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
           <div className="flex flex-col items-stretch justify-end gap-2 sm:flex-row sm:items-center">

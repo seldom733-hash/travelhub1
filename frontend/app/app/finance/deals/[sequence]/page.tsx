@@ -107,9 +107,9 @@ export default function DealDetailPage() {
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[#667085]">
-          <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f]">{deal.requestCode}</span>
-          <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f]">{deal.orderCode ?? "заказ не создан"}</span>
-          <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f]">{deal.bookingCode ?? "бронь не создана"}</span>
+          <Link href={`/app/requests/${deal.requestId}`} className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f] underline-offset-2 hover:underline">Заявка · {deal.requestCode}</Link>
+          {deal.orderId ? <Link href={`/app/orders/${deal.orderId}`} className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f] underline-offset-2 hover:underline">Заказ · {deal.orderCode}</Link> : <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#98a2b3]">Заказ не создан</span>}
+          {deal.bookingId ? <Link href={`/app/bookings/${deal.bookingId}`} className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f] underline-offset-2 hover:underline">Бронь · {deal.bookingCode}</Link> : <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#98a2b3]">Бронь не создана</span>}
           <span className="ml-auto">Создано: {new Date(deal.createdAt).toLocaleString("ru-RU")}</span>
           <span>Менеджер: {deal.manager ?? "—"}</span>
         </div>

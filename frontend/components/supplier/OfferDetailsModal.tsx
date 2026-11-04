@@ -305,6 +305,7 @@ export default function OfferDetailsModal({
         {booked && (
           <div className="mt-4 rounded-xl border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-300">
             {t("tourSearch.booked_ok", locale)} — {booked.referenceNumber}
+            <a href={`/app/finance/deals/${booked.referenceNumber.split("-").pop()}`} className="ml-3 font-semibold underline">Открыть в реестре</a>
           </div>
         )}
 

@@ -292,7 +292,7 @@ export class AzalController {
     } catch {
       // Assignment failure leaves the request persisted for manual distribution.
     }
-    return { id: request.id, code: request.code, referenceNumber: request.referenceNumber, status: request.status, priceVerification: authoritative.verification };
+    return { id: request.id, code: request.code, referenceNumber: request.referenceNumber, commerceSequence: request.commerceSequence, status: request.status, priceVerification: authoritative.verification };
   }
 
   @Post("calendar")
