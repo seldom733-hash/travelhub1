@@ -305,6 +305,15 @@ export class OrderFinancialSettlementService {
     if (amount.lte(0) || amount.greaterThan(new Prisma.Decimal(debt))) throw new ValidationDomainError("Write-off amount exceeds client debt");
     const code = await this.ids.nextCode(this.prisma as any, "CDW");
     const row = await this.prisma.clientDebtWriteOff.create({ data: { code, orderId, amount, currency: order.currency, reason, actorId: actor.id, actorName: actor.username } });
+    await this.ledger.createInTransaction(this.prisma as any, {
+      amount: amount.toString(),
+      currency: order.currency,
+      type: "CLIENT_DEBT_WRITE_OFF",
+      sourceType: "CLIENT_DEBT_WRITE_OFF",
+      sourceId: row.id,
+      businessRef: code,
+      occurredAt: new Date().toISOString(),
+    });
     await this.security.audit(this.prisma as any, { userId: actor.id, username: actor.username, action: "finance.client_debt.written_off", resource: "ClientDebtWriteOff", resourceId: row.id, details: { orderId, code, amount: amount.toString(), reason } });
     return { id: row.id, code, amount: amount.toString(), orderId, reason };
   }
@@ -340,6 +349,15 @@ export class OrderFinancialSettlementService {
     if (amount.lte(0) || amount.greaterThan(new Prisma.Decimal(debt))) throw new ValidationDomainError("Write-off amount exceeds supplier debt");
     const code = await this.ids.nextCode(this.prisma as any, "SDW");
     const row = await this.prisma.supplierDebtWriteOff.create({ data: { code, orderId, amount, currency: order.currency, reason, actorId: actor.id, actorName: actor.username } });
+    await this.ledger.createInTransaction(this.prisma as any, {
+      amount: amount.toString(),
+      currency: order.currency,
+      type: "SUPPLIER_DEBT_WRITE_OFF",
+      sourceType: "SUPPLIER_DEBT_WRITE_OFF",
+      sourceId: row.id,
+      businessRef: code,
+      occurredAt: new Date().toISOString(),
+    });
     await this.security.audit(this.prisma as any, { userId: actor.id, username: actor.username, action: "finance.supplier_debt.written_off", resource: "SupplierDebtWriteOff", resourceId: row.id, details: { orderId, code, amount: amount.toString(), reason } });
     return { id: row.id, code, amount: amount.toString(), orderId, reason };
   }

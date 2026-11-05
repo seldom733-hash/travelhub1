@@ -28,6 +28,30 @@ type DealQuery = {
   sortDirection?: "asc" | "desc";
 };
 
+export function computeDealIncome(input: {
+  isCancelledDeal: boolean;
+  completed: boolean;
+  sales: number;
+  cost: number;
+  clientReceived: number;
+  clientRefunded: number;
+  supplierPaid: number;
+  supplierRefunded: number;
+  clientWriteOff: number;
+}) {
+  const { isCancelledDeal, completed, sales, cost, clientReceived, clientRefunded, supplierPaid, supplierRefunded, clientWriteOff } = input;
+  if (isCancelledDeal) {
+    const cancellationResult = (clientReceived - clientRefunded) - (supplierPaid - supplierRefunded);
+    return { expectedIncome: 0, currentIncome: 0, cancellationResult, cancellationIncome: Math.max(0, cancellationResult), cancellationLoss: Math.min(0, cancellationResult), writeOffExpense: Math.max(0, clientWriteOff), cancelledSalesAmount: sales, lostIncome: Math.max(0, sales - cost - cancellationResult) };
+  }
+  if (completed) {
+    const recognizedRevenue = sales - clientRefunded;
+    const recognizedCost = cost - supplierRefunded;
+    return { expectedIncome: 0, currentIncome: recognizedRevenue - recognizedCost - Math.max(0, clientWriteOff), cancellationResult: 0, cancellationIncome: 0, cancellationLoss: 0, writeOffExpense: Math.max(0, clientWriteOff), cancelledSalesAmount: 0, lostIncome: 0 };
+  }
+  return { expectedIncome: sales - cost, currentIncome: 0, cancellationResult: 0, cancellationIncome: 0, cancellationLoss: 0, writeOffExpense: 0, cancelledSalesAmount: 0, lostIncome: 0 };
+}
+
 type DealRow = {
   sequence: string;
   requestId: string;
@@ -86,6 +110,10 @@ type DealRow = {
   paymentStatus: string;
   supplierPaymentStatus: string;
   cancellationReason: string | null;
+  isCancelledDeal: boolean;
+  cancellationIncome: string;
+  cancellationLoss: string;
+  writeOffExpense: string;
   cancellationResult: string;
   payments: Array<{ id: string; code: string; amount: string; currency: string; status: string; method: string | null; date: string }>;
   refunds: Array<{ id: string; code: string; amount: string; currency: string; status: string; date: string }>;
@@ -183,32 +211,20 @@ export class DealsService {
 
   private kpi(rows: DealRow[]) {
     const sum = (field: keyof DealRow) => rows.reduce((total, row) => total + Number(row[field] ?? 0), 0);
-    // A cancelled deal contributes only its recognised penalties to the sales,
-    // cost and gross-margin KPI cards. The original storefront price and
-    // service cost of a non-delivered service are not revenue/cost. Pending
-    // (not yet confirmed) penalties stay in the settlement workflow and are
-    // excluded from recognised financial KPIs.
-    const cancelledStatuses = new Set(["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"]);
-    // A request is pipeline, not a sale. Only ORDER/BOOKING rows contribute to
-    // sales/cost/gross and recognized income KPI.
     const salesRows = rows.filter((row) => row.stage !== "REQUEST");
-    const salesSum = (field: keyof DealRow) =>
-      salesRows.reduce((total, row) => total + Number(row[field] ?? 0), 0);
-    const recognisedPenaltyStatuses = new Set(["FINANCIALLY_SETTLED_WITH_PENALTY"]);
-    const kpiSales = (row: DealRow) =>
-      cancelledStatuses.has(row.status)
-        ? (recognisedPenaltyStatuses.has(row.settlementStatus ?? "") ? Number(row.clientPenalty) : 0)
-        : Number(row.salesAmount);
-    const kpiCost = (row: DealRow) =>
-      cancelledStatuses.has(row.status)
-        ? (recognisedPenaltyStatuses.has(row.settlementStatus ?? "") ? Number(row.supplierPenalty) : 0)
-        : Number(row.costAmount);
-    const kpiSalesTotal = salesRows.reduce((total, row) => total + kpiSales(row), 0);
-    const kpiCostTotal = salesRows.reduce((total, row) => total + kpiCost(row), 0);
+    const activeRows = salesRows.filter((row) => !row.isCancelledDeal);
+    const cancelledRows = salesRows.filter((row) => row.isCancelledDeal);
+    const salesAmount = activeRows.reduce((total, row) => total + Number(row.salesAmount), 0);
+    const costAmount = activeRows.reduce((total, row) => total + Number(row.costAmount), 0);
+    const expectedIncome = activeRows.reduce((total, row) => total + Number(row.expectedIncome ?? 0), 0);
+    const currentIncome = activeRows.reduce((total, row) => total + Number(row.currentIncome ?? 0), 0);
+    const cancellationIncome = cancelledRows.reduce((total, row) => total + Number(row.cancellationIncome ?? 0), 0);
+    const cancellationLoss = cancelledRows.reduce((total, row) => total + Number(row.cancellationLoss ?? 0), 0);
+    const writeOffExpense = salesRows.reduce((total, row) => total + Number(row.writeOffExpense ?? 0), 0);
     return {
-      salesAmount: fixed(kpiSalesTotal),
-      costAmount: fixed(kpiCostTotal),
-      grossMargin: fixed(kpiSalesTotal - kpiCostTotal),
+      salesAmount: fixed(salesAmount),
+      costAmount: fixed(costAmount),
+      grossMargin: fixed(salesAmount - costAmount),
       clientReceived: fixed(sum("clientReceived")),
       clientDebt: fixed(sum("clientDebt")),
       clientRefunded: fixed(sum("clientRefunded")),
@@ -217,10 +233,14 @@ export class DealsService {
       supplierRefunded: fixed(sum("supplierRefunded")),
       clientPenalty: fixed(sum("clientPenalty")),
       supplierPenalty: fixed(sum("supplierPenalty")),
-      expectedIncome: fixed(salesRows.filter((row) => !cancelledStatuses.has(row.status)).reduce((total, row) => total + Number(row.expectedIncome ?? 0), 0)),
-      currentIncome: fixed(salesRows.filter((row) => !cancelledStatuses.has(row.status)).reduce((total, row) => total + Number(row.currentIncome ?? 0), 0)),
-      cancelledSalesAmount: fixed(rows.filter((row) => row.stage !== "REQUEST" && cancelledStatuses.has(row.status)).reduce((total, row) => total + Number(row.cancelledSalesAmount), 0)),
-      lostIncome: fixed(rows.filter((row) => row.stage !== "REQUEST" && cancelledStatuses.has(row.status)).reduce((total, row) => total + Number(row.lostIncome), 0)),
+      expectedIncome: fixed(expectedIncome),
+      currentIncome: fixed(currentIncome),
+      cancellationIncome: fixed(cancellationIncome),
+      cancellationLoss: fixed(cancellationLoss),
+      writeOffExpense: fixed(writeOffExpense),
+      cancelledSalesAmount: fixed(cancelledRows.reduce((total, row) => total + Number(row.cancelledSalesAmount), 0)),
+      lostIncome: fixed(cancelledRows.reduce((total, row) => total + Number(row.lostIncome), 0)),
+      cancelledCount: cancelledRows.length,
       currency: rows[0]?.currency ?? "AZN",
       count: rows.length,
     };
@@ -336,7 +356,7 @@ export class DealsService {
     const requests = await this.prisma.request.findMany({ orderBy: { createdAt: "desc" }, take: 1000 });
     if (requests.length === 0) return [];
     const orderIds = requests.map((r) => r.convertedOrderId).filter((id): id is string => Boolean(id));
-    const orders = await this.prisma.order.findMany({ where: { OR: [{ id: { in: orderIds } }, { commerceSequence: { in: requests.map((r) => r.commerceSequence) } }] }, select: { id: true, code: true, referenceNumber: true, commerceSequence: true, status: true, amount: true, currency: true, cancelledAt: true, paidAmount: true, refundedAmount: true, customerId: true, createdBy: true, financialStatus: true, commercialSnapshot: true, items: { select: { id: true, title: true, type: true, serviceDate: true, amount: true, productId: true } } } });
+    const orders = await this.prisma.order.findMany({ where: { OR: [{ id: { in: orderIds } }, { commerceSequence: { in: requests.map((r) => r.commerceSequence) } }] }, select: { id: true, code: true, referenceNumber: true, commerceSequence: true, status: true, amount: true, currency: true, cancelledAt: true, returnedToRequestAt: true, paidAmount: true, refundedAmount: true, customerId: true, createdBy: true, financialStatus: true, commercialSnapshot: true, items: { select: { id: true, title: true, type: true, serviceDate: true, amount: true, productId: true } } } });
     const orderBySequence = new Map(orders.map((order) => [order.commerceSequence, order]));
     const resolvedOrderIds = [...new Set([...orderIds, ...orders.map((o) => o.id)])];
     const orderProductIds = [...new Set(orders.flatMap((o) => o.items.map((i) => i.productId)).filter((id): id is string => Boolean(id)))];
@@ -448,23 +468,23 @@ export class DealsService {
       const supplierPenalty = ["CONFIRMED", "WITHHELD", "RECEIVED"].includes(settlement?.supplierPenaltyStatus ?? "")
         ? money(settlement?.supplierPenaltyShare)
         : 0;
-      const penaltyClosed = cancelled || settlement?.status === "FINANCIALLY_SETTLED_WITH_PENALTY";
-      // A cancelled deal has no remaining upside: expected income is the
-      // retained penalty spread, never the catalogue-margin expectation.
-      const expectedIncome = penaltyClosed ? clientPenalty - supplierPenalty : sales - cost;
+      const isCancelledDeal = cancelled || Boolean(order?.cancelledAt && !order?.returnedToRequestAt);
       const completed = ["FULFILLED", "CLOSED"].includes(order?.status ?? "") || status === "COMPLETED";
-      // Revenue is recognized only for a completed deal. For an active
-      // partially paid deal, current income is not cash-in; it stays 0 until
-      // the service is completed (or the cancellation settlement is confirmed).
-      const currentIncome = penaltyClosed
-        ? clientPenalty - supplierPenalty
-        : completed
-          ? sales - cost
-          : settlement
-            ? Math.max(0, money(settlement.finalCustomerLiability) - supplierPaid + supplierRefunded)
-            : 0;
-      const cancelledSalesAmount = cancelled ? sales : 0;
-      const lostIncome = cancelled ? Math.max(0, sales - cost - (clientPenalty - supplierPenalty)) : 0;
+      const income = computeDealIncome({
+        isCancelledDeal,
+        completed,
+        sales,
+        cost,
+        clientReceived: captured,
+        clientRefunded: refunded,
+        supplierPaid,
+        supplierRefunded,
+        clientWriteOff,
+      });
+      const expectedIncome = income.expectedIncome;
+      const currentIncome = income.currentIncome;
+      const cancelledSalesAmount = income.cancelledSalesAmount;
+      const lostIncome = income.lostIncome;
       const attrs = productAttributes;
       const nights = Number(attrs.nights ?? snapOffer.nights ?? 0) || null;
       const country = request.tripCountry ?? (typeof attrs.country === "string" ? attrs.country : typeof snapOffer.country === "string" ? snapOffer.country : null);
@@ -549,6 +569,10 @@ export class DealsService {
         supplierPaymentStatus: supplierPaid <= 0 ? "UNPAID" : supplierPaid >= cost ? "PAID" : "PARTIALLY_PAID",
         cancellationReason: settlement?.cancellationReason ?? null,
         cancellationResult: String(settlement?.cancellationResult ?? 0),
+        isCancelledDeal,
+        cancellationIncome: fixed(income.cancellationIncome),
+        cancellationLoss: fixed(income.cancellationLoss),
+        writeOffExpense: fixed(income.writeOffExpense),
         payments: clientPayments.map((p) => ({ id: p.id, code: p.code, amount: p.amount.toString(), currency: p.currency, status: p.status, method: p.paymentMethod, date: (p.paidAt ?? p.createdAt).toISOString() })),
         refunds: clientRefunds.map((r) => ({ id: r.id, code: r.code, amount: r.amount.toString(), currency: r.currency, status: r.status, date: (r.processedAt ?? r.createdAt).toISOString() })),
         payouts: supplierPayouts.map((p) => ({ id: p.id, code: p.code, amount: p.amount.toString(), currency: p.currency, status: p.status, direction: p.direction, date: p.occurredAt.toISOString(), supplierCode: p.supplierCode ?? p.partnerId ?? null, supplierName: (p.partnerId ? partnerById.get(p.partnerId)?.name : null) ?? (p.supplierCode ? partnerByCode.get(p.supplierCode)?.name : null) ?? p.supplierCode ?? p.partnerId ?? null })),

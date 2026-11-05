@@ -22,8 +22,11 @@ const KPI: KpiCard[] = [
   { key: "expectedIncome", label: "Ожидаемый доход", icon: "↗", tone: "bg-emerald-50 text-emerald-700" },
   { key: "currentIncome", label: "Текущий доход", icon: "✓", tone: "bg-teal-50 text-teal-700" },
   { key: "cancelledSalesAmount", label: "Отменённые продажи", icon: "⊘", tone: "bg-rose-50 text-rose-700" },
+  { key: "cancellationIncome", label: "Доход от отмен", icon: "+", tone: "bg-emerald-50 text-emerald-700" },
+  { key: "cancellationLoss", label: "Убыток от отмен", icon: "−", tone: "bg-rose-50 text-rose-700" },
+  { key: "writeOffExpense", label: "Списания долгов", icon: "×", tone: "bg-amber-50 text-amber-700" },
 ];
-const EMPTY: DealKpi = { salesAmount: "0", costAmount: "0", grossMargin: "0", clientReceived: "0", clientDebt: "0", clientRefunded: "0", supplierPaid: "0", supplierDebt: "0", supplierRefunded: "0", clientPenalty: "0", supplierPenalty: "0", expectedIncome: "0", currentIncome: "0", cancelledSalesAmount: "0", lostIncome: "0", currency: "AZN", count: 0 };
+const EMPTY: DealKpi = { salesAmount: "0", costAmount: "0", grossMargin: "0", clientReceived: "0", clientDebt: "0", clientRefunded: "0", supplierPaid: "0", supplierDebt: "0", supplierRefunded: "0", clientPenalty: "0", supplierPenalty: "0", expectedIncome: "0", currentIncome: "0", cancelledSalesAmount: "0", lostIncome: "0", cancellationIncome: "0", cancellationLoss: "0", writeOffExpense: "0", cancelledCount: 0, currency: "AZN", count: 0 };
 const label: Record<string, string> = {
   NEW: "Новая", CHECKING: "Проверка", SUPPLIER_TIMEOUT: "Поставщик не ответил", PRICE_CHANGED: "Цена изменилась",
   CUSTOMER_ACCEPTED: "Клиент согласовал", CONFIRMED: "Подтверждён", CONVERTED: "Сконвертирован", REJECTED: "Отклонён",

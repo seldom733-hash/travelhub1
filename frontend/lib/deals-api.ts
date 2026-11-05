@@ -69,6 +69,7 @@ export interface DealKpi {
   clientRefunded: string; supplierPaid: string; supplierDebt: string; supplierRefunded: string;
   clientPenalty: string; supplierPenalty: string; expectedIncome: string; currentIncome: string;
   cancelledSalesAmount: string; lostIncome: string;
+  cancellationIncome: string; cancellationLoss: string; writeOffExpense: string; cancelledCount: number;
   currency: string; count: number;
 }
 
