@@ -22,7 +22,7 @@ type Tab = (typeof TABS)[number][0];
 
 function money(value: string | null | undefined, currency: string) { return formatPrice(value ?? "0", currency, "ru") ?? value ?? "0"; }
 function statusRu(status: string) {
-  const map: Record<string, string> = { NEW: "Новая", CHECKING: "Проверка", WAITING_FOR_DATA: "Ждём данные", PROBLEM: "Проблема", SUSPENDED: "Приостановлен", READY_TO_CLOSE: "Готов к закрытию", PARTIALLY_FULFILLED: "Частично исполнен", CONFIRMED: "Подтверждён", PRICE_CHANGED: "Цена изменена", CUSTOMER_ACCEPTED: "Принят клиентом", CONVERTED: "Конвертирован в заказ", REJECTED: "Отклонён", UNAVAILABLE: "Недоступен", EXPIRED: "Истёк", CANCELLED_BY_CUSTOMER: "Отменён клиентом", SUPPLIER_TIMEOUT: "Поставщик не ответил", CUSTOMER_PAYMENT_TIMEOUT: "Клиент не оплатил", IN_PROCESSING: "В работе", READY_FOR_BOOKING: "Готова к брони", SENT_TO_BOOKING: "На бронировании", FULFILLED: "Завершён", COMPLETED: "Завершён", CANCELLED: "Отменён", PENDING: "Ожидает", CAPTURED: "Получен", PAID: "Оплачен", REQUESTED: "Запрошен", APPROVED: "Подтверждён", PROCESSED: "Исполнен", PLANNED: "План", DUE: "К оплате", OVERDUE: "Просрочен", REFUNDED: "Возвращён", PARTIALLY_REFUNDED: "Частичный возврат", FAILED: "Ошибка" };
+  const map: Record<string, string> = { NEW: "Новая", CHECKING: "Проверка", WAITING_FOR_DATA: "Ждём данные", PROBLEM: "Проблема", SUSPENDED: "Приостановлен", READY_TO_CLOSE: "Готов к закрытию", PARTIALLY_FULFILLED: "Частично исполнен", CONFIRMED: "Подтверждён", PRICE_CHANGED: "Цена изменена", CUSTOMER_ACCEPTED: "Принят клиентом", CONVERTED: "Конвертирован в заказ", REJECTED: "Отклонён", UNAVAILABLE: "Недоступен", EXPIRED: "Истёк", CANCELLED_BY_CUSTOMER: "Отменён клиентом", SUPPLIER_TIMEOUT: "Поставщик не ответил", CUSTOMER_PAYMENT_TIMEOUT: "Клиент не оплатил", IN_PROCESSING: "В работе", READY_FOR_BOOKING: "Готова к брони", WAITING_FOR_FIRST_PAYMENT: "Ожидаем первую оплату", SENT_TO_BOOKING: "На бронировании", FULFILLED: "Завершён", COMPLETED: "Завершён", CANCELLED: "Отменён", PENDING: "Ожидает", CAPTURED: "Получен", PAID: "Оплачен", REQUESTED: "Запрошен", APPROVED: "Подтверждён", PROCESSED: "Исполнен", PLANNED: "План", DUE: "К оплате", OVERDUE: "Просрочен", REFUNDED: "Возвращён", PARTIALLY_REFUNDED: "Частичный возврат", FAILED: "Ошибка" };
   return map[status] ?? status;
 }
 function statusTone(status: string) {
@@ -33,7 +33,7 @@ function statusTone(status: string) {
 }
 const ACTION_LABELS: Record<string, string> = {
   process: "Принять в работу", markWaitingData: "Ждём данные", resumeProcessing: "Вернуть в работу",
-  confirm: "Подтвердить заказ", send: "Отправить на бронь", complete: "Завершить",
+  confirm: "Подтвердить заказ", waitFirstPayment: "Ожидаем оплату", send: "Отправить на бронь", complete: "Завершить",
   close: "Закрыть", cancel: "Отменить заказ", problem: "Проблема", suspend: "Приостановить",
   returnToRequest: "Вернуть в заявку",
 };

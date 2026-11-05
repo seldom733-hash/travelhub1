@@ -89,6 +89,7 @@ export type OrderAction =
   | "markWaitingData"
   | "resumeProcessing"
   | "confirm"
+  | "waitFirstPayment"
   | "send"
   | "complete"
   | "close"
@@ -113,10 +114,11 @@ const TRANSITIONS: Record<string, { from: OrderStatus[]; to: OrderStatus }> = {
   markWaitingData: { from: ["IN_PROCESSING"], to: "WAITING_FOR_DATA" },
   resumeProcessing: { from: ["WAITING_FOR_DATA"], to: "IN_PROCESSING" },
   confirm: { from: ["IN_PROCESSING", "WAITING_FOR_DATA"], to: "READY_FOR_BOOKING" },
+  waitFirstPayment: { from: ["READY_FOR_BOOKING"], to: "WAITING_FOR_FIRST_PAYMENT" },
   // Stage 2 (Booking → Order, follow-up): повторная отправка после возврата
   // брони — из PARTIALLY_FULFILLED (свободные items, Q9). Спец-gate в
   // orderAction: 409, если СВОБОДНЫХ items нет (все заняты активными бронями).
-  send: { from: ["READY_FOR_BOOKING", "PARTIALLY_FULFILLED"], to: "SENT_TO_BOOKING" },
+  send: { from: ["READY_FOR_BOOKING", "WAITING_FOR_FIRST_PAYMENT", "PARTIALLY_FULFILLED"], to: "SENT_TO_BOOKING" },
   complete: { from: ["SENT_TO_BOOKING", "PARTIALLY_FULFILLED"], to: "FULFILLED" },
   close: { from: ["FULFILLED", "READY_TO_CLOSE"], to: "CLOSED" },
   cancel: { from: ACTIVE_STATUSES, to: "CANCELLED" },
@@ -146,6 +148,7 @@ const ACTION_LABELS: Record<OrderAction, string> = {
   markWaitingData: "Ожидает данных",
   resumeProcessing: "Возобновлена обработка",
   confirm: "Заказ готов к бронированию",
+  waitFirstPayment: "Ожидаем первую оплату",
   send: "Передан в Booking Center",
   complete: "Заказ исполнен",
   close: "Заказ закрыт",
@@ -161,6 +164,7 @@ export const ACTION_PERMISSIONS: Record<OrderAction, string> = {
   markWaitingData: "order.edit_noncritical",
   resumeProcessing: "order.edit_noncritical",
   confirm: "order.edit_noncritical",
+  waitFirstPayment: "order.edit_noncritical",
   send: "order.request_booking",
   complete: "order.edit_noncritical",
   close: "order.close",
