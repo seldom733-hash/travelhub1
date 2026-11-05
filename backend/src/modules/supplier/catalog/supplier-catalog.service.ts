@@ -656,11 +656,15 @@ export class SupplierCatalogService implements OnModuleInit {
     for (const service of services) {
       const countryKeys = input.countriesByService?.[service] ?? input.countries ?? [input.countryKey];
       for (const countryKey of countryKeys) {
+        const current = await this.prisma.supplierCatalogRun.findUnique({ where: { id }, select: { status: true } });
+        if (current?.status === "CANCELLED") return;
         const result = await this.withTimeout(
           this.source.fetch({ supplierCode: input.supplierCode, serviceType: service, countryKey }),
           60 * 60 * 1000,
           `${input.supplierCode}/${service}/${countryKey} source timeout`,
         );
+        const afterFetch = await this.prisma.supplierCatalogRun.findUnique({ where: { id }, select: { status: true } });
+        if (afterFetch?.status === "CANCELLED") return;
         records = records.concat(result.records);
         complete = complete && result.complete;
         errors.push(...result.errors);
@@ -671,6 +675,8 @@ export class SupplierCatalogService implements OnModuleInit {
       await this.failRun(id, errors.join("; "));
       return;
     }
+    const cancelled = await this.prisma.supplierCatalogRun.findUnique({ where: { id }, select: { status: true } });
+    if (cancelled?.status === "CANCELLED") return;
     const plan = await this.buildPlan(records, complete, input);
     const coverage = complete && errors.length === 0 ? "COMPLETE" : "PARTIAL";
     plan.coverage = coverage;
