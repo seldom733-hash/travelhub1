@@ -334,7 +334,7 @@ export class DealsService {
     const orderBySequence = new Map(orders.map((order) => [order.commerceSequence, order]));
     const resolvedOrderIds = [...new Set([...orderIds, ...orders.map((o) => o.id)])];
     const orderProductIds = [...new Set(orders.flatMap((o) => o.items.map((i) => i.productId)).filter((id): id is string => Boolean(id)))];
-    const [bookings, payments, refunds, payouts, obligations, settlements, customers, products, supplierWriteOffs, media] = await Promise.all([
+    const [bookings, payments, refunds, payouts, obligations, settlements, customers, products, supplierWriteOffs, media, clientWriteOffs] = await Promise.all([
       this.prisma.booking.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, referenceNumber: true, orderId: true, status: true, amount: true, currency: true } }),
       this.prisma.payment.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, paymentMethod: true, paidAt: true, createdAt: true, orderId: true } }),
       this.prisma.refund.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, processedAt: true, createdAt: true, orderId: true } }),
@@ -345,6 +345,7 @@ export class DealsService {
       this.prisma.product.findMany({ where: { id: { in: requests.map((r) => r.productId).filter((id): id is string => Boolean(id)) } }, select: { id: true, title: true, type: true, partnerId: true, attributes: true } }),
       this.prisma.supplierDebtWriteOff.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { orderId: true, amount: true } }),
       orderProductIds.length ? this.prisma.productMedia.findMany({ where: { productId: { in: orderProductIds }, isPrimary: true, status: "PUBLISHED" }, select: { id: true, productId: true } }) : [],
+      this.prisma.clientDebtWriteOff.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { orderId: true, amount: true } }),
     ]);
     const partnerIds = [...new Set([
       ...requests.map((r) => r.partnerId).filter((id): id is string => Boolean(id)),
@@ -431,9 +432,10 @@ export class DealsService {
         : Math.max(0, cost - supplierPaid + supplierRefunded);
       const supplierDebt = Math.max(0, rawSupplierDebt - supplierWriteOff);
       const cancelledOrder = cancelled || Boolean(order?.cancelledAt);
+      const clientWriteOff = clientWriteOffs.filter((w) => w.orderId === order?.id).reduce((sum, w) => sum + money(w.amount), 0);
       const clientDebt = cancelledOrder ? 0 : settlement
-        ? money(settlement.remainingToPay)
-        : Math.max(0, sales - captured + refunded);
+        ? Math.max(0, money(settlement.remainingToPay) - clientWriteOff)
+        : Math.max(0, sales - captured + refunded - clientWriteOff);
       const clientPenalty = ["CONFIRMED", "WITHHELD", "RECEIVED"].includes(settlement?.clientPenaltyStatus ?? "")
         ? money(settlement?.clientPenaltyAmount)
         : 0;

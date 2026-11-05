@@ -1386,7 +1386,7 @@ export class OrderService {
    *    (историческое правило bulk PATCH — заказы вне D3-потока).
    */
   private async assertOrderDebtsCleared(tx: Prisma.TransactionClient, orderId: string, code: string, amount: Prisma.Decimal, status: OrderStatus) {
-    const [payments, refunds, pendingRefunds, obligations, order, outgoing, incoming, writeOffs] = await Promise.all([
+    const [payments, refunds, pendingRefunds, obligations, order, outgoing, incoming, writeOffs, clientWriteOffs] = await Promise.all([
       tx.payment.aggregate({ where: { orderId, status: { in: ["CAPTURED", "REFUNDED"] } }, _sum: { amount: true } }),
       tx.refund.aggregate({ where: { orderId, status: "PROCESSED" }, _sum: { amount: true } }),
       tx.refund.aggregate({ where: { orderId, status: { in: ["REQUESTED", "APPROVED"] } }, _sum: { amount: true } }),
@@ -1395,11 +1395,13 @@ export class OrderService {
       tx.supplierPayout.aggregate({ where: { orderId, status: "CONFIRMED", direction: { not: "INCOMING" } }, _sum: { amount: true } }),
       tx.supplierPayout.aggregate({ where: { orderId, status: "CONFIRMED", direction: "INCOMING" }, _sum: { amount: true } }),
       tx.supplierDebtWriteOff.aggregate({ where: { orderId }, _sum: { amount: true } }),
+      tx.clientDebtWriteOff.aggregate({ where: { orderId }, _sum: { amount: true } }),
     ]);
     const captured = new Prisma.Decimal(payments._sum.amount ?? 0);
     const refunded = new Prisma.Decimal(refunds._sum.amount ?? 0);
     const pendingRefund = new Prisma.Decimal(pendingRefunds._sum.amount ?? 0);
-    const clientDebt = status === "CANCELLED" ? new Prisma.Decimal(0) : Prisma.Decimal.max(new Prisma.Decimal(0), new Prisma.Decimal(amount).minus(captured.minus(refunded)));
+    const baseClientDebt = status === "CANCELLED" ? new Prisma.Decimal(0) : Prisma.Decimal.max(new Prisma.Decimal(0), new Prisma.Decimal(amount).minus(captured.minus(refunded)));
+    const clientDebt = Prisma.Decimal.max(new Prisma.Decimal(0), baseClientDebt.minus(new Prisma.Decimal(clientWriteOffs._sum.amount ?? 0)));
     const snap = (order?.commercialSnapshot ?? {}) as Record<string, unknown>;
     let cost = Number(snap.netSupplierCost ?? snap.supplierPrice ?? 0);
     if (cost <= 0) {

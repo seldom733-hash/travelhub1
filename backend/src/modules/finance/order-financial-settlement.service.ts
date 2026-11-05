@@ -220,6 +220,29 @@ export class OrderFinancialSettlementService {
     return this.toDto(created);
   }
 
+  async writeOffClientDebt(orderId: string, input: { amount?: string | null; reason: string }, actor: Actor) {
+    const reason = input.reason?.trim();
+    if (!reason) throw new ValidationDomainError("Write-off reason is required");
+    const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { id: true, status: true, cancelledAt: true, amount: true, currency: true } });
+    if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+    if (!["CANCELLED", "CLOSED"].includes(order.status) && !order.cancelledAt) throw new ValidationDomainError("Client debt write-off is allowed only for a cancelled order");
+    const [payments, refunds, settlement, previous] = await Promise.all([
+      this.prisma.payment.aggregate({ where: { orderId, status: { in: ["CAPTURED", "REFUNDED"] } }, _sum: { amount: true } }),
+      this.prisma.refund.aggregate({ where: { orderId, status: "PROCESSED" }, _sum: { amount: true } }),
+      this.prisma.orderFinancialSettlement.findUnique({ where: { orderId }, select: { remainingToPay: true } }),
+      this.prisma.clientDebtWriteOff.aggregate({ where: { orderId }, _sum: { amount: true } }),
+    ]);
+    const base = settlement ? Number(settlement.remainingToPay) : Math.max(0, Number(order.amount) - Number(payments._sum.amount ?? 0) + Number(refunds._sum.amount ?? 0));
+    const debt = Math.max(0, base - Number(previous._sum.amount ?? 0));
+    if (debt <= 0) throw new ConflictError("Client has no outstanding debt to write off");
+    const amount = input.amount ? new Prisma.Decimal(input.amount) : new Prisma.Decimal(debt);
+    if (amount.lte(0) || amount.greaterThan(new Prisma.Decimal(debt))) throw new ValidationDomainError("Write-off amount exceeds client debt");
+    const code = await this.ids.nextCode(this.prisma as any, "CDW");
+    const row = await this.prisma.clientDebtWriteOff.create({ data: { code, orderId, amount, currency: order.currency, reason, actorId: actor.id, actorName: actor.username } });
+    await this.security.audit(this.prisma as any, { userId: actor.id, username: actor.username, action: "finance.client_debt.written_off", resource: "ClientDebtWriteOff", resourceId: row.id, details: { orderId, code, amount: amount.toString(), reason } });
+    return { id: row.id, code, amount: amount.toString(), orderId, reason };
+  }
+
   async writeOffSupplierDebt(orderId: string, input: { amount?: string | null; reason: string }, actor: Actor) {
     const reason = input.reason?.trim();
     if (!reason) throw new ValidationDomainError("Write-off reason is required");

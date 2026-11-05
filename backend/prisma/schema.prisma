@@ -4641,6 +4641,21 @@ model SupplierDebtWriteOff {
   @@schema("finance")
 }
 
+model ClientDebtWriteOff {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  orderId   String
+  amount    Decimal  @db.Decimal(12, 2)
+  currency  String   @default("AZN")
+  reason    String
+  actorId   String?
+  actorName String?
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@schema("finance")
+}
+
 model OrderFinancialSettlement {
   id                    String                @id @default(uuid())
   code                  String                @unique // SET-00000001

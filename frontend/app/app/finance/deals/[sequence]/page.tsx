@@ -71,6 +71,7 @@ export default function DealDetailPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [writeOffOpen, setWriteOffOpen] = useState(false);
   const [debtWriteOffOpen, setDebtWriteOffOpen] = useState(false);
+  const [clientDebtWriteOffOpen, setClientDebtWriteOffOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [supplierPaymentOpen, setSupplierPaymentOpen] = useState(false);
   const [editingClientPayment, setEditingClientPayment] = useState<any | null>(null);
@@ -285,6 +286,7 @@ export default function DealDetailPage() {
       {editingRefund && <EditRefundModal refund={editingRefund} onClose={() => setEditingRefund(null)} onSaved={() => { setEditingRefund(null); setReload((v) => v + 1); }} />}
       {editingPayout && <EditSupplierPayoutModal payout={editingPayout} onClose={() => setEditingPayout(null)} onSaved={() => { setEditingPayout(null); setReload((v) => v + 1); }} />}
       {editOpen && <DealEditModal deal={deal} onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); setReload((v) => v + 1); }} />}
+      {clientDebtWriteOffOpen && <ClientDebtWriteOffModal deal={deal} onClose={() => setClientDebtWriteOffOpen(false)} onSaved={() => { setClientDebtWriteOffOpen(false); setReload((v) => v + 1); }} />}
       {debtWriteOffOpen && <SupplierDebtWriteOffModal deal={deal} onClose={() => setDebtWriteOffOpen(false)} onSaved={() => { setDebtWriteOffOpen(false); setReload((v) => v + 1); }} />}
       {writeOffOpen && <WriteOffModal deal={deal} onClose={() => setWriteOffOpen(false)} onSaved={() => { setWriteOffOpen(false); setReload((v) => v + 1); }} />}
       {addOpen && <AddServiceModal deal={deal} onClose={() => setAddOpen(false)} onSaved={() => { setAddOpen(false); setReload((v) => v + 1); }} />}
@@ -596,4 +598,17 @@ function SupplierDebtWriteOffModal({ deal, onClose, onSaved }: { deal: DealRow; 
     try { await api.post(`/orders/${deal.orderId}/financial-settlement/write-off-supplier-debt`, { amount, reason: reason.trim() }); onSaved(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   return <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}><div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}><h3 className="mb-1 text-base font-semibold">Списание долгов</h3><p className="mb-3 text-xs text-slate-500">Долг: {money(deal.supplierDebt, deal.currency)}</p><div className="grid gap-2"><label className="text-xs text-slate-500">Сумма<input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label><label className="text-xs text-slate-500">Причина<textarea value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>{error && <div className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700">{error}</div>}<div className="mt-2 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-3 py-2 text-xs">Отмена</button><button type="button" disabled={busy} onClick={() => void save()} className="rounded-lg bg-[#0f6b5f] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "Сохранение…" : "Списать"}</button></div></div></div></div>;
+}
+
+function ClientDebtWriteOffModal({ deal, onClose, onSaved }: { deal: DealRow; onClose: () => void; onSaved: () => void }) {
+  const [amount, setAmount] = React.useState(deal.clientDebt);
+  const [reason, setReason] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState("");
+  async function save() {
+    if (!reason.trim()) { setError("Укажите причину"); return; }
+    setBusy(true); setError("");
+    try { await api.post(`/orders/${deal.orderId}/financial-settlement/write-off-client-debt`, { amount, reason: reason.trim() }); onSaved(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}><div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}><h3 className="mb-1 text-base font-semibold">Списание долга туриста</h3><p className="mb-3 text-xs text-slate-500">Долг: {money(deal.clientDebt, deal.currency)}</p><div className="grid gap-2"><label className="text-xs text-slate-500">Сумма<input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label><label className="text-xs text-slate-500">Причина<textarea value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>{error && <div className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700">{error}</div>}<div className="mt-2 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-3 py-2 text-xs">Отмена</button><button type="button" disabled={busy} onClick={() => void save()} className="rounded-lg bg-[#0f6b5f] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "Сохранение…" : "Списать"}</button></div></div></div></div>;
 }
