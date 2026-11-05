@@ -16,7 +16,7 @@ import { useCurrentUser } from "@/lib/use-user";
 const TABS = [
   ["overview", "Общая информация"], ["services", "Услуги и расчёты"], ["client", "Платежи клиента"],
   ["supplier", "Расчёты с поставщиком"], ["penalties", "Штрафы и возвраты"], ["docs", "Документы"],
-  ["communications", "Коммуникации"], ["history", "История изменений"],
+  ["communications", "Коммуникации"], ["cancellation", "Отмена и возвраты"], ["history", "История изменений"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
@@ -267,7 +267,7 @@ export default function DealDetailPage() {
 
             <section className="rounded-xl border border-[#e5e2da] bg-white shadow-sm">
               <div className="flex flex-wrap gap-1 border-b border-[#f0eee8] px-2 pt-2">{TABS.map(([key, label]) => <button key={key} type="button" onClick={() => setTab(key)} className={`border-b-2 px-2 py-2 text-[11px] font-medium ${tab === key ? "border-[#0f6b5f] text-[#0f6b5f]" : "border-transparent text-[#667085]"}`}>{label}</button>)}</div>
-              <div className="p-4 text-xs">{tab === "overview" && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><Info label="Общий номер" value={deal.sequence} /><Info label="Заявка" value={deal.requestCode} /><Info label="Заказ" value={deal.orderCode ?? "—"} /><Info label="Бронь" value={deal.bookingCode ?? "—"} /><Info label="Стадия" value={deal.stageLabel} /><Info label="Статус" value={statusRu(deal.status)} /><Info label="Дата услуги" value={dateFrom} /><Info label="Сумма продажи" value={money(deal.salesAmount, deal.currency)} /><Info label="Себестоимость" value={money(deal.costAmount, deal.currency)} /><Info label="Фин. статус" value={deal.financialStatus} /><Info label="Оплата клиента" value={deal.paymentStatus} /><Info label="Оплата поставщику" value={deal.supplierPaymentStatus} /></div>}{tab === "services" && <div className="space-y-2">{deal.services.map((s) => <div key={s.id} className="flex justify-between border-b border-[#f0eee8] py-2"><span>{s.title}</span><span className="font-mono">{money(s.clientPrice, deal.currency)} / {money(s.cost, deal.currency)}</span></div>)}</div>}{tab === "client" && <SimpleRows rows={deal.payments.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.method ?? "Оплата", statusRu(p.status)])} head={["Дата", "Сумма", "Тип", "Статус"]} />}{tab === "supplier" && <SimpleRows rows={deal.payouts.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.direction === "INCOMING" ? "Возврат" : "Оплата", statusRu(p.status)])} head={["Дата", "Сумма", "Тип", "Статус"]} />}{tab === "penalties" && <div className="space-y-2"><Info label="Штраф клиента" value={money(deal.clientPenalty, deal.currency)} /><Info label="Штраф поставщика" value={money(deal.supplierPenalty, deal.currency)} /><Info label="Возвращено клиенту" value={money(deal.clientRefunded, deal.currency)} /><Info label="Возврат поставщика" value={money(deal.supplierRefunded, deal.currency)} /></div>}{tab === "docs" && <DocumentsTab deal={deal} />}{tab === "communications" && <CommunicationsTab deal={deal} />}{tab === "history" && <HistoryTab deal={deal} />}</div>
+              <div className="p-4 text-xs">{tab === "overview" && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><Info label="Общий номер" value={deal.sequence} /><Info label="Заявка" value={deal.requestCode} /><Info label="Заказ" value={deal.orderCode ?? "—"} /><Info label="Бронь" value={deal.bookingCode ?? "—"} /><Info label="Стадия" value={deal.stageLabel} /><Info label="Статус" value={statusRu(deal.status)} /><Info label="Дата услуги" value={dateFrom} /><Info label="Сумма продажи" value={money(deal.salesAmount, deal.currency)} /><Info label="Себестоимость" value={money(deal.costAmount, deal.currency)} /><Info label="Фин. статус" value={deal.financialStatus} /><Info label="Оплата клиента" value={deal.paymentStatus} /><Info label="Оплата поставщику" value={deal.supplierPaymentStatus} /></div>}{tab === "services" && <div className="space-y-2">{deal.services.map((s) => <div key={s.id} className="flex justify-between border-b border-[#f0eee8] py-2"><span>{s.title}</span><span className="font-mono">{money(s.clientPrice, deal.currency)} / {money(s.cost, deal.currency)}</span></div>)}</div>}{tab === "client" && <SimpleRows rows={deal.payments.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.method ?? "Оплата", statusRu(p.status)])} head={["Дата", "Сумма", "Тип", "Статус"]} />}{tab === "supplier" && <SimpleRows rows={deal.payouts.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.direction === "INCOMING" ? "Возврат" : "Оплата", statusRu(p.status)])} head={["Дата", "Сумма", "Тип", "Статус"]} />}{tab === "penalties" && <div className="space-y-2"><Info label="Штраф клиента" value={money(deal.clientPenalty, deal.currency)} /><Info label="Штраф поставщика" value={money(deal.supplierPenalty, deal.currency)} /><Info label="Возвращено клиенту" value={money(deal.clientRefunded, deal.currency)} /><Info label="Возврат поставщика" value={money(deal.supplierRefunded, deal.currency)} /></div>}{tab === "docs" && <DocumentsTab deal={deal} />}{tab === "communications" && <CommunicationsTab deal={deal} />}{tab === "cancellation" && <CancellationTab deal={deal} onSaved={() => setReload((v) => v + 1)} />}{tab === "history" && <HistoryTab deal={deal} />}</div>
             </section>
           </div>
 
@@ -611,4 +611,45 @@ function ClientDebtWriteOffModal({ deal, onClose, onSaved }: { deal: DealRow; on
     try { await api.post(`/orders/${deal.orderId}/financial-settlement/write-off-client-debt`, { amount, reason: reason.trim() }); onSaved(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   return <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}><div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}><h3 className="mb-1 text-base font-semibold">Списание долга туриста</h3><p className="mb-3 text-xs text-slate-500">Долг: {money(deal.clientDebt, deal.currency)}</p><div className="grid gap-2"><label className="text-xs text-slate-500">Сумма<input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label><label className="text-xs text-slate-500">Причина<textarea value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>{error && <div className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700">{error}</div>}<div className="mt-2 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-3 py-2 text-xs">Отмена</button><button type="button" disabled={busy} onClick={() => void save()} className="rounded-lg bg-[#0f6b5f] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "Сохранение…" : "Списать"}</button></div></div></div></div>;
+}
+
+function CancellationTab({ deal, onSaved }: { deal: DealRow; onSaved: () => void }) {
+  const reasons = [
+    ["CUSTOMER_FAULT", "Вина туриста"], ["SUPPLIER_FAULT", "Вина поставщика"],
+    ["NAVITRAVEL_FAULT", "Вина Navitravel"], ["FORCE_MAJEURE", "Форс-мажор"],
+    ["MUTUAL_AGREEMENT", "Взаимное соглашение"],
+  ];
+  const [reason, setReason] = React.useState("CUSTOMER_FAULT");
+  const [clientPenalty, setClientPenalty] = React.useState("0");
+  const [supplierPenalty, setSupplierPenalty] = React.useState("0");
+  const [preview, setPreview] = React.useState<any>(null);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const [notice, setNotice] = React.useState("");
+  if (!deal.orderId) return <Empty text="Сначала создайте заказ" />;
+  const body = { cancellationReason: reason, clientPenaltyAmount: clientPenalty, supplierPenaltyAmount: supplierPenalty, penaltyAmount: clientPenalty, supplierPenaltyShare: supplierPenalty, platformPenaltyShare: String(Math.max(0, Number(clientPenalty) - Number(supplierPenalty))), reason: reasons.find(([k]) => k === reason)?.[1] ?? "Отмена" };
+  async function calculate() {
+    setBusy(true); setError("");
+    try { setPreview(await api.post(`/orders/${deal.orderId}/financial-settlement/preview`, body)); }
+    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  async function confirm() {
+    setBusy(true); setError("");
+    try { await api.post(`/orders/${deal.orderId}/financial-settlement/confirm`, body); setNotice("Расчёт утверждён"); onSaved(); }
+    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  return <div className="grid gap-3 lg:grid-cols-2">
+    <div className="space-y-2 rounded-lg border border-[#e5e2da] p-3">
+      <div className="text-[10px] font-semibold uppercase text-[#667085]">Условия отмены</div>
+      <label className="grid gap-1 text-[11px]">Причина<select value={reason} onChange={(e) => setReason(e.target.value)} className="rounded border px-2 py-1.5">{reasons.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+      <label className="grid gap-1 text-[11px]">Штраф туриста<input value={clientPenalty} onChange={(e) => setClientPenalty(e.target.value)} inputMode="decimal" className="rounded border px-2 py-1.5" /></label>
+      <label className="grid gap-1 text-[11px]">Штраф поставщика<input value={supplierPenalty} onChange={(e) => setSupplierPenalty(e.target.value)} inputMode="decimal" className="rounded border px-2 py-1.5" /></label>
+      <div className="flex gap-2"><button type="button" disabled={busy} onClick={() => void calculate()} className="rounded bg-[#0f6b5f] px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50">Рассчитать</button><button type="button" disabled={busy || !preview} onClick={() => void confirm()} className="rounded border border-[#0f6b5f] px-3 py-1.5 text-[11px] font-semibold text-[#0f6b5f] disabled:opacity-50">Утвердить</button></div>
+      {error && <div className="rounded bg-rose-50 px-2 py-1 text-[10px] text-rose-700">{error}</div>}{notice && <div className="rounded bg-emerald-50 px-2 py-1 text-[10px] text-emerald-700">{notice}</div>}
+    </div>
+    <div className="space-y-1 rounded-lg border border-[#e5e2da] p-3 text-[11px]">
+      <div className="text-[10px] font-semibold uppercase text-[#667085]">Предварительный расчёт</div>
+      {preview ? <>{[["Получено от туриста", preview.capturedAmount], ["Штраф туриста", preview.clientPenaltyAmount], ["Возврат туристу", preview.remainingToRefund], ["Штраф поставщика", preview.supplierPenaltyAmount], ["Финансовый результат", preview.cancellationResult], ["Статус", preview.status]].map(([k, v]) => <div key={String(k)} className="flex justify-between border-b border-[#f0eee8] py-1"><span className="text-[#667085]">{k}</span><span className="font-mono">{String(v ?? "—")}</span></div>)}</> : <div className="text-[#98a2b3]">Введите суммы и нажмите «Рассчитать»</div>}
+    </div>
+  </div>;
 }

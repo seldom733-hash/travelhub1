@@ -4683,6 +4683,9 @@ model OrderFinancialSettlement {
   writeOffById          String?
   status                OrderFinancialStatus
   reason                String
+  cancellationReason    String?
+  supplierPenaltyAmount Decimal               @default(0) @db.Decimal(12, 2)
+  cancellationResult    Decimal               @default(0) @db.Decimal(12, 2)
   confirmedAt           DateTime
   confirmedById         String?
   version               Int                   @default(1)

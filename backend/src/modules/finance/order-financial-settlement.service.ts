@@ -23,6 +23,8 @@ export interface SettlementConfirmInput {
   supplierPenaltyShare?: string | null;
   writeOffAmount?: string | null;
   writeOffReason?: string | null;
+  cancellationReason?: "CUSTOMER_FAULT" | "SUPPLIER_FAULT" | "NAVITRAVEL_FAULT" | "FORCE_MAJEURE" | "MUTUAL_AGREEMENT" | null;
+  supplierPenaltyAmount?: string | null;
   reason?: string;
 }
 
@@ -132,6 +134,9 @@ export class OrderFinancialSettlementService {
           writeOffById: input.writeOffAmount && Number(input.writeOffAmount) > 0 ? actor.id : null,
           status: result.status as OrderFinancialStatus,
           reason,
+          cancellationReason: input.cancellationReason ?? null,
+          supplierPenaltyAmount: new Prisma.Decimal(input.supplierPenaltyAmount ?? "0"),
+          cancellationResult: new Prisma.Decimal((result as any).cancellationResult ?? "0"),
           confirmedAt: new Date(),
           confirmedById: actor.id,
           version: 1,
@@ -482,7 +487,7 @@ export class OrderFinancialSettlementService {
       ?? (context.terminalKind === "CANCELLED"
         ? (preview ? context.capturedAmount.toString() : null)
         : context.order.amount.toString());
-    return calculateCancellationSettlement({
+    const baseResult = calculateCancellationSettlement({
       originalAmount: context.order.amount.toString(),
       capturedAmount: context.capturedAmount.toString(),
       refundedAmount: context.refundedAmount.toString(),
@@ -502,6 +507,14 @@ export class OrderFinancialSettlementService {
       penaltyReason: input.reason ?? null,
       ledgerComplete: context.ledgerComplete,
     });
+    if (input.cancellationReason) {
+      const clientPenalty = new Prisma.Decimal(input.clientPenaltyAmount ?? input.penaltyAmount ?? "0");
+      const supplierPenalty = new Prisma.Decimal(input.supplierPenaltyAmount ?? input.supplierPenaltyShare ?? "0");
+      const safeClientPenalty = ["SUPPLIER_FAULT", "NAVITRAVEL_FAULT"].includes(input.cancellationReason) ? new Prisma.Decimal(0) : clientPenalty;
+      const refundToClient = Prisma.Decimal.max(new Prisma.Decimal(0), context.capturedAmount.minus(safeClientPenalty));
+      return { ...baseResult, finalCustomerLiability: safeClientPenalty.toString(), clientPenaltyAmount: safeClientPenalty.toString(), supplierPenaltyAmount: supplierPenalty.toString(), cancellationResult: safeClientPenalty.minus(supplierPenalty).toString(), remainingToRefund: refundToClient.toString(), remainingToPay: "0.00" } as typeof baseResult & { supplierPenaltyAmount: string; cancellationResult: string };
+    }
+    return baseResult;
   }
 
   private sameSettlement(

@@ -43,6 +43,16 @@ class SettlementPreviewDto {
 
   @IsOptional()
   @IsString()
+  @Matches(/^(CUSTOMER_FAULT|SUPPLIER_FAULT|NAVITRAVEL_FAULT|FORCE_MAJEURE|MUTUAL_AGREEMENT)$/)
+  cancellationReason?: "CUSTOMER_FAULT" | "SUPPLIER_FAULT" | "NAVITRAVEL_FAULT" | "FORCE_MAJEURE" | "MUTUAL_AGREEMENT";
+
+  @IsOptional()
+  @IsString()
+  @Matches(MONEY)
+  supplierPenaltyAmount?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(1000)
   reason?: string;
 }
@@ -82,6 +92,16 @@ class SettlementConfirmDto {
   @IsString()
   @Matches(MONEY)
   supplierPenaltyShare?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(CUSTOMER_FAULT|SUPPLIER_FAULT|NAVITRAVEL_FAULT|FORCE_MAJEURE|MUTUAL_AGREEMENT)$/)
+  cancellationReason?: "CUSTOMER_FAULT" | "SUPPLIER_FAULT" | "NAVITRAVEL_FAULT" | "FORCE_MAJEURE" | "MUTUAL_AGREEMENT";
+
+  @IsOptional()
+  @IsString()
+  @Matches(MONEY)
+  supplierPenaltyAmount?: string;
 
   @IsString()
   @MinLength(1)
