@@ -327,8 +327,8 @@ export class OrderController {
 
   @Get("orders/:id/travelers")
   @RequirePermissions("order.read")
-  getOrderTravelers(@Param("id") id: string) {
-    return this.orders.getOrderTravelers(id);
+  getOrderTravelers(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.orders.getOrderTravelers(id, { role: actor.role as never });
   }
 
   @Post("orders/:id/travelers")

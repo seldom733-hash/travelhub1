@@ -19,7 +19,7 @@ export const TRAVELER_PII_FIELDS = ["passportSeries", "passportNumber", "passpor
 
 /** Кто может видеть полные PII traveler'ов/пассажиров. */
 export function canViewTravelerPii(role: RoleCode): boolean {
-  return role === RoleCode.OPERATOR || role === RoleCode.ADMIN;
+  return role === RoleCode.OPERATOR || role === RoleCode.ADMIN || role === RoleCode.SALES_MANAGER || role === RoleCode.SALES_HEAD;
 }
 
 /** Тип зрителя: отсутствует (internal trusted call) или роль пользователя. */
