@@ -674,6 +674,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "sales.checkout.write",
     "finance.overview.read",
     "finance.payment.read",
+    "finance.payment.create",
     "finance.refund.read",
     "finance.dispute.read",
     "finance.invoice.read",
