@@ -185,7 +185,7 @@ export class BookingSubscribers implements OnModuleInit {
           const bookingRefNum = order.commerceSequence
             ? `${this.refNum.commerceBookingRef(order.commerceSequence)}${orderAttempt ? `-${orderAttempt}` : ""}${
                 order.items.length > 1 ? `-${itemOrdinal}` : ""
-              }${priorAttempts > 1 ? `-${priorAttempts}` : ""}`
+              }${priorAttempts > 1 ? `-${priorAttempts - 1}` : ""}`
             : await this.generateBookingReferenceNumber(tx, order, item);
           // Step 2.8: canonical cardinality 1 OrderItem → 1 Booking. orderItemId
           // (частичный unique — status <> CANCELLED AND rejectedAt IS NULL,
