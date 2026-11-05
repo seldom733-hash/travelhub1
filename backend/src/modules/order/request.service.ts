@@ -1000,6 +1000,10 @@ export class RequestService {
     const supplierPrice = round2(newPrice);
     const markupAmount = round2(supplierPrice * markupRate);
     const platformPrice = round2(supplierPrice + markupAmount);
+    const oldFx = snapshot.fx as Record<string, any> | undefined;
+    const fx = oldFx && Number(oldFx.rate) > 0
+      ? { ...oldFx, sourceAmount: round2(supplierPrice / Number(oldFx.rate)), aznAmount: supplierPrice, convertedAt: now.toISOString() }
+      : undefined;
 
     if (request.commercialSnapshot) {
       await this.prisma.request.update({
@@ -1013,6 +1017,7 @@ export class RequestService {
             customerFinalPrice: platformPrice,
             netSupplierCost: supplierPrice,
             platformGrossIncome: markupAmount,
+            ...(fx ? { fx } : {}),
             individualDiscount: false,
             discountType: "NONE",
             discountValue: null,
@@ -1030,7 +1035,9 @@ export class RequestService {
         status: "PRICE_CHANGED",
         supplierRespondedAt: now,
         supplierDecision: "PRICE_CHANGED",
-        supplierPriceProposal: platformPrice as any,
+        supplierPriceProposal: platformPrice as any,
+        confirmedPrice: platformPrice as any,
+        confirmedCurrency: snapshot.customerCurrency ?? request.confirmedCurrency,
         supplierNote: note ?? null,
         customerActionDeadline,
         version: { increment: 1 },
