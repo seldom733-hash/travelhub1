@@ -331,8 +331,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                       {collapsed && item.href === "/app/finance/deals" && unreadRequests > 0 && (
                         <span className="absolute right-1 top-1 size-2 animate-pulse rounded-full bg-amber-400" />
                       )}
-                      {!collapsed && item.href === "/app/payments" && pendingPayments > 0 && (
-                        <span className="ml-auto inline-flex min-w-5 animate-pulse items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-900" title={`${pendingPayments} платежей ждут подтверждения`}>
+                      {!collapsed && item.href === "/app/finance/deals" && pendingPayments > 0 && (
+                        <span className={`${unreadRequests > 0 ? "ml-1" : "ml-auto"} inline-flex min-w-5 animate-pulse items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-900`} title={`${pendingPayments} платежей ждут подтверждения`}>
                           {pendingPayments}
                         </span>
                       )}
