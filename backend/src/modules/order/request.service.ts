@@ -998,11 +998,13 @@ export class RequestService {
     const snapshot = (request.commercialSnapshot ?? {}) as Record<string, any>;
     const markupRate = Number(snapshot.markupRate ?? 0);
     const supplierPrice = round2(newPrice);
-    const markupAmount = round2(supplierPrice * markupRate);
-    const platformPrice = round2(supplierPrice + markupAmount);
+    const commissionAmount = round2(Number(snapshot.commissionAmount ?? 0));
+    const costBase = round2(supplierPrice + commissionAmount);
+    const markupAmount = round2(costBase * markupRate);
+    const platformPrice = round2(costBase + markupAmount);
     const oldFx = snapshot.fx as Record<string, any> | undefined;
     const fx = oldFx && Number(oldFx.rate) > 0
-      ? { ...oldFx, sourceAmount: round2(supplierPrice / Number(oldFx.rate)), aznAmount: supplierPrice, convertedAt: now.toISOString() }
+      ? { ...oldFx, sourceAmount: round2(costBase / Number(oldFx.rate)), aznAmount: costBase, convertedAt: now.toISOString() }
       : undefined;
 
     if (request.commercialSnapshot) {
@@ -1015,7 +1017,7 @@ export class RequestService {
             markupAmount,
             publicPrice: platformPrice,
             customerFinalPrice: platformPrice,
-            netSupplierCost: supplierPrice,
+            netSupplierCost: costBase,
             platformGrossIncome: markupAmount,
             ...(fx ? { fx } : {}),
             individualDiscount: false,
