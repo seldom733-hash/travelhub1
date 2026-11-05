@@ -8,6 +8,7 @@ type DealQuery = {
   scope?: string;
   state?: string;
   viewerId?: string;
+  cancellationReason?: string;
   status?: string;
   statusGroup?: string;
   supplierId?: string;
@@ -83,6 +84,8 @@ type DealRow = {
   financialStatus: string;
   paymentStatus: string;
   supplierPaymentStatus: string;
+  cancellationReason: string | null;
+  cancellationResult: string;
   payments: Array<{ id: string; code: string; amount: string; currency: string; status: string; method: string | null; date: string }>;
   refunds: Array<{ id: string; code: string; amount: string; currency: string; status: string; date: string }>;
   payouts: Array<{ id: string; code: string; amount: string; currency: string; status: string; direction: string; date: string }>;
@@ -238,6 +241,7 @@ export class DealsService {
       }
       if (query.stage && row.stage !== query.stage) return false;
       if (query.status && row.status !== query.status) return false;
+      if (query.cancellationReason && row.cancellationReason !== query.cancellationReason) return false;
       if (query.statusGroup === "cancelled" && !["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED", "REJECTED"].includes(row.status)) return false;
       if (query.scope === "my" && row.managerId !== query.viewerId) return false;
       if (query.state === "open" && ["CLOSED", "COMPLETED", "FULFILLED", "CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED", "REJECTED", "UNAVAILABLE"].includes(row.status)) return false;
@@ -340,7 +344,7 @@ export class DealsService {
       this.prisma.refund.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, processedAt: true, createdAt: true, orderId: true } }),
       this.prisma.supplierPayout.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, direction: true, occurredAt: true, orderId: true, supplierCode: true, partnerId: true } }),
       this.prisma.supplierObligation.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { orderId: true, aznAmount: true, remainingAmount: true } }),
-      this.prisma.orderFinancialSettlement.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { orderId: true, status: true, penaltyAmount: true, clientPenaltyAmount: true, clientPenaltyStatus: true, supplierPenaltyStatus: true, supplierPenaltyShare: true, remainingToPay: true, remainingToRefund: true, finalCustomerLiability: true } }),
+      this.prisma.orderFinancialSettlement.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { orderId: true, status: true, penaltyAmount: true, clientPenaltyAmount: true, clientPenaltyStatus: true, supplierPenaltyStatus: true, supplierPenaltyShare: true, remainingToPay: true, remainingToRefund: true, cancellationReason: true, supplierPenaltyAmount: true, cancellationResult: true, finalCustomerLiability: true } }),
       this.prisma.customer.findMany({ where: { id: { in: requests.map((r) => r.customerId).filter((id): id is string => Boolean(id)) } }, select: { id: true, firstName: true, lastName: true, companyName: true, phone: true, email: true } }),
       this.prisma.product.findMany({ where: { id: { in: requests.map((r) => r.productId).filter((id): id is string => Boolean(id)) } }, select: { id: true, title: true, type: true, partnerId: true, attributes: true } }),
       this.prisma.supplierDebtWriteOff.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { orderId: true, amount: true } }),
@@ -541,6 +545,8 @@ export class DealsService {
         financialStatus: settlement?.status ?? order?.financialStatus ?? "OPEN",
         paymentStatus: captured <= 0 ? "UNPAID" : captured >= sales ? "PAID" : "PARTIALLY_PAID",
         supplierPaymentStatus: supplierPaid <= 0 ? "UNPAID" : supplierPaid >= cost ? "PAID" : "PARTIALLY_PAID",
+        cancellationReason: settlement?.cancellationReason ?? null,
+        cancellationResult: String(settlement?.cancellationResult ?? 0),
         payments: clientPayments.map((p) => ({ id: p.id, code: p.code, amount: p.amount.toString(), currency: p.currency, status: p.status, method: p.paymentMethod, date: (p.paidAt ?? p.createdAt).toISOString() })),
         refunds: clientRefunds.map((r) => ({ id: r.id, code: r.code, amount: r.amount.toString(), currency: r.currency, status: r.status, date: (r.processedAt ?? r.createdAt).toISOString() })),
         payouts: supplierPayouts.map((p) => ({ id: p.id, code: p.code, amount: p.amount.toString(), currency: p.currency, status: p.status, direction: p.direction, date: p.occurredAt.toISOString(), supplierCode: p.supplierCode ?? p.partnerId ?? null, supplierName: (p.partnerId ? partnerById.get(p.partnerId)?.name : null) ?? (p.supplierCode ? partnerByCode.get(p.supplierCode)?.name : null) ?? p.supplierCode ?? p.partnerId ?? null })),

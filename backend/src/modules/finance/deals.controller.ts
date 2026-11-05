@@ -13,6 +13,7 @@ function queryFrom(raw: Record<string, string | undefined>) {
     state: raw.state,
     status: raw.status,
     statusGroup: raw.statusGroup,
+    cancellationReason: raw.cancellationReason,
     supplierId: raw.supplierId,
     country: raw.country,
     manager: raw.manager,
