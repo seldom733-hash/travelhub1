@@ -1629,6 +1629,11 @@ export class OrderService {
         throw new ConflictError(`Cannot ${action} order ${order.code} from status ${order.status}`);
       }
 
+      if (action === "confirm") {
+        const activeBookings = await tx.booking.count({ where: { orderId, status: { notIn: BOOKING_TERMINAL } } });
+        if (activeBookings > 0) throw new ConflictError(`Order ${order.code} has ${activeBookings} active booking(s); use resume/complete instead of re-confirming`);
+      }
+
       if (action === "cancel") {
         const activeBookings = await tx.booking.count({ where: { orderId, status: { notIn: BOOKING_TERMINAL } } });
         if (activeBookings > 0) {
@@ -1750,8 +1755,13 @@ export class OrderService {
       // Step 2.5A: business milestone timestamp фиксируется в ТОМ ЖЕ CAS-апдейте,
       // что и статус (атомарно; один timestamp на переход; повторный переход
       // невозможен lifecycle-ом → immutable milestone).
+      let targetStatus = transition.to;
+      if (action === "resumeProcessing" && ["PROBLEM", "SUSPENDED"].includes(order.status)) {
+        const activeBookings = await tx.booking.count({ where: { orderId, status: { notIn: BOOKING_TERMINAL } } });
+        if (activeBookings > 0) targetStatus = "SENT_TO_BOOKING";
+      }
       const data: Prisma.OrderUpdateManyMutationInput = {
-        status: transition.to,
+        status: targetStatus,
         version: { increment: 1 },
         updatedBy: actor ?? null,
       };
