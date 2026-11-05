@@ -92,6 +92,9 @@ export default function DealDetailPage() {
     api.get<{ availableActions?: string[]; travelers?: typeof orderTravelers; finalConfirmedAt?: string | null }>(`/orders/${deal.orderId}`)
       .then((order) => { if (alive) { setAvailableActions(order.availableActions ?? []); setOrderTravelers(order.travelers ?? []); setOrderFinalConfirmedAt(order.finalConfirmedAt ?? null); } })
       .catch(() => { if (alive) { setAvailableActions([]); setOrderTravelers([]); setOrderFinalConfirmedAt(null); } });
+    api.get<typeof orderTravelers>(`/orders/${deal.orderId}/travelers`)
+      .then((rows) => { if (alive) setOrderTravelers(rows); })
+      .catch(() => undefined);
     return () => { alive = false; };
   }, [deal?.orderId, reload]);
 

@@ -1170,6 +1170,10 @@ export class OrderService {
     return { rows, total };
   }
 
+  async getOrderTravelers(orderId: string) {
+    return this.prisma.orderTraveler.findMany({ where: { orderId }, orderBy: { position: "asc" } });
+  }
+
   async getOrder(id: string, viewer?: TravelerViewer, grantedPermissions: string[] = []) {
     const order = await this.prisma.order.findUnique({
       where: { id },
