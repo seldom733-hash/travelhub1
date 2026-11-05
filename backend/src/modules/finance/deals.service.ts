@@ -229,7 +229,7 @@ export class DealsService {
       clientDebt: fixed(sum("clientDebt")),
       clientRefunded: fixed(sum("clientRefunded")),
       supplierPaid: fixed(sum("supplierPaid")),
-      supplierDebt: fixed(sum("supplierDebt")),
+      supplierDebt: fixed(rows.filter((row) => row.stage !== "REQUEST").reduce((total, row) => total + Number(row.supplierDebt ?? 0), 0)),
       supplierRefunded: fixed(sum("supplierRefunded")),
       clientPenalty: fixed(sum("clientPenalty")),
       supplierPenalty: fixed(sum("supplierPenalty")),
@@ -453,9 +453,11 @@ export class DealsService {
       const stage = returnedToRequest ? "REQUEST" : activeBooking ? "BOOKING" : order ? "ORDER" : "REQUEST";
       const status = returnedToRequest ? request.status : activeBooking?.status ?? order?.status ?? request.status;
       const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(status);
-      const rawSupplierDebt = useObligationCost && obligationDebt <= cost
-        ? obligationDebt
-        : Math.max(0, cost - supplierPaid + supplierRefunded);
+      const rawSupplierDebt = order?.status === "CANCELLED"
+        ? Math.max(0, supplierPaid - supplierRefunded)
+        : useObligationCost && obligationDebt <= cost
+          ? obligationDebt
+          : Math.max(0, cost - supplierPaid + supplierRefunded);
       const supplierDebt = Math.max(0, rawSupplierDebt - supplierWriteOff);
       const cancelledOrder = cancelled || Boolean(order?.cancelledAt);
       const clientWriteOff = clientWriteOffs.filter((w) => w.orderId === order?.id).reduce((sum, w) => sum + money(w.amount), 0);
