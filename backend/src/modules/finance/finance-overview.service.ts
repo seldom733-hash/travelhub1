@@ -298,7 +298,7 @@ export class FinanceOverviewService {
 
   private async expectedMarginMetric(range: RangeFilter): Promise<AznMetric> {
     const orders = await this.prisma.order.findMany({
-      where: { commercialSnapshot: { not: Prisma.JsonNull }, ...rangeWhere("createdAt", range) },
+      where: { commercialSnapshot: { not: Prisma.JsonNull }, cancelledAt: null, returnedToRequestAt: null, status: { notIn: ["CLOSED", "CANCELLED", "CANCELLATION_REQUESTED", "CANCELLATION_APPROVED"] }, ...rangeWhere("createdAt", range) },
       select: { commercialSnapshot: true },
       orderBy: { createdAt: "desc" },
       take: MARGIN_SCAN_LIMIT,
