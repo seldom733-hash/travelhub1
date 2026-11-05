@@ -699,22 +699,41 @@ function CancellationTab({ deal, onSaved }: { deal: DealRow; onSaved: () => void
 
 function RequestCancellationModal({ orderId, onClose, onSaved }: { orderId: string; onClose: () => void; onSaved: () => void }) {
   const reasons = [
-    ["CUSTOMER_FAULT", "По вине туриста"], ["SUPPLIER_FAULT", "По вине поставщика"],
-    ["NAVITRAVEL_FAULT", "По вине Navitravel"], ["FORCE_MAJEURE", "Форс-мажор"],
-    ["MUTUAL_AGREEMENT", "Взаимное соглашение"],
+    ["CUSTOMER_FAULT", "По вине туриста", "Заявление туриста об отказе, переписка, уведомление"],
+    ["SUPPLIER_FAULT", "По вине поставщика", "Письмо поставщика об отмене бронирования"],
+    ["NAVITRAVEL_FAULT", "По вине Navitravel", "Внутренний акт или служебная записка"],
+    ["FORCE_MAJEURE", "Форс-мажор", "Официальное подтверждение обстоятельств"],
+    ["MUTUAL_AGREEMENT", "Взаимное соглашение", "Соглашение об отмене"],
   ];
   const [reason, setReason] = React.useState("CUSTOMER_FAULT");
   const [comment, setComment] = React.useState("");
-  const [document, setDocument] = React.useState("");
+  const [docLink, setDocLink] = React.useState("");
+  const [docSource, setDocSource] = React.useState("");
+  const [docComment, setDocComment] = React.useState("");
+  const [file, setFile] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
+  const selected = reasons.find(([k]) => k === reason);
   async function submit() {
     if (!comment.trim()) { setError("Укажите комментарий"); return; }
     setBusy(true); setError("");
     try {
-      await api.patch(`/orders/${orderId}`, { action: "requestCancellation", reason: `${reason}|комментарий: ${comment.trim()}${document.trim() ? `|документ: ${document.trim()}` : ""}` });
+      const details = [
+        `комментарий: ${comment.trim()}`,
+        docSource.trim() ? `источник: ${docSource.trim()}` : "",
+        docLink.trim() ? `ссылка: ${docLink.trim()}` : "",
+        docComment.trim() ? `документ: ${docComment.trim()}` : "",
+        file ? `файл: ${file}` : "",
+      ].filter(Boolean).join("|");
+      await api.patch(`/orders/${orderId}`, { action: "requestCancellation", reason: `${reason}|${details}` });
       onSaved();
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}><div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}><h3 className="mb-1 text-base font-semibold">Инициировать отмену</h3><p className="mb-3 text-xs text-slate-500">Заказ перейдёт в статус «Отмена запрошена» и потребует согласования.</p><div className="grid gap-2"><label className="text-xs text-slate-500">Причина<select value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm">{reasons.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label><label className="text-xs text-slate-500">Комментарий<textarea value={comment} onChange={(e) => setComment(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label><label className="text-xs text-slate-500">Ссылка на документ<textarea value={document} onChange={(e) => setDocument(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>{error && <div className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700">{error}</div>}<div className="mt-2 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-3 py-2 text-xs">Отмена</button><button type="button" disabled={busy} onClick={() => void submit()} className="rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "Отправка…" : "Запросить отмену"}</button></div></div></div></div>;
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}><div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}><h3 className="mb-1 text-base font-semibold">Инициировать отмену</h3><p className="mb-3 text-xs text-slate-500">Заказ перейдёт в статус «Отмена запрошена» и потребует согласования.</p>
+    <div className="mb-3 overflow-hidden rounded-lg border border-[#e5e2da]"><table className="w-full text-left text-[11px]"><thead className="bg-[#fbfaf7] text-[#667085]"><tr><th className="px-2 py-1.5 font-medium">Причина отмены</th><th className="px-2 py-1.5 font-medium">Что может подтвердить</th></tr></thead><tbody>{reasons.map(([k, label, doc]) => <tr key={k} className={`border-t border-[#f0eee8] ${reason === k ? "bg-amber-50" : ""}`}><td className="px-2 py-1.5 font-medium">{label}</td><td className="px-2 py-1.5 text-[#667085]">{doc}</td></tr>)}</tbody></table></div>
+    <div className="grid gap-2"><label className="text-xs text-slate-500">Причина<select value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm">{reasons.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+    <label className="text-xs text-slate-500">Комментарий менеджера<textarea value={comment} onChange={(e) => setComment(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>
+    <div className="rounded-lg border border-[#e5e2da] p-2"><div className="mb-1 text-[10px] font-semibold uppercase text-[#667085]">Подтверждающие документы <span className="font-normal normal-case">(необязательно)</span></div><div className="grid gap-2 sm:grid-cols-2"><label className="text-[11px] text-slate-500">Файл (PDF, Word, изображение)<input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp" onChange={(e) => setFile(e.target.files?.[0]?.name ?? "")} className="mt-1 block w-full text-[10px]" /></label><label className="text-[11px] text-slate-500">Ссылка на документ<input value={docLink} onChange={(e) => setDocLink(e.target.value)} placeholder="Google Drive, Dropbox…" className="mt-1 w-full rounded border px-2 py-1.5 text-[11px]" /></label><label className="text-[11px] text-slate-500">Источник документа<input value={docSource} onChange={(e) => setDocSource(e.target.value)} placeholder="Клиент, поставщик, внутренний" className="mt-1 w-full rounded border px-2 py-1.5 text-[11px]" /></label><label className="text-[11px] text-slate-500">Комментарий к документу<input value={docComment} onChange={(e) => setDocComment(e.target.value)} className="mt-1 w-full rounded border px-2 py-1.5 text-[11px]" /></label></div></div>
+    {selected && <div className="rounded bg-slate-50 px-2 py-1 text-[10px] text-slate-600">Рекомендуемое подтверждение: {selected[2]}. Если документа нет, зафиксируйте устное обращение в комментарии.</div>}
+    {error && <div className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700">{error}</div>}<div className="mt-2 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-3 py-2 text-xs">Отмена</button><button type="button" disabled={busy} onClick={() => void submit()} className="rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "Отправка…" : "Запросить отмену"}</button></div></div></div></div>;
 }
