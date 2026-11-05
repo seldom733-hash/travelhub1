@@ -112,7 +112,7 @@ const ACTIVE_STATUSES: OrderStatus[] = [
 const TRANSITIONS: Record<string, { from: OrderStatus[]; to: OrderStatus }> = {
   process: { from: ["NEW"], to: "IN_PROCESSING" },
   markWaitingData: { from: ["IN_PROCESSING"], to: "WAITING_FOR_DATA" },
-  resumeProcessing: { from: ["WAITING_FOR_DATA"], to: "IN_PROCESSING" },
+  resumeProcessing: { from: ["WAITING_FOR_DATA", "PROBLEM", "SUSPENDED"], to: "IN_PROCESSING" },
   confirm: { from: ["IN_PROCESSING", "WAITING_FOR_DATA"], to: "READY_FOR_BOOKING" },
   waitFirstPayment: { from: ["READY_FOR_BOOKING"], to: "WAITING_FOR_FIRST_PAYMENT" },
   // Stage 2 (Booking → Order, follow-up): повторная отправка после возврата
@@ -214,7 +214,8 @@ export function computeAvailableOrderActions(
     // "waiting for data"/"resume processing" round-trip.
     if (action === "close" && order.returnedToRequestAt) continue;
     if (action === "close" && order.returnedToRequestAt) continue;
-    if (order.finalConfirmedAt && (action === "markWaitingData" || action === "resumeProcessing")) continue;
+    if (order.finalConfirmedAt && action === "markWaitingData") continue;
+    if (order.finalConfirmedAt && action === "resumeProcessing" && order.status === "WAITING_FOR_DATA") continue;
     // confirm требует полные данные всех туристов (как в orderAction).
     if (action === "confirm" && (order.travelers ?? []).some((x) => x.dataCompleteness !== "COMPLETE")) continue;
     actions.push(action);
