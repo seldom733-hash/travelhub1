@@ -774,7 +774,8 @@ export class OrderService {
       where: { requestId: r.id },
       orderBy: { position: "asc" },
     });
-    assertRequestTravelersMatchCount(requestTravelers, r.travelerCount);
+    // Request-stage travelers seed the order when present; a request with no
+    // travelers is converted and the party is collected on the Order stage.
 
     // dataCompleteness — canonical логика D4 REMEDIATION F6 (те же REQUIRED-
     // поля pinned, что и в traveler-мутациях): FIO+birthDate всегда есть,
