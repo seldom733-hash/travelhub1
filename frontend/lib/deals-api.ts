@@ -11,6 +11,7 @@ export interface DealRow {
   stage: "REQUEST" | "ORDER" | "BOOKING";
   stageLabel: string;
   status: string;
+  orderStatus: string | null;
   statusLabel: string;
   customerId: string | null;
   customerName: string;

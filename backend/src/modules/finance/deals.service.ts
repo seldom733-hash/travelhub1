@@ -37,6 +37,7 @@ type DealRow = {
   stage: "REQUEST" | "ORDER" | "BOOKING";
   stageLabel: string;
   status: string;
+  orderStatus: string | null;
   statusLabel: string;
   customerId: string | null;
   customerName: string;
@@ -476,6 +477,7 @@ export class DealsService {
         stage,
         stageLabel: cancelled ? "Отменена" : stage === "BOOKING" ? "Бронь" : stage === "ORDER" ? "Заказ" : "Заявка",
         status,
+        orderStatus: order?.status ?? null,
         statusLabel: status,
         customerId: customer?.id ?? null,
         customerName: customer
