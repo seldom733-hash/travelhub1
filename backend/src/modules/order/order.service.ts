@@ -1770,7 +1770,14 @@ export class OrderService {
       if (action === "returnToRequest" && linkedRequestId && linkedRequestCode) {
         const reactivated = await tx.request.updateMany({
           where: { id: linkedRequestId, status: "CONVERTED" },
-          data: { status: "CHECKING", version: { increment: 1 } },
+          data: {
+            status: "CHECKING",
+            convertedOrderId: null,
+            convertedAt: null,
+            customerAcceptedAt: null,
+            customerDecision: null,
+            version: { increment: 1 },
+          },
         });
         if (reactivated.count !== 1) {
           throw new ConflictError(
