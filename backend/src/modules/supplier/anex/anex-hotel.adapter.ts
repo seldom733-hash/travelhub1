@@ -171,6 +171,11 @@ export class AnexHotelAdapter implements SupplierAdapter {
 
   constructor(private readonly provider: AnexProvider) {}
 
+  async discoverCountries(): Promise<Array<{ countryId?: string; countryName?: string }>> {
+    const states = await this.provider.hotelStates();
+    return states.map((s) => ({ countryId: String(s.id), countryName: s.nameAlt || s.name }));
+  }
+
   // ── SupplierAdapter: search ───────────────────────────────────────────
 
   async search(query: SupplierSearchQuery): Promise<SupplierOffer[]> {

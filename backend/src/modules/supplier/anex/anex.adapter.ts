@@ -806,6 +806,12 @@ export class AnexAdapter implements SupplierAdapter {
    * entries must precede HOTEL ones so ingest can link hotels through their
    * town. Without an argument: union across every state ANEX serves.
    */
+  /** Canonical country discovery for supplier catalog sync. */
+  async discoverCountries(): Promise<Array<{ countryId?: string; countryName?: string }>> {
+    const states = await this.provider.states();
+    return states.map((s) => ({ countryId: String(s.id), countryName: s.nameAlt || s.name }));
+  }
+
   async discoverGeoOptions(countryExternalId?: string): Promise<SupplierGeoOption[]> {
     if (countryExternalId) {
       return this.discoverForState(countryExternalId);

@@ -80,6 +80,10 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
 
   constructor(@Optional() private readonly captchaStore?: KompasCaptchaStore) {}
 
+  async discoverCountries(): Promise<Array<{ countryId?: string; countryName?: string }>> {
+    return [{ countryId: "TR", countryName: "Turkey" }];
+  }
+
   // в”Ђв”Ђ Program Discovery в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
   async discoverPrograms(): Promise<Array<{ value: string; name: string }>> {

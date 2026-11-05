@@ -157,6 +157,8 @@ export class SupplierCatalogService implements OnModuleInit {
     };
     if (input.supplierCode === "VOYAGER" && anyAdapter.discoverCountries) {
       raw = await anyAdapter.discoverCountries();
+    } else if ((input.supplierCode === "ANEX" || input.supplierCode === "SUMMERTOUR") && anyAdapter.discoverCountries) {
+      raw = await anyAdapter.discoverCountries();
     } else if (input.supplierCode === "KAZUNION" && anyAdapter.discoverCountries) {
       raw = await anyAdapter.discoverCountries();
     } else if (input.serviceType === "tours" && input.supplierCode === "KOMPAS" && anyAdapter.discoverCountriesAndPrograms) {
@@ -201,7 +203,7 @@ export class SupplierCatalogService implements OnModuleInit {
         ? nativeId.toUpperCase()
         : input.supplierCode === "KOMPAS" && /^\d+$/.test(nativeId)
           ? KOMPAS_HOTEL_STATEINC_TO_ISO[nativeId] ?? byName.get(this.normalizeCountry(name))
-          : byName.get(this.normalizeCountry(name));
+          : byName.get(this.normalizeCountry(name)) ?? (/t[uü]rki?ye|turkey/i.test(name) ? "TR" : undefined);
       if (!iso) { skipped += 1; continue; }
       resolved.set(iso, name);
     }
