@@ -2456,6 +2456,9 @@ model Order {
   /// Момент перехода cancel → CANCELLED (OrderCancelled). Server-owned;
   /// immutable.
   cancelledAt DateTime?
+  /// Момент возврата заказа в заявку (returnToRequest). Отменённый заказ с
+  /// этим значением нельзя закрыть: он должен быть переконвертирован.
+  returnedToRequestAt DateTime?
   /// Момент перехода complete ИЛИ reconcile-реконсиляции → FULFILLED
   /// (OrderFulfilled). Server-owned; immutable.
   fulfilledAt DateTime?

@@ -190,6 +190,7 @@ export function computeAvailableOrderActions(
     travelerCount: number | null;
     termsAcceptedAt: Date | null;
     finalConfirmedAt: Date | null;
+    returnedToRequestAt?: Date | null;
     travelers?: Array<{ dataCompleteness: string }>;
   },
   granted: readonly string[],
@@ -211,6 +212,8 @@ export function computeAvailableOrderActions(
     if (d3Scope && !order.finalConfirmedAt && (action === "confirm" || action === "send")) continue;
     // Data is already confirmed: the next step is confirm order, not another
     // "waiting for data"/"resume processing" round-trip.
+    if (action === "close" && order.returnedToRequestAt) continue;
+    if (action === "close" && order.returnedToRequestAt) continue;
     if (order.finalConfirmedAt && (action === "markWaitingData" || action === "resumeProcessing")) continue;
     // confirm требует полные данные всех туристов (как в orderAction).
     if (action === "confirm" && (order.travelers ?? []).some((x) => x.dataCompleteness !== "COMPLETE")) continue;
@@ -1585,7 +1588,7 @@ export class OrderService {
           id: true, code: true, customerId: true, status: true, version: true,
           amount: true, currency: true,
           termsAcceptedAt: true, finalConfirmedAt: true, travelerCount: true,
-          acquisitionSource: true,
+          acquisitionSource: true, returnedToRequestAt: true,
           travelers: { select: { id: true, dataCompleteness: true } },
         },
       });
@@ -1604,6 +1607,10 @@ export class OrderService {
         if (activeBookings > 0) {
           throw new ConflictError(`Order ${order.code} has ${activeBookings} active booking(s); return or cancel them before cancelling the order`);
         }
+      }
+
+      if (action === "close" && order.returnedToRequestAt) {
+        throw new ValidationDomainError(`Order ${order.code} was returned to Request; convert it again before closing`);
       }
 
       if (action === "complete" || action === "close") {
@@ -1723,6 +1730,7 @@ export class OrderService {
       else if (action === "complete") data.fulfilledAt = milestoneNow;
       else if (action === "close") data.closedAt = milestoneNow;
       else if (action === "cancel" || action === "returnToRequest") data.cancelledAt = milestoneNow;
+      if (action === "returnToRequest") data.returnedToRequestAt = milestoneNow;
       const updatedRows = await tx.order.updateMany({
         where: { id: orderId, status: order.status, version: order.version },
         data,
