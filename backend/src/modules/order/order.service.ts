@@ -205,6 +205,9 @@ export function computeAvailableOrderActions(
     if (action === "returnToRequest" && activeBlockingBookings > 0) continue;
     // D3 traveler gate (как в orderAction): confirm/send требуют finalConfirmedAt.
     if (d3Scope && !order.finalConfirmedAt && (action === "confirm" || action === "send")) continue;
+    // Data is already confirmed: the next step is confirm order, not another
+    // "waiting for data"/"resume processing" round-trip.
+    if (order.finalConfirmedAt && (action === "markWaitingData" || action === "resumeProcessing")) continue;
     // confirm требует полные данные всех туристов (как в orderAction).
     if (action === "confirm" && (order.travelers ?? []).some((x) => x.dataCompleteness !== "COMPLETE")) continue;
     actions.push(action);
