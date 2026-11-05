@@ -107,8 +107,8 @@ export class DealsService {
       orderIds.length ? this.prisma.supplierPayout.findMany({ where: { orderId: { in: orderIds } }, select: { id: true } }) : [],
     ]);
     const ids = [request?.id, ...orderIds, ...bookings.map((b) => b.id), ...payments.map((p) => p.id), ...refunds.map((r) => r.id), ...payouts.map((p) => p.id)].filter((id): id is string => Boolean(id));
-    const audit = ids.length ? await this.prisma.auditLog.findMany({ where: { resourceId: { in: ids } }, orderBy: { createdAt: "desc" }, take: 500 }) : [];
-    return { items: audit.map((a) => ({ id: a.id, createdAt: a.createdAt.toISOString(), actorName: a.username, action: a.action, resource: a.resource, resourceId: a.resourceId, details: a.details })) };
+    const audit = ids.length ? await this.prisma.auditLog.findMany({ where: { resourceId: { in: ids } }, orderBy: { createdAt: "desc" }, take: 500, include: { user: { select: { username: true } } } }) : [];
+    return { items: audit.map((a) => ({ id: a.id, createdAt: a.createdAt.toISOString(), actorName: a.username ?? a.user?.username ?? "Система", action: a.action, resource: a.resource, resourceId: a.resourceId, details: a.details })) };
   }
 
   async list(query: DealQuery) {

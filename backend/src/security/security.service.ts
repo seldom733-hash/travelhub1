@@ -744,7 +744,7 @@ export class SecurityService implements OnModuleInit {
     await client.auditLog.create({
       data: {
         userId: entry.userId ?? null,
-        username: entry.username ?? null,
+        username: entry.username ?? (typeof entry.details?.actor === "string" ? entry.details.actor : null),
         action: entry.action,
         resource: entry.resource ?? null,
         resourceId: entry.resourceId ?? null,

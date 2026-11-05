@@ -236,6 +236,21 @@ export class RefundService {
   // ── Lifecycle transitions (единственный state-machine authority) ──────────
 
   /** REQUESTED → APPROVED (согласован; approval step, finance.refund.approve). */
+  async update(code: string, input: { amount?: string; reason?: string | null }, actor: Actor): Promise<Record<string, unknown>> {
+    const row = await this.prisma.refund.findUnique({ where: { code } });
+    if (!row) throw new NotFoundError(`Refund ${code} not found`);
+    if (row.status !== "REQUESTED" && row.status !== "APPROVED") {
+      throw new ValidationDomainError(`Refund ${code} is ${row.status}; only REQUESTED/APPROVED can be edited`);
+    }
+    const amount = input.amount != null ? new Prisma.Decimal(input.amount) : row.amount;
+    if (amount.lessThanOrEqualTo(0)) throw new ValidationDomainError("amount must be > 0");
+    const payment = await this.prisma.payment.findUnique({ where: { id: row.paymentId }, select: { amount: true } });
+    if (payment && amount.greaterThan(payment.amount)) throw new ValidationDomainError("refund exceeds payment amount");
+    const updated = await this.prisma.refund.update({ where: { id: row.id }, data: { amount, reason: input.reason !== undefined ? input.reason : row.reason, version: { increment: 1 } } });
+    await this.security.audit(this.prisma as any, { userId: actor.id, username: actor.username, action: "finance.refund.edited", resource: "Refund", resourceId: row.id, details: { code, fromAmount: row.amount.toString(), toAmount: amount.toString() } });
+    return this.refundDto(updated);
+  }
+
   async approveRefund(code: string, actor: Actor): Promise<Record<string, unknown>> {
     return this.transition(code, RefundStatus.APPROVED, RefundStatus.REQUESTED, "approvedAt", "approved", "finance.refund.approved", DomainEvents.RefundApproved, actor);
   }
