@@ -9,6 +9,7 @@ type DealQuery = {
   state?: string;
   viewerId?: string;
   cancellationReason?: string;
+  settlementStatus?: string;
   status?: string;
   statusGroup?: string;
   supplierId?: string;
@@ -252,6 +253,7 @@ export class DealsService {
       if (query.manager && row.manager !== query.manager) return false;
       if (query.clientPayment && row.paymentStatus !== query.clientPayment) return false;
       if (query.supplierPayment && row.supplierPaymentStatus !== query.supplierPayment) return false;
+      if (query.settlementStatus && row.settlementStatus !== query.settlementStatus) return false;
       if (query.financialStatus && row.financialStatus !== query.financialStatus) return false;
       if (query.serviceType && row.productType !== query.serviceType) return false;
       if (from || to) {
