@@ -110,4 +110,41 @@ describe("calculateCancellationSettlement", () => {
     expect(r.status).toBe("PENDING_SETTLEMENT");
     expect(r.blockers).toContain("FINAL_LIABILITY_NOT_CONFIRMED");
   });
+
+  it("full penalty retains all captured money", () => {
+    const r = calculateCancellationSettlement({
+      ...base, originalAmount: "1000.00", capturedAmount: "300.00", refundedAmount: "0.00",
+      finalCustomerLiability: "300.00", penaltyAmount: "300.00", platformPenaltyShare: "300.00", supplierPenaltyShare: "0.00",
+    });
+    expect(r.status).toBe("FINANCIALLY_SETTLED_WITH_PENALTY");
+    expect(r.remainingToRefund).toBe("0");
+    expect(r.annulledUnpaidAmount).toBe("700");
+  });
+
+  it("supplier fault gives full refund and zero penalty", () => {
+    const r = calculateCancellationSettlement({
+      ...base, originalAmount: "1000.00", capturedAmount: "300.00", refundedAmount: "300.00",
+      finalCustomerLiability: "0.00", penaltyAmount: "0.00", platformPenaltyShare: "0.00", supplierPenaltyShare: "0.00", penaltyReason: null,
+    });
+    expect(r.status).toBe("FINANCIALLY_SETTLED_FULL_REFUND");
+    expect(r.remainingToRefund).toBe("0");
+  });
+
+  it("partial refund settles with remaining penalty", () => {
+    const r = calculateCancellationSettlement({
+      ...base, originalAmount: "1000.00", capturedAmount: "300.00", refundedAmount: "200.00",
+      finalCustomerLiability: "100.00", penaltyAmount: "100.00", platformPenaltyShare: "100.00", supplierPenaltyShare: "0.00",
+    });
+    expect(r.status).toBe("FINANCIALLY_SETTLED_WITH_PENALTY");
+    expect(r.remainingToRefund).toBe("0");
+  });
+
+  it("penalty above final liability is blocked", () => {
+    const r = calculateCancellationSettlement({
+      ...base, finalCustomerLiability: "50.00", penaltyAmount: "100.00", clientPenaltyAmount: "100.00",
+      platformPenaltyShare: "100.00", supplierPenaltyShare: "0.00",
+    });
+    expect(r.status).toBe("PENDING_SETTLEMENT");
+    expect(r.blockers).toContain("PENALTY_EXCEEDS_LIABILITY");
+  });
 });
