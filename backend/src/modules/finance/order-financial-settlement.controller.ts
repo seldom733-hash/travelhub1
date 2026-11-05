@@ -142,6 +142,12 @@ export class OrderFinancialSettlementController {
     return this.settlements.confirm(id, dto, user);
   }
 
+  @Post(":id/financial-settlement/write-off-supplier-debt")
+  @RequirePermissions("finance.settlement.manage")
+  writeOffSupplierDebt(@Param("id") id: string, @Body() dto: WriteOffDto, @CurrentUser() user: { id: string; username: string }) {
+    return this.settlements.writeOffSupplierDebt(id, dto, user);
+  }
+
   @Post(":id/financial-settlement/write-off-supplier")
   @RequirePermissions("finance.settlement.manage")
   writeOffSupplier(@Param("id") id: string, @Body() dto: WriteOffDto, @CurrentUser() user: { id: string; username: string }) {

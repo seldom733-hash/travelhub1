@@ -332,7 +332,7 @@ export class DealsService {
     const orders = await this.prisma.order.findMany({ where: { OR: [{ id: { in: orderIds } }, { commerceSequence: { in: requests.map((r) => r.commerceSequence) } }] }, select: { id: true, code: true, referenceNumber: true, commerceSequence: true, status: true, amount: true, currency: true, cancelledAt: true, paidAmount: true, refundedAmount: true, customerId: true, createdBy: true, financialStatus: true, commercialSnapshot: true, items: { select: { id: true, title: true, type: true, serviceDate: true, amount: true } } } });
     const orderBySequence = new Map(orders.map((order) => [order.commerceSequence, order]));
     const resolvedOrderIds = [...new Set([...orderIds, ...orders.map((o) => o.id)])];
-    const [bookings, payments, refunds, payouts, obligations, settlements, customers, products] = await Promise.all([
+    const [bookings, payments, refunds, payouts, obligations, settlements, customers, products, supplierWriteOffs] = await Promise.all([
       this.prisma.booking.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, referenceNumber: true, orderId: true, status: true, amount: true, currency: true } }),
       this.prisma.payment.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, paymentMethod: true, paidAt: true, createdAt: true, orderId: true } }),
       this.prisma.refund.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, processedAt: true, createdAt: true, orderId: true } }),
@@ -341,6 +341,7 @@ export class DealsService {
       this.prisma.orderFinancialSettlement.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { orderId: true, status: true, penaltyAmount: true, clientPenaltyAmount: true, clientPenaltyStatus: true, supplierPenaltyStatus: true, supplierPenaltyShare: true, remainingToPay: true, remainingToRefund: true, finalCustomerLiability: true } }),
       this.prisma.customer.findMany({ where: { id: { in: requests.map((r) => r.customerId).filter((id): id is string => Boolean(id)) } }, select: { id: true, firstName: true, lastName: true, companyName: true, phone: true, email: true } }),
       this.prisma.product.findMany({ where: { id: { in: requests.map((r) => r.productId).filter((id): id is string => Boolean(id)) } }, select: { id: true, title: true, type: true, partnerId: true, attributes: true } }),
+      this.prisma.supplierDebtWriteOff.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { orderId: true, amount: true } }),
     ]);
     const partnerIds = [...new Set([
       ...requests.map((r) => r.partnerId).filter((id): id is string => Boolean(id)),
@@ -390,6 +391,7 @@ export class DealsService {
       const clientRefunds = (order ? refundsByOrder.get(order.id) ?? [] : []).filter((r) => r.status === "PROCESSED");
       const supplierPayouts = order ? payoutsByOrder.get(order.id) ?? [] : [];
       const supplierObligations = order ? obligationsByOrder.get(order.id) ?? [] : [];
+      const supplierWriteOff = supplierWriteOffs.filter((w) => w.orderId === order?.id).reduce((sum, w) => sum + money(w.amount), 0);
       const settlement = order ? settlementByOrder.get(order.id) : undefined;
       const captured = clientPayments.filter((p) => p.status === "CAPTURED" || p.status === "REFUNDED").reduce((sum, p) => sum + money(p.amount), 0);
       const refunded = clientRefunds.filter((r) => r.status !== "FAILED").reduce((sum, r) => sum + money(r.amount), 0);
@@ -420,11 +422,10 @@ export class DealsService {
       const stage = returnedToRequest ? "REQUEST" : activeBooking ? "BOOKING" : order ? "ORDER" : "REQUEST";
       const status = returnedToRequest ? request.status : activeBooking?.status ?? order?.status ?? request.status;
       const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(status);
-      const supplierDebt = cancelled && supplierObligations.length === 0
-        ? 0
-        : useObligationCost && obligationDebt <= cost
-          ? obligationDebt
-          : Math.max(0, cost - supplierPaid + supplierRefunded);
+      const rawSupplierDebt = useObligationCost && obligationDebt <= cost
+        ? obligationDebt
+        : Math.max(0, cost - supplierPaid + supplierRefunded);
+      const supplierDebt = Math.max(0, rawSupplierDebt - supplierWriteOff);
       const cancelledOrder = cancelled || Boolean(order?.cancelledAt);
       const clientDebt = cancelledOrder ? 0 : settlement
         ? money(settlement.remainingToPay)

@@ -1386,17 +1386,34 @@ export class OrderService {
    *    (историческое правило bulk PATCH — заказы вне D3-потока).
    */
   private async assertOrderDebtsCleared(tx: Prisma.TransactionClient, orderId: string, code: string, amount: Prisma.Decimal, status: OrderStatus) {
-    const [payments, refunds, pendingRefunds, obligations] = await Promise.all([
+    const [payments, refunds, pendingRefunds, obligations, order, outgoing, incoming, writeOffs] = await Promise.all([
       tx.payment.aggregate({ where: { orderId, status: { in: ["CAPTURED", "REFUNDED"] } }, _sum: { amount: true } }),
       tx.refund.aggregate({ where: { orderId, status: "PROCESSED" }, _sum: { amount: true } }),
       tx.refund.aggregate({ where: { orderId, status: { in: ["REQUESTED", "APPROVED"] } }, _sum: { amount: true } }),
       tx.supplierObligation.aggregate({ where: { orderId, status: { in: ["OPEN", "PARTIALLY_PAID"] } }, _sum: { remainingAmount: true } }),
+      tx.order.findUnique({ where: { id: orderId }, select: { commercialSnapshot: true } }),
+      tx.supplierPayout.aggregate({ where: { orderId, status: "CONFIRMED", direction: { not: "INCOMING" } }, _sum: { amount: true } }),
+      tx.supplierPayout.aggregate({ where: { orderId, status: "CONFIRMED", direction: "INCOMING" }, _sum: { amount: true } }),
+      tx.supplierDebtWriteOff.aggregate({ where: { orderId }, _sum: { amount: true } }),
     ]);
     const captured = new Prisma.Decimal(payments._sum.amount ?? 0);
     const refunded = new Prisma.Decimal(refunds._sum.amount ?? 0);
     const pendingRefund = new Prisma.Decimal(pendingRefunds._sum.amount ?? 0);
     const clientDebt = status === "CANCELLED" ? new Prisma.Decimal(0) : Prisma.Decimal.max(new Prisma.Decimal(0), new Prisma.Decimal(amount).minus(captured.minus(refunded)));
-    const supplierDebt = new Prisma.Decimal(obligations._sum.remainingAmount ?? 0);
+    const snap = (order?.commercialSnapshot ?? {}) as Record<string, unknown>;
+    let cost = Number(snap.netSupplierCost ?? snap.supplierPrice ?? 0);
+    if (cost <= 0) {
+      const items = await tx.orderItem.findMany({ where: { orderId }, select: { productId: true } });
+      for (const item of items) {
+        if (!item.productId) continue;
+        const product = await tx.product.findUnique({ where: { id: item.productId }, select: { attributes: true } });
+        const attrs = (product?.attributes ?? {}) as Record<string, unknown>;
+        cost += Number(attrs.priceLocal ?? attrs.convertedPrice ?? attrs.startingPrice ?? 0);
+      }
+    }
+    const obligationDebt = Number(obligations._sum.remainingAmount ?? 0);
+    const baseSupplierDebt = obligationDebt > 0 ? obligationDebt : Math.max(0, cost - Number(outgoing._sum.amount ?? 0) + Number(incoming._sum.amount ?? 0));
+    const supplierDebt = new Prisma.Decimal(Math.max(0, baseSupplierDebt - Number(writeOffs._sum.amount ?? 0)));
     if (!clientDebt.isZero() || !supplierDebt.isZero() || !pendingRefund.isZero()) {
       throw new ConflictError(
         `Order ${code} cannot be completed/closed: clientDebt=${clientDebt.toString()}, supplierDebt=${supplierDebt.toString()}, pendingRefund=${pendingRefund.toString()}`,

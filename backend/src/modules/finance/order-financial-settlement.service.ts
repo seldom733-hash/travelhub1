@@ -220,6 +220,41 @@ export class OrderFinancialSettlementService {
     return this.toDto(created);
   }
 
+  async writeOffSupplierDebt(orderId: string, input: { amount?: string | null; reason: string }, actor: Actor) {
+    const reason = input.reason?.trim();
+    if (!reason) throw new ValidationDomainError("Write-off reason is required");
+    const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { id: true, code: true, status: true, cancelledAt: true, amount: true, currency: true, commercialSnapshot: true } });
+    if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+    if (order.status !== "CANCELLED" && !order.cancelledAt) throw new ValidationDomainError("Supplier debt write-off is allowed only for a cancelled order");
+    const [outgoing, incoming, obligations, previous] = await Promise.all([
+      this.prisma.supplierPayout.aggregate({ where: { orderId, status: "CONFIRMED", direction: { not: "INCOMING" } }, _sum: { amount: true } }),
+      this.prisma.supplierPayout.aggregate({ where: { orderId, status: "CONFIRMED", direction: "INCOMING" }, _sum: { amount: true } }),
+      this.prisma.supplierObligation.aggregate({ where: { orderId, status: { in: ["OPEN", "PARTIALLY_PAID"] } }, _sum: { remainingAmount: true } }),
+      this.prisma.supplierDebtWriteOff.aggregate({ where: { orderId }, _sum: { amount: true } }),
+    ]);
+    const snap = (order.commercialSnapshot ?? {}) as Record<string, unknown>;
+    let cost = Number(snap.netSupplierCost ?? snap.supplierPrice ?? 0);
+    if (cost <= 0) {
+      const items = await this.prisma.orderItem.findMany({ where: { orderId }, select: { productId: true, amount: true } });
+      for (const item of items) {
+        if (!item.productId) continue;
+        const product = await this.prisma.product.findUnique({ where: { id: item.productId }, select: { attributes: true } });
+        const attrs = (product?.attributes ?? {}) as Record<string, unknown>;
+        cost += Number(attrs.priceLocal ?? attrs.convertedPrice ?? attrs.startingPrice ?? 0);
+      }
+    }
+    const obligationDebt = Number(obligations._sum.remainingAmount ?? 0);
+    const baseDebt = obligationDebt > 0 ? obligationDebt : Math.max(0, cost - Number(outgoing._sum.amount ?? 0) + Number(incoming._sum.amount ?? 0));
+    const debt = Math.max(0, baseDebt - Number(previous._sum.amount ?? 0));
+    if (debt <= 0) throw new ConflictError("Supplier has no outstanding debt to write off");
+    const amount = input.amount ? new Prisma.Decimal(input.amount) : new Prisma.Decimal(debt);
+    if (amount.lte(0) || amount.greaterThan(new Prisma.Decimal(debt))) throw new ValidationDomainError("Write-off amount exceeds supplier debt");
+    const code = await this.ids.nextCode(this.prisma as any, "SDW");
+    const row = await this.prisma.supplierDebtWriteOff.create({ data: { code, orderId, amount, currency: order.currency, reason, actorId: actor.id, actorName: actor.username } });
+    await this.security.audit(this.prisma as any, { userId: actor.id, username: actor.username, action: "finance.supplier_debt.written_off", resource: "SupplierDebtWriteOff", resourceId: row.id, details: { orderId, code, amount: amount.toString(), reason } });
+    return { id: row.id, code, amount: amount.toString(), orderId, reason };
+  }
+
   async writeOffSupplier(orderId: string, input: { amount?: string | null; reason: string }, actor: Actor): Promise<Record<string, unknown>> {
     const reason = input.reason?.trim();
     if (!reason) throw new ValidationDomainError("Write-off reason is required");
