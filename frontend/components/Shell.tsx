@@ -336,7 +336,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                           {pendingPayments}
                         </span>
                       )}
-                      {collapsed && item.href === "/app/payments" && pendingPayments > 0 && (
+                      {collapsed && item.href === "/app/finance/deals" && pendingPayments > 0 && (
                         <span className="absolute right-1 top-1 size-2 animate-pulse rounded-full bg-amber-400" />
                       )}
                       {collapsed && (
