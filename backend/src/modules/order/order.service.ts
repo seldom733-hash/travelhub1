@@ -700,7 +700,10 @@ export class OrderService {
     // Request → Order: переиспользуем shared commerce root заявки (НЕ новая
     // последовательность): MKT-REQ-{SEQ} → MKT-ORD-{SEQ} (один chain root §26).
     const commerceSequence = r.commerceSequence;
-    const referenceNumber = this.refNum.commerceOrderRef(commerceSequence);
+    const existingOrders = await tx.order.count({ where: { commerceSequence } });
+    const referenceNumber = existingOrders === 0
+      ? this.refNum.commerceOrderRef(commerceSequence)
+      : `${this.refNum.commerceOrderRef(commerceSequence)}-${existingOrders}`;
     const serviceDate = r.requestedServiceDate
       ? new Date(`${r.requestedServiceDate.toISOString().slice(0, 10)}T00:00:00.000Z`)
       : null;
@@ -1765,16 +1768,9 @@ export class OrderService {
       //  - concurrent-claimer (другая команда изменила Request) → ConflictError
       //    → полный rollback: Order остаётся активным, ничего не «половинчато».
       if (action === "returnToRequest" && linkedRequestId && linkedRequestCode) {
-        const nextCommerceSequence = await this.refNum.nextCommerceSequence(tx);
-        const nextRequestReference = this.refNum.commerceRequestRef(nextCommerceSequence);
         const reactivated = await tx.request.updateMany({
           where: { id: linkedRequestId, status: "CONVERTED" },
-          data: {
-            status: "CHECKING",
-            commerceSequence: nextCommerceSequence,
-            referenceNumber: nextRequestReference,
-            version: { increment: 1 },
-          },
+          data: { status: "CHECKING", version: { increment: 1 } },
         });
         if (reactivated.count !== 1) {
           throw new ConflictError(
