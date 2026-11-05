@@ -1423,7 +1423,13 @@ export class OrderService {
       }
     }
     const obligationDebt = Number(obligations._sum.remainingAmount ?? 0);
-    const baseSupplierDebt = obligationDebt > 0 ? obligationDebt : Math.max(0, cost - Number(outgoing._sum.amount ?? 0) + Number(incoming._sum.amount ?? 0));
+    const supplierPaidTotal = Number(outgoing._sum.amount ?? 0);
+    const supplierRefundedTotal = Number(incoming._sum.amount ?? 0);
+    const baseSupplierDebt = status === "CANCELLED"
+      ? Math.max(0, supplierPaidTotal - supplierRefundedTotal)
+      : obligationDebt > 0
+        ? obligationDebt
+        : Math.max(0, cost - supplierPaidTotal + supplierRefundedTotal);
     const supplierDebt = new Prisma.Decimal(Math.max(0, baseSupplierDebt - Number(writeOffs._sum.amount ?? 0)));
     const supplierRefundShortfall = supplierTerms.reduce((sum: number, term: any) => sum + Math.max(0, Number(term.supplierRefundAgreed) - Number(term.supplierRefundActual)), 0);
     const clientRefundShortfall = supplierTerms.reduce((sum: number, term: any) => sum + Math.max(0, Number(term.clientRefundAgreed) - Number(term.clientRefundActual)), 0);
