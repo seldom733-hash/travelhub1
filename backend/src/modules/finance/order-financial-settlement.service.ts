@@ -225,6 +225,36 @@ export class OrderFinancialSettlementService {
     return this.toDto(created);
   }
 
+  async getCancellationApproval(orderId: string) {
+    return this.prisma.cancellationApproval.findFirst({ where: { orderId }, orderBy: { createdAt: "desc" } });
+  }
+
+  async submitCancellationApproval(orderId: string, input: SettlementConfirmInput, actor: Actor) {
+    const pending = await this.prisma.cancellationApproval.findFirst({ where: { orderId, status: "PENDING" } });
+    if (pending) throw new ConflictError("Cancellation approval is already pending for this order");
+    const code = await this.ids.nextCode(this.prisma as any, "CNA");
+    const row = await this.prisma.cancellationApproval.create({
+      data: { code, orderId, input: input as any, submittedById: actor.id, submittedByName: actor.username },
+    });
+    await this.security.audit(this.prisma as any, { userId: actor.id, username: actor.username, action: "finance.cancellation.submitted", resource: "CancellationApproval", resourceId: row.id, details: { orderId, code } });
+    return row;
+  }
+
+  async approveCancellationApproval(orderId: string, actor: Actor) {
+    const approval = await this.prisma.cancellationApproval.findFirst({ where: { orderId, status: "PENDING" }, orderBy: { createdAt: "desc" } });
+    if (!approval) throw new NotFoundError("Pending cancellation approval not found");
+    if (approval.submittedById === actor.id) throw new ConflictError("The approver cannot approve their own calculation");
+    const settlement = await this.confirm(orderId, approval.input as unknown as SettlementConfirmInput, actor);
+    await this.prisma.cancellationApproval.update({ where: { id: approval.id }, data: { status: "APPROVED", approvedById: actor.id, approvedByName: actor.username, approvedAt: new Date() } });
+    return settlement;
+  }
+
+  async rejectCancellationApproval(orderId: string, reason: string, actor: Actor) {
+    const approval = await this.prisma.cancellationApproval.findFirst({ where: { orderId, status: "PENDING" }, orderBy: { createdAt: "desc" } });
+    if (!approval) throw new NotFoundError("Pending cancellation approval not found");
+    return this.prisma.cancellationApproval.update({ where: { id: approval.id }, data: { status: "REJECTED", rejectionReason: reason, approvedById: actor.id, approvedByName: actor.username, approvedAt: new Date() } });
+  }
+
   async getCancellationSupplierTerms(orderId: string) {
     return this.prisma.orderCancellationSupplierTerm.findMany({ where: { orderId }, orderBy: { createdAt: "asc" } });
   }

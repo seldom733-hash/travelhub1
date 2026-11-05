@@ -4677,6 +4677,26 @@ model OrderCancellationSupplierTerm {
   @@schema("finance")
 }
 
+model CancellationApproval {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  orderId     String
+  input       Json
+  status      String   @default("PENDING")
+  submittedById String
+  submittedByName String
+  submittedAt DateTime @default(now())
+  approvedById String?
+  approvedByName String?
+  approvedAt  DateTime?
+  rejectionReason String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([orderId])
+  @@schema("finance")
+}
+
 model OrderFinancialSettlement {
   id                    String                @id @default(uuid())
   code                  String                @unique // SET-00000001

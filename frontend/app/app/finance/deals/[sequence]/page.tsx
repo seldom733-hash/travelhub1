@@ -654,9 +654,21 @@ function CancellationTab({ deal, onSaved }: { deal: DealRow; onSaved: () => void
     try { setPreview(await api.post(`/orders/${deal.orderId}/financial-settlement/preview`, body)); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
-  async function confirm() {
+  async function submit() {
     setBusy(true); setError("");
-    try { await api.post(`/orders/${deal.orderId}/financial-settlement/confirm`, body); setNotice("Расчёт утверждён"); onSaved(); }
+    try { await api.post(`/orders/${deal.orderId}/cancellation/submit`, body); setNotice("Расчёт отправлен на утверждение"); }
+    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  async function approve() {
+    setBusy(true); setError("");
+    try { await api.post(`/orders/${deal.orderId}/cancellation/approve`, {}); setNotice("Расчёт утверждён"); onSaved(); }
+    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  async function reject() {
+    const reason = window.prompt("Причина отклонения") ?? "";
+    if (!reason.trim()) return;
+    setBusy(true); setError("");
+    try { await api.post(`/orders/${deal.orderId}/cancellation/reject`, { reason }); setNotice("Расчёт отклонён"); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   return <div className="grid gap-3 lg:grid-cols-2">
@@ -665,7 +677,7 @@ function CancellationTab({ deal, onSaved }: { deal: DealRow; onSaved: () => void
       <label className="grid gap-1 text-[11px]">Причина<select value={reason} onChange={(e) => setReason(e.target.value)} className="rounded border px-2 py-1.5">{reasons.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
       <label className="grid gap-1 text-[11px]">Штраф туриста<input value={clientPenalty} onChange={(e) => setClientPenalty(e.target.value)} inputMode="decimal" className="rounded border px-2 py-1.5" /></label>
       <label className="grid gap-1 text-[11px]">Штраф поставщика<input value={supplierPenalty} onChange={(e) => setSupplierPenalty(e.target.value)} inputMode="decimal" className="rounded border px-2 py-1.5" /></label>
-      <div className="flex gap-2"><button type="button" disabled={busy} onClick={() => void calculate()} className="rounded bg-[#0f6b5f] px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50">Рассчитать</button><button type="button" disabled={busy || !preview} onClick={() => void confirm()} className="rounded border border-[#0f6b5f] px-3 py-1.5 text-[11px] font-semibold text-[#0f6b5f] disabled:opacity-50">Утвердить</button></div>
+      <div className="flex gap-2"><button type="button" disabled={busy} onClick={() => void calculate()} className="rounded bg-[#0f6b5f] px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50">Рассчитать</button><button type="button" disabled={busy || !preview} onClick={() => void submit()} className="rounded border border-[#0f6b5f] px-3 py-1.5 text-[11px] font-semibold text-[#0f6b5f] disabled:opacity-50">На утверждение</button><button type="button" disabled={busy} onClick={() => void approve()} className="rounded bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50">Утвердить</button><button type="button" disabled={busy} onClick={() => void reject()} className="rounded border border-rose-300 px-3 py-1.5 text-[11px] font-semibold text-rose-600 disabled:opacity-50">Отклонить</button></div>
       {error && <div className="rounded bg-rose-50 px-2 py-1 text-[10px] text-rose-700">{error}</div>}{notice && <div className="rounded bg-emerald-50 px-2 py-1 text-[10px] text-emerald-700">{notice}</div>}
     </div>
     <div className="space-y-1 rounded-lg border border-[#e5e2da] p-3 text-[11px]">

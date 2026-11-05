@@ -162,6 +162,30 @@ export class OrderFinancialSettlementController {
     return this.settlements.confirm(id, dto, user);
   }
 
+  @Get(":id/cancellation/approval")
+  @RequirePermissions("finance.settlement.read")
+  getCancellationApproval(@Param("id") id: string) {
+    return this.settlements.getCancellationApproval(id);
+  }
+
+  @Post(":id/cancellation/submit")
+  @RequirePermissions("finance.settlement.manage")
+  submitCancellationApproval(@Param("id") id: string, @Body() dto: SettlementConfirmDto, @CurrentUser() user: { id: string; username: string }) {
+    return this.settlements.submitCancellationApproval(id, dto, user);
+  }
+
+  @Post(":id/cancellation/approve")
+  @RequirePermissions("finance.settlement.manage")
+  approveCancellationApproval(@Param("id") id: string, @CurrentUser() user: { id: string; username: string }) {
+    return this.settlements.approveCancellationApproval(id, user);
+  }
+
+  @Post(":id/cancellation/reject")
+  @RequirePermissions("finance.settlement.manage")
+  rejectCancellationApproval(@Param("id") id: string, @Body() body: { reason: string }, @CurrentUser() user: { id: string; username: string }) {
+    return this.settlements.rejectCancellationApproval(id, body.reason ?? "", user);
+  }
+
   @Get(":id/cancellation/supplier-terms")
   @RequirePermissions("finance.settlement.read")
   getCancellationSupplierTerms(@Param("id") id: string) {
