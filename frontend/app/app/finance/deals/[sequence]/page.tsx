@@ -517,26 +517,24 @@ function EditSupplierPayoutModal({ payout, onClose, onSaved }: { payout: any; on
 function HistoryTab({ deal }: { deal: DealRow }) {
   const [items, setItems] = React.useState<Array<any>>([]);
   const [loading, setLoading] = React.useState(true);
-  const labels: Record<string, string> = {
-    "finance.payment.edited": "Платёж клиента изменён",
-    "finance.supplier_payment.edited": "Расчёт с поставщиком изменён",
-    "finance.supplier_payment.confirmed": "Расчёт с поставщиком подтверждён",
-    "finance.supplier_payment.allocation_reversed": "Распределение сторнировано",
-    "order.returned_to_request": "Заказ возвращён в заявку",
-    "order.updated": "Заказ изменён",
-    "request.updated": "Заявка изменена",
-  };
+  const actionLabels: Record<string, string> = { "finance.payment.edited": "Платёж клиента изменён", "finance.supplier_payment.edited": "Расчёт с поставщиком изменён", "finance.supplier_payment.confirmed": "Расчёт с поставщиком подтверждён", "finance.supplier_payment.created": "Расчёт с поставщиком создан", "finance.supplier_payment.cancelled": "Расчёт с поставщиком отменён", "finance.supplier_payment.allocation_reversed": "Распределение сторнировано", "finance.supplier_payment.allocated": "Распределение изменено", "finance.refund.edited": "Возврат изменён", "order.returned_to_request": "Заказ возвращён в заявку", "order.updated": "Заказ изменён", "request.updated": "Заявка изменена" };
+  const resourceLabels: Record<string, string> = { SupplierPayout: "Расчёт с поставщиком", Payment: "Платёж", Refund: "Возврат", Request: "Заявка", Order: "Заказ", Booking: "Бронь" };
+  const fieldLabels: Record<string, string> = { code: "Код", actor: "Пользователь", aznAmount: "Сумма, AZN", allocationCount: "Распределений", fromAmount: "Было", toAmount: "Стало", fromStatus: "Статус был", toStatus: "Статус стал", reason: "Причина" };
+  function detailsText(details: any): string {
+    if (!details || typeof details !== "object") return "—";
+    return Object.entries(details).filter(([key]) => key !== "correlation").map(([key, value]) => `${fieldLabels[key] ?? key}: ${typeof value === "object" ? JSON.stringify(value) : String(value)}`).join(" · ");
+  }
   React.useEffect(() => {
     let alive = true;
     api.get<any>(`/finance/deals/${deal.sequence}/history`).then((data) => {
       if (!alive) return;
-      setItems((data.items ?? []).map((x: any) => ({ ...x, label: labels[x.action] ?? x.action ?? "Изменение" })));
+      setItems((data.items ?? []).map((x: any) => ({ ...x, label: actionLabels[x.action] ?? x.action ?? "Изменение", actor: x.actorName && x.actorName !== "Система" ? x.actorName : (x.details?.actor ?? x.actorName ?? "Система") })));
     }).catch(() => { if (alive) setItems([]); }).finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [deal.sequence]);
   if (loading) return <Empty text="Загрузка истории…" />;
   if (items.length === 0) return <Empty text="История изменений пуста" />;
-  return <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-[10px]"><thead className="text-[#98a2b3]"><tr>{["Дата и время", "Кто", "Действие", "Объект", "Детали"].map((h) => <th key={h} className="px-2 py-1 font-medium">{h}</th>)}</tr></thead><tbody>{items.map((x, i) => <tr key={x.id ?? i} className="border-t border-[#f0eee8] align-top"><td className="px-2 py-1.5 whitespace-nowrap">{x.createdAt ? new Date(x.createdAt).toLocaleString("ru-RU") : "—"}</td><td className="px-2 py-1.5">{x.actorName ?? "Система"}</td><td className="px-2 py-1.5 font-medium">{x.label}</td><td className="px-2 py-1.5">{x.resource ?? "—"}</td><td className="px-2 py-1.5 font-mono text-[9px]">{x.details ? JSON.stringify(x.details) : "—"}</td></tr>)}</tbody></table></div>;
+  return <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-[10px]"><thead className="text-[#98a2b3]"><tr>{["Дата и время", "Кто", "Действие", "Объект", "Детали"].map((h) => <th key={h} className="px-2 py-1 font-medium">{h}</th>)}</tr></thead><tbody>{items.map((x, i) => <tr key={x.id ?? i} className="border-t border-[#f0eee8] align-top"><td className="px-2 py-1.5 whitespace-nowrap">{x.createdAt ? new Date(x.createdAt).toLocaleString("ru-RU") : "—"}</td><td className="px-2 py-1.5">{x.actor}</td><td className="px-2 py-1.5 font-medium">{x.label}</td><td className="px-2 py-1.5">{resourceLabels[x.resource] ?? x.resource ?? "—"}</td><td className="px-2 py-1.5">{detailsText(x.details)}</td></tr>)}</tbody></table></div>;
 }
 
 function ClientChats({ deal }: { deal: DealRow }) {
