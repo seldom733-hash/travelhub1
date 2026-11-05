@@ -206,7 +206,7 @@ export function computeAvailableOrderActions(
     if (!granted.includes(ACTION_PERMISSIONS[action])) continue;
     // Stage 2 fix (Bug 2): блокирует только реально активный Booking;
     // исторический (returned/cancelled) не должен прятать кнопку.
-    if (action === "returnToRequest" && activeBlockingBookings > 0) continue;
+    if ((action === "returnToRequest" || action === "cancel") && activeBlockingBookings > 0) continue;
     // D3 traveler gate (как в orderAction): confirm/send требуют finalConfirmedAt.
     if (d3Scope && !order.finalConfirmedAt && (action === "confirm" || action === "send")) continue;
     // Data is already confirmed: the next step is confirm order, not another
@@ -1590,6 +1590,13 @@ export class OrderService {
       }
       if (!transition.from.includes(order.status)) {
         throw new ConflictError(`Cannot ${action} order ${order.code} from status ${order.status}`);
+      }
+
+      if (action === "cancel") {
+        const activeBookings = await tx.booking.count({ where: { orderId, status: { notIn: BOOKING_TERMINAL } } });
+        if (activeBookings > 0) {
+          throw new ConflictError(`Order ${order.code} has ${activeBookings} active booking(s); return or cancel them before cancelling the order`);
+        }
       }
 
       if (action === "complete" || action === "close") {
