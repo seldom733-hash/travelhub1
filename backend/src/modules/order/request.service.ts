@@ -998,13 +998,14 @@ export class RequestService {
     const snapshot = (request.commercialSnapshot ?? {}) as Record<string, any>;
     const markupRate = Number(snapshot.markupRate ?? 0);
     const supplierPrice = round2(newPrice);
-    const commissionAmount = round2(Number(snapshot.commissionAmount ?? 0));
-    const costBase = round2(supplierPrice + commissionAmount);
-    const markupAmount = round2(costBase * markupRate);
-    const platformPrice = round2(costBase + markupAmount);
+    const commissionRate = Number(snapshot.commissionRate ?? 0);
+    const grossBase = round2(supplierPrice / (1 - commissionRate));
+    const commissionAmount = round2(grossBase - supplierPrice);
+    const markupAmount = round2(grossBase * markupRate);
+    const platformPrice = round2(grossBase + markupAmount);
     const oldFx = snapshot.fx as Record<string, any> | undefined;
     const fx = oldFx && Number(oldFx.rate) > 0
-      ? { ...oldFx, sourceAmount: round2(costBase / Number(oldFx.rate)), aznAmount: costBase, convertedAt: now.toISOString() }
+      ? { ...oldFx, sourceAmount: round2(grossBase / Number(oldFx.rate)), aznAmount: grossBase, convertedAt: now.toISOString() }
       : undefined;
 
     if (request.commercialSnapshot) {
@@ -1017,8 +1018,8 @@ export class RequestService {
             markupAmount,
             publicPrice: platformPrice,
             customerFinalPrice: platformPrice,
-            netSupplierCost: costBase,
-            platformGrossIncome: markupAmount,
+            netSupplierCost: supplierPrice,
+            platformGrossIncome: round2(markupAmount + commissionAmount),
             ...(fx ? { fx } : {}),
             individualDiscount: false,
             discountType: "NONE",
