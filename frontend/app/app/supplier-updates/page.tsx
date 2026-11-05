@@ -180,7 +180,6 @@ export default function SupplierUpdatesPage() {
   const suppliers = useMemo(() => {
     const map = new Map<string, { code: string; name: string; serviceTypes: Set<string> }>();
     for (const cap of capabilities) {
-      if (!cap.countries.length) continue;
       const current = map.get(cap.supplierCode) ?? { code: cap.supplierCode, name: cap.name, serviceTypes: new Set<string>() };
       cap.serviceTypes.forEach((s) => current.serviceTypes.add(s));
       map.set(cap.supplierCode, current);
@@ -191,7 +190,7 @@ export default function SupplierUpdatesPage() {
   const services = useMemo(() => {
     const set = new Set<string>();
     capabilities
-      .filter((cap) => cap.supplierCode === supplierCode && cap.countries.length > 0)
+      .filter((cap) => cap.supplierCode === supplierCode)
       .forEach((cap) => cap.serviceTypes.forEach((s) => set.add(s)));
     const values = [...set] as SupplierCatalogRunServiceType[];
     if (values.length > 1) values.push("all");
