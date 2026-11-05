@@ -176,4 +176,49 @@ describe("calculateCancellationSettlement", () => {
     expect(r.status).toBe("PENDING_SETTLEMENT");
     expect(r.blockers).toContain("CANCELLATION_NOT_CONFIRMED");
   });
+
+  it("penalty without justification is blocked", () => {
+    const r = calculateCancellationSettlement({ ...base, penaltyReason: null });
+    expect(r.blockers).toContain("PENALTY_JUSTIFICATION_MISSING");
+  });
+
+  it("completed order uses original amount as liability", () => {
+    const r = calculateCancellationSettlement({ ...base, terminalKind: "COMPLETED" });
+    expect(r.finalCustomerLiability).toBe("2000");
+  });
+
+  it("full refund exactly equals captured", () => {
+    const r = calculateCancellationSettlement({
+      ...base, capturedAmount: "300.00", refundedAmount: "300.00", finalCustomerLiability: "0.00",
+      penaltyAmount: "0.00", platformPenaltyShare: "0.00", supplierPenaltyShare: "0.00", penaltyReason: null,
+    });
+    expect(r.remainingToRefund).toBe("0");
+    expect(r.status).toBe("FINANCIALLY_SETTLED_FULL_REFUND");
+  });
+
+  it("supplier penalty only is reflected in supplier share", () => {
+    const r = calculateCancellationSettlement({
+      ...base, finalCustomerLiability: "0.00", penaltyAmount: "100.00", clientPenaltyAmount: "0.00",
+      platformPenaltyShare: "0.00", supplierPenaltyShare: "100.00",
+    });
+    expect(r.supplierPenaltyShare).toBe("100");
+  });
+
+  it("zero penalty with retained liability settles normally", () => {
+    const r = calculateCancellationSettlement({
+      ...base, finalCustomerLiability: "900.00", penaltyAmount: "0.00",
+      platformPenaltyShare: "0.00", supplierPenaltyShare: "0.00", penaltyReason: null,
+    });
+    expect(r.status).toBe("FINANCIALLY_SETTLED");
+  });
+
+  it("over-refund remainder is never negative", () => {
+    const r = calculateCancellationSettlement({ ...base, capturedAmount: "100.00", refundedAmount: "300.00", finalCustomerLiability: "0.00", penaltyAmount: "0.00", platformPenaltyShare: "0.00", supplierPenaltyShare: "0.00", penaltyReason: null });
+    expect(Number(r.remainingToRefund)).toBeGreaterThanOrEqual(0);
+  });
+
+  it("non-terminal order is always open", () => {
+    const r = calculateCancellationSettlement({ ...base, terminal: false, terminalKind: null });
+    expect(r.status).toBe("OPEN");
+  });
 });
