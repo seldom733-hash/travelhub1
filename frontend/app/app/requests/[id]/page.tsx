@@ -67,6 +67,7 @@ interface RequestDetail {
   supplierRespondedAt: string | null;
   supplierDecision: string | null;
   supplierPriceProposal: string | null;
+  proposedSupplierPrice: string | null;
   supplierNote: string | null;
   customerActionDeadline: string | null;
   customerAcceptedAt: string | null;

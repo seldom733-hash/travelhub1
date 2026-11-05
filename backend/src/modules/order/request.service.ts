@@ -994,6 +994,35 @@ export class RequestService {
 
     const now = new Date();
     const customerActionDeadline = new Date(now.getTime() + DEFAULT_CUSTOMER_TTL_HOURS * 60 * 60 * 1000);
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const snapshot = (request.commercialSnapshot ?? {}) as Record<string, any>;
+    const markupRate = Number(snapshot.markupRate ?? 0);
+    const supplierPrice = round2(newPrice);
+    const markupAmount = round2(supplierPrice * markupRate);
+    const platformPrice = round2(supplierPrice + markupAmount);
+
+    if (request.commercialSnapshot) {
+      await this.prisma.request.update({
+        where: { id: requestId },
+        data: {
+          commercialSnapshot: {
+            ...snapshot,
+            supplierPrice,
+            markupAmount,
+            publicPrice: platformPrice,
+            customerFinalPrice: platformPrice,
+            netSupplierCost: supplierPrice,
+            platformGrossIncome: markupAmount,
+            individualDiscount: false,
+            discountType: "NONE",
+            discountValue: null,
+            discountAmount: 0,
+            pricingCalculatedAt: now.toISOString(),
+          } as any,
+        },
+      });
+    }
+
 
     const updated = await this.prisma.request.update({
       where: { id: requestId },
@@ -1001,7 +1030,7 @@ export class RequestService {
         status: "PRICE_CHANGED",
         supplierRespondedAt: now,
         supplierDecision: "PRICE_CHANGED",
-        supplierPriceProposal: newPrice as any,
+        supplierPriceProposal: platformPrice as any,
         supplierNote: note ?? null,
         customerActionDeadline,
         version: { increment: 1 },
@@ -1016,7 +1045,7 @@ export class RequestService {
         to: "PRICE_CHANGED",
         actorId: actor.id,
         actorName: actor.username,
-        comment: `Предложена новая цена: ${newPrice}. ${note ?? ""}`,
+        comment: `Цена поставщика: ${supplierPrice}; цена платформы: ${platformPrice} (наценка ${markupAmount}). ${note ?? ""}`,
       },
     });
 
@@ -1753,6 +1782,7 @@ export class RequestService {
       supplierRespondedAt: r.supplierRespondedAt?.toISOString() ?? null,
       supplierDecision: r.supplierDecision,
       supplierPriceProposal: r.supplierPriceProposal?.toString() ?? null,
+      proposedSupplierPrice: (r.commercialSnapshot as any)?.supplierPrice != null ? String((r.commercialSnapshot as any).supplierPrice) : null,
       supplierNote: r.supplierNote,
       customerActionDeadline: r.customerActionDeadline?.toISOString() ?? null,
       customerAcceptedAt: r.customerAcceptedAt?.toISOString() ?? null,
