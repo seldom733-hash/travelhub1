@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Put } from "@nestjs/common";
 import { IsBoolean, IsOptional, IsString, Matches, MaxLength, MinLength } from "class-validator";
 import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import { OrderFinancialSettlementService } from "./order-financial-settlement.service";
@@ -160,6 +160,18 @@ export class OrderFinancialSettlementController {
     @CurrentUser() user: { id: string; username: string },
   ) {
     return this.settlements.confirm(id, dto, user);
+  }
+
+  @Get(":id/cancellation/supplier-terms")
+  @RequirePermissions("finance.settlement.read")
+  getCancellationSupplierTerms(@Param("id") id: string) {
+    return this.settlements.getCancellationSupplierTerms(id);
+  }
+
+  @Put(":id/cancellation/supplier-terms")
+  @RequirePermissions("finance.settlement.manage")
+  saveCancellationSupplierTerms(@Param("id") id: string, @Body() body: { terms: Array<Record<string, unknown>> }, @CurrentUser() user: { id: string; username: string }) {
+    return this.settlements.saveCancellationSupplierTerms(id, body.terms ?? [], user);
   }
 
   @Post(":id/financial-settlement/write-off-client-debt")

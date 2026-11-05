@@ -4656,6 +4656,27 @@ model ClientDebtWriteOff {
   @@schema("finance")
 }
 
+model OrderCancellationSupplierTerm {
+  id                   String   @id @default(uuid())
+  orderId              String
+  supplierCode         String?
+  supplierName         String?
+  serviceTitle         String?
+  paidAmount           Decimal  @default(0) @db.Decimal(12, 2)
+  supplierPenalty      Decimal  @default(0) @db.Decimal(12, 2)
+  supplierRefundAgreed Decimal  @default(0) @db.Decimal(12, 2)
+  supplierRefundActual Decimal  @default(0) @db.Decimal(12, 2)
+  clientRefundAgreed   Decimal  @default(0) @db.Decimal(12, 2)
+  clientRefundActual   Decimal  @default(0) @db.Decimal(12, 2)
+  comment              String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([orderId, supplierCode, serviceTitle])
+  @@index([orderId])
+  @@schema("finance")
+}
+
 model OrderFinancialSettlement {
   id                    String                @id @default(uuid())
   code                  String                @unique // SET-00000001

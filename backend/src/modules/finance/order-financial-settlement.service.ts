@@ -225,6 +225,37 @@ export class OrderFinancialSettlementService {
     return this.toDto(created);
   }
 
+  async getCancellationSupplierTerms(orderId: string) {
+    return this.prisma.orderCancellationSupplierTerm.findMany({ where: { orderId }, orderBy: { createdAt: "asc" } });
+  }
+
+  async saveCancellationSupplierTerms(orderId: string, terms: Array<Record<string, unknown>>, actor: Actor) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { id: true } });
+    if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.orderCancellationSupplierTerm.deleteMany({ where: { orderId } });
+      for (const term of terms) {
+        await tx.orderCancellationSupplierTerm.create({
+          data: {
+            orderId,
+            supplierCode: typeof term.supplierCode === "string" ? term.supplierCode : null,
+            supplierName: typeof term.supplierName === "string" ? term.supplierName : null,
+            serviceTitle: typeof term.serviceTitle === "string" ? term.serviceTitle : null,
+            paidAmount: new Prisma.Decimal(String(term.paidAmount ?? "0")),
+            supplierPenalty: new Prisma.Decimal(String(term.supplierPenalty ?? "0")),
+            supplierRefundAgreed: new Prisma.Decimal(String(term.supplierRefundAgreed ?? "0")),
+            supplierRefundActual: new Prisma.Decimal(String(term.supplierRefundActual ?? "0")),
+            clientRefundAgreed: new Prisma.Decimal(String(term.clientRefundAgreed ?? "0")),
+            clientRefundActual: new Prisma.Decimal(String(term.clientRefundActual ?? "0")),
+            comment: typeof term.comment === "string" ? term.comment : null,
+          },
+        });
+      }
+    });
+    await this.security.audit(this.prisma as any, { userId: actor.id, username: actor.username, action: "finance.cancellation.supplier_terms_saved", resource: "Order", resourceId: orderId, details: { count: terms.length } });
+    return this.getCancellationSupplierTerms(orderId);
+  }
+
   async writeOffClientDebt(orderId: string, input: { amount?: string | null; reason: string }, actor: Actor) {
     const reason = input.reason?.trim();
     if (!reason) throw new ValidationDomainError("Write-off reason is required");
