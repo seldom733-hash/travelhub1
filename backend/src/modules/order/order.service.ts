@@ -1980,6 +1980,32 @@ export class OrderService {
    *  - birthDate/passportExpiry — строго YYYY-MM-DD (isDateOnly), иначе 422;
    *  - dataCompleteness вычисляется сервером из МЕРЖА (existing + new) значений.
    */
+  async addTraveler(orderId: string, input: { firstName?: string; lastName?: string; birthDate?: string; citizenship?: string; passportSeries?: string; passportNumber?: string; passportExpiry?: string }, actor: { id: string; username: string }) {
+    if (!input.firstName?.trim() || !input.lastName?.trim()) throw new ValidationDomainError("firstName and lastName are required");
+    const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { id: true, customerId: true, status: true } });
+    if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+    if (["CLOSED", "CANCELLED"].includes(order.status)) throw new ConflictError(`Cannot add traveler to order in ${order.status}`);
+    const last = await this.prisma.orderTraveler.findFirst({ where: { orderId }, orderBy: { position: "desc" }, select: { position: true } });
+    const values = { citizenship: input.citizenship ?? null, passportSeries: input.passportSeries ?? null, passportNumber: input.passportNumber ?? null, birthDate: input.birthDate ? new Date(input.birthDate) : null };
+    const traveler = await this.prisma.orderTraveler.create({
+      data: {
+        orderId,
+        customerId: order.customerId,
+        position: (last?.position ?? 0) + 1,
+        firstName: input.firstName.trim(),
+        lastName: input.lastName.trim(),
+        birthDate: values.birthDate,
+        citizenship: values.citizenship,
+        passportSeries: values.passportSeries,
+        passportNumber: values.passportNumber,
+        passportExpiry: input.passportExpiry ? new Date(input.passportExpiry) : null,
+        dataCompleteness: this.computeTravelerCompleteness(null, values),
+      },
+    });
+    await this.prisma.orderHistory.create({ data: { orderId, action: "traveler_added", to: traveler.id, source: "API", actorId: actor.id, actorName: actor.username, comment: `Traveler ${traveler.lastName} ${traveler.firstName} added` } });
+    return traveler;
+  }
+
   async updateTravelerD3(
     orderId: string,
     travelerId: string,

@@ -105,7 +105,6 @@ export function computeRequestAvailableActions(
     // Phase 3: + деньги (design §8) — без валидных денег convert=false.
     convert:
       canEdit &&
-      travelersReady &&
       hasD3AcceptSnapshot &&
       hasAcceptedMoney &&
       request.status === "CUSTOMER_ACCEPTED" &&
@@ -1424,7 +1423,8 @@ export class RequestService {
     // Two-stage §6/§10 (execution authority): конвертация копирует
     // RequestTraveler → OrderTraveler, поэтому состав обязан быть полным и
     // согласованным с travelerCount уже СЕЙЧАС (иначе §10-инвариант невозможен).
-    await this.assertTravelersReadyForCommercialStep(existing);
+    // Travelers are now collected on the Order stage (WAITING_FOR_DATA);
+    // conversion must not deadlock on Request-stage composition.
 
     // Заявка без productId конвертируется в заказ без продуктовой привязки
     // (ограничение снято): productSnapshot может быть null → OrderItem получает

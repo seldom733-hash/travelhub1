@@ -328,6 +328,12 @@ export class OrderController {
     return this.orders.getPinnedRequirements(id, actor);
   }
 
+  @Post("orders/:id/travelers")
+  @RequirePermissions("order.edit_noncritical")
+  addTraveler(@Param("id") id: string, @Body() dto: TravelerCollectDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.orders.addTraveler(id, dto, { id: actor.id, username: actor.username });
+  }
+
   @Patch("orders/:id/travelers/:travelerId")
   @RequirePermissions("order.edit_noncritical")
   updateTravelerD3(
