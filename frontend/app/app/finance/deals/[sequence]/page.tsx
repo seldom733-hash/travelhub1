@@ -52,6 +52,8 @@ const BOOKING_ACTION_LABELS: Record<string, string> = {
 
 export default function DealDetailPage() {
   const user = useCurrentUser();
+  const canConfirmClientPayments = Boolean(user?.permissions.includes("finance.payment.manage"));
+  const canConfirmSupplierPayments = Boolean(user?.permissions.includes("finance.supplier_payment.confirm"));
   const params = useParams<{ sequence: string }>();
   const sequence = params.sequence;
   const [deal, setDeal] = useState<DealRow | null>(null);
@@ -115,6 +117,18 @@ export default function DealDetailPage() {
       .catch(() => { if (alive) setBookingActions([]); });
     return () => { alive = false; };
   }, [deal?.bookingId, reload]);
+
+  async function confirmClientPayment(code: string) {
+    setActionBusy(`client-payment-${code}`); setActionError("");
+    try { await api.post(`/finance/payments/${code}/confirm`); setReload((v) => v + 1); }
+    catch (e) { setActionError((e as Error).message); } finally { setActionBusy(""); }
+  }
+
+  async function confirmSupplierPayment(code: string) {
+    setActionBusy(`supplier-payment-${code}`); setActionError("");
+    try { await api.post(`/finance/supplier-payments/${code}/confirm`); setReload((v) => v + 1); }
+    catch (e) { setActionError((e as Error).message); } finally { setActionBusy(""); }
+  }
 
   async function runAction(action: string) {
     if (!deal?.orderId) return;
@@ -259,10 +273,10 @@ export default function DealDetailPage() {
 
             <div className="grid gap-3 lg:grid-cols-2">
               <Panel title="Платежи клиента" action={clientPayable ? <button type="button" onClick={() => setPaymentOpen(true)} className="text-[11px] font-semibold text-[#0f6b5f]">+ Добавить платёж</button> : <span className="text-[10px] text-[#98a2b3]">{!deal.orderId ? "Заказ не создан" : financialLocked ? "Заказ закрыт" : "Долг закрыт"}</span>} totals={[["Всего получено", money(deal.clientReceived, deal.currency)], ["Возвращено", money(deal.clientRefunded, deal.currency)], ["Остаток к оплате", money(deal.clientDebt, deal.currency)]]}>
-                {deal.payments.length + deal.refunds.length === 0 ? <Empty text="Платежей клиента нет" /> : <SimpleRows rows={[...deal.payments.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.method ?? "Оплата", statusRu(p.status), p.status !== "REFUNDED" ? <button type="button" onClick={() => setEditingClientPayment(p)} className="text-[10px] font-semibold text-[#0f6b5f]">✎</button> : null]), ...deal.refunds.map((r) => [new Date(r.date).toLocaleDateString("ru-RU"), `−${money(r.amount, r.currency)}`, "Возврат клиенту", statusRu(r.status), r.status === "REQUESTED" || r.status === "APPROVED" ? <button type="button" onClick={() => setEditingRefund(r)} className="text-[10px] font-semibold text-[#0f6b5f]">✎</button> : null])]} head={["Дата", "Поставщик", "Сумма", "Тип", "Статус", ""]} />}
+                {deal.payments.length + deal.refunds.length === 0 ? <Empty text="Платежей клиента нет" /> : <SimpleRows rows={[...deal.payments.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), money(p.amount, p.currency), p.method ?? "Оплата", statusRu(p.status), p.status !== "REFUNDED" ? <span className="inline-flex gap-2">{p.status === "PENDING" && canConfirmClientPayments && <button type="button" disabled={Boolean(actionBusy)} onClick={() => void confirmClientPayment(p.code)} className="text-[10px] font-semibold text-emerald-700">Подтвердить</button>}<button type="button" onClick={() => setEditingClientPayment(p)} className="text-[10px] font-semibold text-[#0f6b5f]">✎</button></span> : null]), ...deal.refunds.map((r) => [new Date(r.date).toLocaleDateString("ru-RU"), `−${money(r.amount, r.currency)}`, "Возврат клиенту", statusRu(r.status), r.status === "REQUESTED" || r.status === "APPROVED" ? <button type="button" onClick={() => setEditingRefund(r)} className="text-[10px] font-semibold text-[#0f6b5f]">✎</button> : null])]} head={["Дата", "Поставщик", "Сумма", "Тип", "Статус", ""]} />}
               </Panel>
               <Panel title="Расчёты с поставщиком" action={supplierPayable ? <button type="button" onClick={() => setSupplierPaymentOpen(true)} className="text-[11px] font-semibold text-[#0f6b5f]">+ Добавить платёж</button> : <span className="text-[10px] text-[#98a2b3]">{!deal.orderId ? "Заказ не создан" : financialLocked ? "Заказ закрыт" : "Долг закрыт"}</span>} totals={[["Всего оплачено", money(deal.supplierPaid, deal.currency)], ["Возврат от поставщика", money(deal.supplierRefunded, deal.currency)], ["Остаток поставщику", money(deal.supplierDebt, deal.currency)]]}>
-                {deal.payouts.length === 0 ? <Empty text="Расчётов с поставщиком нет" /> : <SimpleRows rows={deal.payouts.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), p.supplierName ?? p.supplierCode ?? "—", money(p.amount, p.currency), p.direction === "INCOMING" ? "Возврат" : "Оплата поставщику", statusRu(p.status), p.direction !== "INCOMING" && p.status !== "CANCELLED" ? <button type="button" onClick={() => setEditingPayout(p)} className="text-[10px] font-semibold text-[#0f6b5f]">✎</button> : null])} head={["Дата", "Поставщик", "Сумма", "Тип", "Статус", ""]} />}
+                {deal.payouts.length === 0 ? <Empty text="Расчётов с поставщиком нет" /> : <SimpleRows rows={deal.payouts.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), p.supplierName ?? p.supplierCode ?? "—", money(p.amount, p.currency), p.direction === "INCOMING" ? "Возврат" : "Оплата поставщику", statusRu(p.status), p.direction !== "INCOMING" && p.status !== "CANCELLED" ? <span className="inline-flex gap-2">{p.status === "PENDING" && canConfirmSupplierPayments && <button type="button" disabled={Boolean(actionBusy)} onClick={() => void confirmSupplierPayment(p.code)} className="text-[10px] font-semibold text-emerald-700">Подтвердить</button>}<button type="button" onClick={() => setEditingPayout(p)} className="text-[10px] font-semibold text-[#0f6b5f]">✎</button></span> : null])} head={["Дата", "Поставщик", "Сумма", "Тип", "Статус", ""]} />}
               </Panel>
             </div>
 
