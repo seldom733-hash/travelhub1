@@ -152,8 +152,8 @@ export default function DealDetailPage() {
   if (error || !deal) return <div className="p-8 text-sm text-rose-600">Сделка не найдена: {error}</div>;
 
   const cancelled = /CANCEL|REJECT/.test(deal.status);
-  const financialLocked = ["CLOSED", "CANCELLED"].includes(deal.status);
-  const paymentsUnlocked = ["WAITING_FOR_FIRST_PAYMENT", "SENT_TO_BOOKING", "PARTIALLY_FULFILLED", "FULFILLED", "READY_TO_CLOSE"].includes(deal.orderStatus ?? "");
+  const financialLocked = deal.status === "CLOSED";
+  const paymentsUnlocked = ["WAITING_FOR_FIRST_PAYMENT", "SENT_TO_BOOKING", "PARTIALLY_FULFILLED", "FULFILLED", "READY_TO_CLOSE", "CANCELLED"].includes(deal.orderStatus ?? "");
   const clientPayable = Boolean(deal.orderId) && !financialLocked && Number(deal.clientDebt) > 0 && paymentsUnlocked;
   const supplierPayable = Boolean(deal.orderId) && !financialLocked && Number(deal.supplierDebt) > 0 && paymentsUnlocked;
   const refundable = Number(deal.clientReceived) > 0 && !cancelled;

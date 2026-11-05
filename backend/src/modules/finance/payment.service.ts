@@ -69,7 +69,7 @@ interface Actor {
 }
 
 /** Статусы Order, при которых оплата невозможна (обязательство не подлежит оплате). */
-const ORDER_NOT_PAYABLE = ["CANCELLED", "CLOSED"];
+const ORDER_NOT_PAYABLE = ["CLOSED"];
 
 @Injectable()
 export class PaymentService {
