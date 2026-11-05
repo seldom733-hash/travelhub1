@@ -1386,7 +1386,7 @@ export class OrderService {
    *    (историческое правило bulk PATCH — заказы вне D3-потока).
    */
   private async assertOrderDebtsCleared(tx: Prisma.TransactionClient, orderId: string, code: string, amount: Prisma.Decimal, status: OrderStatus) {
-    const [payments, refunds, pendingRefunds, obligations, order, outgoing, incoming, writeOffs, clientWriteOffs] = await Promise.all([
+    const [payments, refunds, pendingRefunds, obligations, order, outgoing, incoming, writeOffs, clientWriteOffs, approval, supplierTerms] = await Promise.all([
       tx.payment.aggregate({ where: { orderId, status: { in: ["CAPTURED", "REFUNDED"] } }, _sum: { amount: true } }),
       tx.refund.aggregate({ where: { orderId, status: "PROCESSED" }, _sum: { amount: true } }),
       tx.refund.aggregate({ where: { orderId, status: { in: ["REQUESTED", "APPROVED"] } }, _sum: { amount: true } }),
@@ -1396,6 +1396,8 @@ export class OrderService {
       tx.supplierPayout.aggregate({ where: { orderId, status: "CONFIRMED", direction: "INCOMING" }, _sum: { amount: true } }),
       tx.supplierDebtWriteOff.aggregate({ where: { orderId }, _sum: { amount: true } }),
       tx.clientDebtWriteOff.aggregate({ where: { orderId }, _sum: { amount: true } }),
+      tx.cancellationApproval.findFirst({ where: { orderId }, orderBy: { createdAt: "desc" } }) as any,
+      tx.orderCancellationSupplierTerm.findMany({ where: { orderId } }) as any,
     ]);
     const captured = new Prisma.Decimal(payments._sum.amount ?? 0);
     const refunded = new Prisma.Decimal(refunds._sum.amount ?? 0);
@@ -1416,9 +1418,12 @@ export class OrderService {
     const obligationDebt = Number(obligations._sum.remainingAmount ?? 0);
     const baseSupplierDebt = obligationDebt > 0 ? obligationDebt : Math.max(0, cost - Number(outgoing._sum.amount ?? 0) + Number(incoming._sum.amount ?? 0));
     const supplierDebt = new Prisma.Decimal(Math.max(0, baseSupplierDebt - Number(writeOffs._sum.amount ?? 0)));
-    if (!clientDebt.isZero() || !supplierDebt.isZero() || !pendingRefund.isZero()) {
+    const supplierRefundShortfall = supplierTerms.reduce((sum: number, term: any) => sum + Math.max(0, Number(term.supplierRefundAgreed) - Number(term.supplierRefundActual)), 0);
+    const clientRefundShortfall = supplierTerms.reduce((sum: number, term: any) => sum + Math.max(0, Number(term.clientRefundAgreed) - Number(term.clientRefundActual)), 0);
+    const approvalBlocked = approval ? approval.status !== "APPROVED" : false;
+    if (!clientDebt.isZero() || !supplierDebt.isZero() || !pendingRefund.isZero() || supplierRefundShortfall > 0 || clientRefundShortfall > 0 || approvalBlocked) {
       throw new ConflictError(
-        `Order ${code} cannot be completed/closed: clientDebt=${clientDebt.toString()}, supplierDebt=${supplierDebt.toString()}, pendingRefund=${pendingRefund.toString()}`,
+        `Order ${code} cannot be completed/closed: clientDebt=${clientDebt.toString()}, supplierDebt=${supplierDebt.toString()}, pendingRefund=${pendingRefund.toString()}, supplierRefundShortfall=${supplierRefundShortfall.toFixed(2)}, clientRefundShortfall=${clientRefundShortfall.toFixed(2)}, approval=${approval?.status ?? "NONE"}`,
       );
     }
   }
