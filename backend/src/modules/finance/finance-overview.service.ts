@@ -30,6 +30,7 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { DealsService } from "./deals.service";
 import { TARGET_AZN } from "./supplier-obligation.service";
 
 const TARGET = TARGET_AZN;
@@ -144,7 +145,7 @@ function marginFromSnapshot(raw: unknown): Prisma.Decimal | null {
 
 @Injectable()
 export class FinanceOverviewService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly deals?: DealsService) {}
 
   async getOverview(range: RangeFilter = {}): Promise<FinanceOverview> {
     const [obligations, supplierPayouts, supplierPayables, expectedMargin, customerReceipts, customerDebt] = await Promise.all([
@@ -297,6 +298,16 @@ export class FinanceOverviewService {
   }
 
   private async expectedMarginMetric(range: RangeFilter): Promise<AznMetric> {
+    if (this.deals) {
+      const kpi = await this.deals.summary({ dateFrom: range.from, dateTo: range.to });
+      return {
+        amount: kpi.expectedIncome,
+        availability: "OK",
+        knownCount: kpi.count,
+        unknownCount: 0,
+        note: "Source: DealsService.kpi()",
+      };
+    }
     const orders = await this.prisma.order.findMany({
       where: { commercialSnapshot: { not: Prisma.JsonNull }, cancelledAt: null, returnedToRequestAt: null, status: { notIn: ["CLOSED", "CANCELLED", "CANCELLATION_REQUESTED", "CANCELLATION_APPROVED"] }, ...rangeWhere("createdAt", range) },
       select: { commercialSnapshot: true },
