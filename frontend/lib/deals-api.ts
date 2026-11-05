@@ -22,6 +22,7 @@ export interface DealRow {
   productTitle: string;
   supplierId: string | null;
   supplierCode: string | null;
+  supplierName: string | null;
   manager: string | null;
   managerId: string | null;
   travelerCount: number | null;

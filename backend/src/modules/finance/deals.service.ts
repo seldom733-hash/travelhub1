@@ -48,6 +48,7 @@ type DealRow = {
   productTitle: string;
   supplierId: string | null;
   supplierCode: string | null;
+  supplierName: string | null;
   manager: string | null;
   managerId: string | null;
   travelerCount: number | null;
@@ -492,6 +493,7 @@ export class DealsService {
         productType: String(snapshot.productType ?? product?.type ?? ""),
         productTitle: String(snapshot.productTitle ?? product?.title ?? "—"),
         supplierId: product?.partnerId ?? request.partnerId ?? null,
+        supplierName: partnerById.get(product?.partnerId ?? request.partnerId ?? "")?.name ?? null,
         supplierCode: typeof snapshot.supplierCode === "string"
           ? snapshot.supplierCode
           : typeof snapOffer.supplierCode === "string"
