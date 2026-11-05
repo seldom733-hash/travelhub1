@@ -842,10 +842,13 @@ export class BookingService {
     }
 
     // ── 3. Q4: деньги-гвард — 409 «сначала refund»; никаких auto-refund ────
-    const heldPayments = await tx.payment.count({
-      where: { orderId: order.id, status: { in: ["AUTHORIZED", "CAPTURED"] } },
-    });
-    if (heldPayments > 0) {
+    const [heldPayments, heldAmount, refundedAmount] = await Promise.all([
+      tx.payment.count({ where: { orderId: order.id, status: { in: ["AUTHORIZED", "CAPTURED"] } } }),
+      tx.payment.aggregate({ where: { orderId: order.id, status: { in: ["AUTHORIZED", "CAPTURED"] } }, _sum: { amount: true } }),
+      tx.refund.aggregate({ where: { orderId: order.id, status: "PROCESSED" }, _sum: { amount: true } }),
+    ]);
+    const heldNet = Number(heldAmount._sum.amount ?? 0) - Number(refundedAmount._sum.amount ?? 0);
+    if (heldPayments > 0 && heldNet > 0) {
       throw new ConflictError(
         `Cannot returnToOrder booking ${booking.code}: order ${order.code} has ${heldPayments} authorized/captured payment(s); refund first`,
       );

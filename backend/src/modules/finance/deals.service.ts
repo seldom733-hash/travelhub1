@@ -329,7 +329,7 @@ export class DealsService {
     const requests = await this.prisma.request.findMany({ orderBy: { createdAt: "desc" }, take: 1000 });
     if (requests.length === 0) return [];
     const orderIds = requests.map((r) => r.convertedOrderId).filter((id): id is string => Boolean(id));
-    const orders = await this.prisma.order.findMany({ where: { OR: [{ id: { in: orderIds } }, { commerceSequence: { in: requests.map((r) => r.commerceSequence) } }] }, select: { id: true, code: true, referenceNumber: true, commerceSequence: true, status: true, amount: true, currency: true, paidAmount: true, refundedAmount: true, customerId: true, createdBy: true, financialStatus: true, commercialSnapshot: true, items: { select: { id: true, title: true, type: true, serviceDate: true, amount: true } } } });
+    const orders = await this.prisma.order.findMany({ where: { OR: [{ id: { in: orderIds } }, { commerceSequence: { in: requests.map((r) => r.commerceSequence) } }] }, select: { id: true, code: true, referenceNumber: true, commerceSequence: true, status: true, amount: true, currency: true, cancelledAt: true, paidAmount: true, refundedAmount: true, customerId: true, createdBy: true, financialStatus: true, commercialSnapshot: true, items: { select: { id: true, title: true, type: true, serviceDate: true, amount: true } } } });
     const orderBySequence = new Map(orders.map((order) => [order.commerceSequence, order]));
     const resolvedOrderIds = [...new Set([...orderIds, ...orders.map((o) => o.id)])];
     const [bookings, payments, refunds, payouts, obligations, settlements, customers, products] = await Promise.all([
@@ -416,15 +416,17 @@ export class DealsService {
         ? obligationCost
         : costFromSnapshot || costFromProduct;
       const returnedToRequest = order?.status === "CANCELLED" && request.status !== "CONVERTED" && !["CANCELLED_BY_CUSTOMER", "REJECTED", "UNAVAILABLE", "EXPIRED"].includes(request.status);
-      const stage = returnedToRequest ? "REQUEST" : booking ? "BOOKING" : order ? "ORDER" : "REQUEST";
-      const status = returnedToRequest ? request.status : booking?.status ?? order?.status ?? request.status;
+      const activeBooking = booking && booking.status !== "CANCELLED" ? booking : null;
+      const stage = returnedToRequest ? "REQUEST" : activeBooking ? "BOOKING" : order ? "ORDER" : "REQUEST";
+      const status = returnedToRequest ? request.status : activeBooking?.status ?? order?.status ?? request.status;
       const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(status);
       const supplierDebt = cancelled && supplierObligations.length === 0
         ? 0
         : useObligationCost && obligationDebt <= cost
           ? obligationDebt
           : Math.max(0, cost - supplierPaid + supplierRefunded);
-      const clientDebt = cancelled ? 0 : settlement
+      const cancelledOrder = cancelled || Boolean(order?.cancelledAt);
+      const clientDebt = cancelledOrder ? 0 : settlement
         ? money(settlement.remainingToPay)
         : Math.max(0, sales - captured + refunded);
       const clientPenalty = ["CONFIRMED", "WITHHELD", "RECEIVED"].includes(settlement?.clientPenaltyStatus ?? "")

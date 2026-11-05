@@ -120,7 +120,7 @@ const TRANSITIONS: Record<string, { from: OrderStatus[]; to: OrderStatus }> = {
   // orderAction: 409, если СВОБОДНЫХ items нет (все заняты активными бронями).
   send: { from: ["READY_FOR_BOOKING", "WAITING_FOR_FIRST_PAYMENT", "PARTIALLY_FULFILLED"], to: "SENT_TO_BOOKING" },
   complete: { from: ["SENT_TO_BOOKING", "PARTIALLY_FULFILLED"], to: "FULFILLED" },
-  close: { from: ["FULFILLED", "READY_TO_CLOSE"], to: "CLOSED" },
+  close: { from: ["FULFILLED", "READY_TO_CLOSE", "CANCELLED"], to: "CLOSED" },
   cancel: { from: ACTIVE_STATUSES, to: "CANCELLED" },
   problem: { from: ACTIVE_STATUSES.filter((s) => s !== "PROBLEM"), to: "PROBLEM" },
   suspend: { from: ACTIVE_STATUSES.filter((s) => s !== "SUSPENDED"), to: "SUSPENDED" },
@@ -1385,7 +1385,7 @@ export class OrderService {
    *  - pinned нет (legacy pre-D3, bulk-контракт): полнота по passportNumber
    *    (историческое правило bulk PATCH — заказы вне D3-потока).
    */
-  private async assertOrderDebtsCleared(tx: Prisma.TransactionClient, orderId: string, code: string, amount: Prisma.Decimal) {
+  private async assertOrderDebtsCleared(tx: Prisma.TransactionClient, orderId: string, code: string, amount: Prisma.Decimal, status: OrderStatus) {
     const [payments, refunds, pendingRefunds, obligations] = await Promise.all([
       tx.payment.aggregate({ where: { orderId, status: { in: ["CAPTURED", "REFUNDED"] } }, _sum: { amount: true } }),
       tx.refund.aggregate({ where: { orderId, status: "PROCESSED" }, _sum: { amount: true } }),
@@ -1395,7 +1395,7 @@ export class OrderService {
     const captured = new Prisma.Decimal(payments._sum.amount ?? 0);
     const refunded = new Prisma.Decimal(refunds._sum.amount ?? 0);
     const pendingRefund = new Prisma.Decimal(pendingRefunds._sum.amount ?? 0);
-    const clientDebt = Prisma.Decimal.max(new Prisma.Decimal(0), new Prisma.Decimal(amount).minus(captured.minus(refunded)));
+    const clientDebt = status === "CANCELLED" ? new Prisma.Decimal(0) : Prisma.Decimal.max(new Prisma.Decimal(0), new Prisma.Decimal(amount).minus(captured.minus(refunded)));
     const supplierDebt = new Prisma.Decimal(obligations._sum.remainingAmount ?? 0);
     if (!clientDebt.isZero() || !supplierDebt.isZero() || !pendingRefund.isZero()) {
       throw new ConflictError(
@@ -1576,7 +1576,7 @@ export class OrderService {
       }
 
       if (action === "complete" || action === "close") {
-        await this.assertOrderDebtsCleared(tx, orderId, order.code, order.amount);
+        await this.assertOrderDebtsCleared(tx, orderId, order.code, order.amount, order.status);
       }
 
       // Stage 1 (Order → Request): guards «назад» — только pre-send данные.

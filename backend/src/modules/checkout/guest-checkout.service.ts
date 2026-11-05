@@ -79,9 +79,19 @@ export class GuestCheckoutService {
     if (productId) {
       const product = await this.prisma.product.findUnique({
         where: { id: productId },
-        select: { id: true },
+        select: { id: true, attributes: true },
       });
       if (!product) throw new NotFoundError(`Product ${productId} not found`);
+    }
+
+    let displayedPrice: number | undefined;
+    let displayedCurrency = GUEST_CHECKOUT_CURRENCY;
+    if (productId) {
+      const product = await this.prisma.product.findUnique({ where: { id: productId }, select: { attributes: true } });
+      const attrs = (product?.attributes ?? {}) as Record<string, unknown>;
+      const candidate = Number(attrs.startingPrice ?? attrs.convertedPrice ?? attrs.priceLocal);
+      if (Number.isFinite(candidate) && candidate > 0) displayedPrice = candidate;
+      if (typeof attrs.currency === "string" && /^[A-Z]{3}$/.test(attrs.currency)) displayedCurrency = attrs.currency;
     }
 
     let customerId = resolved.customerId;
@@ -112,7 +122,8 @@ export class GuestCheckoutService {
         quantity: input.quantity ?? 1,
         travelerCount: input.travelerCount ?? 1,
         requestedServiceDate: input.requestedServiceDate,
-        displayedCurrency: GUEST_CHECKOUT_CURRENCY,
+        displayedPrice,
+        displayedCurrency,
       },
       GUEST_ACTOR,
     );
