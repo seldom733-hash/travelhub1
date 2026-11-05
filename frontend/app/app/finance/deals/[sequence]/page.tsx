@@ -627,8 +627,10 @@ function CancellationTab({ deal, onSaved }: { deal: DealRow; onSaved: () => void
   const [error, setError] = React.useState("");
   const [notice, setNotice] = React.useState("");
   const [terms, setTerms] = React.useState<Array<any>>([]);
+  const [approval, setApproval] = React.useState<any>(null);
   React.useEffect(() => {
     if (!deal.orderId) return;
+    api.get<any>(`/orders/${deal.orderId}/cancellation/approval`).then(setApproval).catch(() => undefined);
     api.get<any[]>(`/orders/${deal.orderId}/cancellation/supplier-terms`).then((rows) => {
       if (rows.length > 0) setTerms(rows);
       else {
@@ -673,7 +675,7 @@ function CancellationTab({ deal, onSaved }: { deal: DealRow; onSaved: () => void
   }
   return <div className="grid gap-3 lg:grid-cols-2">
     <div className="space-y-2 rounded-lg border border-[#e5e2da] p-3">
-      <div className="text-[10px] font-semibold uppercase text-[#667085]">Условия отмены</div>
+      <div className="flex items-center justify-between"><div className="text-[10px] font-semibold uppercase text-[#667085]">Условия отмены</div>{approval && <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold ${approval.status === "APPROVED" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : approval.status === "REJECTED" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>{approval.status}</span>}</div>
       <label className="grid gap-1 text-[11px]">Причина<select value={reason} onChange={(e) => setReason(e.target.value)} className="rounded border px-2 py-1.5">{reasons.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
       <label className="grid gap-1 text-[11px]">Штраф туриста<input value={clientPenalty} onChange={(e) => setClientPenalty(e.target.value)} inputMode="decimal" className="rounded border px-2 py-1.5" /></label>
       <label className="grid gap-1 text-[11px]">Штраф поставщика<input value={supplierPenalty} onChange={(e) => setSupplierPenalty(e.target.value)} inputMode="decimal" className="rounded border px-2 py-1.5" /></label>
