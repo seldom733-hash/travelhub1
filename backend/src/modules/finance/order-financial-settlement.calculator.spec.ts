@@ -147,4 +147,33 @@ describe("calculateCancellationSettlement", () => {
     expect(r.status).toBe("PENDING_SETTLEMENT");
     expect(r.blockers).toContain("PENALTY_EXCEEDS_LIABILITY");
   });
+
+  it("pending payments block settlement", () => {
+    const r = calculateCancellationSettlement({ ...base, pendingPaymentsCount: 1 });
+    expect(r.status).toBe("PENDING_SETTLEMENT");
+    expect(r.blockers).toContain("PENDING_PAYMENTS");
+  });
+
+  it("no charges settlement when nothing captured", () => {
+    const r = calculateCancellationSettlement({
+      ...base, capturedAmount: "0.00", refundedAmount: "0.00", finalCustomerLiability: "0.00",
+      penaltyAmount: "0.00", platformPenaltyShare: "0.00", supplierPenaltyShare: "0.00", penaltyReason: null,
+    });
+    expect(r.status).toBe("FINANCIALLY_SETTLED_NO_CHARGES");
+    expect(r.remainingToRefund).toBe("0");
+  });
+
+  it("over-refund produces payable remainder", () => {
+    const r = calculateCancellationSettlement({
+      ...base, capturedAmount: "300.00", refundedAmount: "400.00", finalCustomerLiability: "0.00",
+      penaltyAmount: "0.00", platformPenaltyShare: "0.00", supplierPenaltyShare: "0.00", penaltyReason: null,
+    });
+    expect(r.remainingToPay).toBe("100");
+  });
+
+  it("cancellation without confirmation is blocked", () => {
+    const r = calculateCancellationSettlement({ ...base, cancellationConfirmed: false });
+    expect(r.status).toBe("PENDING_SETTLEMENT");
+    expect(r.blockers).toContain("CANCELLATION_NOT_CONFIRMED");
+  });
 });
