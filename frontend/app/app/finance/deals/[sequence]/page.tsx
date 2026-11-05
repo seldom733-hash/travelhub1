@@ -152,7 +152,8 @@ export default function DealDetailPage() {
 
   const cancelled = /CANCEL|REJECT/.test(deal.status);
   const financialLocked = ["CLOSED", "CANCELLED"].includes(deal.status);
-  const clientPayable = Boolean(deal.orderId) && !financialLocked && Number(deal.clientDebt) > 0;
+  const paymentsUnlocked = ["WAITING_FOR_FIRST_PAYMENT", "SENT_TO_BOOKING", "PARTIALLY_FULFILLED", "FULFILLED", "READY_TO_CLOSE"].includes(deal.status);
+  const clientPayable = Boolean(deal.orderId) && !financialLocked && Number(deal.clientDebt) > 0 && paymentsUnlocked;
   const supplierPayable = Boolean(deal.orderId) && !financialLocked && Number(deal.supplierDebt) > 0;
   const refundable = Number(deal.clientReceived) > 0 && !cancelled;
   const readOnly = user?.role === "SALES_MANAGER" && deal.managerId !== user.id;

@@ -86,6 +86,7 @@ class OrderActionDto {
     "markWaitingData",
     "resumeProcessing",
     "confirm",
+    "waitFirstPayment",
     "send",
     "complete",
     "close",
