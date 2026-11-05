@@ -175,13 +175,13 @@ export class OrderFinancialSettlementController {
   }
 
   @Post(":id/cancellation/approve")
-  @RequirePermissions("finance.settlement.manage")
+  @RequirePermissions("finance.settlement.approve")
   approveCancellationApproval(@Param("id") id: string, @CurrentUser() user: { id: string; username: string }) {
     return this.settlements.approveCancellationApproval(id, user);
   }
 
   @Post(":id/cancellation/reject")
-  @RequirePermissions("finance.settlement.manage")
+  @RequirePermissions("finance.settlement.approve")
   rejectCancellationApproval(@Param("id") id: string, @Body() body: { reason: string }, @CurrentUser() user: { id: string; username: string }) {
     return this.settlements.rejectCancellationApproval(id, body.reason ?? "", user);
   }
