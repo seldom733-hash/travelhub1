@@ -93,7 +93,7 @@ export default function DealDetailPage() {
       .then((order) => { if (alive) { setAvailableActions(order.availableActions ?? []); setOrderTravelers(order.travelers ?? []); setOrderFinalConfirmedAt(order.finalConfirmedAt ?? null); } })
       .catch(() => { if (alive) { setAvailableActions([]); setOrderTravelers([]); setOrderFinalConfirmedAt(null); } });
     api.get<typeof orderTravelers>(`/orders/${deal.orderId}/travelers`)
-      .then((rows) => { if (alive) setOrderTravelers(rows); })
+      .then((rows) => { if (alive && Array.isArray(rows)) setOrderTravelers(rows); })
       .catch(() => undefined);
     return () => { alive = false; };
   }, [deal?.orderId, reload]);

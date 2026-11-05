@@ -327,9 +327,8 @@ export class OrderController {
 
   @Get("orders/:id/travelers")
   @RequirePermissions("order.read")
-  getPinnedRequirements(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
-    // D3 §16: PII redaction по viewer (тот же контракт, что listOrders/getOrder).
-    return this.orders.getPinnedRequirements(id, actor);
+  getOrderTravelers(@Param("id") id: string) {
+    return this.orders.getOrderTravelers(id);
   }
 
   @Post("orders/:id/travelers")
