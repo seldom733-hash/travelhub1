@@ -46,7 +46,7 @@ function deriveBookingDelayActions(
       actionType: "NAVIGATE",
       target: {
         type: "BOOKING",
-        route: "/app/bookings",
+        route: "/app/finance/deals",
         filters: { status: "AWAITING_CONFIRMATION", overdue: "true", slaMinutes: String(sla) },
       },
       requiredPermission: "booking.read",
@@ -77,7 +77,7 @@ function deriveFailedPaymentActions(
       actionType: "NAVIGATE",
       target: {
         type: "ORDER",
-        route: "/app/orders",
+        route: "/app/finance/deals",
         filters: { paymentFailed: "true" },
       },
       requiredPermission: "finance.payment.read",
@@ -110,7 +110,7 @@ function deriveCancellationActions(
       actionType: "NAVIGATE",
       target: {
         type: "ORDER",
-        route: "/app/orders",
+        route: "/app/finance/deals",
         filters: { status: "CANCELLED", cancelledWithin: String(days) },
       },
       requiredPermission: "order.read",
@@ -141,8 +141,8 @@ function derivePendingRefundActions(
       actionType: "NAVIGATE",
       target: {
         type: "ORDER",
-        route: "/app/orders",
-        filters: { pendingRefund: "true" },
+        route: "/app/finance/deals",
+        filters: {},
       },
       requiredPermission: "finance.refund.read",
       executionMode: "NAVIGATION_ONLY",
@@ -171,8 +171,8 @@ function deriveUpcomingBookingActions(
       actionType: "NAVIGATE",
       target: {
         type: "BOOKING",
-        route: "/app/bookings",
-        filters: { upcoming: "true" },
+        route: "/app/finance/deals",
+        filters: { stage: "BOOKING" },
       },
       requiredPermission: "booking.read",
       executionMode: "NAVIGATION_ONLY",

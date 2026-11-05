@@ -106,9 +106,21 @@ export class DealsService {
       orderIds.length ? this.prisma.refund.findMany({ where: { orderId: { in: orderIds } }, select: { id: true } }) : [],
       orderIds.length ? this.prisma.supplierPayout.findMany({ where: { orderId: { in: orderIds } }, select: { id: true } }) : [],
     ]);
-    const ids = [request?.id, ...orderIds, ...bookings.map((b) => b.id), ...payments.map((p) => p.id), ...refunds.map((r) => r.id), ...payouts.map((p) => p.id)].filter((id): id is string => Boolean(id));
+    const bookingIds = bookings.map((b) => b.id);
+    const [orderHistory, requestHistory, bookingHistory] = await Promise.all([
+      orderIds.length ? this.prisma.orderHistory.findMany({ where: { orderId: { in: orderIds } }, orderBy: { createdAt: "desc" }, take: 500 }) : [],
+      request ? this.prisma.requestHistory.findMany({ where: { requestId: request.id }, orderBy: { createdAt: "desc" }, take: 500 }) : [],
+      bookingIds.length ? this.prisma.bookingHistory.findMany({ where: { bookingId: { in: bookingIds } }, orderBy: { createdAt: "desc" }, take: 500 }) : [],
+    ]);
+    const ids = [request?.id, ...orderIds, ...bookingIds, ...payments.map((p) => p.id), ...refunds.map((r) => r.id), ...payouts.map((p) => p.id)].filter((id): id is string => Boolean(id));
     const audit = ids.length ? await this.prisma.auditLog.findMany({ where: { resourceId: { in: ids } }, orderBy: { createdAt: "desc" }, take: 500, include: { user: { select: { username: true } } } }) : [];
-    return { items: audit.map((a) => ({ id: a.id, createdAt: a.createdAt.toISOString(), actorName: a.username ?? a.user?.username ?? "Система", action: a.action, resource: a.resource, resourceId: a.resourceId, details: a.details })) };
+    const items = [
+      ...audit.map((a) => ({ id: a.id, createdAt: a.createdAt.toISOString(), actorName: a.username ?? a.user?.username ?? "Система", action: a.action, resource: a.resource, resourceId: a.resourceId, details: a.details })),
+      ...orderHistory.map((h: any) => ({ id: h.id, createdAt: h.createdAt.toISOString(), actorName: h.actorName ?? "Система", action: h.action, resource: "Order", resourceId: h.orderId, details: h.fields ?? { from: h.from, to: h.to, comment: h.comment } })),
+      ...requestHistory.map((h: any) => ({ id: h.id, createdAt: h.createdAt.toISOString(), actorName: h.actorName ?? "Система", action: h.action, resource: "Request", resourceId: h.requestId, details: { from: h.from, to: h.to, comment: h.comment } })),
+      ...bookingHistory.map((h: any) => ({ id: h.id, createdAt: h.createdAt.toISOString(), actorName: h.actorName ?? "Система", action: h.action, resource: "Booking", resourceId: h.bookingId, details: h.fields ?? { from: h.from, to: h.to, comment: h.comment } })),
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return { items };
   }
 
   async list(query: DealQuery) {
