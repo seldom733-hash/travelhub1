@@ -36,7 +36,7 @@ export interface DealRow {
   supplierBasePriceAzn: string;
   channel: string;
   trip: { country: string | null; dateFrom: string | null; dateTo: string | null; nights: number | null; adults: number | null; children: number | null };
-  services: Array<{ id: string; title: string; type: string; serviceDate: string | null; clientPrice: string; cost: string; income: string }>;
+  services: Array<{ id: string; title: string; type: string; serviceDate: string | null; clientPrice: string; cost: string; income: string; mediaId: string | null }>;
   markupAmount: string;
   commissionAmount: string;
   clientReceived: string;

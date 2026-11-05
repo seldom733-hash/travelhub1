@@ -63,7 +63,7 @@ type DealRow = {
   supplierBasePriceAzn: string;
   channel: string;
   trip: { country: string | null; dateFrom: string | null; dateTo: string | null; nights: number | null; adults: number | null; children: number | null };
-  services: Array<{ id: string; title: string; type: string; serviceDate: string | null; clientPrice: string; cost: string; income: string }>;
+  services: Array<{ id: string; title: string; type: string; serviceDate: string | null; clientPrice: string; cost: string; income: string; mediaId: string | null }>;
   markupAmount: string;
   commissionAmount: string;
   clientReceived: string;
@@ -330,10 +330,11 @@ export class DealsService {
     const requests = await this.prisma.request.findMany({ orderBy: { createdAt: "desc" }, take: 1000 });
     if (requests.length === 0) return [];
     const orderIds = requests.map((r) => r.convertedOrderId).filter((id): id is string => Boolean(id));
-    const orders = await this.prisma.order.findMany({ where: { OR: [{ id: { in: orderIds } }, { commerceSequence: { in: requests.map((r) => r.commerceSequence) } }] }, select: { id: true, code: true, referenceNumber: true, commerceSequence: true, status: true, amount: true, currency: true, cancelledAt: true, paidAmount: true, refundedAmount: true, customerId: true, createdBy: true, financialStatus: true, commercialSnapshot: true, items: { select: { id: true, title: true, type: true, serviceDate: true, amount: true } } } });
+    const orders = await this.prisma.order.findMany({ where: { OR: [{ id: { in: orderIds } }, { commerceSequence: { in: requests.map((r) => r.commerceSequence) } }] }, select: { id: true, code: true, referenceNumber: true, commerceSequence: true, status: true, amount: true, currency: true, cancelledAt: true, paidAmount: true, refundedAmount: true, customerId: true, createdBy: true, financialStatus: true, commercialSnapshot: true, items: { select: { id: true, title: true, type: true, serviceDate: true, amount: true, productId: true } } } });
     const orderBySequence = new Map(orders.map((order) => [order.commerceSequence, order]));
     const resolvedOrderIds = [...new Set([...orderIds, ...orders.map((o) => o.id)])];
-    const [bookings, payments, refunds, payouts, obligations, settlements, customers, products, supplierWriteOffs] = await Promise.all([
+    const orderProductIds = [...new Set(orders.flatMap((o) => o.items.map((i) => i.productId)).filter((id): id is string => Boolean(id)))];
+    const [bookings, payments, refunds, payouts, obligations, settlements, customers, products, supplierWriteOffs, media] = await Promise.all([
       this.prisma.booking.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, referenceNumber: true, orderId: true, status: true, amount: true, currency: true } }),
       this.prisma.payment.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, paymentMethod: true, paidAt: true, createdAt: true, orderId: true } }),
       this.prisma.refund.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, processedAt: true, createdAt: true, orderId: true } }),
@@ -343,6 +344,7 @@ export class DealsService {
       this.prisma.customer.findMany({ where: { id: { in: requests.map((r) => r.customerId).filter((id): id is string => Boolean(id)) } }, select: { id: true, firstName: true, lastName: true, companyName: true, phone: true, email: true } }),
       this.prisma.product.findMany({ where: { id: { in: requests.map((r) => r.productId).filter((id): id is string => Boolean(id)) } }, select: { id: true, title: true, type: true, partnerId: true, attributes: true } }),
       this.prisma.supplierDebtWriteOff.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { orderId: true, amount: true } }),
+      orderProductIds.length ? this.prisma.productMedia.findMany({ where: { productId: { in: orderProductIds }, isPrimary: true, status: "PUBLISHED" }, select: { id: true, productId: true } }) : [],
     ]);
     const partnerIds = [...new Set([
       ...requests.map((r) => r.partnerId).filter((id): id is string => Boolean(id)),
@@ -372,6 +374,7 @@ export class DealsService {
     const customerById = new Map(customers.map((c) => [c.id, c]));
     const productById = new Map(products.map((p) => [p.id, p]));
     const partnerById = new Map(partners.map((p) => [p.id, p]));
+    const mediaByProduct = new Map(media.map((m) => [m.productId, m.id]));
     const partnerByCode = new Map(partners.map((p) => [p.code, p]));
     const managerIds = [...new Set(requests.map((r) => r.assignedManagerId).filter((id): id is string => Boolean(id)))];
     const managers = managerIds.length > 0
@@ -467,9 +470,9 @@ export class DealsService {
         ? itemRows.map((item) => {
             const itemAmount = money(item.amount);
             const itemCost = sales > 0 ? cost * (itemAmount / sales) : 0;
-            return { id: item.id, title: item.title, type: item.type, serviceDate: item.serviceDate ? item.serviceDate.toISOString() : null, clientPrice: fixed(itemAmount), cost: fixed(itemCost), income: fixed(itemAmount - itemCost) };
+            return { id: item.id, title: item.title, type: item.type, serviceDate: item.serviceDate ? item.serviceDate.toISOString() : null, clientPrice: fixed(itemAmount), cost: fixed(itemCost), income: fixed(itemAmount - itemCost), mediaId: mediaByProduct.get(item.productId ?? "") ?? null };
           })
-        : [{ id: request.id, title: String(snapshot.productTitle ?? product?.title ?? "—"), type: String(snapshot.type ?? product?.type ?? "—"), serviceDate: dateFrom, clientPrice: fixed(sales), cost: fixed(cost), income: fixed(expectedIncome) }];
+        : [{ id: request.id, title: String(snapshot.productTitle ?? product?.title ?? "—"), type: String(snapshot.type ?? product?.type ?? "—"), serviceDate: dateFrom, clientPrice: fixed(sales), cost: fixed(cost), income: fixed(expectedIncome), mediaId: null }];
       return {
         sequence: request.commerceSequence,
         requestId: request.id,
