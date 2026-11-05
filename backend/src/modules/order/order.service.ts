@@ -1765,9 +1765,16 @@ export class OrderService {
       //  - concurrent-claimer (другая команда изменила Request) → ConflictError
       //    → полный rollback: Order остаётся активным, ничего не «половинчато».
       if (action === "returnToRequest" && linkedRequestId && linkedRequestCode) {
+        const nextCommerceSequence = await this.refNum.nextCommerceSequence(tx);
+        const nextRequestReference = this.refNum.commerceRequestRef(nextCommerceSequence);
         const reactivated = await tx.request.updateMany({
           where: { id: linkedRequestId, status: "CONVERTED" },
-          data: { status: "CHECKING", version: { increment: 1 } },
+          data: {
+            status: "CHECKING",
+            commerceSequence: nextCommerceSequence,
+            referenceNumber: nextRequestReference,
+            version: { increment: 1 },
+          },
         });
         if (reactivated.count !== 1) {
           throw new ConflictError(
