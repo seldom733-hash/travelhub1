@@ -6,6 +6,7 @@ import { t, useLocale } from "@/lib/i18n";
 import { todayISO } from "@/lib/dates";
 import type { SearchContext } from "@/lib/search-engine";
 import DestinationPicker from "./DestinationPicker";
+import HotelStarsSelect from "./HotelStarsSelect";
 import HotelFilterSelect from "./HotelFilterSelect";
 import {
   fetchGeoDirectory,
@@ -71,6 +72,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
   // признак активности — из CRM-партнёров); пустой выбор = все поставщики.
   const [supplierOptions, setSupplierOptions] = useState<Array<{ code: string; name: string; countries?: string[] }>>([]);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
+  const [hotelStars, setHotelStars] = useState<string[]>([]);
   const [suppliersOpen, setSuppliersOpen] = useState(false);
   const suppliersRef = useRef<HTMLDivElement>(null);
   useClickOutside(suppliersRef, suppliersOpen, () => setSuppliersOpen(false));
@@ -354,6 +356,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
       children,
       childAges: childAges.slice(0, children),
       suppliers: selectedSuppliers.length ? selectedSuppliers : undefined,
+      hotelStars: hotelStars.length ? hotelStars : undefined,
     });
   };
 
@@ -468,6 +471,8 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
             ))}
           </select>
         </div>
+
+        <div className="min-w-[170px] max-w-[260px] flex-[0_1_260px]"><HotelStarsSelect selected={hotelStars} onChange={setHotelStars} countryCode={toCountry?.code} /></div>
 
         {/* Suppliers («Поставщики») — hotel suppliers from CRM partners,
             multi-select; empty = every supplier. */}

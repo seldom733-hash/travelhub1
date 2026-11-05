@@ -17,7 +17,7 @@ export interface SupplierStarOption {
   externalIds: Record<string, string>;
 }
 
-const FALLBACK: SupplierStarOption[] = [4, 5].map((s) => ({
+const FALLBACK: SupplierStarOption[] = [0, 1, 2, 3, 4, 5].map((s) => ({
   label: `${s}*`,
   stars: s,
   suppliers: [],

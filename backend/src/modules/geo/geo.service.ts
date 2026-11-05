@@ -462,6 +462,10 @@ export class GeoService {
       if (!entry.externalIds[l.supplierCode]) entry.externalIds[l.supplierCode] = l.externalId;
     }
 
+    for (const stars of [0, 1, 2, 3, 4, 5]) {
+      const label = `${stars}*`;
+      if (!byLabel.has(label)) byLabel.set(label, { stars, suppliers: new Set(), externalIds: {} });
+    }
     return [...byLabel.entries()]
       .map(([label, v]) => ({
         label,
