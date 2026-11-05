@@ -127,22 +127,15 @@ export class SupplierCatalogService implements OnModuleInit {
         cap.countries.push({ key: row.countryKey, label: row.countryLabel });
       }
     }
-    const names = [...new Set(caps.map((c) => PARTNER_NAME[c.supplierCode]).filter(Boolean))];
-    if (names.length === 0) return caps;
-    const partners = await this.prisma.partner.findMany({
-      where: { name: { in: names } },
-      select: { name: true, status: true },
-    });
-    const statusByName = new Map(partners.map((p) => [p.name, p.status]));
-    return caps.map((cap) => {
-      const name = PARTNER_NAME[cap.supplierCode];
-      const status = name ? statusByName.get(name) : undefined;
-      if (!name || status === "ACTIVE") return cap;
-      return {
-        ...cap,
-        countries: [],
-        unavailableReason: `Supplier partner ${name} is ${status ?? "missing"}; catalog sync requires ACTIVE`,
-      };
+    const partnerNames = [...new Set(caps.map((c) => PARTNER_NAME[c.supplierCode]).filter(Boolean))];
+    const partnerStatuses = partnerNames.length
+      ? await this.prisma.partner.findMany({ where: { name: { in: partnerNames } }, select: { name: true, status: true } })
+      : [];
+    const statusByName = new Map(partnerStatuses.map((p) => [p.name, p.status]));
+    return caps.filter((cap) => {
+      const partnerName = PARTNER_NAME[cap.supplierCode];
+      if (!partnerName) return true;
+      return statusByName.get(partnerName) === "ACTIVE";
     });
   }
 
@@ -172,6 +165,13 @@ export class SupplierCatalogService implements OnModuleInit {
       raw = await anyAdapter.discoverCountriesAndProgramsForSync();
     } else if (input.serviceType === "hotels" && input.supplierCode === "KOMPAS" && anyAdapter.discoverCountries) {
       raw = await anyAdapter.discoverCountries();
+    }
+
+    // An empty discovery response is not proof that the supplier has no
+    // countries: it can be auth/session/parser failure. Never tombstone the
+    // whole dictionary in that case.
+    if (raw.length === 0) {
+      return { discovered: 0, skipped: 0, countries: [], unavailableReason: "Supplier discovery returned no countries; dictionary left unchanged" };
     }
 
     const geo = await this.prisma.geoCountry.findMany({
