@@ -626,6 +626,27 @@ function CancellationTab({ deal, onSaved }: { deal: DealRow; onSaved: () => void
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
   const [notice, setNotice] = React.useState("");
+  const [terms, setTerms] = React.useState<Array<any>>([]);
+  React.useEffect(() => {
+    if (!deal.orderId) return;
+    api.get<any[]>(`/orders/${deal.orderId}/cancellation/supplier-terms`).then((rows) => {
+      if (rows.length > 0) setTerms(rows);
+      else {
+        const map = new Map<string, any>();
+        for (const p of deal.payouts) {
+          const key = p.supplierName ?? p.supplierCode ?? "supplier";
+          if (!map.has(key)) map.set(key, { supplierCode: p.supplierCode, supplierName: p.supplierName ?? p.supplierCode, serviceTitle: deal.services[0]?.title ?? "—", paidAmount: p.amount, supplierPenalty: "0", supplierRefundAgreed: "0", supplierRefundActual: "0", clientRefundAgreed: "0", clientRefundActual: "0" });
+        }
+        setTerms([...map.values()]);
+      }
+    }).catch(() => undefined);
+  }, [deal.orderId, deal.payouts, deal.services]);
+  async function saveTerms() {
+    if (!deal.orderId) return;
+    setBusy(true); setError("");
+    try { setTerms(await api.put<any[]>(`/orders/${deal.orderId}/cancellation/supplier-terms`, { terms })); setNotice("Условия по поставщикам сохранены"); }
+    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
   if (!deal.orderId) return <Empty text="Сначала создайте заказ" />;
   const body = { cancellationReason: reason, clientPenaltyAmount: clientPenalty, supplierPenaltyAmount: supplierPenalty, penaltyAmount: clientPenalty, supplierPenaltyShare: supplierPenalty, platformPenaltyShare: String(Math.max(0, Number(clientPenalty) - Number(supplierPenalty))), reason: reasons.find(([k]) => k === reason)?.[1] ?? "Отмена" };
   async function calculate() {
@@ -650,6 +671,10 @@ function CancellationTab({ deal, onSaved }: { deal: DealRow; onSaved: () => void
     <div className="space-y-1 rounded-lg border border-[#e5e2da] p-3 text-[11px]">
       <div className="text-[10px] font-semibold uppercase text-[#667085]">Предварительный расчёт</div>
       {preview ? <>{[["Получено от туриста", preview.capturedAmount], ["Штраф туриста", preview.clientPenaltyAmount], ["Возврат туристу", preview.remainingToRefund], ["Штраф поставщика", preview.supplierPenaltyAmount], ["Финансовый результат", preview.cancellationResult], ["Статус", preview.status]].map(([k, v]) => <div key={String(k)} className="flex justify-between border-b border-[#f0eee8] py-1"><span className="text-[#667085]">{k}</span><span className="font-mono">{String(v ?? "—")}</span></div>)}</> : <div className="text-[#98a2b3]">Введите суммы и нажмите «Рассчитать»</div>}
+    </div>
+    <div className="space-y-2 rounded-lg border border-[#e5e2da] p-3 lg:col-span-2">
+      <div className="flex items-center justify-between"><div className="text-[10px] font-semibold uppercase text-[#667085]">Расчёты по поставщикам</div><button type="button" disabled={busy || terms.length === 0} onClick={() => void saveTerms()} className="rounded border border-[#0f6b5f] px-3 py-1.5 text-[11px] font-semibold text-[#0f6b5f] disabled:opacity-50">Сохранить условия</button></div>
+      {terms.length === 0 ? <div className="text-[11px] text-[#98a2b3]">Нет расчётов с поставщиками</div> : <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-[10px]"><thead className="text-[#98a2b3]"><tr>{["Поставщик", "Услуга", "Оплачено", "Штраф", "Возврат согласован", "Возврат получен"].map((h) => <th key={h} className="px-1 py-1 font-medium">{h}</th>)}</tr></thead><tbody>{terms.map((x, i) => <tr key={i} className="border-t border-[#f0eee8]"><td className="px-1 py-1">{x.supplierName ?? x.supplierCode}</td><td className="px-1 py-1">{x.serviceTitle}</td><td className="px-1 py-1"><input value={x.paidAmount} onChange={(e) => setTerms(terms.map((r, j) => j === i ? { ...r, paidAmount: e.target.value } : r))} className="w-20 rounded border px-1 py-0.5" /></td><td className="px-1 py-1"><input value={x.supplierPenalty} onChange={(e) => setTerms(terms.map((r, j) => j === i ? { ...r, supplierPenalty: e.target.value } : r))} className="w-20 rounded border px-1 py-0.5" /></td><td className="px-1 py-1"><input value={x.supplierRefundAgreed} onChange={(e) => setTerms(terms.map((r, j) => j === i ? { ...r, supplierRefundAgreed: e.target.value } : r))} className="w-20 rounded border px-1 py-0.5" /></td><td className="px-1 py-1"><input value={x.supplierRefundActual} onChange={(e) => setTerms(terms.map((r, j) => j === i ? { ...r, supplierRefundActual: e.target.value } : r))} className="w-20 rounded border px-1 py-0.5" /></td></tr>)}</tbody></table></div>}
     </div>
   </div>;
 }
