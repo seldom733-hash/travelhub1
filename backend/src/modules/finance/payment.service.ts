@@ -324,14 +324,16 @@ export class PaymentService {
    */
   private async generateCommercePaymentRef(
     tx: any,
-    order: { id: string; commerceSequence: string | null; acquisitionSource: string | null; sellerPartnerId: string | null },
+    order: { id: string; referenceNumber?: string | null; commerceSequence: string | null; acquisitionSource: string | null; sellerPartnerId: string | null },
   ): Promise<{ referenceNumber: string; paymentOrdinal: number }> {
     if (order.commerceSequence) {
       // Count existing payments for this order to determine ordinal
       const existingCount = await tx.payment.count({ where: { orderId: order.id } });
       const ordinal = existingCount + 1;
+      const attempt = /-(\d+)$/.exec(order.referenceNumber ?? "")?.[1] ?? "";
+      const base = this.refNum.commercePaymentRef(order.commerceSequence, ordinal);
       return {
-        referenceNumber: this.refNum.commercePaymentRef(order.commerceSequence, ordinal),
+        referenceNumber: attempt ? `${base.slice(0, base.length - String(ordinal).length - 1)}-${attempt}-${ordinal}` : base,
         paymentOrdinal: ordinal,
       };
     }
