@@ -2293,6 +2293,8 @@ enum OrderStatus {
   FULFILLED
   READY_TO_CLOSE
   CLOSED
+  CANCELLATION_REQUESTED
+  CANCELLATION_APPROVED
   CANCELLED
   PROBLEM
   SUSPENDED
@@ -2459,6 +2461,12 @@ model Order {
   /// Момент возврата заказа в заявку (returnToRequest). Отменённый заказ с
   /// этим значением нельзя закрыть: он должен быть переконвертирован.
   returnedToRequestAt DateTime?
+  cancellationReason   String?
+  cancellationComment  String?
+  cancellationRequestedAt DateTime?
+  cancellationRequestedById String?
+  cancellationApprovedAt DateTime?
+  cancellationApprovedById String?
   /// Момент перехода complete ИЛИ reconcile-реконсиляции → FULFILLED
   /// (OrderFulfilled). Server-owned; immutable.
   fulfilledAt DateTime?

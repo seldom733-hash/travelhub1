@@ -93,6 +93,9 @@ export type OrderAction =
   | "send"
   | "complete"
   | "close"
+  | "requestCancellation"
+  | "approveCancellation"
+  | "rejectCancellation"
   | "cancel"
   | "problem"
   | "suspend"
@@ -121,7 +124,10 @@ const TRANSITIONS: Record<string, { from: OrderStatus[]; to: OrderStatus }> = {
   send: { from: ["READY_FOR_BOOKING", "WAITING_FOR_FIRST_PAYMENT", "PARTIALLY_FULFILLED"], to: "SENT_TO_BOOKING" },
   complete: { from: ["SENT_TO_BOOKING", "PARTIALLY_FULFILLED"], to: "FULFILLED" },
   close: { from: ["FULFILLED", "READY_TO_CLOSE", "CANCELLED"], to: "CLOSED" },
-  cancel: { from: ACTIVE_STATUSES, to: "CANCELLED" },
+  requestCancellation: { from: ACTIVE_STATUSES, to: "CANCELLATION_REQUESTED" },
+  approveCancellation: { from: ["CANCELLATION_REQUESTED"], to: "CANCELLATION_APPROVED" },
+  rejectCancellation: { from: ["CANCELLATION_REQUESTED"], to: "IN_PROCESSING" },
+  cancel: { from: ["CANCELLATION_APPROVED"], to: "CANCELLED" },
   problem: { from: ACTIVE_STATUSES.filter((s) => s !== "PROBLEM"), to: "PROBLEM" },
   suspend: { from: ACTIVE_STATUSES.filter((s) => s !== "SUSPENDED"), to: "SUSPENDED" },
   // Stage 1 (Order → Request, только назад): тот же active-диапазон, что и
@@ -152,6 +158,9 @@ const ACTION_LABELS: Record<OrderAction, string> = {
   send: "Передан в Booking Center",
   complete: "Заказ исполнен",
   close: "Заказ закрыт",
+  requestCancellation: "Запрошена отмена заказа",
+  approveCancellation: "Отмена согласована",
+  rejectCancellation: "В отмене отказано",
   cancel: "Заказ отменён",
   problem: "Заказ помечен проблемным",
   suspend: "Заказ приостановлен",
@@ -168,6 +177,9 @@ export const ACTION_PERMISSIONS: Record<OrderAction, string> = {
   send: "order.request_booking",
   complete: "order.edit_noncritical",
   close: "order.close",
+  requestCancellation: "order.cancel",
+  approveCancellation: "finance.settlement.manage",
+  rejectCancellation: "finance.settlement.manage",
   cancel: "order.cancel",
   problem: "order.edit_noncritical",
   suspend: "order.suspend",
@@ -1619,6 +1631,9 @@ export class OrderService {
         }
       }
 
+      if (action === "requestCancellation" && !reason?.trim()) {
+        throw new ValidationDomainError("Cancellation reason is required");
+      }
       if (action === "close" && order.returnedToRequestAt) {
         throw new ValidationDomainError(`Order ${order.code} was returned to Request; convert it again before closing`);
       }
@@ -1741,6 +1756,8 @@ export class OrderService {
       else if (action === "close") data.closedAt = milestoneNow;
       else if (action === "cancel" || action === "returnToRequest") data.cancelledAt = milestoneNow;
       if (action === "returnToRequest") data.returnedToRequestAt = milestoneNow;
+      if (action === "requestCancellation") { data.cancellationReason = reason; data.cancellationComment = reason; data.cancellationRequestedAt = milestoneNow; data.cancellationRequestedById = actorId ?? null; }
+      if (action === "approveCancellation") { data.cancellationApprovedAt = milestoneNow; data.cancellationApprovedById = actorId ?? null; }
       const updatedRows = await tx.order.updateMany({
         where: { id: orderId, status: order.status, version: order.version },
         data,

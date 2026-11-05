@@ -22,7 +22,7 @@ type Tab = (typeof TABS)[number][0];
 
 function money(value: string | null | undefined, currency: string) { return formatPrice(value ?? "0", currency, "ru") ?? value ?? "0"; }
 function statusRu(status: string) {
-  const map: Record<string, string> = { NEW: "Новая", CHECKING: "Проверка", WAITING_FOR_DATA: "Ждём данные", PROBLEM: "Проблема", SUSPENDED: "Приостановлен", READY_TO_CLOSE: "Готов к закрытию", PARTIALLY_FULFILLED: "Частично исполнен", CONFIRMED: "Подтверждён", PRICE_CHANGED: "Цена изменена", CUSTOMER_ACCEPTED: "Принят клиентом", CONVERTED: "Конвертирован в заказ", REJECTED: "Отклонён", UNAVAILABLE: "Недоступен", EXPIRED: "Истёк", CANCELLED_BY_CUSTOMER: "Отменён клиентом", SUPPLIER_TIMEOUT: "Поставщик не ответил", CUSTOMER_PAYMENT_TIMEOUT: "Клиент не оплатил", IN_PROCESSING: "В работе", READY_FOR_BOOKING: "Готова к брони", WAITING_FOR_FIRST_PAYMENT: "Ожидаем первую оплату", SENT_TO_BOOKING: "На бронировании", FULFILLED: "Завершён", COMPLETED: "Завершён", CANCELLED: "Отменён", PENDING: "Ожидает", CAPTURED: "Получен", PAID: "Оплачен", REQUESTED: "Запрошен", APPROVED: "Подтверждён", PROCESSED: "Исполнен", PLANNED: "План", DUE: "К оплате", OVERDUE: "Просрочен", REFUNDED: "Возвращён", PARTIALLY_REFUNDED: "Частичный возврат", FAILED: "Ошибка" };
+  const map: Record<string, string> = { NEW: "Новая", CHECKING: "Проверка", WAITING_FOR_DATA: "Ждём данные", PROBLEM: "Проблема", SUSPENDED: "Приостановлен", READY_TO_CLOSE: "Готов к закрытию", PARTIALLY_FULFILLED: "Частично исполнен", CONFIRMED: "Подтверждён", PRICE_CHANGED: "Цена изменена", CUSTOMER_ACCEPTED: "Принят клиентом", CONVERTED: "Конвертирован в заказ", REJECTED: "Отклонён", UNAVAILABLE: "Недоступен", EXPIRED: "Истёк", CANCELLED_BY_CUSTOMER: "Отменён клиентом", SUPPLIER_TIMEOUT: "Поставщик не ответил", CUSTOMER_PAYMENT_TIMEOUT: "Клиент не оплатил", IN_PROCESSING: "В работе", READY_FOR_BOOKING: "Готова к брони", WAITING_FOR_FIRST_PAYMENT: "Ожидаем первую оплату", SENT_TO_BOOKING: "На бронировании", FULFILLED: "Завершён", COMPLETED: "Завершён", CANCELLED: "Отменён", CANCELLATION_REQUESTED: "Отмена запрошена", CANCELLATION_APPROVED: "Отмена согласована", PENDING: "Ожидает", CAPTURED: "Получен", PAID: "Оплачен", REQUESTED: "Запрошен", APPROVED: "Подтверждён", PROCESSED: "Исполнен", PLANNED: "План", DUE: "К оплате", OVERDUE: "Просрочен", REFUNDED: "Возвращён", PARTIALLY_REFUNDED: "Частичный возврат", FAILED: "Ошибка" };
   return map[status] ?? status;
 }
 function statusTone(status: string) {
@@ -34,7 +34,7 @@ function statusTone(status: string) {
 const ACTION_LABELS: Record<string, string> = {
   process: "Принять в работу", markWaitingData: "Ждём данные", resumeProcessing: "Вернуть в работу",
   confirm: "Подтвердить заказ", waitFirstPayment: "Ожидаем оплату", send: "Отправить на бронь", complete: "Завершить",
-  close: "Закрыть", cancel: "Отменить заказ", problem: "Проблема", suspend: "Приостановить",
+  close: "Закрыть", requestCancellation: "Инициировать отмену", approveCancellation: "Согласовать отмену", rejectCancellation: "Отклонить отмену", cancel: "Отменить заказ", problem: "Проблема", suspend: "Приостановить",
   returnToRequest: "Вернуть в заявку",
 };
 const REQUEST_ACTION_LABELS: Record<string, string> = {
@@ -71,6 +71,7 @@ export default function DealDetailPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [writeOffOpen, setWriteOffOpen] = useState(false);
   const [debtWriteOffOpen, setDebtWriteOffOpen] = useState(false);
+  const [cancelRequestOpen, setCancelRequestOpen] = useState(false);
   const [clientDebtWriteOffOpen, setClientDebtWriteOffOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [supplierPaymentOpen, setSupplierPaymentOpen] = useState(false);
@@ -114,6 +115,7 @@ export default function DealDetailPage() {
 
   async function runAction(action: string) {
     if (!deal?.orderId) return;
+    if (action === "requestCancellation") { setCancelRequestOpen(true); return; }
     setActionBusy(action); setActionError("");
     try {
       await api.patch(`/orders/${deal.orderId}`, { action });
@@ -288,6 +290,7 @@ export default function DealDetailPage() {
       {editingPayout && <EditSupplierPayoutModal payout={editingPayout} onClose={() => setEditingPayout(null)} onSaved={() => { setEditingPayout(null); setReload((v) => v + 1); }} />}
       {editOpen && <DealEditModal deal={deal} onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); setReload((v) => v + 1); }} />}
       {clientDebtWriteOffOpen && <ClientDebtWriteOffModal deal={deal} onClose={() => setClientDebtWriteOffOpen(false)} onSaved={() => { setClientDebtWriteOffOpen(false); setReload((v) => v + 1); }} />}
+      {cancelRequestOpen && deal.orderId && <RequestCancellationModal orderId={deal.orderId} onClose={() => setCancelRequestOpen(false)} onSaved={() => { setCancelRequestOpen(false); setReload((v) => v + 1); }} />}
       {debtWriteOffOpen && <SupplierDebtWriteOffModal deal={deal} onClose={() => setDebtWriteOffOpen(false)} onSaved={() => { setDebtWriteOffOpen(false); setReload((v) => v + 1); }} />}
       {writeOffOpen && <WriteOffModal deal={deal} onClose={() => setWriteOffOpen(false)} onSaved={() => { setWriteOffOpen(false); setReload((v) => v + 1); }} />}
       {addOpen && <AddServiceModal deal={deal} onClose={() => setAddOpen(false)} onSaved={() => { setAddOpen(false); setReload((v) => v + 1); }} />}
@@ -692,4 +695,26 @@ function CancellationTab({ deal, onSaved }: { deal: DealRow; onSaved: () => void
       {terms.length === 0 ? <div className="text-[11px] text-[#98a2b3]">Нет расчётов с поставщиками</div> : <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-[10px]"><thead className="text-[#98a2b3]"><tr>{["Поставщик", "Услуга", "Оплачено", "Штраф", "Возврат согласован", "Возврат получен"].map((h) => <th key={h} className="px-1 py-1 font-medium">{h}</th>)}</tr></thead><tbody>{terms.map((x, i) => <tr key={i} className="border-t border-[#f0eee8]"><td className="px-1 py-1">{x.supplierName ?? x.supplierCode}</td><td className="px-1 py-1">{x.serviceTitle}</td><td className="px-1 py-1"><input value={x.paidAmount} onChange={(e) => setTerms(terms.map((r, j) => j === i ? { ...r, paidAmount: e.target.value } : r))} className="w-20 rounded border px-1 py-0.5" /></td><td className="px-1 py-1"><input value={x.supplierPenalty} onChange={(e) => setTerms(terms.map((r, j) => j === i ? { ...r, supplierPenalty: e.target.value } : r))} className="w-20 rounded border px-1 py-0.5" /></td><td className="px-1 py-1"><input value={x.supplierRefundAgreed} onChange={(e) => setTerms(terms.map((r, j) => j === i ? { ...r, supplierRefundAgreed: e.target.value } : r))} className="w-20 rounded border px-1 py-0.5" /></td><td className="px-1 py-1"><input value={x.supplierRefundActual} onChange={(e) => setTerms(terms.map((r, j) => j === i ? { ...r, supplierRefundActual: e.target.value } : r))} className="w-20 rounded border px-1 py-0.5" /></td></tr>)}</tbody></table></div>}
     </div>
   </div>;
+}
+
+function RequestCancellationModal({ orderId, onClose, onSaved }: { orderId: string; onClose: () => void; onSaved: () => void }) {
+  const reasons = [
+    ["CUSTOMER_FAULT", "По вине туриста"], ["SUPPLIER_FAULT", "По вине поставщика"],
+    ["NAVITRAVEL_FAULT", "По вине Navitravel"], ["FORCE_MAJEURE", "Форс-мажор"],
+    ["MUTUAL_AGREEMENT", "Взаимное соглашение"],
+  ];
+  const [reason, setReason] = React.useState("CUSTOMER_FAULT");
+  const [comment, setComment] = React.useState("");
+  const [document, setDocument] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState("");
+  async function submit() {
+    if (!comment.trim()) { setError("Укажите комментарий"); return; }
+    setBusy(true); setError("");
+    try {
+      await api.patch(`/orders/${orderId}`, { action: "requestCancellation", reason: `${reason}|комментарий: ${comment.trim()}${document.trim() ? `|документ: ${document.trim()}` : ""}` });
+      onSaved();
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}><div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}><h3 className="mb-1 text-base font-semibold">Инициировать отмену</h3><p className="mb-3 text-xs text-slate-500">Заказ перейдёт в статус «Отмена запрошена» и потребует согласования.</p><div className="grid gap-2"><label className="text-xs text-slate-500">Причина<select value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm">{reasons.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label><label className="text-xs text-slate-500">Комментарий<textarea value={comment} onChange={(e) => setComment(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label><label className="text-xs text-slate-500">Ссылка на документ<textarea value={document} onChange={(e) => setDocument(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>{error && <div className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700">{error}</div>}<div className="mt-2 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-3 py-2 text-xs">Отмена</button><button type="button" disabled={busy} onClick={() => void submit()} className="rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "Отправка…" : "Запросить отмену"}</button></div></div></div></div>;
 }
