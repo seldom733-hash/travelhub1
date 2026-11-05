@@ -23,6 +23,8 @@ export default function CreateSupplierPaymentForm({
   bookingId,
   bookingCode,
   fallbackCost,
+  defaultSupplierCode,
+  defaultSupplierName,
   onClose,
   onCreated,
 }: {
@@ -32,6 +34,8 @@ export default function CreateSupplierPaymentForm({
   bookingCode?: string;
   /** Order/booking amount used when no supplier obligations exist yet. */
   fallbackCost?: string | null;
+  defaultSupplierCode?: string | null;
+  defaultSupplierName?: string | null;
   onClose: () => void;
   onCreated?: () => void;
 }) {
@@ -39,7 +43,7 @@ export default function CreateSupplierPaymentForm({
   const [obligations, setObligations] = useState<SupplierObligation[]>([]);
   const [payments, setPayments] = useState<Array<{ aznAmount: string; status: string; direction?: string }>>([]);
   const [suppliers, setSuppliers] = useState<FxSupplier[]>([]);
-  const [supplierCode, setSupplierCode] = useState("");
+  const [supplierCode, setSupplierCode] = useState(defaultSupplierCode ?? "");
   const [direction, setDirection] = useState<"EXPENSE" | "INCOME">("EXPENSE");
   const [amount, setAmount] = useState("");
   const amountTouchedRef = useRef(false);
@@ -202,9 +206,12 @@ export default function CreateSupplierPaymentForm({
                 id="supplier-payment-supplier"
                 value={supplierCode}
                 onChange={(event) => setSupplierCode(event.target.value)}
-                disabled={busy || suppliers.length === 0 || obligations.length > 0}
+                disabled={busy || obligations.length > 0 || suppliers.length > 1}
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
               >
+                {defaultSupplierCode && !suppliers.some((supplier) => supplier.supplierCode === defaultSupplierCode) && (
+                  <option value={defaultSupplierCode}>{defaultSupplierName ?? defaultSupplierCode}</option>
+                )}
                 <option value="">Выберите поставщика</option>
                 {suppliers.map((supplier) => (
                   <option key={supplier.supplierCode} value={supplier.supplierCode}>
