@@ -95,6 +95,7 @@ type DealRow = {
   clientReceived: string;
   clientDebt: string;
   clientRefunded: string;
+  clientRefundPending: string;
   supplierPaid: string;
   supplierDebt: string;
   supplierRefunded: string;
@@ -419,7 +420,8 @@ export class DealsService {
       const snapOffer = (snapshot.offer ?? {}) as Record<string, unknown>;
       const commercial = (order?.commercialSnapshot ?? request.commercialSnapshot ?? {}) as Record<string, unknown>;
       const clientPayments = order ? paymentsByOrder.get(order.id) ?? [] : [];
-      const clientRefunds = (order ? refundsByOrder.get(order.id) ?? [] : []).filter((r) => r.status === "PROCESSED");
+      const clientRefundRows = order ? refundsByOrder.get(order.id) ?? [] : [];
+      const clientRefunds = clientRefundRows.filter((r) => r.status === "PROCESSED");
       const supplierPayouts = order ? payoutsByOrder.get(order.id) ?? [] : [];
       const supplierObligations = order ? obligationsByOrder.get(order.id) ?? [] : [];
       const supplierWriteOff = supplierWriteOffs.filter((w) => w.orderId === order?.id).reduce((sum, w) => sum + money(w.amount), 0);
@@ -555,6 +557,7 @@ export class DealsService {
         clientReceived: fixed(captured),
         clientDebt: fixed(clientDebt),
         clientRefunded: fixed(refunded),
+        clientRefundPending: fixed(clientRefundRows.filter((r) => ["REQUESTED", "APPROVED"].includes(r.status)).reduce((sum, r) => sum + money(r.amount), 0)),
         supplierPaid: fixed(supplierPaid),
         supplierDebt: fixed(supplierDebt),
         supplierRefunded: fixed(supplierRefunded),
@@ -576,7 +579,7 @@ export class DealsService {
         cancellationLoss: fixed(income.cancellationLoss),
         writeOffExpense: fixed(income.writeOffExpense),
         payments: clientPayments.map((p) => ({ id: p.id, code: p.code, amount: p.amount.toString(), currency: p.currency, status: p.status, method: p.paymentMethod, date: (p.paidAt ?? p.createdAt).toISOString() })),
-        refunds: clientRefunds.map((r) => ({ id: r.id, code: r.code, amount: r.amount.toString(), currency: r.currency, status: r.status, date: (r.processedAt ?? r.createdAt).toISOString() })),
+        refunds: clientRefundRows.map((r) => ({ id: r.id, code: r.code, amount: r.amount.toString(), currency: r.currency, status: r.status, date: (r.processedAt ?? r.createdAt).toISOString() })),
         payouts: supplierPayouts.map((p) => ({ id: p.id, code: p.code, amount: p.amount.toString(), currency: p.currency, status: p.status, direction: p.direction, date: p.occurredAt.toISOString(), supplierCode: p.supplierCode ?? p.partnerId ?? null, supplierName: (p.partnerId ? partnerById.get(p.partnerId)?.name : null) ?? (p.supplierCode ? partnerByCode.get(p.supplierCode)?.name : null) ?? p.supplierCode ?? p.partnerId ?? null })),
       };
     });
