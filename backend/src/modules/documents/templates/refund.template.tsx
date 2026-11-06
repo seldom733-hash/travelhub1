@@ -1,5 +1,6 @@
 ﻿import React from "react";
 import { Page, Text, View } from "@react-pdf/renderer";
+import { statusRu } from "./status-label";
 import { styles, colors } from "./shared.styles";
 
 export interface RefundData {
@@ -66,7 +67,7 @@ export function RefundTemplate({ data }: { data: RefundData }) {
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Payment Status</Text>
-          <Text style={styles.value}>{data.paymentStatus ?? "N/A"}</Text>
+          <Text style={styles.value}>{statusRu(data.paymentStatus)}</Text>
         </View>
         {data.refundDate && (
           <View style={styles.row}>
