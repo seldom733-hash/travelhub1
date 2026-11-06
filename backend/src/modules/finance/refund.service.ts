@@ -230,7 +230,9 @@ export class RefundService {
       });
       if (sf) return order.commerceSequence ? `${sf.storefrontCode}-REF-${order.commerceSequence}` : this.refNum.nextStorefrontReference(tx, sf.storefrontCode, "REF");
     }
-    return order.commerceSequence ? `MKT-REF-${order.commerceSequence}` : this.refNum.nextMarketplaceReference(tx, "REF");
+    if (!order.commerceSequence) return this.refNum.nextMarketplaceReference(tx, "REF");
+    const existingCount = await tx.refund.count({ where: { orderId: payment.orderId, status: { not: "FAILED" } } });
+    return `MKT-REF-${order.commerceSequence}${existingCount > 0 ? `-${existingCount}` : ""}`;
   }
 
   // ── Lifecycle transitions (единственный state-machine authority) ──────────

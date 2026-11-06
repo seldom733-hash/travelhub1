@@ -19,6 +19,7 @@ const SIGNED_URL_TTL_SECONDS = 300; // 5 minutes
 export interface CreateDocumentInput {
   type: DocumentType;
   sourceId?: string | null;
+  code?: string | null;
   bookingId: string;
   orderId: string;
   customerId?: string | null;
@@ -67,7 +68,7 @@ export class DocumentsService {
     tx: Prisma.TransactionClient,
     input: CreateDocumentInput,
   ): Promise<{ id: string; code: string }> {
-    const code = await this.ids.nextCode(tx, this.prefixForType(input.type));
+    const code = input.code ?? await this.ids.nextCode(tx, this.prefixForType(input.type));
     const doc = await tx.document.create({
       data: {
         code,

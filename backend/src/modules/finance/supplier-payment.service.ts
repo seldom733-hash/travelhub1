@@ -883,7 +883,7 @@ export class SupplierPaymentService {
     const sequence = order.commerceSequence ?? source.match(/(\d+)\s*$/)?.[1] ?? source.replace(/\D/g, "");
     if (!sequence) throw new ValidationDomainError(`Cannot derive order sequence for ${source}`);
     const existing = await this.prisma.supplierPayout.count({ where: { orderId } });
-    return `SPO-${sequence}-${existing + 1}`;
+    return existing === 0 ? `SPO-${sequence}` : `SPO-${sequence}-${existing}`;
   }
 
   private async prepareAllocations(

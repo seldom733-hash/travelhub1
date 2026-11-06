@@ -78,7 +78,9 @@ export class FinancialDocumentConsumer {
         if (!order) return;
         const booking = await tx.booking.findFirst({ where: { orderId: p.orderId }, orderBy: { createdAt: "desc" } });
         if (!booking) return;
+        const paymentRow = await tx.payment.findUnique({ where: { id: p.paymentId }, select: { referenceNumber: true } });
         const { id, code } = await this.documents.createDocument(tx, {
+          code: paymentRow?.referenceNumber ?? undefined,
           type: "PARTIAL_PAYMENT", sourceId: p.paymentId, bookingId: booking.id, orderId: order.id,
           customerId: order.customerId, totalAmount: order.amount, paidAmount: order.paidAmount,
           currency: p.currency, paymentStatus: order.paymentStatus,
