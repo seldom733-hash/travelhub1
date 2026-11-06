@@ -47,7 +47,7 @@ const BOOKING_ACTION_LABELS: Record<string, string> = {
   resume: "Вернуть в работу", confirm: "Подтвердить бронь", reject: "Отклонить бронь",
   service: "Начать обслуживание", requestChange: "Запросить изменение", resolveChange: "Согласовать изменение",
   requestCancellation: "Запросить отмену", complete: "Завершить бронь", cancel: "Отменить бронь",
-  problem: "Проблема", returnToOrder: "Вернуть в заказ",
+  problem: "Проблема с бронью", returnToOrder: "Вернуть в заказ",
 };
 
 export default function DealDetailPage() {
@@ -182,7 +182,7 @@ export default function DealDetailPage() {
   const effectiveRequestActions = readOnly ? {} : requestActions;
   const effectiveBookingActions = readOnly ? [] : bookingActions;
   const hasOutstandingDebt = Number(deal.clientDebt) > 0 || Number(deal.supplierDebt) > 0;
-  const effectiveOrderActions = readOnly ? [] : availableActions.filter((a) => !(a === "close" && hasOutstandingDebt));
+  const effectiveOrderActions = readOnly || deal.stage === "BOOKING" ? [] : availableActions.filter((a) => !(a === "close" && hasOutstandingDebt));
   const stage = deal.stage === "BOOKING" ? 2 : deal.stage === "ORDER" ? 1 : 0;
   const dateFrom = deal.trip.dateFrom ? new Date(deal.trip.dateFrom).toLocaleDateString("ru-RU") : deal.serviceDate ? new Date(deal.serviceDate).toLocaleDateString("ru-RU") : "—";
   const dateTo = deal.trip.dateTo ? new Date(deal.trip.dateTo).toLocaleDateString("ru-RU") : "—";
