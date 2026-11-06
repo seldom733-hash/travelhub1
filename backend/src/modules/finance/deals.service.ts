@@ -96,6 +96,7 @@ type DealRow = {
   clientDebt: string;
   clientRefunded: string;
   clientRefundPending: string;
+  clientRefundTotal: string;
   supplierPaid: string;
   supplierDebt: string;
   supplierRefunded: string;
@@ -428,6 +429,7 @@ export class DealsService {
       const settlement = order ? settlementByOrder.get(order.id) : undefined;
       const captured = clientPayments.filter((p) => p.status === "CAPTURED" || p.status === "REFUNDED").reduce((sum, p) => sum + money(p.amount), 0);
       const refunded = clientRefunds.filter((r) => r.status !== "FAILED").reduce((sum, r) => sum + money(r.amount), 0);
+      const refundedTotal = clientRefundRows.filter((r) => r.status !== "FAILED").reduce((sum, r) => sum + money(r.amount), 0);
       const supplierPaid = supplierPayouts.filter((p) => p.direction !== "INCOMING" && p.status === "CONFIRMED").reduce((sum, p) => sum + money(p.amount), 0);
       const supplierRefunded = supplierPayouts.filter((p) => p.direction === "INCOMING" && p.status === "CONFIRMED").reduce((sum, p) => sum + money(p.amount), 0);
       const sales = order ? money(order.amount) : money(request.confirmedPrice ?? request.displayedPrice);
@@ -457,15 +459,15 @@ export class DealsService {
       const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(status);
       const rawSupplierDebt = order?.status === "CANCELLED"
         ? Math.max(0, supplierPaid - supplierRefunded)
-        : useObligationCost && obligationDebt <= cost
-          ? obligationDebt
-          : Math.max(0, cost - supplierPaid + supplierRefunded);
+        : cost > 0
+          ? Math.max(0, cost - supplierPaid + supplierRefunded)
+          : obligationDebt;
       const supplierDebt = Math.max(0, rawSupplierDebt - supplierWriteOff);
       const cancelledOrder = cancelled || Boolean(order?.cancelledAt);
       const clientWriteOff = clientWriteOffs.filter((w) => w.orderId === order?.id).reduce((sum, w) => sum + money(w.amount), 0);
       const clientDebt = cancelledOrder ? 0 : settlement
         ? Math.max(0, money(settlement.remainingToPay) - clientWriteOff)
-        : Math.max(0, sales - captured + refunded - clientWriteOff);
+        : Math.max(0, sales - captured + refundedTotal - clientWriteOff);
       const clientPenalty = ["CONFIRMED", "WITHHELD", "RECEIVED"].includes(settlement?.clientPenaltyStatus ?? "")
         ? money(settlement?.clientPenaltyAmount)
         : 0;
@@ -558,6 +560,7 @@ export class DealsService {
         clientDebt: fixed(clientDebt),
         clientRefunded: fixed(refunded),
         clientRefundPending: fixed(clientRefundRows.filter((r) => ["REQUESTED", "APPROVED"].includes(r.status)).reduce((sum, r) => sum + money(r.amount), 0)),
+        clientRefundTotal: fixed(refundedTotal),
         supplierPaid: fixed(supplierPaid),
         supplierDebt: fixed(supplierDebt),
         supplierRefunded: fixed(supplierRefunded),
