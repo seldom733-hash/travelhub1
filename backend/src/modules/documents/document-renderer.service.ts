@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { pdf, Document } from "@react-pdf/renderer";
+import { pdf, Document, Font } from "@react-pdf/renderer";
+import path from "node:path";
 import React from "react";
 import type { DocumentType } from "../../generated/prisma/client";
 import { VoucherTemplate } from "./templates/voucher.template";
@@ -16,6 +17,16 @@ import type { RefundData } from "./templates/refund.template";
  * Produces valid PDF binary with proper header, A4 layout, and styled content.
  * Uses TSX templates (AD-D13-12/13) as the production rendering engine.
  */
+Font.register({
+  family: "Arial",
+  fonts: [
+    { src: path.join(process.cwd(), "assets", "fonts", "arial.ttf") },
+    { src: path.join(process.cwd(), "assets", "fonts", "arialbd.ttf"), fontWeight: "bold" },
+    { src: path.join(process.cwd(), "assets", "fonts", "ariali.ttf"), fontStyle: "italic" },
+    { src: path.join(process.cwd(), "assets", "fonts", "arialbi.ttf"), fontWeight: "bold", fontStyle: "italic" },
+  ],
+});
+
 @Injectable()
 export class DocumentRenderer {
   private readonly logger = new Logger(DocumentRenderer.name);
