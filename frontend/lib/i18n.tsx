@@ -3002,7 +3002,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "documents.status.SUPERSEDED": { ru: "Заменён", az: "Əvəz olunub", en: "Superseded" },
   "documents.status.INVALIDATED": { ru: "Аннулирован", az: "Ləğv edilib", en: "Invalidated" },
   "documents.type.VOUCHER": { ru: "Ваучер", az: "Voucher", en: "Voucher" },
-  "documents.type.PARTIAL_PAYMENT": { ru: "Частичная оплата", az: "Qismi ödəniş", en: "Partial payment" },
+  "documents.type.PARTIAL_PAYMENT": { ru: "Оплата", az: "Ödəniş", en: "Payment" },
   "documents.type.REFUND": { ru: "Возврат", az: "Geri qaytarma", en: "Refund" },
   "documents.filter.type_all": { ru: "Все типы", az: "Bütün növlər", en: "All types" },
   "documents.filter.status_all": { ru: "Все статусы", az: "Bütün statuslar", en: "All statuses" },

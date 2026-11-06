@@ -19,8 +19,8 @@ export function PartialPaymentTemplate({ data }: { data: PartialPaymentData }) {
   return (
     <Page size="A4" style={styles.page}>
       <View style={styles.header}>
-        <Text style={styles.title}>NAVITRAVEL PARTIAL PAYMENT DOCUMENT</Text>
-        <Text style={styles.subtitle}>Payment State Confirmation</Text>
+        <Text style={styles.title}>NAVITRAVEL PAYMENT DOCUMENT</Text>
+        <Text style={styles.subtitle}>Payment Confirmation</Text>
       </View>
 
       <View style={styles.section}>
