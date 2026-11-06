@@ -181,7 +181,7 @@ export class BookingSubscribers implements OnModuleInit {
           // (unique) — ordinal suffix keeps MKT-BKG-{root}-{n} stable per OrderItem.
           const itemOrdinal = order.items.findIndex((i) => i.id === item.id) + 1;
           const priorAttempts = existing.filter((b) => b.orderItemId === item.id).length + 1;
-          const orderAttempt = /-(\d+)$/.exec(order.referenceNumber ?? "")?.[1] ?? "";
+          const orderAttempt = /-(\d{1,2})$/.exec(order.referenceNumber ?? "")?.[1] ?? "";
           const bookingRefNum = order.commerceSequence
             ? `${this.refNum.commerceBookingRef(order.commerceSequence)}${orderAttempt ? `-${orderAttempt}` : ""}${
                 order.items.length > 1 ? `-${itemOrdinal}` : ""
