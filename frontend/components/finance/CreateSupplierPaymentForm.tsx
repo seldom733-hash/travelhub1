@@ -104,14 +104,23 @@ export default function CreateSupplierPaymentForm({
   const remaining = Math.max(0, cost - paid + refunded);
 
   useEffect(() => {
-    if (!amountTouchedRef.current) setAmount(remaining.toFixed(2));
-  }, [remaining]);
+    amountTouchedRef.current = false;
+  }, [direction]);
+
+  useEffect(() => {
+    if (!amountTouchedRef.current) {
+      const auto = direction === "INCOME" ? Math.max(0, paid - refunded) : remaining;
+      setAmount(auto.toFixed(2));
+    }
+  }, [remaining, paid, refunded, direction]);
 
   const amountValue = Number(amount);
   const amountValid =
     Number.isFinite(amountValue) &&
     amountValue > 0 &&
-    (direction === "INCOME" || obligations.length === 0 || amountValue <= remaining + 0.005);
+    (direction === "INCOME"
+      ? amountValue <= Math.max(0, paid - refunded) + 0.005
+      : obligations.length === 0 || amountValue <= remaining + 0.005);
   const canSubmit =
     !busy &&
     Boolean(orderId) &&
