@@ -265,11 +265,11 @@ export class DealsService {
       if (query.stage && row.stage !== query.stage) return false;
       if (query.status && row.status !== query.status) return false;
       if (query.cancellationReason && row.cancellationReason !== query.cancellationReason) return false;
-      if (query.statusGroup === "cancelled" && !["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED", "REJECTED"].includes(row.status)) return false;
+      if (query.statusGroup === "cancelled" && !row.isCancelledDeal && !["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED", "REJECTED"].includes(row.status)) return false;
       if (query.scope === "my" && row.managerId !== query.viewerId) return false;
       if (query.state === "open" && ["CLOSED", "COMPLETED", "FULFILLED", "CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED", "REJECTED", "UNAVAILABLE"].includes(row.status)) return false;
       if (query.state === "closed" && !["CLOSED", "COMPLETED", "FULFILLED"].includes(row.status)) return false;
-      if (query.state === "cancelled" && !["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED", "REJECTED", "UNAVAILABLE"].includes(row.status)) return false;
+      if (query.state === "cancelled" && !row.isCancelledDeal && !["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED", "REJECTED", "UNAVAILABLE"].includes(row.status)) return false;
       if (query.supplierId && row.supplierId !== query.supplierId && row.supplierCode !== query.supplierId) return false;
       if (query.country && row.trip.country !== query.country) return false;
       if (query.manager && row.manager !== query.manager) return false;
@@ -358,7 +358,7 @@ export class DealsService {
     const requests = await this.prisma.request.findMany({ orderBy: { createdAt: "desc" }, take: 1000 });
     if (requests.length === 0) return [];
     const orderIds = requests.map((r) => r.convertedOrderId).filter((id): id is string => Boolean(id));
-    const orders = await this.prisma.order.findMany({ where: { OR: [{ id: { in: orderIds } }, { commerceSequence: { in: requests.map((r) => r.commerceSequence) } }] }, select: { id: true, code: true, referenceNumber: true, commerceSequence: true, status: true, amount: true, currency: true, cancelledAt: true, returnedToRequestAt: true, paidAmount: true, refundedAmount: true, customerId: true, createdBy: true, financialStatus: true, commercialSnapshot: true, items: { select: { id: true, title: true, type: true, serviceDate: true, amount: true, productId: true } } } });
+    const orders = await this.prisma.order.findMany({ where: { OR: [{ id: { in: orderIds } }, { commerceSequence: { in: requests.map((r) => r.commerceSequence) } }] }, select: { id: true, code: true, referenceNumber: true, commerceSequence: true, status: true, amount: true, currency: true, cancelledAt: true, returnedToRequestAt: true, cancellationReason: true, paidAmount: true, refundedAmount: true, customerId: true, createdBy: true, financialStatus: true, commercialSnapshot: true, items: { select: { id: true, title: true, type: true, serviceDate: true, amount: true, productId: true } } } });
     const orderBySequence = new Map(orders.map((order) => [order.commerceSequence, order]));
     const resolvedOrderIds = [...new Set([...orderIds, ...orders.map((o) => o.id)])];
     const orderProductIds = [...new Set(orders.flatMap((o) => o.items.map((i) => i.productId)).filter((id): id is string => Boolean(id)))];
@@ -576,7 +576,7 @@ export class DealsService {
         financialStatus: settlement?.status ?? order?.financialStatus ?? "OPEN",
         paymentStatus: captured <= 0 ? "UNPAID" : captured >= sales ? "PAID" : "PARTIALLY_PAID",
         supplierPaymentStatus: supplierPaid <= 0 ? "UNPAID" : supplierPaid >= cost ? "PAID" : "PARTIALLY_PAID",
-        cancellationReason: settlement?.cancellationReason ?? null,
+        cancellationReason: settlement?.cancellationReason ?? order?.cancellationReason ?? null,
         cancellationResult: String(settlement?.cancellationResult ?? 0),
         isCancelledDeal,
         cancellationIncome: fixed(income.cancellationIncome),

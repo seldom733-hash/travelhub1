@@ -24,6 +24,7 @@ export interface DealRow {
   supplierCode: string | null;
   supplierName: string | null;
   cancellationReason: string | null;
+  isCancelledDeal: boolean;
   cancellationResult: string;
   settlementStatus: string | null;
   manager: string | null;
