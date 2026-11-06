@@ -9,6 +9,7 @@ export interface DocumentListItem {
   type: DocumentType;
   status: DocumentStatus;
   bookingCode: string | null;
+  orderId: string;
   serviceDate: string | null;
   totalAmount: string | null;
   paidAmount: string | null;

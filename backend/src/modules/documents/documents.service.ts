@@ -18,6 +18,7 @@ const SIGNED_URL_TTL_SECONDS = 300; // 5 minutes
 
 export interface CreateDocumentInput {
   type: DocumentType;
+  sourceId?: string | null;
   bookingId: string;
   orderId: string;
   customerId?: string | null;
@@ -36,6 +37,7 @@ export interface DocumentListItem {
   type: DocumentType;
   status: DocumentStatus;
   bookingCode: string | null;
+  orderId: string;
   serviceDate: Date | null;
   totalAmount: Prisma.Decimal | null;
   paidAmount: Prisma.Decimal | null;
@@ -70,6 +72,7 @@ export class DocumentsService {
       data: {
         code,
         type: input.type,
+        sourceId: input.sourceId ?? null,
         status: "NOT_ISSUED",
         bookingId: input.bookingId,
         orderId: input.orderId,
@@ -288,7 +291,8 @@ export class DocumentsService {
         code: d.code,
         type: d.type,
         status: d.status,
-        bookingCode: null, // resolved separately if needed
+        bookingCode: null,
+        orderId: d.orderId, // resolved separately if needed
         serviceDate: d.serviceDate,
         totalAmount: d.totalAmount,
         paidAmount: d.paidAmount,
@@ -346,6 +350,7 @@ export class DocumentsService {
         type: d.type,
         status: d.status,
         bookingCode: null,
+        orderId: d.orderId,
         serviceDate: d.serviceDate,
         totalAmount: d.totalAmount,
         paidAmount: d.paidAmount,

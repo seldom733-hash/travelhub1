@@ -6172,6 +6172,8 @@ model Document {
   // Ownership chain: Document → Booking → Order → Customer → User (Buyer)
   bookingId  String // ref booking.Booking (no FK — ADR-0001)
   orderId    String // ref order.Order (no FK — ADR-0001)
+  /// Source financial fact id (Payment/Refund/SupplierPayout) for idempotency.
+  sourceId   String?
   customerId String? // ref crm.Customer (no FK; NULL = internal)
 
   // Current version pointer

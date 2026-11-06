@@ -3,6 +3,7 @@ import { DocumentsService } from "./documents.service";
 import { DocumentsController } from "./documents.controller";
 import { VoucherConsumer } from "./voucher.consumer";
 import { RefundDocumentConsumer } from "./refund-document.consumer";
+import { FinancialDocumentConsumer } from "./financial-document.consumer";
 import { InvalidationConsumer } from "./invalidation.consumer";
 import { DocumentRenderer } from "./document-renderer.service";
 import { S3ObjectStorageService } from "../catalog/media/storage/s3-storage.service";
@@ -19,6 +20,7 @@ import { S3ObjectStorageService } from "../catalog/media/storage/s3-storage.serv
     DocumentsService,
     VoucherConsumer,
     RefundDocumentConsumer,
+    FinancialDocumentConsumer,
     InvalidationConsumer,
     DocumentRenderer,
     { provide: "ObjectStorageService", useClass: S3ObjectStorageService },

@@ -427,8 +427,8 @@ function DocumentsTab({ deal }: { deal: DealRow }) {
   const [error, setError] = React.useState("");
   React.useEffect(() => {
     if (!deal.bookingCode) return;
-    documentsApi.list({ pageSize: 100 }).then((page) => setItems(page.items.filter((d) => d.bookingCode === deal.bookingCode))).catch((e) => setError((e as Error).message));
-  }, [deal.bookingCode]);
+    documentsApi.list({ pageSize: 100 }).then((page) => setItems(page.items.filter((d) => d.orderId === deal.orderId || (deal.bookingCode && d.bookingCode === deal.bookingCode)))).catch((e) => setError((e as Error).message));
+  }, [deal.bookingCode, deal.orderId]);
   const financialDocs = [
     ...deal.payments.map((p) => ({ key: `pay-${p.id}`, code: p.code, title: "Квитанция об оплате", date: p.date, amount: p.amount, currency: p.currency, status: p.status })),
     ...deal.refunds.map((r) => ({ key: `ref-${r.id}`, code: r.code, title: "Документ возврата клиенту", date: r.date, amount: r.amount, currency: r.currency, status: r.status })),

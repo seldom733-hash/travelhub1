@@ -47,7 +47,7 @@ export class RefundDocumentConsumer {
         }
 
         // Find the booking for this order
-        const booking = await tx.booking.findFirst({ where: { orderId: p.orderId } });
+        const booking = await tx.booking.findFirst({ where: { orderId: p.orderId }, orderBy: { createdAt: "desc" } });
         if (!booking) {
           await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });
           return;
@@ -55,7 +55,7 @@ export class RefundDocumentConsumer {
 
         // Check if refund document already exists (idempotent)
         const existing = await tx.document.findFirst({
-          where: { orderId: p.orderId, type: "REFUND" },
+          where: { type: "REFUND", sourceId: p.refundId },
         });
         if (existing) {
           await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });
