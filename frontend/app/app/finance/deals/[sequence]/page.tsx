@@ -429,12 +429,18 @@ function DocumentsTab({ deal }: { deal: DealRow }) {
     if (!deal.bookingCode) return;
     documentsApi.list({ pageSize: 100 }).then((page) => setItems(page.items.filter((d) => d.bookingCode === deal.bookingCode))).catch((e) => setError((e as Error).message));
   }, [deal.bookingCode]);
-  if (!deal.bookingCode) return <Empty text="Документы появятся после создания брони" />;
-  if (error) return <Empty text={error} />;
-  if (items.length === 0) return <Empty text="Документов по этой брони нет" />;
-  return <div className="space-y-2">{items.map((d) => <Link key={d.id} href={`/app/documents/${d.id}`} className="flex items-center justify-between rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2 text-[11px]"><span className="font-mono font-semibold text-[#0f6b5f]">{d.code}</span><span>{d.type}</span><span>{d.status}</span><span className="font-mono">{money(d.totalAmount, d.currency ?? "AZN")}</span></Link>)}</div>;
+  const financialDocs = [
+    ...deal.payments.map((p) => ({ key: `pay-${p.id}`, code: p.code, title: "Квитанция об оплате", date: p.date, amount: p.amount, currency: p.currency, status: p.status })),
+    ...deal.refunds.map((r) => ({ key: `ref-${r.id}`, code: r.code, title: "Документ возврата клиенту", date: r.date, amount: r.amount, currency: r.currency, status: r.status })),
+    ...deal.payouts.map((p) => ({ key: `payout-${p.id}`, code: p.code, title: p.direction === "INCOMING" ? "Документ возврата от поставщика" : "Платёжное поручение поставщику", date: p.date, amount: p.amount, currency: p.currency, status: p.status })),
+  ];
+  if (financialDocs.length === 0 && items.length === 0) return <Empty text="Документов по сделке нет" />;
+  return <div className="space-y-3">
+    {financialDocs.length > 0 && <div><div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[#98a2b3]">Платежи и возвраты</div><div className="space-y-1">{financialDocs.map((d) => <div key={d.key} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2 text-[11px]"><span className="font-mono font-semibold text-[#0f6b5f]">{d.code}</span><span className="flex-1">{d.title}</span><span className="text-[#667085]">{new Date(d.date).toLocaleDateString("ru-RU")}</span><span className="font-mono">{money(d.amount, d.currency)}</span><span>{statusRu(d.status)}</span></div>)}</div></div>}
+    {items.length > 0 && <div><div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[#98a2b3]">Документы брони</div><div className="space-y-1">{items.map((d) => <Link key={d.id} href={`/app/documents/${d.id}`} className="flex items-center justify-between rounded-lg border border-[#f0eee8] bg-white p-2 text-[11px]"><span className="font-mono font-semibold text-[#0f6b5f]">{d.code}</span><span>{d.type}</span><span>{d.status}</span><span className="font-mono">{money(d.totalAmount, d.currency ?? "AZN")}</span></Link>)}</div></div>}
+    {error && <div className="text-[10px] text-rose-600">{error}</div>}
+  </div>;
 }
-
 function CommunicationsTab({ deal }: { deal: DealRow }) {
   const [items, setItems] = React.useState<Array<{ id: string; code: string; type: string; subject: string | null; body: string; occurredAt: string }>>([]);
   const [error, setError] = React.useState("");
