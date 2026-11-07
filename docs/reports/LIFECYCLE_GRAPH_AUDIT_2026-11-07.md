@@ -151,9 +151,9 @@ supplierRefunded    = 20.00
 
 ## 8. Ограничения
 
-### Мультивалютная сделка — FAIL (не исправлено)
+### Мультивалютная сделка — PARTIAL (fail-closed)
 
-Код `DealsService` суммирует суммы без проверки валюты:
+`DealsService` по-прежнему суммирует суммы без проверки валюты:
 
 ```text
 supplierPaid    = Σ supplierPayout.amount   (direction OUTGOING)
@@ -161,14 +161,28 @@ supplierRefunded = Σ supplierPayout.amount  (direction INCOMING)
 clientReceived  = Σ payment.amount
 ```
 
-При этом `Payment` не хранит AZN-эквивалент, а `SupplierPayout` имеет `amount`, `currency`, `aznAmount`. Если поставщику оплачено в EUR, а продажа в USD, KPI сложит 60 EUR и 100 USD как числа.
+Если поставщику оплачено в EUR, а продажа в USD, KPI сложил бы 60 EUR и 100 USD как числа.
 
-Это не исправлено, потому что политика пересчёта в валюту сделки не определена однозначно. Нельзя молча выбрать курс или валюту. Требуется решение:
+Добавлен fail-closed guard в `SupplierPaymentService.create`: платёж/возврат поставщику в валюте, отличной от валюты заказа, отклоняется:
 
-- запретить разные валюты в одной сделке; или
-- пересчитывать все операции в валюту сделки по зафиксированному курсу.
+```http
+422 Supplier payment currency EUR does not match order currency AZN;
+    multi-currency settlements per deal are not supported yet
+```
 
-До решения multi-currency **FAIL**.
+Проверено через API на реальном заказе:
+
+```text
+order currency = AZN
+EUR supplier payment → 422
+```
+
+Это предотвращает молчаливое искажение KPI, но не реализует мультивалютные расчёты. Для поддержки нужно решение:
+
+- пересчитывать все операции в валюту сделки по зафиксированному курсу; или
+- хранить в KPI отдельные валютные корзины.
+
+Статус: **PARTIAL — fail-closed, multi-currency не поддерживается**.
 
 - Не проверено частичное выполнение до отмены (только partial fulfillment после completed/cancelled).
 - E2E cancellation guard выполнен без фикстуры (vacuous pass).
@@ -186,7 +200,7 @@ Partial finance / penalties / writeoff PASS
 Multi-supplier                         PASS
 USD + refund ordering                  PASS
 Supplier refund before client          PASS
-Multi-currency in one deal             FAIL — суммы разных валют складываются без FX
+Multi-currency in one deal             PARTIAL — fail-closed 422, FX не поддерживается
 Booking/payment numbering              PASS
 Lifecycle notifications                PASS
 Full Jest suite                         PASS — 2924/2924
