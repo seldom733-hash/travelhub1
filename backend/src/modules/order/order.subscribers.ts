@@ -65,7 +65,9 @@ export class OrderSubscribers implements OnModuleInit {
     const p = ev.payload as unknown as { bookingId?: string; orderId?: string; to?: string; code?: string };
     if (!p?.orderId) return;
     // Агрегат интересуют только продвигающие состояния брони.
-    if (!CONFIRMED_BOOKING.includes(p.to ?? "")) return;
+    const aggregateStatuses = [...CONFIRMED_BOOKING, "COMPLETED", "CANCELLED", "SUPPLIER_REJECTED"];
+    const to = p.to ?? (ev.eventType === DomainEvents.BookingCancelled ? "CANCELLED" : "");
+    if (!aggregateStatuses.includes(to)) return;
     if (await this.eventBus.isProcessed(CONSUMER_ID, ev.id)) return;
     try {
       await this.prisma.$transaction(async (tx) => {
