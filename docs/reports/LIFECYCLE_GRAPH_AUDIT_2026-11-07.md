@@ -158,7 +158,31 @@ supplierRefunded    = 20.00
 
 Результат: **PASS**.
 
-## 8. Ограничения
+## 8. Round 12 — частичное выполнение до отмены
+
+```text
+2 Booking
+Booking 1 → COMPLETED
+Booking 2 → CANCELLED
+Order → PARTIALLY_FULFILLED
+
+requestCancellation → CANCELLATION_REQUESTED
+finance approve    → CANCELLATION_APPROVED
+cancel             → CANCELLED
+close              → CLOSED
+```
+
+KPI:
+
+```text
+cancellationIncome = 0.00
+supplierDebt       = 0.00
+clientDebt         = 0.00
+```
+
+Сценарий PASS. Отмена после частичного выполнения разрешена и корректно закрывается при отсутствии долгов; финансовые последствия выполнённой услуги в этом прогоне не моделировались (без оплат).
+
+## 9. Ограничения
 
 ### Мультивалютная сделка — PARTIAL (fail-closed)
 
@@ -193,7 +217,6 @@ EUR supplier payment → 422
 
 Статус: **PARTIAL — fail-closed, multi-currency не поддерживается**.
 
-- Не проверено частичное выполнение до отмены (только partial fulfillment после completed/cancelled).
 - E2E cancellation guard с фикстурой — PASS; без фикстуры тест vacuous.
 
 ## 9. Итог
@@ -203,6 +226,7 @@ Request → Order → Booking              PASS
 Booking complete / reject / change     PASS
 Все брони отменены → READY             PASS
 Partial fulfillment                    PASS
+Cancellation after partial fulfillment PASS
 Problem / Suspend / Resume             PASS
 Cancellation → financial close         PASS
 Partial finance / penalties / writeoff PASS
