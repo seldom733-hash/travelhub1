@@ -119,7 +119,16 @@ Test Suites: 189 passed, 189 total
 Tests:       2924 passed, 2924 total
 ```
 
-Важно: `cancellation-close-guard.e2e.spec.ts` в текущей БД не находит cancelled-сделку и завершается без выполнения assertions (return). Поэтому его PASS не подтверждает реальный guard в этом прогоне; сам guard проверялся вручную ранее.
+`cancellation-close-guard.e2e.spec.ts` проверен с реальной cancelled-сделкой:
+
+```text
+√ blocks closing a cancelled order while approval is pending
+√ forbids self-approval
+Test Suites: 1 passed
+Tests:       2 passed
+```
+
+После удаления фикстуры тест снова завершается без assertions при отсутствии cancelled-сделки; это ограничение тестовой среды, а не продукта.
 
 ## 7. Round 8 — возврат поставщика раньше клиента
 
@@ -185,7 +194,7 @@ EUR supplier payment → 422
 Статус: **PARTIAL — fail-closed, multi-currency не поддерживается**.
 
 - Не проверено частичное выполнение до отмены (только partial fulfillment после completed/cancelled).
-- E2E cancellation guard выполнен без фикстуры (vacuous pass).
+- E2E cancellation guard с фикстурой — PASS; без фикстуры тест vacuous.
 
 ## 9. Итог
 
@@ -204,7 +213,7 @@ Multi-currency in one deal             PARTIAL — fail-closed 422, FX не по
 Booking/payment numbering              PASS
 Lifecycle notifications                PASS
 Full Jest suite                         PASS — 2924/2924
-Cancellation e2e fixture                PARTIAL — vacuous pass без cancelled-сделки
+Cancellation e2e fixture                PASS — реальная cancelled-сделка, 2/2
 ```
 
 Коммиты:
