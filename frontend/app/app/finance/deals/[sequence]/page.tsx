@@ -9,7 +9,7 @@ import { dealsApi, type DealRow } from "@/lib/deals-api";
 import { documentsApi, type DocumentListItem } from "@/lib/documents-api";
 import CreatePaymentForm from "@/components/finance/CreatePaymentForm";
 import CreateSupplierPaymentForm from "@/components/finance/CreateSupplierPaymentForm";
-import type { WhatsAppConversationRow } from "@/lib/whatsapp";
+import { sendWhatsAppMessage, uploadWhatsAppFile, whatsappMediaUrl, type WhatsAppConversationRow, type WhatsAppTimelineItem, type WhatsAppUploadResult } from "@/lib/whatsapp";
 import OperationalNotes from "@/components/OperationalNotes";
 import { useCurrentUser } from "@/lib/use-user";
 
@@ -310,7 +310,7 @@ export default function DealDetailPage() {
             <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span>✎</span>Статус и действия</div><div className="flex items-center justify-between rounded-lg border border-[#e5e2da] px-2 py-2 text-xs"><span className="text-[#667085]">{deal.stage === "REQUEST" ? "Статус заявки" : deal.stage === "BOOKING" ? "Статус брони" : "Статус заказа"}</span><span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusTone(deal.status)}`}>{statusRu(deal.status)}</span></div>{actionError && <div className="mt-2 rounded bg-rose-50 px-2 py-1 text-[10px] text-rose-700">{actionError}</div>}<div className="mt-2 space-y-1.5">{deal.orderId && ["IN_PROCESSING", "WAITING_FOR_DATA"].includes(deal.status) && orderTravelers.length > 0 && orderTravelers.every((traveler) => traveler.dataCompleteness === "COMPLETE" && Boolean(traveler.citizenship) && Boolean(traveler.passportSeries) && Boolean(traveler.passportNumber)) && !orderFinalConfirmedAt && !readOnly && <button type="button" disabled={Boolean(actionBusy)} onClick={() => void finalConfirm()} className="mb-2 block w-full rounded-lg bg-[#0f6b5f] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{actionBusy === "final-confirm" ? "Подтверждение…" : "Подтвердить данные туристов"}</button>}{Object.entries(effectiveRequestActions).filter(([, enabled]) => enabled).length > 0 && <div className="mb-2 space-y-1 rounded-lg border border-[#e5e2da] p-2"><div className="text-[9px] font-semibold uppercase tracking-wide text-[#98a2b3]">Заявка</div>{Object.entries(effectiveRequestActions).filter(([, enabled]) => enabled).map(([action]) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runRequestAction(action)} className="block w-full rounded-lg border border-[#e5e2da] px-3 py-1.5 text-xs font-medium text-[#344054] disabled:opacity-50">{actionBusy === action ? "Выполняется…" : REQUEST_ACTION_LABELS[action] ?? action}</button>)}</div>}{effectiveBookingActions.length > 0 && <div className="mb-2 space-y-1 rounded-lg border border-[#e5e2da] p-2"><div className="text-[9px] font-semibold uppercase tracking-wide text-[#98a2b3]">Бронь</div>{effectiveBookingActions.map((action) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runBookingAction(action)} className="block w-full rounded-lg border border-[#e5e2da] px-3 py-1.5 text-xs font-medium text-[#344054] disabled:opacity-50">{actionBusy === action ? "Выполняется…" : BOOKING_ACTION_LABELS[action] ?? action}</button>)}</div>}{effectiveOrderActions.map((action, index) => <button key={action} type="button" disabled={Boolean(actionBusy)} onClick={() => void runAction(action)} className={`block w-full rounded-lg px-3 py-2 text-center text-xs font-semibold disabled:opacity-50 ${/cancel|problem|suspend/.test(action) ? "border border-rose-200 text-rose-700" : index === 0 ? "bg-[#0f6b5f] text-white" : "border border-[#e5e2da] text-[#344054]"}`}>{actionBusy === action ? "Выполняется…" : ACTION_LABELS[action] ?? action}</button>)}{(deal.status === "CANCELLED" || deal.orderStatus === "CLOSED") && Number(deal.supplierDebt) > 0 && !readOnly && <button type="button" onClick={() => setDebtWriteOffOpen(true)} className="mt-2 block w-full rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800">Списать долги</button>}{deal.status === "CANCELLED" && Number(deal.supplierRefundDue) > 0 && <button type="button" onClick={() => setWriteOffOpen(true)} className="mt-2 w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Признать убытком и закрыть</button>}</div></div>
             <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-[#667085]">История этапов</div><Timeline title="Заявка создана" code={deal.requestCode} date={new Date(deal.createdAt).toLocaleString("ru-RU")} tone="done" /><Timeline title="Заказ создан" code={deal.orderCode} date={deal.orderCode ? "Текущий этап" : "Ожидает"} tone={deal.orderCode ? "current" : "todo"} /><Timeline title="Бронь" code={deal.bookingCode ?? "ожидает создания"} date={deal.bookingCode ? "Создана" : "Ожидает"} tone={deal.bookingCode ? "done" : "todo"} /></div>
             {user && !readOnly ? <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><OperationalNotes entityType={deal.orderId ? "Order" : "Request"} entityId={deal.orderId ?? deal.requestId} permissions={user.permissions} currentUserId={user.id} currentRole={user.role} /></div> : null}
-            <ClientChats deal={deal} />
+            <ClientChats deal={deal} canSend={Boolean(user?.permissions.includes("whatsapp.send"))} />
           </aside>
         </div>
       </div>
@@ -587,21 +587,133 @@ function HistoryTab({ deal }: { deal: DealRow }) {
   return <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-[10px]"><thead className="text-[#98a2b3]"><tr>{["Дата и время", "Кто", "Действие", "Объект", "Детали"].map((h) => <th key={h} className="px-2 py-1 font-medium">{h}</th>)}</tr></thead><tbody>{items.map((x, i) => <tr key={x.id ?? i} className="border-t border-[#f0eee8] align-top"><td className="px-2 py-1.5 whitespace-nowrap">{x.createdAt ? new Date(x.createdAt).toLocaleString("ru-RU") : "—"}</td><td className="px-2 py-1.5">{x.actor}</td><td className="px-2 py-1.5 font-medium">{x.label}</td><td className="px-2 py-1.5">{resourceLabels[x.resource] ?? x.resource ?? "—"}</td><td className="px-2 py-1.5">{detailsText(x.details)}</td></tr>)}</tbody></table></div>;
 }
 
-function ClientChats({ deal }: { deal: DealRow }) {
+function ClientChats({ deal, canSend }: { deal: DealRow; canSend: boolean }) {
   const [rows, setRows] = React.useState<WhatsAppConversationRow[]>([]);
+  const [selectedId, setSelectedId] = React.useState<string>("");
+  const [timeline, setTimeline] = React.useState<WhatsAppTimelineItem[]>([]);
+  const [text, setText] = React.useState("");
+  const [upload, setUpload] = React.useState<WhatsAppUploadResult | null>(null);
   const [loading, setLoading] = React.useState(true);
-  React.useEffect(() => {
-    let alive = true;
-    api.get<WhatsAppConversationRow[]>("/whatsapp/conversations?limit=100").then((data) => {
-      if (!alive) return;
+  const [threadLoading, setThreadLoading] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const scrollRef = React.useRef<HTMLDivElement | null>(null);
+  const fileRef = React.useRef<HTMLInputElement | null>(null);
+
+  const loadRows = React.useCallback(async () => {
+    try {
+      const data = await api.get<WhatsAppConversationRow[]>("/whatsapp/conversations?limit=100");
       const digits = (deal.customerPhone ?? "").replace(/\D/g, "").slice(-9);
       setRows(data.filter((row) => row.customerId === deal.customerId || (digits.length > 0 && (row.canonicalPhone ?? row.remoteJid ?? "").replace(/\D/g, "").slice(-9) === digits)));
-    }).catch(() => { if (alive) setRows([]); }).finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, [deal.customerPhone, deal.customerId]);
-  return <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span>💬</span>Общение с клиентом</div>{loading ? <div className="text-[10px] text-[#98a2b3]">Загрузка диалогов…</div> : rows.length === 0 ? <div className="rounded-lg border border-dashed border-[#e5e2da] bg-[#fbfaf7] px-3 py-4 text-[10px] text-[#98a2b3]">Диалогов WhatsApp по номеру {deal.customerPhone ?? "—"} нет</div> : <div className="space-y-1">{rows.slice(0, 5).map((row) => <a key={row.id} href={`/app/whatsapp?conversation=${row.id}`} className="block rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2 hover:border-[#0f6b5f]"><div className="flex justify-between gap-2 text-[10px]"><span className="font-semibold text-[#344054]">{row.canonicalPhone ?? row.remoteJid}</span><span className="text-[#98a2b3]">{row.lastMessageAt ? new Date(row.lastMessageAt).toLocaleDateString("ru-RU") : "—"}</span></div><div className="mt-0.5 truncate text-[10px] text-[#667085]">{row.lastMessagePreview ?? "Нет сообщений"}</div></a>)}</div>}</div>;
-}
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [deal.customerId, deal.customerPhone]);
 
+  const loadTimeline = React.useCallback(async (id: string, silent = false) => {
+    if (!silent) setThreadLoading(true);
+    try {
+      const items = await api.get<WhatsAppTimelineItem[]>(`/whatsapp/conversations/${id}/messages?limit=100`);
+      setTimeline(items);
+    } catch (e) {
+      if (!silent) setError((e as Error).message);
+    } finally {
+      if (!silent) setThreadLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => { void loadRows(); }, [loadRows]);
+
+  React.useEffect(() => {
+    if (rows.length === 0) { setSelectedId(""); setTimeline([]); return; }
+    if (!selectedId || !rows.some((r) => r.id === selectedId)) {
+      setSelectedId(rows[0].id);
+    }
+  }, [rows, selectedId]);
+
+  React.useEffect(() => {
+    if (selectedId) void loadTimeline(selectedId);
+  }, [selectedId, loadTimeline]);
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      void loadRows();
+      if (selectedId) void loadTimeline(selectedId, true);
+    }, 10_000);
+    return () => clearInterval(timer);
+  }, [loadRows, loadTimeline, selectedId]);
+
+  React.useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [timeline]);
+
+  const selected = rows.find((r) => r.id === selectedId) ?? null;
+
+  async function handleFile(file: File) {
+    setUploading(true); setError("");
+    try { setUpload(await uploadWhatsAppFile(file)); }
+    catch (e) { setError((e as Error).message); }
+    finally { setUploading(false); if (fileRef.current) fileRef.current.value = ""; }
+  }
+
+  async function handleSend() {
+    if (!selected || sending || uploading) return;
+    const body = text.trim();
+    if (!body && !upload) { setError("Введите сообщение или прикрепите файл"); return; }
+    setSending(true); setError("");
+    try {
+      await sendWhatsAppMessage({
+        conversationId: selected.id,
+        text: body,
+        customerId: selected.customerId,
+        phone: selected.canonicalPhone,
+        uploadId: upload?.uploadId ?? null,
+      });
+      setText(""); setUpload(null);
+      await Promise.all([loadTimeline(selected.id, true), loadRows()]);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return <div className="rounded-xl border border-[#e5e2da] bg-white shadow-sm">
+    <div className="flex items-center justify-between border-b border-[#f0eee8] px-3 py-2">
+      <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span>💬</span>Общение с клиентом</div>
+      {rows.length > 0 && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700">{rows.length} диалог{rows.length > 1 ? "а" : ""}</span>}
+    </div>
+    <div className="p-3">
+      {loading ? <div className="text-[10px] text-[#98a2b3]">Загрузка диалогов…</div> : rows.length === 0 ? <div className="rounded-lg border border-dashed border-[#e5e2da] bg-[#fbfaf7] px-3 py-4 text-[10px] text-[#98a2b3]">Диалогов WhatsApp по номеру {deal.customerPhone ?? "—"} нет</div> : <>
+        {rows.length > 1 && <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)} className="mb-2 w-full rounded-lg border border-[#e5e2da] bg-white px-2 py-1.5 text-[11px]">
+          {rows.map((r) => <option key={r.id} value={r.id}>{r.canonicalPhone ?? r.remoteJid}</option>)}
+        </select>}
+        <div ref={scrollRef} className="h-64 space-y-2 overflow-y-auto rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2">
+          {threadLoading ? <div className="text-[10px] text-[#98a2b3]">Загрузка сообщений…</div> : timeline.length === 0 ? <div className="text-[10px] text-[#98a2b3]">Сообщений пока нет</div> : timeline.map((m) => <div key={m.id} className={`max-w-[90%] rounded-lg px-2 py-1.5 text-[11px] ${m.direction === "OUTBOUND" ? "ml-auto bg-[#0f6b5f] text-white" : "bg-white text-[#344054] border border-[#e5e2da]"}`}>
+            {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
+            {m.hasMedia && m.mediaFilename && <a href={whatsappMediaUrl(m.origin, m.id)} target="_blank" rel="noreferrer" className={`mt-1 block truncate underline ${m.direction === "OUTBOUND" ? "text-emerald-100" : "text-[#0f6b5f]"}`}>📎 {m.mediaFilename}</a>}
+            <div className={`mt-0.5 text-[9px] ${m.direction === "OUTBOUND" ? "text-emerald-100/80" : "text-[#98a2b3]"}`}>{new Date(m.occurredAt).toLocaleString("ru-RU")}</div>
+          </div>)}
+        </div>
+        {error && <div className="mt-2 rounded bg-rose-50 px-2 py-1 text-[10px] text-rose-700">{error}</div>}
+        {canSend ? <div className="mt-2 space-y-1.5">
+          {upload && <div className="flex items-center justify-between rounded bg-[#f0eee8] px-2 py-1 text-[10px]"><span className="truncate">📎 {upload.filename}</span><button type="button" onClick={() => setUpload(null)} className="text-rose-600">×</button></div>}
+          <div className="flex items-end gap-1.5">
+            <input ref={fileRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
+            <button type="button" disabled={uploading || sending} onClick={() => fileRef.current?.click()} className="rounded-lg border border-[#e5e2da] px-2 py-2 text-[11px] text-[#667085] disabled:opacity-50" title="Прикрепить файл">{uploading ? "…" : "📎"}</button>
+            <textarea value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleSend(); } }} rows={2} placeholder="Введите сообщение…" className="min-h-[42px] flex-1 resize-none rounded-lg border border-[#e5e2da] px-2 py-1.5 text-[11px] outline-none focus:border-[#0f6b5f]" />
+            <button type="button" disabled={sending || uploading || (!text.trim() && !upload)} onClick={() => void handleSend()} className="rounded-lg bg-[#0f6b5f] px-3 py-2 text-[11px] font-semibold text-white disabled:opacity-50">{sending ? "…" : "Отправить"}</button>
+          </div>
+        </div> : <div className="mt-2 text-[10px] text-[#98a2b3]">Нет права на отправку сообщений</div>}
+      </>}
+    </div>
+  </div>;
+}
 function EditRefundModal({ refund, onClose, onSaved }: { refund: any; onClose: () => void; onSaved: () => void }) {
   const [amount, setAmount] = React.useState(refund.amount);
   const [reason, setReason] = React.useState(refund.reason ?? "");
