@@ -145,6 +145,7 @@ export class BookingSubscribers implements OnModuleInit {
 
         // Step 2.11: defensive consistency — каждый копируемый money fact
         // (amount + currency) валиден до записи (Decimal ≥ 0, ≤2dp, ISO 4217).
+        let bookingOrdinal = existing.length;
         for (const item of freeItems) {
           validateFrozenMoneyFact(item.amount, item.currency, "booking money fact");
         }
@@ -176,16 +177,13 @@ export class BookingSubscribers implements OnModuleInit {
 
         for (const item of freeItems) {
           const code = await this.ids.nextCode(tx, "BKG");
+          bookingOrdinal += 1;
           // Shared Commerce Sequence: derive Booking ref from Order's commerceSequence.
           // Multi-item Order: same commerce root must not collide on Booking.referenceNumber
           // (unique) — ordinal suffix keeps MKT-BKG-{root}-{n} stable per OrderItem.
-          const itemOrdinal = order.items.findIndex((i) => i.id === item.id) + 1;
-          const priorAttempts = existing.filter((b) => b.orderItemId === item.id).length + 1;
           const orderAttempt = /-(\d{1,2})$/.exec(order.referenceNumber ?? "")?.[1] ?? "";
           const bookingRefNum = order.commerceSequence
-            ? `${this.refNum.commerceBookingRef(order.commerceSequence)}${orderAttempt ? `-${orderAttempt}` : ""}${
-                order.items.length > 1 ? `-${itemOrdinal}` : ""
-              }${priorAttempts > 1 ? `-${priorAttempts - 1}` : ""}`
+            ? `${this.refNum.commerceBookingRef(order.commerceSequence)}${orderAttempt ? `-${orderAttempt}` : ""}${bookingOrdinal > 1 ? `-${bookingOrdinal - 1}` : ""}`
             : await this.generateBookingReferenceNumber(tx, order, item);
           // Step 2.8: canonical cardinality 1 OrderItem → 1 Booking. orderItemId
           // (частичный unique — status <> CANCELLED AND rejectedAt IS NULL,
