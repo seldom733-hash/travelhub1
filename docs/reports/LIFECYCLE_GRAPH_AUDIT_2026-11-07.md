@@ -121,14 +121,41 @@ Tests:       2924 passed, 2924 total
 
 Важно: `cancellation-close-guard.e2e.spec.ts` в текущей БД не находит cancelled-сделку и завершается без выполнения assertions (return). Поэтому его PASS не подтверждает реальный guard в этом прогоне; сам guard проверялся вручную ранее.
 
-## 7. Ограничения
+## 7. Round 8 — возврат поставщика раньше клиента
+
+```text
+USD 100; клиент оплатил 100; поставщику 60
+Сначала возврат поставщика 20 → F = 100 − (60 − 20) = 60
+Затем возврат клиенту 40     → F = (100 − 40) − (60 − 20) = 20
+После списания 40            → supplierDebt = 0, status = CLOSED
+```
+
+KPI на промежуточном шаге:
+
+```text
+cancellationIncome = 60.00
+clientRefunded      = 0.00
+supplierRefunded    = 20.00
+supplierDebt        = 40.00
+```
+
+После возврата клиенту:
+
+```text
+cancellationIncome = 20.00
+clientRefunded      = 40.00
+supplierRefunded    = 20.00
+```
+
+Результат: **PASS**.
+
+## 8. Ограничения
 
 - Не проверены несколько валют в одной сделке.
-- Не проверен возврат поставщика раньше клиента.
 - Не проверено частичное выполнение до отмены (только partial fulfillment после completed/cancelled).
 - E2E cancellation guard выполнен без фикстуры (vacuous pass).
 
-## 8. Итог
+## 9. Итог
 
 ```text
 Request → Order → Booking              PASS
@@ -140,6 +167,7 @@ Cancellation → financial close         PASS
 Partial finance / penalties / writeoff PASS
 Multi-supplier                         PASS
 USD + refund ordering                  PASS
+Supplier refund before client          PASS
 Booking/payment numbering              PASS
 Lifecycle notifications                PASS
 Full Jest suite                         PASS — 2924/2924
