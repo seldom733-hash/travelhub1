@@ -241,10 +241,73 @@ e5d58cb fix: close lifecycle gaps in cancellation, completion and deal stage
 | Cancellation approval → CANCELLED → CLOSED | PASS (после исправления) |
 | KPI отменённой закрытой сделки | PASS |
 | Guard активной брони | PASS (unit projection) |
-| PROBLEM / SUSPENDED | FAIL — не проверены реальными API-вызовами |
-| Booking reject/change/cancel/return | FAIL — не проверены |
-| Частичные оплаты/возвраты/штрафы/списания | FAIL — не проверены |
+| PROBLEM / SUSPENDED | PASS — API-переходы и запреты проверены |
+| Booking reject/change/cancel/return | PASS — API-переходы проверены |
+| Завершение с долгами / закрытие только после долгов | PASS — после разделения guards |
+| Частичные оплаты/возвраты/штрафы/списания | FAIL — не проверены реальными API-сценариями |
 | Полный Jest suite | FAIL — 20 тестов, причины выше |
 | RBAC всех переходов | PARTIAL — проверены finance-approval и self-approval |
 
 **Общий вывод:** базовый граф Request → Order → Booking → cancellation → close теперь проходим, ключевой тупик отмены устранён. Полная приёмка по всем боковым ветвям и всем 2849 тестам не достигнута.
+
+## 8. Round 2 — дополнительные проверки и исправления
+
+### Проверенные ветви
+
+| Переход | Проверка | Результат |
+|---|---|---|
+| NEW → PROBLEM | API | PASS |
+| PROBLEM → PROBLEM (повтор) | API 409 | PASS |
+| PROBLEM → IN_PROCESSING | API | PASS |
+| IN_PROCESSING → SUSPENDED | API | PASS |
+| SUSPENDED → close | API 409 | PASS |
+| SUSPENDED → cancel | API 409 | PASS |
+| SUSPENDED → IN_PROCESSING | API | PASS |
+| Booking SENT_TO_SUPPLIER → SUPPLIER_REJECTED | API | PASS |
+| Booking SUPPLIER_REJECTED → returnToOrder | API | PASS |
+| Order → READY_FOR_BOOKING после возврата брони | API | PASS |
+| Повторный send → новый Booking `-1` | API/DB | PASS |
+| Booking CONFIRMED → CHANGE_REQUESTED → CONFIRMED | API | PASS |
+| Booking CONFIRMED → IN_SERVICE → CANCELLATION_REQUESTED → CANCELLED | API | PASS |
+| Order PARTIALLY_FULFILLED → FULFILLED при долгах | API | PASS |
+| FULFILLED → close при долгах | API 409 | PASS |
+
+### D6. Завершение сделки ошибочно требовало погашения долгов
+
+**Причина:** `complete` и `close` использовали один и тот же `assertOrderDebtsCleared`. Из-за этого нельзя было зафиксировать факт оказания услуг до оплаты, хотя по финансовой модели выполненная сделка может иметь дебиторскую/кредиторскую задолженность.
+
+**Исправление:** `complete` проверяет только отсутствие активных броней; `close` дополнительно требует отсутствия долгов, возвратов и незавершённого согласования.
+
+**Проверка:** `complete` при `clientDebt=100` и `supplierDebt=1551.52` → `FULFILLED`; последующий `close` → 409 с теми же долгами.
+
+### D7. Close guard и KPI считали долг поставщику по-разному
+
+**Причина:** close guard предпочитал `SupplierObligation.remainingAmount`, а KPI игнорировал legacy-obligation, если её сумма равна продаже, и брал себестоимость из каталога. В результате guard видел долг 100, KPI — 1551.52.
+
+**Исправление:** close guard использует ту же формулу, что `DealsService`: obligation учитывается только если `obligationCost < sale`; иначе `cost − paid + refunded`.
+
+**Проверка:** после исправления close вернул `supplierDebt=1551.52`, совпадающий с KPI.
+
+### D8. Возобновление теряло предыдущий статус
+
+**Причина:** `resumeProcessing` всегда вёл в `IN_PROCESSING` (кроме активной брони), хотя приостановка должна сохранять состояние.
+
+**Исправление:** при resume берётся последняя запись history `problem`/`suspend` и восстанавливается её `from`, если это допустимый активный статус; при активной брони приоритет — `SENT_TO_BOOKING`. History/audit/outbox теперь пишут фактический `targetStatus`, а не статический `transition.to`.
+
+**Проверка:** логика проверена на PROBLEM/SUSPENDED API-переходах; отдельный сценарий «suspend из READY_FOR_BOOKING → resume» требует отдельной фикстуры и в этом раунде не прогнан.
+
+### Тесты Round 2
+
+```text
+order-actions.active-booking.spec.ts           2/2 PASS
+deals.kpi.spec.ts                              PASS
+order-financial-settlement.calculator.spec.ts  PASS
+booking-to-order.projection.spec.ts            PASS
+Итого                                          44/44 PASS
+```
+
+Коммит:
+
+```text
+e3433ed fix: separate completion from debt settlement and restore paused status
+```
