@@ -1614,7 +1614,7 @@ export class OrderService {
       const order = await tx.order.findUnique({
         where: { id: orderId },
         select: {
-          id: true, code: true, customerId: true, status: true, version: true,
+          id: true, code: true, referenceNumber: true, commerceSequence: true, customerId: true, status: true, version: true,
           amount: true, currency: true,
           termsAcceptedAt: true, finalConfirmedAt: true, travelerCount: true,
           acquisitionSource: true, returnedToRequestAt: true,
@@ -1813,6 +1813,18 @@ export class OrderService {
           actorName: actor ?? null,
           comment: reason ? `${ACTION_LABELS[action]}: ${reason}` : ACTION_LABELS[action],
         },
+      });
+
+      await this.notifyOrderTransition(tx, {
+        orderId,
+        code: order.code,
+        referenceNumber: order.referenceNumber,
+        sequence: order.commerceSequence,
+        action,
+        status: targetStatus,
+        reason: reason ?? null,
+        actor: actor ?? null,
+        version: updated.version,
       });
 
       // Stage 1 (Order → Request): реактивация СУЩЕСТВУЮЩЕЙ Request в той же
@@ -2524,4 +2536,45 @@ export class OrderService {
       return { item, orderAmount: updated.amount, currency: updated.currency };
     });
   }
+  private async notifyOrderTransition(
+    tx: any,
+    input: { orderId: string; code: string; referenceNumber: string | null; sequence: string | null; action: OrderAction; status: string; reason: string | null; actor: string | null; version: number },
+  ): Promise<void> {
+    try {
+      const typeByAction: Partial<Record<OrderAction, string>> = {
+        problem: "ORDER_PROBLEM",
+        suspend: "ORDER_SUSPENDED",
+        resumeProcessing: "ORDER_RESUMED",
+        requestCancellation: "ORDER_CANCELLATION_REQUESTED",
+        approveCancellation: "ORDER_CANCELLATION_APPROVED",
+        cancel: "ORDER_CANCELLED",
+        complete: "ORDER_FULFILLED",
+        close: "ORDER_CLOSED",
+      };
+      const type = typeByAction[input.action];
+      if (!type) return;
+      const users = await tx.user.findMany({
+        where: { status: "ACTIVE", role: { code: { in: ["ADMIN", "SALES_HEAD", "SALES_MANAGER", "FINANCE"] } } },
+        select: { id: true },
+      });
+      if (users.length === 0) return;
+      const title = ACTION_LABELS[input.action] ?? input.action;
+      await tx.userNotification.createMany({
+        data: users.map((u: { id: string }) => ({
+          recipientId: u.id,
+          type,
+          entityType: "Order",
+          entityId: input.orderId,
+          title: `${input.referenceNumber ?? input.code}: ${title}`,
+          body: input.reason ? `${title}: ${input.reason}` : title,
+          payload: { orderId: input.orderId, sequence: input.sequence, status: input.status, action: input.action, actor: input.actor },
+          dedupeKey: `order-action:${input.orderId}:${input.action}:${input.version}:${u.id}`,
+        })),
+        skipDuplicates: true,
+      });
+    } catch {
+      // Notifications must not roll back the lifecycle transition.
+    }
+  }
+
 }
