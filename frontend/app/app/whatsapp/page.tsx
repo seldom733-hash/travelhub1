@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import NotificationStrip from "@/components/NotificationStrip";
 import { useLocale, t, ti, LOCALE_TAGS, type Locale } from "@/lib/i18n";
 import { useCan } from "@/lib/use-can";
 import {
@@ -328,6 +329,7 @@ export default function WhatsappInboxPage() {
 
   return (
     <div className="space-y-4 p-6">
+      <NotificationStrip scope="whatsapp" />
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">{t("whatsapp.title", locale)}</h1>

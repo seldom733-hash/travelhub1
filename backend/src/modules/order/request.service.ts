@@ -388,6 +388,8 @@ export class RequestService {
       },
     });
 
+    await this.notifyDealCreated(request.id, request.referenceNumber, request.customerId);
+
     // Auto-distribution must never lose the request: a failure leaves it QUEUED
     // and visible to the supervisor; the request itself is already persisted.
     try {
@@ -1807,4 +1809,33 @@ export class RequestService {
       version: r.version,
     };
   }
+  private async notifyDealCreated(requestId: string, referenceNumber: string, customerId: string | null): Promise<void> {
+    try {
+      const [users, customer] = await Promise.all([
+        this.prisma.user.findMany({
+          where: { status: "ACTIVE", role: { code: { in: ["SALES_HEAD", "SALES_MANAGER", "ADMIN"] } } },
+          select: { id: true },
+        }),
+        customerId ? this.prisma.customer.findUnique({ where: { id: customerId }, select: { firstName: true, lastName: true } }) : null,
+      ]);
+      if (users.length === 0) return;
+      const customerName = customer ? [customer.firstName, customer.lastName].filter(Boolean).join(" ") : "Клиент";
+      await this.prisma.userNotification.createMany({
+        data: users.map((u) => ({
+          recipientId: u.id,
+          type: "DEAL_CREATED",
+          entityType: "Request",
+          entityId: requestId,
+          title: `Новая сделка ${referenceNumber}`,
+          body: `${customerName} — откройте реестр продаж`,
+          payload: { referenceNumber, customerId },
+          dedupeKey: `deal-created:${requestId}:${u.id}`,
+        })),
+        skipDuplicates: true,
+      });
+    } catch {
+      // Notifications must not block request creation.
+    }
+  }
+
 }

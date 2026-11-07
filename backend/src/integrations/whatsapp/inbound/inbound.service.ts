@@ -369,6 +369,14 @@ export class WhatsAppInboundService implements OnApplicationBootstrap, OnApplica
           );
         }
 
+        await this.notifyInboundMessage(tx, {
+          providerMessageId,
+          conversationId: conversation.id,
+          customerId: conversation.customerId,
+          phone: canonicalPhone,
+          preview: previewText,
+        });
+
         // §22 hook: STOP-ключевое слово → suppression (в этой же транзакции).
         if (supported && canonicalPhone) {
           const keyword = detectStopKeyword(bodyText);
@@ -712,4 +720,34 @@ export class WhatsAppInboundService implements OnApplicationBootstrap, OnApplica
     });
     return true;
   }
+  private async notifyInboundMessage(
+    tx: any,
+    input: { providerMessageId: string; conversationId: string; customerId: string | null; phone: string | null; preview: string },
+  ): Promise<void> {
+    try {
+      const linked = Boolean(input.customerId);
+      const roles = linked ? ["SALES_HEAD", "SALES_MANAGER", "ADMIN"] : ["SALES_HEAD", "SALES_MANAGER", "ADMIN"];
+      const users = await tx.user.findMany({
+        where: { status: "ACTIVE", role: { code: { in: roles } } },
+        select: { id: true },
+      });
+      if (users.length === 0) return;
+      await tx.userNotification.createMany({
+        data: users.map((u: { id: string }) => ({
+          recipientId: u.id,
+          type: linked ? "WHATSAPP_MESSAGE_LINKED" : "WHATSAPP_MESSAGE_UNLINKED",
+          entityType: "WhatsAppConversation",
+          entityId: input.conversationId,
+          title: linked ? "Новое сообщение клиента" : "Сообщение от неизвестного номера",
+          body: `${input.phone ?? "WhatsApp"}: ${input.preview.slice(0, 120)}`,
+          payload: { conversationId: input.conversationId, phone: input.phone, linked },
+          dedupeKey: `wa-message:${input.providerMessageId}:${u.id}`,
+        })),
+        skipDuplicates: true,
+      });
+    } catch {
+      // Notifications must not block message persistence.
+    }
+  }
+
 }

@@ -150,6 +150,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [pendingPayments, setPendingPayments] = useState(0);
   const [unreadRequests, setUnreadRequests] = useState(0);
+  const [dealNotifications, setDealNotifications] = useState(0);
+  const [waLinked, setWaLinked] = useState(0);
+  const [waUnlinked, setWaUnlinked] = useState(0);
   const collapsedRef = useRef(false);
   const { brandName } = useGlobalBranding();
 
@@ -325,6 +328,18 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                     >
                       <span className="w-5 shrink-0 text-center text-base">{item.icon}</span>
                       {!collapsed && <span className="truncate">{label}</span>}
+                      {!collapsed && item.href === "/app/finance/deals" && dealNotifications > 0 && (
+                        <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700" title={`${dealNotifications} новых сделок`}>🏷 {dealNotifications}</span>
+                      )}
+                      {!collapsed && item.href === "/app/finance/deals" && waLinked > 0 && (
+                        <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700" title={`${waLinked} новых сообщений клиентов`}>💬 {waLinked}</span>
+                      )}
+                      {!collapsed && item.href === "/app/whatsapp" && (waLinked > 0 || waUnlinked > 0) && (
+                        <span className="ml-auto inline-flex items-center gap-1">
+                          {waLinked > 0 && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700" title={`${waLinked} сообщений от клиентов`}>💬 {waLinked}</span>}
+                          {waUnlinked > 0 && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800" title={`${waUnlinked} сообщений от неизвестных номеров`}>👤 {waUnlinked}</span>}
+                        </span>
+                      )}
                       {!collapsed && item.href === "/app/finance/deals" && unreadRequests > 0 && (
                         <span className="ml-auto inline-flex min-w-5 animate-pulse items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-900" title={`${unreadRequests} новых назначенных заявок`}>{unreadRequests}</span>
                       )}

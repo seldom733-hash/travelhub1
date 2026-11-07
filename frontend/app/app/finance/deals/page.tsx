@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/i18n";
 import { dealsApi, type DealKpi, type DealList, type DealQuery, type DealRow } from "@/lib/deals-api";
+import NotificationStrip from "@/components/NotificationStrip";
 
 function cancellationReasonRu(reason: string | null) { return reason ? ({ CUSTOMER_FAULT: "вина туриста", SUPPLIER_FAULT: "вина поставщика", NAVITRAVEL_FAULT: "вина Navitravel", FORCE_MAJEURE: "форс-мажор", MUTUAL_AGREEMENT: "взаимное соглашение" } as Record<string, string>)[reason] ?? reason : ""; }
 
@@ -102,6 +103,7 @@ export default function DealsPage() {
       </div>
 
       <div className="space-y-4 p-4 lg:p-6">
+        <NotificationStrip scope="sales" />
         <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
           {KPI.map((c) => <button key={c.key} type="button" title={c.key === "cancelledSalesAmount" ? "Σ сумма продаж сделок со статусами CANCELLED / CANCELLED_BY_CUSTOMER / SUPPLIER_REJECTED / REJECTED за выбранный период. Не включает возвраты и штрафы — они показаны отдельно." : undefined} onClick={() => c.key === "cancelledSalesAmount" ? setFilter({ statusGroup: query.statusGroup === "cancelled" ? "" : "cancelled", status: "" }) : setModal(c)} className={`flex items-start gap-2 rounded-xl border bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${c.key === "cancelledSalesAmount" && query.statusGroup === "cancelled" ? "border-rose-300 ring-1 ring-rose-200" : "border-[#e5e2da]"}`}><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-semibold ${c.tone}`}>{c.icon}</span><span className="min-w-0"><span className="block truncate text-[10px] font-medium uppercase tracking-wide text-[#667085]">{c.label}</span><span className="mt-1 block font-mono text-[16px] font-semibold tabular-nums text-[#101828]">{fmt(String(kpi[c.key] ?? "0"), kpi.currency)}</span></span></button>)}
         </div>

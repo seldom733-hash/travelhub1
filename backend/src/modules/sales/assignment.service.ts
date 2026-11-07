@@ -237,12 +237,15 @@ export class AssignmentService {
   }
 
   async unread(userId: string) {
-    const [total, requests, payments] = await Promise.all([
+    const [total, requests, payments, deals, whatsappLinked, whatsappUnlinked] = await Promise.all([
       this.prisma.userNotification.count({ where: { recipientId: userId, readAt: null } }),
       this.prisma.userNotification.count({ where: { recipientId: userId, readAt: null, entityType: "Request" } }),
       this.prisma.userNotification.count({ where: { recipientId: userId, readAt: null, entityType: "Payment" } }),
+      this.prisma.userNotification.count({ where: { recipientId: userId, readAt: null, type: "DEAL_CREATED" } }),
+      this.prisma.userNotification.count({ where: { recipientId: userId, readAt: null, type: "WHATSAPP_MESSAGE_LINKED" } }),
+      this.prisma.userNotification.count({ where: { recipientId: userId, readAt: null, type: "WHATSAPP_MESSAGE_UNLINKED" } }),
     ]);
-    return { total, requests, payments };
+    return { total, requests, payments, deals, whatsappLinked, whatsappUnlinked, whatsapp: whatsappLinked + whatsappUnlinked };
   }
 
   async list(userId: string, unreadOnly = false) {
