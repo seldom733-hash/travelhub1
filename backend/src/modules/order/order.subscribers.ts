@@ -36,6 +36,7 @@ export class OrderSubscribers implements OnModuleInit {
     this.eventBus.on(DomainEvents.BookingConfirmed, (ev) => this.onBookingConfirmed(ev));
     this.eventBus.on(DomainEvents.BookingRejected, (ev) => this.onBookingRejected(ev));
     this.eventBus.on(DomainEvents.BookingStatusChanged, (ev) => this.onBookingStatusChanged(ev));
+    this.eventBus.on(DomainEvents.BookingCancelled, (ev) => this.onBookingStatusChanged(ev));
     // Step 2.12: canonical факт оплаты → Order-owned projection (Order.paymentStatus
     // / paidAmount — Order-owned поля; Finance НЕ пишет order.* напрямую, §20).
     this.eventBus.on(DomainEvents.PaymentCaptured, (ev) => this.onPaymentCaptured(ev));
@@ -154,12 +155,15 @@ export class OrderSubscribers implements OnModuleInit {
 
     let target: OrderStatus | null = null;
     if (["SENT_TO_BOOKING", "PARTIALLY_FULFILLED"].includes(order.status) && bookings.length > 0) {
+      const allTerminal = bookings.every((b) => TERMINAL_BOOKING.includes(b));
       const allCompleted = bookings.every((b) => b === "COMPLETED");
       const anyCompleted = bookings.some((b) => b === "COMPLETED");
       const anyConfirmed = bookings.some((b) => CONFIRMED_BOOKING.includes(b));
-      if (allCompleted) target = "FULFILLED";
-      else if (anyCompleted || anyConfirmed) target = "PARTIALLY_FULFILLED";
-      else if (order.status === "PARTIALLY_FULFILLED") target = "READY_FOR_BOOKING";
+      if (allTerminal) {
+        if (allCompleted) target = "FULFILLED";
+        else if (anyCompleted || anyConfirmed) target = "PARTIALLY_FULFILLED";
+        else target = "READY_FOR_BOOKING";
+      }
     }
 
     if (target && target !== order.status) {
