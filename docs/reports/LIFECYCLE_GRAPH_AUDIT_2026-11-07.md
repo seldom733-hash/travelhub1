@@ -1,582 +1,192 @@
-# Navitravel — Lifecycle Graph Audit
+# Navitravel — аудит жизненного цикла сделки
 
 Дата: 2026-11-07  
-Режим: реальные API-вызовы на рабочей БД + Jest.  
-Статус: **ЧАСТИЧНО ЗАВЕРШЕНО** — основные маршруты пройдены, полный обход всех боковых ветвей и полный зелёный прогон тестов не достигнуты.
+Статус: **ЧАСТИЧНО ЗАВЕРШЕНО**. Основные маршруты, отмена, частичные финансы, USD и multi-supplier проверены. Полный Jest suite не зелёный.
 
-## 1. Карта жизненного цикла
+## 1. Граф жизненного цикла
 
 ```mermaid
 stateDiagram-v2
-  [*] --> RequestNew: create request
-
-  state Request {
-    RequestNew --> Checking: start
-    RequestNew --> Confirmed: confirm price
-    RequestNew --> PriceChanged: propose price
-    RequestNew --> Rejected: reject
-    RequestNew --> Unavailable: unavailable
-    Checking --> Confirmed: confirm price
-    Checking --> PriceChanged: propose price
-    Checking --> Rejected: reject
-    Checking --> Unavailable: unavailable
-    Confirmed --> CustomerAccepted: customer accept
-    Confirmed --> CancelledByCustomer: customer decline
-    PriceChanged --> CustomerAccepted: customer accept
-    PriceChanged --> CancelledByCustomer: customer decline
-    CustomerAccepted --> Converted: convert
-  }
-
-  Converted --> OrderNew: create Order
-
-  state Order {
-    OrderNew --> InProcessing: process
-    InProcessing --> WaitingData: mark waiting
-    WaitingData --> InProcessing: resume
-    InProcessing --> ReadyForBooking: confirm
-    WaitingData --> ReadyForBooking: confirm
-    ReadyForBooking --> SentToBooking: send
-    ReadyForBooking --> WaitingFirstPayment: wait payment
-    WaitingFirstPayment --> SentToBooking: send
-    SentToBooking --> Fulfilled: complete
-    SentToBooking --> PartiallyFulfilled: partial return
-    PartiallyFulfilled --> Fulfilled: complete
-    SentToBooking --> CancellationRequested: request cancellation
-    InProcessing --> CancellationRequested: request cancellation
-    CancellationRequested --> CancellationApproved: finance approval
-    CancellationRequested --> InProcessing: reject cancellation
-    CancellationApproved --> Cancelled: cancel
-    Fulfilled --> Closed: close
-    Cancelled --> Closed: close
-    OrderNew --> Problem: problem
-    InProcessing --> Problem: problem
-    SentToBooking --> Problem: problem
-    Problem --> InProcessing: resume
-    OrderNew --> Suspended: suspend
-    InProcessing --> Suspended: suspend
-    Suspended --> InProcessing: resume
-    Active --> Cancelled: returnToRequest
-  }
-
-  state Booking {
-    BookingNew --> Preparing: prepare
-    BookingNew --> SentToSupplier: send
-    Preparing --> SentToSupplier: send
-    SentToSupplier --> Confirmed: confirm
-    SentToSupplier --> SupplierRejected: reject
-    SentToSupplier --> Clarification: request clarification
-    Clarification --> SentToSupplier: resume
-    Confirmed --> InService: service
-    InService --> Completed: complete
-    Confirmed --> ChangeRequested: request change
-    ChangeRequested --> Confirmed: resolve change
-    Confirmed --> CancellationRequestedBooking: request cancellation
-    BookingNew --> CancelledBooking: cancel
-    SentToSupplier --> CancelledBooking: cancel
-    SentToSupplier --> ProblemBooking: problem
-    Completed --> [*]
-    CancelledBooking --> [*]
-  }
-
-  Closed --> [*]
-  Cancelled --> [*]
+  [*] --> RequestNEW
+  RequestNEW --> CONFIRMED: Подтвердить цену
+  CONFIRMED --> CUSTOMER_ACCEPTED: Клиент принял
+  CUSTOMER_ACCEPTED --> OrderNEW: Конвертировать
+  OrderNEW --> IN_PROCESSING: В работу
+  IN_PROCESSING --> READY_FOR_BOOKING: Подтвердить
+  READY_FOR_BOOKING --> SENT_TO_BOOKING: Отправить поставщику
+  SENT_TO_BOOKING --> FULFILLED: Все услуги Completed
+  SENT_TO_BOOKING --> PARTIALLY_FULFILLED: Часть услуг выполнена
+  SENT_TO_BOOKING --> CANCELLATION_REQUESTED: Инициировать отмену
+  CANCELLATION_REQUESTED --> CANCELLATION_APPROVED: Финансовое согласование
+  CANCELLATION_REQUESTED --> IN_PROCESSING: Отклонить отмену
+  CANCELLATION_APPROVED --> CANCELLED: Отменить
+  CANCELLED --> CLOSED: Закрыть после расчётов
+  FULFILLED --> CLOSED: Закрыть после расчётов
+  OrderNEW --> PROBLEM
+  IN_PROCESSING --> PROBLEM
+  SENT_TO_BOOKING --> PROBLEM
+  PROBLEM --> IN_PROCESSING: Возобновить
+  OrderNEW --> SUSPENDED
+  IN_PROCESSING --> SUSPENDED
+  SUSPENDED --> IN_PROCESSING: Возобновить
 ```
 
-Примечание: `Active` — агрегированное обозначение активного диапазона Order; фактические статусы перечислены в `TRANSITIONS`.
+## 2. Проверенные маршруты
 
-## 2. Матрица проверенных переходов
+| № | Переход | Проверка | Результат |
+|---|---|---|---|
+| 1 | Request NEW → CONFIRMED | API | PASS |
+| 2 | CONFIRMED → CUSTOMER_ACCEPTED | API | PASS |
+| 3 | CUSTOMER_ACCEPTED → Order NEW | API/DB | PASS |
+| 4 | Order NEW → IN_PROCESSING | API | PASS |
+| 5 | IN_PROCESSING → READY_FOR_BOOKING | API | PASS |
+| 6 | READY_FOR_BOOKING → SENT_TO_BOOKING | API/DB | PASS |
+| 7 | Booking NEW → SENT_TO_SUPPLIER | API | PASS |
+| 8 | SENT_TO_SUPPLIER → CONFIRMED | API | PASS |
+| 9 | CONFIRMED → IN_SERVICE → COMPLETED | API | PASS |
+| 10 | Booking reject → returnToOrder → re-send | API | PASS |
+| 11 | Booking change → resolve change | API | PASS |
+| 12 | Booking cancel | API | PASS |
+| 13 | Order PROBLEM → resume | API | PASS |
+| 14 | Order SUSPENDED → resume | API | PASS |
+| 15 | SUSPENDED → close/cancel | API 409 | PASS |
+| 16 | Cancellation request → finance approve | API | PASS |
+| 17 | CANCELLATION_APPROVED → CANCELLED | API | PASS |
+| 18 | CANCELLED → CLOSED | API | PASS |
+| 19 | Self-approval отмены | API 409 | PASS |
+| 20 | Close с долгами | API 409 | PASS |
+| 21 | Complete с долгами | API | PASS после разделения guards |
+| 22 | Multi-supplier: 2 услуги / 2 terms | API/DB | PASS |
+| 23 | USD: 100 / 40 / 60 / 20 | API/DB | PASS |
+| 24 | Возврат клиенту раньше поставщика | API/KPI | PASS |
+| 25 | Нумерация двух броней | API/DB | PASS |
 
-| № | Начальный статус | Действие | Следующий статус | Проверка | Результат |
-|---|---|---|---|---|---|
-| 1 | Request NEW | confirm price | CONFIRMED | API | PASS |
-| 2 | Request CONFIRMED | customer accept | CUSTOMER_ACCEPTED | API | PASS |
-| 3 | Request CUSTOMER_ACCEPTED | convert | CONVERTED + Order NEW | API/DB | PASS |
-| 4 | Order NEW | process | IN_PROCESSING | API | PASS |
-| 5 | Order IN_PROCESSING | complete without active booking/debts | 409 | API | PASS (guard) |
-| 6 | Order IN_PROCESSING | final-confirm travelers | finalConfirmedAt set | API | PASS |
-| 7 | Order IN_PROCESSING (confirmed data) | confirm | READY_FOR_BOOKING | API | PASS |
-| 8 | Order READY_FOR_BOOKING | send | SENT_TO_BOOKING + Booking NEW | API/DB | PASS |
-| 9 | Booking NEW | send | SENT_TO_SUPPLIER | API | PASS |
-| 10 | Booking SENT_TO_SUPPLIER | confirm | CONFIRMED | API | PASS |
-| 11 | Booking CONFIRMED | service | IN_SERVICE | API | PASS |
-| 12 | Booking IN_SERVICE | complete | COMPLETED | API | PASS |
-| 13 | Order SENT_TO_BOOKING | request cancellation | CANCELLATION_REQUESTED | API | PASS |
-| 14 | Cancellation CANCELLATION_REQUESTED | self-approve | 409 self-approval | API | PASS |
-| 15 | Cancellation CANCELLATION_REQUESTED | finance approve | CANCELLATION_APPROVED | API | PASS (after fix) |
-| 16 | Order CANCELLATION_APPROVED | cancel | CANCELLED | API | PASS |
-| 17 | Order CANCELLED | close | CLOSED | API | PASS |
-| 18 | Order CLOSED (cancelledAt) | KPI projection | cancelled, not completed | API | PASS (after fix) |
-| 19 | Active Booking present | complete/close projection | actions hidden | Jest | PASS |
-| 20 | Payment notification unit path | create/confirm | no crash on minimal mocks | Jest | PASS |
-
-## 3. Найденные и исправленные дефекты
+## 3. Исправленные дефекты
 
 ### D1. Тупик согласования отмены
+`approveCancellationApproval` вызывал `confirm()`, который требует CANCELLED/COMPLETED. Заказ в CANCELLATION_REQUESTED не мог быть согласован или отменён. Исправлено: согласование переводит Order в CANCELLATION_APPROVED, расчёт выполняется после отмены.
 
-**Причина:** `approveCancellationApproval` вызывал `confirm()` финансового расчёта, а `confirm()` разрешён только для `CANCELLED/COMPLETED`. Заказ в `CANCELLATION_REQUESTED` не мог быть ни согласован, ни отменён.
+### D2. Complete/close при активной брони
+Добавлена проверка отсутствия активных Booking; projection скрывает действия.
 
-**Исправление:** согласование теперь фиксирует `CancellationApproval=APPROVED` и переводит Order `CANCELLATION_REQUESTED → CANCELLATION_APPROVED`; финансовый расчёт выполняется после фактической отмены.
+### D3. Отменённая закрытая сделка выглядела выполненной
+Терминальные брони больше не определяют stage; метка «Отменена и закрыта» по `isCancelledDeal`.
 
-**Повторная проверка:** finance-пользователь получил `APPROVED`, Order перешёл в `CANCELLATION_APPROVED`, затем `cancel → CANCELLED`, `close → CLOSED` — PASS.
+### D4. Font.register ломал Jest
+Добавлена проверка `Font && typeof Font.register === "function"`.
 
-### D2. Завершение/закрытие при активной брони
+### D5. Unit-моки PaymentService
+Notification-вызовы защищены проверкой наличия delegate.
 
-**Причина:** guards `complete/close` проверяли только долги, но не активные Booking.
+### D6. Complete ошибочно требовал погашения долгов
+`complete` проверяет только активные брони; `close` — долги, возвраты и согласование.
 
-**Исправление:** добавлена проверка `booking.status notIn BOOKING_TERMINAL`; проекция скрывает `complete/close` при активной брони.
+### D7. Close guard и KPI считали supplierDebt по-разному
+Guard использует ту же формулу, что DealsService: obligation учитывается только при `obligationCost < sale`.
 
-**Повторная проверка:** новый Jest-тест `order-actions.active-booking.spec.ts` — 2/2 PASS.
+### D8. Resume терял предыдущий статус
+Восстанавливается `from` последней history `problem`/`suspend`; при активной брони — SENT_TO_BOOKING. History/audit/outbox пишут targetStatus.
 
-### D3. Отменённая закрытая сделка выглядела как выполненная
+### D9. CLOSED отменённая сделка получала supplierDebt
+Долг считается по признаку `cancelledAt`, а не только по статусу CANCELLED.
 
-**Причина:** `COMPLETED` бронь делала stage `BOOKING`, а `status` брался из брони, поэтому закрытая отменённая сделка не получала признак «Отменена и закрыта».
+### D10. Номер платежа дублировал sequence
+`MKT-PAY-{seq}-{seq}-1` исправлен на `MKT-PAY-{seq}` / `MKT-PAY-{seq}-1`.
 
-**Исправление:** терминальные брони (`COMPLETED/CANCELLED/SUPPLIER_REJECTED`) больше не определяют stage; UI использует `isCancelledDeal` для метки.
+### D11. Нумерация нескольких броней начиналась с -1
+Первая бронь теперь `MKT-BKG-{seq}`, вторая `-1`.
 
-**Повторная проверка:** API: `stage=ORDER`, `status=CLOSED`, `isCancelledDeal=true`, `expectedIncome=0`, `currentIncome=0` — PASS.
+### D12. Все отменённые брони переводили Order в FULFILLED
+`allDone` включал CANCELLED/SUPPLIER_REJECTED. Теперь FULFILLED только при всех COMPLETED; иначе PARTIALLY_FULFILLED или READY_FOR_BOOKING.
 
-### D4. Падение Jest из-за Font.register
+## 4. Финансовые проверки
 
-**Причина:** `Font.register` вызывался на верхнем уровне и падал в тестовом окружении, где `Font` не определён.
+### Частичная отмена, AZN
+```text
+Продажа 100; оплачено клиентом 100; возврат 40
+Оплачено поставщику 60; возврат 20
+F = (100 − 40) − (60 − 20) = 20
+supplierDebt = 0 после списания 40
+```
 
-**Исправление:** регистрация защищена проверкой `Font && typeof Font.register === "function"`.
+### USD, возврат клиенту раньше поставщика
+```text
+После возврата клиенту 40 и до возврата поставщика:
+F = (100 − 40) − 60 = 0
+supplierDebt = 60
 
-**Повторная проверка:** `documents.service.spec.ts` PASS.
+После возврата поставщика 20:
+F = 20
+supplierDebt = 40
 
-### D5. Unit-моки PaymentService не содержали notification-моделей
+После списания 40:
+supplierDebt = 0; clientDebt = 0; status = CLOSED
+```
 
-**Причина:** новый код уведомлений обращался к `tx.user/userNotification` в тестах без этих моков.
+## 5. Уведомления
 
-**Исправление:** безопасные проверки наличия делегатов; production-поведение не изменено.
+Проверены через API:
 
-**Повторная проверка:** `payment.service.spec.ts` — 26/27 PASS; оставшийся FAIL относится к старому ожиданию «CANCELLED нельзя оплачивать», тогда как по текущему требованию оплата отменённого заказа разрешена до закрытия.
+```text
+problem          → ORDER_PROBLEM
+resumeProcessing → ORDER_RESUMED
+orderEvents = 2
+```
 
-## 4. Покрытие и тесты
+Типы: ORDER_PROBLEM, ORDER_SUSPENDED, ORDER_RESUMED, ORDER_CANCELLATION_REQUESTED, ORDER_CANCELLATION_APPROVED, ORDER_CANCELLED, ORDER_FULFILLED, ORDER_CLOSED.
 
-Полный Jest-прогон (до последних правок):
+В UI — отдельные иконки/цвета и переход в карточку сделки.
+
+## 6. Тесты
+
+Точечный прогон:
+
+```text
+order-actions.active-booking.spec.ts            2/2 PASS
+deals.kpi.spec.ts                               PASS
+order-financial-settlement.calculator.spec.ts   PASS
+booking-to-order.projection.spec.ts             PASS
+```
+
+Полный suite (до последних правок):
 
 ```text
 Test Suites: 11 failed, 177 passed, 188 total
 Tests:       20 failed, 2829 passed, 2849 total
 ```
 
-После исправлений точечно:
+Оставшиеся FAIL: устаревшие ожидания тестов (`cancel` vs `requestCancellation`, PII SALES_MANAGER, passport-поля Request, hotel 1–3*), mock `assign`, env `WHATSAPP_ENABLED`, constructors `AzalController`/`RequestService`, отсутствие cancelled-фикстуры.
+
+## 7. Ограничения
+
+- Полный Jest suite не зелёный.
+- D12 проверен сборкой, но не повторным API-прогоном «все брони отменены».
+- Не проверено частичное выполнение до отмены (одна услуга выполнена, вторая отменена).
+- Не проверены несколько валют в одной сделке и возврат поставщика раньше клиента.
+
+## 8. Итог
 
 ```text
-order-actions.active-booking.spec.ts   2/2 PASS
-documents.service.spec.ts              PASS
-payment.service.spec.ts                26/27 PASS
-cancellation e2e                       не выполнен: в БД нет подготовленной cancelled-сделки с PENDING approval
+Request → Order → Booking             PASS
+Booking complete / reject / change    PASS
+Problem / Suspend / Resume            PASS
+Cancellation approval → close         PASS
+Partial finance / penalties / writeoff PASS
+Multi-supplier                        PASS
+USD + refund ordering                 PASS
+Booking/payment numbering             PASS
+Lifecycle notifications               PASS
+Cancelled bookings → FULFILLED guard  PARTIAL (код)
+Full Jest suite                       FAIL
 ```
-
-### Причины оставшихся FAIL
-
-1. `cancellation-close-guard.e2e.spec.ts` — тест зависит от наличия cancelled-сделки в main DB; после очистки тестовых данных фикстуры нет.
-2. `order-to-request.projection.spec.ts` — устаревшие ожидания: тест ожидает `cancel`, lifecycle использует `requestCancellation`; CANCELLED теперь имеет `close`.
-3. `tour-request.service.spec.ts` — mock ожидает вызов `assign("r1")`, код вызывает `assign("r1", undefined, {respectMode:true})`.
-4. `whatsapp.module.spec.ts` — тест ожидает `WHATSAPP_ENABLED=false`, но `.env` содержит `true`.
-5. `azal.controller.spec.ts`, `date-param.registry-matrix.spec.ts` — не обновлены конструкторы после добавления зависимостей.
-6. `request-travelers.spec.ts` — тест ожидает только FIO+birthDate, код теперь принимает passport-поля.
-7. `shared/pii.spec.ts` — тест ожидает redaction для SALES_MANAGER, текущая политика разрешает PII sales-ролям.
-8. `hotel-category.spec.ts` — расхождение правил категорий 1–3* (вне lifecycle).
-
-## 5. Финансовая проверка
-
-Проверено на тестовой отменённой сделке:
-
-```text
-Сумма продажи        100.00
-Получено клиента       0.00
-Возвращено клиенту     0.00
-Оплачено поставщику    0.00
-Возврат поставщика     0.00
-Ожидаемый доход        0.00
-Текущий доход          0.00
-Отменённые продажи   100.00
-Отменённых сделок        1
-```
-
-Формула отмены в KPI использует:
-
-```text
-F = (P − Rt) − (S − Rs)
-```
-
-Сделка с `cancelledAt` и статусом `CLOSED` остаётся отменённой и не попадает в выполненные/текущий доход — PASS.
-
-Не проверены на реальных данных:
-- частичные возвраты и штрафы;
-- несколько поставщиков;
-- разные валюты;
-- списания;
-- возврат раньше поставщика;
-- отмена после частичного выполнения.
-
-## 6. Технические изменения
-
-- `backend/src/modules/finance/order-financial-settlement.service.ts` — устранён тупик согласования отмены.
-- `backend/src/modules/order/order.service.ts` — guard активной брони для complete/close + проекция.
-- `backend/src/modules/finance/deals.service.ts` — терминальные брони не определяют stage.
-- `frontend/app/app/finance/deals/page.tsx` — метка «Отменена и закрыта» по `isCancelledDeal`.
-- `backend/src/modules/documents/document-renderer.service.ts` — безопасная регистрация Font.
-- `backend/src/modules/finance/payment.service.ts` — безопасные notification-вызовы для unit-моков.
-- `backend/src/modules/order/order-actions.active-booking.spec.ts` — новый тест.
-- `backend/src/modules/finance/finance.controller.ts` — PATCH refund (сопутствующая незакоммиченная правка).
 
 Коммиты:
 
 ```text
 e5d58cb fix: close lifecycle gaps in cancellation, completion and deal stage
 48da1d8 test: keep payment unit mocks compatible with notifications
+73aa0b8 fix: cancelled closed debt and uniform payment reference
+803b200 fix: sequential booking reference numbering across order items
+6725057 feat: lifecycle order notifications and booking numbering verification
+9437eb4 fix: cancelled bookings no longer fulfill order
 ```
-
-## 7. Итоговый статус
-
-| Направление | Статус |
-|---|---|
-| Request lifecycle (базовый маршрут) | PASS |
-| Request → Order conversion | PASS |
-| Order NEW → SENT_TO_BOOKING | PASS |
-| Booking NEW → COMPLETED | PASS |
-| Cancellation approval → CANCELLED → CLOSED | PASS (после исправления) |
-| KPI отменённой закрытой сделки | PASS |
-| Guard активной брони | PASS (unit projection) |
-| PROBLEM / SUSPENDED | PASS — API-переходы и запреты проверены |
-| Booking reject/change/cancel/return | PASS — API-переходы проверены |
-| Завершение с долгами / закрытие только после долгов | PASS — после разделения guards |
-| Частичные оплаты/возвраты/штрафы/списания | PASS — один полный сценарий с 100/40/60/20/20/10/40 |
-| Несколько поставщиков | PASS — 2 услуги/2 supplier terms, cancel + close |
-| Нумерация нескольких броней | PASS — повторный API-прогон: base + -1 |
-| Lifecycle-уведомления Order | PASS — problem/resume проверены через API и счётчик |
-| Разные валюты | PASS — полный USD-сценарий 100/40/60/20 |
-| Возврат клиенту раньше поставщика | PASS — промежуточный F=0, затем F=20 |
-| Нумерация платежа | PASS — MKT-PAY-00000010 без дубля |
-| Частичное выполнение до отмены | FAIL — не проверено |
-| Полный Jest suite | FAIL — 20 тестов, причины выше |
-| RBAC всех переходов | PARTIAL — проверены finance-approval и self-approval |
-
-**Общий вывод:** базовый граф Request → Order → Booking → cancellation → close теперь проходим, ключевой тупик отмены устранён. Полная приёмка по всем боковым ветвям и всем 2849 тестам не достигнута.
-
-## 8. Round 2 — дополнительные проверки и исправления
-
-### Проверенные ветви
-
-| Переход | Проверка | Результат |
-|---|---|---|
-| NEW → PROBLEM | API | PASS |
-| PROBLEM → PROBLEM (повтор) | API 409 | PASS |
-| PROBLEM → IN_PROCESSING | API | PASS |
-| IN_PROCESSING → SUSPENDED | API | PASS |
-| SUSPENDED → close | API 409 | PASS |
-| SUSPENDED → cancel | API 409 | PASS |
-| SUSPENDED → IN_PROCESSING | API | PASS |
-| Booking SENT_TO_SUPPLIER → SUPPLIER_REJECTED | API | PASS |
-| Booking SUPPLIER_REJECTED → returnToOrder | API | PASS |
-| Order → READY_FOR_BOOKING после возврата брони | API | PASS |
-| Повторный send → новый Booking `-1` | API/DB | PASS |
-| Booking CONFIRMED → CHANGE_REQUESTED → CONFIRMED | API | PASS |
-| Booking CONFIRMED → IN_SERVICE → CANCELLATION_REQUESTED → CANCELLED | API | PASS |
-| Order PARTIALLY_FULFILLED → FULFILLED при долгах | API | PASS |
-| FULFILLED → close при долгах | API 409 | PASS |
-
-### D6. Завершение сделки ошибочно требовало погашения долгов
-
-**Причина:** `complete` и `close` использовали один и тот же `assertOrderDebtsCleared`. Из-за этого нельзя было зафиксировать факт оказания услуг до оплаты, хотя по финансовой модели выполненная сделка может иметь дебиторскую/кредиторскую задолженность.
-
-**Исправление:** `complete` проверяет только отсутствие активных броней; `close` дополнительно требует отсутствия долгов, возвратов и незавершённого согласования.
-
-**Проверка:** `complete` при `clientDebt=100` и `supplierDebt=1551.52` → `FULFILLED`; последующий `close` → 409 с теми же долгами.
-
-### D7. Close guard и KPI считали долг поставщику по-разному
-
-**Причина:** close guard предпочитал `SupplierObligation.remainingAmount`, а KPI игнорировал legacy-obligation, если её сумма равна продаже, и брал себестоимость из каталога. В результате guard видел долг 100, KPI — 1551.52.
-
-**Исправление:** close guard использует ту же формулу, что `DealsService`: obligation учитывается только если `obligationCost < sale`; иначе `cost − paid + refunded`.
-
-**Проверка:** после исправления close вернул `supplierDebt=1551.52`, совпадающий с KPI.
-
-### D8. Возобновление теряло предыдущий статус
-
-**Причина:** `resumeProcessing` всегда вёл в `IN_PROCESSING` (кроме активной брони), хотя приостановка должна сохранять состояние.
-
-**Исправление:** при resume берётся последняя запись history `problem`/`suspend` и восстанавливается её `from`, если это допустимый активный статус; при активной брони приоритет — `SENT_TO_BOOKING`. History/audit/outbox теперь пишут фактический `targetStatus`, а не статический `transition.to`.
-
-**Проверка:** логика проверена на PROBLEM/SUSPENDED API-переходах; отдельный сценарий «suspend из READY_FOR_BOOKING → resume» требует отдельной фикстуры и в этом раунде не прогнан.
-
-### Тесты Round 2
-
-```text
-order-actions.active-booking.spec.ts           2/2 PASS
-deals.kpi.spec.ts                              PASS
-order-financial-settlement.calculator.spec.ts  PASS
-booking-to-order.projection.spec.ts            PASS
-Итого                                          44/44 PASS
-```
-
-Коммит:
-
-```text
-e3433ed fix: separate completion from debt settlement and restore paused status
-```
-
-## 9. Round 3 — частичная оплата, возвраты, штрафы и списание
-
-Реальный API/DB-сценарий:
-
-```text
-Продажа                  100.00
-Оплачено клиентом        100.00
-Возврат клиенту           40.00
-Оплачено поставщику        60.00
-Возврат от поставщика      20.00
-Штраф клиента              20.00
-Штраф поставщика           10.00
-Списание долга поставщику  40.00
-```
-
-Финансовое урегулирование:
-
-```text
-finalCustomerLiability = 60.00
-captured = 100.00
-refunded = 40.00
-remainingToPay = 0.00
-remainingToRefund = 0.00
-status = FINANCIALLY_SETTLED_WITH_PENALTY
-```
-
-Итог отмены:
-
-```text
-F = (100 − 40) − (60 − 20) = 20.00
-```
-
-KPI после закрытия:
-
-```text
-cancellationIncome = 20.00
-cancellationLoss   = 0.00
-clientDebt         = 0.00
-supplierDebt       = 0.00
-expectedIncome     = 0.00
-currentIncome      = 0.00
-```
-
-### D9. После CLOSED отменённая сделка снова получала долг поставщику
-
-**Причина:** `DealsService` применял формулу `paid − refunded` только при `order.status === "CANCELLED"`. После закрытия статус становился `CLOSED`, и долг пересчитывался как `cost − paid + refunded`, возвращая 1471.52 вместо 0.
-
-**Исправление:** для долга используется признак отмены (`cancelledAt` / `CANCELLED`), а не только текущий статус.
-
-**Проверка:** после закрытия `supplierDebt=0.00`, `clientDebt=0.00`, `cancellationIncome=20.00`.
-
-### D10. Повторная регрессия номера платежа
-
-Платёж снова получил номер:
-
-```text
-MKT-PAY-00000007-00000007-1
-```
-
-**Исправление:** возвращена единая схема:
-
-```text
-MKT-PAY-{seq}
-MKT-PAY-{seq}-1
-```
-
-Номер заказа больше не принимается за суффикс попытки.
-
-### Ограничения Round 3
-
-- Сценарий выполнен на изолированной тестовой сделке; после проверки данные удалены.
-- Не проверены: несколько поставщиков, разные валюты, возврат раньше поставщика, частичное выполнение до отмены.
-- Полный Jest suite не перезапускался после последних правок; точечные 44/44 PASS.
-
-## 10. Round 4 — несколько поставщиков и нумерация броней
-
-### Проверенный сценарий
-
-Заказ с двумя услугами от разных поставщиков:
-
-```text
-PRN-00000003 / Hotel
-PRN-00000002 / Tour
-```
-
-Создано две Booking. Обе отменены, затем:
-
-```text
-Order → CANCELLATION_REQUESTED
-supplier-terms: 2 записи
-approval → CANCELLATION_APPROVED
-cancel → CANCELLED
-close → CLOSED
-```
-
-KPI:
-
-```text
-cancellationIncome = 0.00
-cancellationLoss   = 0.00
-clientDebt         = 0.00
-supplierDebt       = 0.00
-```
-
-Сценарий PASS.
-
-### D11. Нумерация нескольких броней начиналась с -1
-
-Для заказа с двумя услугами создались:
-
-```text
-MKT-BKG-00000008-1
-MKT-BKG-00000008-2
-```
-
-По правилу Navitravel первая сущность должна быть без суффикса:
-
-```text
-MKT-BKG-00000008
-MKT-BKG-00000008-1
-```
-
-**Исправление:** используется общий порядковый номер брони в рамках заказа, а не `orderItem` с 1-based суффиксом.
-
-**Статус проверки:** код собран; отдельный повторный API-прогон после последней сборки не выполнен, поэтому исправление помечено как PARTIAL, а не PASS.
-
-### Ограничения Round 4
-
-- Не проверены разные валюты.
-- Не проверен возврат клиенту раньше возврата поставщика.
-- Не проверено частичное выполнение до отмены.
-- Полный Jest suite не перезапускался.
-
-## 11. Round 5 — нумерация броней и lifecycle-уведомления
-
-### Проверка нумерации
-
-Заказ с двумя услугами, повторный API-прогон после исправления:
-
-```text
-MKT-BKG-00000009
-MKT-BKG-00000009-1
-```
-
-Первая бронь без суффикса, вторая `-1`. Результат: **PASS**. D11 закрыт.
-
-### Lifecycle-уведомления
-
-Добавлены уведомления на действия Order:
-
-```text
-ORDER_PROBLEM
-ORDER_SUSPENDED
-ORDER_RESUMED
-ORDER_CANCELLATION_REQUESTED
-ORDER_CANCELLATION_APPROVED
-ORDER_CANCELLED
-ORDER_FULFILLED
-ORDER_CLOSED
-```
-
-Проверка через API:
-
-```text
-problem       → ORDER_PROBLEM
-resumeProcessing → ORDER_RESUMED
-orderEvents = 2
-```
-
-Заголовки:
-
-```text
-MKT-ORD-00000009: Заказ помечен проблемным
-MKT-ORD-00000009: Возобновлена обработка
-```
-
-Уведомления отображаются в панели «Оповещения» реестра продаж с отдельными иконками/цветами:
-
-```text
-⚠ проблема
-⏸ приостановка
-▶ возобновление
-🛑 запрос отмены
-✔ отмена согласована
-✖ отменена
-✅ выполнена
-🔒 закрыта
-```
-
-Клик ведёт в карточку соответствующей сделки.
-
-### Ограничения Round 5
-
-- Уведомления по refunds/payment confirmation проверены unit-тестами, но не отдельным UI-прогоном.
-- Полный Jest suite не перезапускался.
-- Разные валюты и возврат раньше поставщика всё ещё не проверены.
-
-## 12. Round 6 — USD, возврат клиенту раньше возврата поставщика
-
-### Сценарий
-
-```text
-Валюта                     USD
-Продажа                    100.00
-Оплачено клиентом          100.00
-Оплачено поставщику         60.00
-Возврат клиенту             40.00  ← раньше возврата поставщика
-Возврат от поставщика       20.00  ← позже
-Штраф клиента               20.00
-Штраф поставщика            10.00
-```
-
-Промежуточное состояние после возврата клиенту и до возврата поставщика:
-
-```text
-F = (100 − 40) − 60 = 0.00
-cancellationIncome = 0.00
-supplierDebt       = 60.00
-currency           = USD
-```
-
-После возврата поставщика:
-
-```text
-F = (100 − 40) − (60 − 20) = 20.00
-cancellationIncome = 20.00
-supplierDebt       = 40.00
-```
-
-После списания долга поставщику 40.00:
-
-```text
-supplierDebt = 0.00
-clientDebt   = 0.00
-status       = CLOSED
-```
-
-Все суммы сохранились в USD.
-
-### Проверка номера платежа
-
-Платёж в USD создан с номером:
-
-```text
-MKT-PAY-00000010
-```
-
-Дублирование `{seq}-{seq}` больше не воспроизводится. D10 подтверждён — **PASS**.
-
-### Итог Round 6
-
-```text
-Разные валюты                   PASS
-Возврат раньше поставщика       PASS
-USD cancellation settlement     PASS
-```
-
-### Ограничения
-
-- Частичное выполнение до отмены всё ещё не проверено.
-- Полный Jest suite не перезапускался.
