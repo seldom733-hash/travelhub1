@@ -458,7 +458,8 @@ export class DealsService {
       const stage = returnedToRequest ? "REQUEST" : activeBooking ? "BOOKING" : order ? "ORDER" : "REQUEST";
       const status = returnedToRequest ? request.status : activeBooking?.status ?? order?.status ?? request.status;
       const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(status);
-      const rawSupplierDebt = order?.status === "CANCELLED"
+      const cancelledForDebt = order?.status === "CANCELLED" || Boolean(order?.cancelledAt && !order?.returnedToRequestAt);
+      const rawSupplierDebt = cancelledForDebt
         ? Math.max(0, supplierPaid - supplierRefunded)
         : cost > 0
           ? Math.max(0, cost - supplierPaid + supplierRefunded)
