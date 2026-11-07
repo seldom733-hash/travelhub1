@@ -357,7 +357,7 @@ export class PaymentService {
   async confirmPayment(code: string, actor: Actor): Promise<Record<string, unknown>> {
     const result = await this.transition(code, PaymentStatus.CAPTURED, "paidAt", "captured", "finance.payment.captured", DomainEvents.PaymentCaptured, actor);
     const payment = await this.prisma.payment.findUnique({ where: { code }, select: { id: true } });
-    if (payment) {
+    if (payment && this.prisma.userNotification?.updateMany) {
       await this.prisma.userNotification.updateMany({
         where: { entityType: "Payment", entityId: payment.id, type: "PAYMENT_CONFIRMATION", readAt: null },
         data: { readAt: new Date() },
