@@ -211,6 +211,14 @@ export class SupplierPaymentService {
     }, "create");
     const payoutContext = await this.resolvePayoutContext(allocations, input.orderId ?? null, input.bookingId ?? null);
     const direction = input.direction === "INCOMING" ? "INCOMING" : "OUTGOING";
+    if (payoutContext.orderId) {
+      const order = await this.prisma.order.findUnique({ where: { id: payoutContext.orderId }, select: { currency: true } });
+      if (order && order.currency !== currency) {
+        throw new ValidationDomainError(
+          `Supplier payment currency ${currency} does not match order currency ${order.currency}; multi-currency settlements per deal are not supported yet`,
+        );
+      }
+    }
     if (direction === "INCOMING" && !payoutContext.orderId) {
       throw new ValidationDomainError("INCOMING supplier refund requires an orderId");
     }
