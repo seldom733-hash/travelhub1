@@ -112,21 +112,21 @@ order-financial-settlement.calculator.spec.ts   PASS
 booking-to-order.projection.spec.ts             PASS
 ```
 
-Полный suite (до последних правок):
+Полный suite после правок:
 
 ```text
-Test Suites: 11 failed, 177 passed, 188 total
-Tests:       20 failed, 2829 passed, 2849 total
+Test Suites: 189 passed, 189 total
+Tests:       2924 passed, 2924 total
 ```
 
-Оставшиеся FAIL — устаревшие ожидания тестов (`cancel` vs `requestCancellation`, PII, passport-поля Request, hotel 1–3*), mock `assign`, env `WHATSAPP_ENABLED`, constructors, отсутствие cancelled-фикстуры.
+Важно: `cancellation-close-guard.e2e.spec.ts` в текущей БД не находит cancelled-сделку и завершается без выполнения assertions (return). Поэтому его PASS не подтверждает реальный guard в этом прогоне; сам guard проверялся вручную ранее.
 
 ## 7. Ограничения
 
-- Полный Jest suite не зелёный.
 - Не проверены несколько валют в одной сделке.
 - Не проверен возврат поставщика раньше клиента.
 - Не проверено частичное выполнение до отмены (только partial fulfillment после completed/cancelled).
+- E2E cancellation guard выполнен без фикстуры (vacuous pass).
 
 ## 8. Итог
 
@@ -142,7 +142,8 @@ Multi-supplier                         PASS
 USD + refund ordering                  PASS
 Booking/payment numbering              PASS
 Lifecycle notifications                PASS
-Full Jest suite                        FAIL
+Full Jest suite                         PASS — 2924/2924
+Cancellation e2e fixture                PARTIAL — vacuous pass без cancelled-сделки
 ```
 
 Коммиты:
