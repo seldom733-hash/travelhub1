@@ -1414,7 +1414,7 @@ export class OrderService {
       tx.payment.aggregate({ where: { orderId, status: { in: ["CAPTURED", "REFUNDED"] } }, _sum: { amount: true } }),
       tx.refund.aggregate({ where: { orderId, status: "PROCESSED" }, _sum: { amount: true } }),
       tx.refund.aggregate({ where: { orderId, status: { in: ["REQUESTED", "APPROVED"] } }, _sum: { amount: true } }),
-      tx.supplierObligation.aggregate({ where: { orderId, status: { in: ["OPEN", "PARTIALLY_PAID"] } }, _sum: { remainingAmount: true } }),
+      tx.supplierObligation.aggregate({ where: { orderId, status: { in: ["OPEN", "PARTIALLY_PAID"] } }, _sum: { remainingAmount: true, aznAmount: true } }),
       tx.order.findUnique({ where: { id: orderId }, select: { commercialSnapshot: true } }),
       tx.supplierPayout.aggregate({ where: { orderId, status: "CONFIRMED", direction: { not: "INCOMING" } }, _sum: { amount: true } }),
       tx.supplierPayout.aggregate({ where: { orderId, status: "CONFIRMED", direction: "INCOMING" }, _sum: { amount: true } }),
@@ -1440,11 +1440,13 @@ export class OrderService {
       }
     }
     const obligationDebt = Number(obligations._sum.remainingAmount ?? 0);
+    const obligationCost = Number(obligations._sum.aznAmount ?? 0);
     const supplierPaidTotal = Number(outgoing._sum.amount ?? 0);
     const supplierRefundedTotal = Number(incoming._sum.amount ?? 0);
+    const useObligationCost = obligationCost > 0 && obligationCost < Number(amount);
     const baseSupplierDebt = status === "CANCELLED"
       ? Math.max(0, supplierPaidTotal - supplierRefundedTotal)
-      : obligationDebt > 0
+      : useObligationCost && obligationDebt > 0
         ? obligationDebt
         : Math.max(0, cost - supplierPaidTotal + supplierRefundedTotal);
     const supplierDebt = new Prisma.Decimal(Math.max(0, baseSupplierDebt - Number(writeOffs._sum.amount ?? 0)));
@@ -1649,6 +1651,12 @@ export class OrderService {
       }
 
       if (action === "complete" || action === "close") {
+        const activeBookings = await tx.booking.count({ where: { orderId, status: { notIn: BOOKING_TERMINAL } } });
+        if (activeBookings > 0) {
+          throw new ConflictError(`Order ${order.code} cannot be ${action === "complete" ? "completed" : "closed"} while it has ${activeBookings} active booking(s)`);
+        }
+      }
+      if (action === "close") {
         await this.assertOrderDebtsCleared(tx, orderId, order.code, order.amount, order.status);
       }
 
@@ -1757,6 +1765,15 @@ export class OrderService {
       // невозможен lifecycle-ом → immutable milestone).
       let targetStatus = transition.to;
       if (action === "resumeProcessing" && ["PROBLEM", "SUSPENDED"].includes(order.status)) {
+        const pausedFrom = await tx.orderHistory.findFirst({
+          where: { orderId, action: { in: ["problem", "suspend"] } },
+          orderBy: { createdAt: "desc" },
+          select: { from: true },
+        });
+        const restore = pausedFrom?.from;
+        if (restore && !["PROBLEM", "SUSPENDED", "CANCELLED", "CANCELLATION_REQUESTED", "CANCELLATION_APPROVED"].includes(restore)) {
+          targetStatus = restore as OrderStatus;
+        }
         const activeBookings = await tx.booking.count({ where: { orderId, status: { notIn: BOOKING_TERMINAL } } });
         if (activeBookings > 0) targetStatus = "SENT_TO_BOOKING";
       }
@@ -1790,7 +1807,7 @@ export class OrderService {
           orderId,
           action,
           from: order.status,
-          to: transition.to,
+          to: targetStatus,
           source: source ?? "API",
           actorId: actor ?? null,
           actorName: actor ?? null,
@@ -1845,7 +1862,7 @@ export class OrderService {
           details: {
             orderCode: order.code,
             orderFrom: order.status,
-            orderTo: transition.to,
+            orderTo: targetStatus,
             requestId: linkedRequestId,
             requestCode: linkedRequestCode,
             requestFrom: "CONVERTED",
@@ -1932,7 +1949,7 @@ export class OrderService {
             aggregateType: "Order",
             aggregateId: orderId,
             eventType: DomainEvents.OrderStatusChanged,
-            payload: { from: order.status, to: transition.to, actor } as Prisma.InputJsonValue,
+            payload: { from: order.status, to: targetStatus, actor } as Prisma.InputJsonValue,
           });
         }
       }
