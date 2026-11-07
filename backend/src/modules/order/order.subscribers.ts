@@ -154,10 +154,12 @@ export class OrderSubscribers implements OnModuleInit {
 
     let target: OrderStatus | null = null;
     if (["SENT_TO_BOOKING", "PARTIALLY_FULFILLED"].includes(order.status) && bookings.length > 0) {
-      const allDone = bookings.every((b) => TERMINAL_BOOKING.includes(b));
+      const allCompleted = bookings.every((b) => b === "COMPLETED");
+      const anyCompleted = bookings.some((b) => b === "COMPLETED");
       const anyConfirmed = bookings.some((b) => CONFIRMED_BOOKING.includes(b));
-      if (allDone) target = "FULFILLED";
-      else if (anyConfirmed || order.status === "PARTIALLY_FULFILLED") target = "PARTIALLY_FULFILLED";
+      if (allCompleted) target = "FULFILLED";
+      else if (anyCompleted || anyConfirmed) target = "PARTIALLY_FULFILLED";
+      else if (order.status === "PARTIALLY_FULFILLED") target = "READY_FOR_BOOKING";
     }
 
     if (target && target !== order.status) {
