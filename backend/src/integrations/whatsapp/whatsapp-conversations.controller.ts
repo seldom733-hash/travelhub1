@@ -131,7 +131,7 @@ export class WhatsAppConversationsController {
   @Get("conversations/:id/messages")
   @RequirePermissions("whatsapp.read")
   timeline(@Param("id") id: string, @Query() query: TimelineQueryDto) {
-    return this.conversations.timeline(id, query.limit ?? 100);
+    return this.conversations.timeline(id, query.limit);
   }
 
   @Post("conversations/:id/customer")

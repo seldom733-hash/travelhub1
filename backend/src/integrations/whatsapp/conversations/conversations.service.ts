@@ -189,7 +189,7 @@ export class WhatsAppConversationsService {
   }
 
   /** §25 messages: merged timeline (inbound + outbound) одной историей (§14). */
-  async timeline(conversationId: string, limit = 100): Promise<TimelineItem[]> {
+  async timeline(conversationId: string, limit?: number): Promise<TimelineItem[]> {
     const conversation = await this.prisma.whatsAppConversation.findUnique({
       where: { id: conversationId },
       select: { id: true },
@@ -197,7 +197,7 @@ export class WhatsAppConversationsService {
     if (!conversation) {
       throw new NotFoundError(`WhatsApp conversation ${conversationId} not found`);
     }
-    const take = Math.min(Math.max(Math.trunc(limit), 1), 200);
+    const take = limit === undefined ? undefined : Math.min(Math.max(Math.trunc(limit), 1), 200);
 
     const [inboundRows, outboundRows] = await Promise.all([
       this.prisma.whatsAppInboundMessage.findMany({

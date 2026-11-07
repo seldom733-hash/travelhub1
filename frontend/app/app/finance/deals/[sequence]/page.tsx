@@ -616,7 +616,7 @@ function ClientChats({ deal, canSend }: { deal: DealRow; canSend: boolean }) {
   const loadTimeline = React.useCallback(async (id: string, silent = false) => {
     if (!silent) setThreadLoading(true);
     try {
-      const items = await api.get<WhatsAppTimelineItem[]>(`/whatsapp/conversations/${id}/messages?limit=100`);
+      const items = await api.get<WhatsAppTimelineItem[]>(`/whatsapp/conversations/${id}/messages`);
       setTimeline(items);
     } catch (e) {
       if (!silent) setError((e as Error).message);
