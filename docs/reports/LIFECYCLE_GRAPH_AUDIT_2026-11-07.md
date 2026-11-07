@@ -244,7 +244,7 @@ e5d58cb fix: close lifecycle gaps in cancellation, completion and deal stage
 | PROBLEM / SUSPENDED | PASS — API-переходы и запреты проверены |
 | Booking reject/change/cancel/return | PASS — API-переходы проверены |
 | Завершение с долгами / закрытие только после долгов | PASS — после разделения guards |
-| Частичные оплаты/возвраты/штрафы/списания | FAIL — не проверены реальными API-сценариями |
+| Частичные оплаты/возвраты/штрафы/списания | PASS — один полный сценарий с 100/40/60/20/20/10/40 |
 | Полный Jest suite | FAIL — 20 тестов, причины выше |
 | RBAC всех переходов | PARTIAL — проверены finance-approval и self-approval |
 
@@ -311,3 +311,77 @@ booking-to-order.projection.spec.ts            PASS
 ```text
 e3433ed fix: separate completion from debt settlement and restore paused status
 ```
+
+## 9. Round 3 — частичная оплата, возвраты, штрафы и списание
+
+Реальный API/DB-сценарий:
+
+```text
+Продажа                  100.00
+Оплачено клиентом        100.00
+Возврат клиенту           40.00
+Оплачено поставщику        60.00
+Возврат от поставщика      20.00
+Штраф клиента              20.00
+Штраф поставщика           10.00
+Списание долга поставщику  40.00
+```
+
+Финансовое урегулирование:
+
+```text
+finalCustomerLiability = 60.00
+captured = 100.00
+refunded = 40.00
+remainingToPay = 0.00
+remainingToRefund = 0.00
+status = FINANCIALLY_SETTLED_WITH_PENALTY
+```
+
+Итог отмены:
+
+```text
+F = (100 − 40) − (60 − 20) = 20.00
+```
+
+KPI после закрытия:
+
+```text
+cancellationIncome = 20.00
+cancellationLoss   = 0.00
+clientDebt         = 0.00
+supplierDebt       = 0.00
+expectedIncome     = 0.00
+currentIncome      = 0.00
+```
+
+### D9. После CLOSED отменённая сделка снова получала долг поставщику
+
+**Причина:** `DealsService` применял формулу `paid − refunded` только при `order.status === "CANCELLED"`. После закрытия статус становился `CLOSED`, и долг пересчитывался как `cost − paid + refunded`, возвращая 1471.52 вместо 0.
+
+**Исправление:** для долга используется признак отмены (`cancelledAt` / `CANCELLED`), а не только текущий статус.
+
+**Проверка:** после закрытия `supplierDebt=0.00`, `clientDebt=0.00`, `cancellationIncome=20.00`.
+
+### D10. Повторная регрессия номера платежа
+
+Платёж снова получил номер:
+
+```text
+MKT-PAY-00000007-00000007-1
+```
+
+**Исправление:** возвращена единая схема:
+
+```text
+MKT-PAY-{seq}
+MKT-PAY-{seq}-1
+```
+
+Номер заказа больше не принимается за суффикс попытки.
+
+### Ограничения Round 3
+
+- Сценарий выполнен на изолированной тестовой сделке; после проверки данные удалены.
+- Не проверены: несколько поставщиков, разные валюты, возврат раньше поставщика, частичное выполнение до отмены.
+- Полный Jest suite не перезапускался после последних правок; точечные 44/44 PASS.
