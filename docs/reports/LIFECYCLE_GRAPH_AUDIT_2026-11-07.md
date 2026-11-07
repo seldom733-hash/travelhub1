@@ -151,7 +151,25 @@ supplierRefunded    = 20.00
 
 ## 8. Ограничения
 
-- Не проверены несколько валют в одной сделке.
+### Мультивалютная сделка — FAIL (не исправлено)
+
+Код `DealsService` суммирует суммы без проверки валюты:
+
+```text
+supplierPaid    = Σ supplierPayout.amount   (direction OUTGOING)
+supplierRefunded = Σ supplierPayout.amount  (direction INCOMING)
+clientReceived  = Σ payment.amount
+```
+
+При этом `Payment` не хранит AZN-эквивалент, а `SupplierPayout` имеет `amount`, `currency`, `aznAmount`. Если поставщику оплачено в EUR, а продажа в USD, KPI сложит 60 EUR и 100 USD как числа.
+
+Это не исправлено, потому что политика пересчёта в валюту сделки не определена однозначно. Нельзя молча выбрать курс или валюту. Требуется решение:
+
+- запретить разные валюты в одной сделке; или
+- пересчитывать все операции в валюту сделки по зафиксированному курсу.
+
+До решения multi-currency **FAIL**.
+
 - Не проверено частичное выполнение до отмены (только partial fulfillment после completed/cancelled).
 - E2E cancellation guard выполнен без фикстуры (vacuous pass).
 
@@ -168,6 +186,7 @@ Partial finance / penalties / writeoff PASS
 Multi-supplier                         PASS
 USD + refund ordering                  PASS
 Supplier refund before client          PASS
+Multi-currency in one deal             FAIL — суммы разных валют складываются без FX
 Booking/payment numbering              PASS
 Lifecycle notifications                PASS
 Full Jest suite                         PASS — 2924/2924
