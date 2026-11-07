@@ -454,7 +454,7 @@ export class DealsService {
         ? obligationCost
         : costFromSnapshot || costFromProduct;
       const returnedToRequest = order?.status === "CANCELLED" && request.status !== "CONVERTED" && !["CANCELLED_BY_CUSTOMER", "REJECTED", "UNAVAILABLE", "EXPIRED"].includes(request.status);
-      const activeBooking = booking && booking.status !== "CANCELLED" ? booking : null;
+      const activeBooking = booking && !["CANCELLED", "COMPLETED", "SUPPLIER_REJECTED"].includes(booking.status) ? booking : null;
       const stage = returnedToRequest ? "REQUEST" : activeBooking ? "BOOKING" : order ? "ORDER" : "REQUEST";
       const status = returnedToRequest ? request.status : activeBooking?.status ?? order?.status ?? request.status;
       const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(status);

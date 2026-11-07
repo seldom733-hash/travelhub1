@@ -800,6 +800,12 @@ export class FinanceController {
     return this.refunds.getByCode(code);
   }
 
+  @Patch("refunds/:code")
+  @RequirePermissions("finance.refund.write")
+  async updateRefund(@Param("code") code: string, @Body() body: { amount?: string; reason?: string | null }, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.refunds.update(code, body, { id: actor.id, username: actor.username });
+  }
+
   @Post("refunds")
   @RequirePermissions("finance.refund.write")
   async createRefund(@Req() req: Request, @CurrentUser() actor: AuthedRequest["user"], @Body() dto: CreateRefundDto) {

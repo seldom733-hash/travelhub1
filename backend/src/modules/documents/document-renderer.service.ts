@@ -17,7 +17,7 @@ import type { RefundData } from "./templates/refund.template";
  * Produces valid PDF binary with proper header, A4 layout, and styled content.
  * Uses TSX templates (AD-D13-12/13) as the production rendering engine.
  */
-Font.register({
+if (Font && typeof Font.register === "function") Font.register({
   family: "Arial",
   fonts: [
     { src: path.join(process.cwd(), "assets", "fonts", "arial.ttf") },

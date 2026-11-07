@@ -244,6 +244,17 @@ export class OrderFinancialSettlementService {
     const approval = await this.prisma.cancellationApproval.findFirst({ where: { orderId, status: "PENDING" }, orderBy: { createdAt: "desc" } });
     if (!approval) throw new NotFoundError("Pending cancellation approval not found");
     if (approval.submittedById === actor.id) throw new ConflictError("The approver cannot approve their own calculation");
+    const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { status: true } });
+    if (order?.status !== "CANCELLED") {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.cancellationApproval.update({ where: { id: approval.id }, data: { status: "APPROVED", approvedById: actor.id, approvedByName: actor.username, approvedAt: new Date() } });
+        if (order?.status === "CANCELLATION_REQUESTED") {
+          await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLATION_APPROVED", cancellationApprovedAt: new Date(), version: { increment: 1 } } });
+          await tx.orderHistory.create({ data: { orderId, action: "approveCancellation", from: "CANCELLATION_REQUESTED", to: "CANCELLATION_APPROVED", source: "API", actorId: actor.id, actorName: actor.username, comment: "Финансовый расчёт утверждён" } });
+        }
+      });
+      return this.prisma.cancellationApproval.findUnique({ where: { id: approval.id } });
+    }
     const settlement = await this.confirm(orderId, approval.input as unknown as SettlementConfirmInput, actor);
     await this.prisma.cancellationApproval.update({ where: { id: approval.id }, data: { status: "APPROVED", approvedById: actor.id, approvedByName: actor.username, approvedAt: new Date() } });
     return settlement;

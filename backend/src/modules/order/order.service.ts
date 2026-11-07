@@ -219,7 +219,7 @@ export function computeAvailableOrderActions(
     if (!granted.includes(ACTION_PERMISSIONS[action])) continue;
     // Stage 2 fix (Bug 2): блокирует только реально активный Booking;
     // исторический (returned/cancelled) не должен прятать кнопку.
-    if ((action === "returnToRequest" || action === "cancel") && activeBlockingBookings > 0) continue;
+    if ((action === "returnToRequest" || action === "cancel" || action === "complete" || action === "close") && activeBlockingBookings > 0) continue;
     // D3 traveler gate (как в orderAction): confirm/send требуют finalConfirmedAt.
     if (d3Scope && !order.finalConfirmedAt && (action === "confirm" || action === "send")) continue;
     // Data is already confirmed: the next step is confirm order, not another

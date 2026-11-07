@@ -275,11 +275,12 @@ export class PaymentService {
         // Notify finance staff through the same UserNotification channel used
         // for request assignments. Idempotent per payment/recipient.
         if (created.status === "PENDING") {
-          const recipients = await tx.user.findMany({
+          const recipients = tx.user?.findMany ? await tx.user.findMany({
             where: { status: "ACTIVE", role: { code: { in: ["ADMIN", "DIRECTOR", "FINANCE"] } } },
             select: { id: true },
-          });
+          }) : [];
           for (const recipient of recipients) {
+            if (!tx.userNotification?.upsert) continue;
             await tx.userNotification.upsert({
               where: { dedupeKey: `payment-pending:${created.id}:${recipient.id}` },
               create: {
