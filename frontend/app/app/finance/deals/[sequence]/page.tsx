@@ -592,13 +592,13 @@ function ClientChats({ deal }: { deal: DealRow }) {
   const [loading, setLoading] = React.useState(true);
   React.useEffect(() => {
     let alive = true;
-    api.get<WhatsAppConversationRow[]>("/whatsapp/conversations").then((data) => {
+    api.get<WhatsAppConversationRow[]>("/whatsapp/conversations?limit=100").then((data) => {
       if (!alive) return;
       const digits = (deal.customerPhone ?? "").replace(/\D/g, "").slice(-9);
-      setRows(digits ? data.filter((row) => ((row.canonicalPhone ?? row.remoteJid ?? "").replace(/\D/g, "").slice(-9) === digits)) : []);
+      setRows(data.filter((row) => row.customerId === deal.customerId || (digits.length > 0 && (row.canonicalPhone ?? row.remoteJid ?? "").replace(/\D/g, "").slice(-9) === digits)));
     }).catch(() => { if (alive) setRows([]); }).finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [deal.customerPhone]);
+  }, [deal.customerPhone, deal.customerId]);
   return <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span>💬</span>Общение с клиентом</div>{loading ? <div className="text-[10px] text-[#98a2b3]">Загрузка диалогов…</div> : rows.length === 0 ? <div className="rounded-lg border border-dashed border-[#e5e2da] bg-[#fbfaf7] px-3 py-4 text-[10px] text-[#98a2b3]">Диалогов WhatsApp по номеру {deal.customerPhone ?? "—"} нет</div> : <div className="space-y-1">{rows.slice(0, 5).map((row) => <a key={row.id} href={`/app/whatsapp?conversation=${row.id}`} className="block rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2 hover:border-[#0f6b5f]"><div className="flex justify-between gap-2 text-[10px]"><span className="font-semibold text-[#344054]">{row.canonicalPhone ?? row.remoteJid}</span><span className="text-[#98a2b3]">{row.lastMessageAt ? new Date(row.lastMessageAt).toLocaleDateString("ru-RU") : "—"}</span></div><div className="mt-0.5 truncate text-[10px] text-[#667085]">{row.lastMessagePreview ?? "Нет сообщений"}</div></a>)}</div>}</div>;
 }
 
