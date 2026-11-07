@@ -1,4 +1,4 @@
-﻿import { Test } from "@nestjs/testing";
+import { Test } from "@nestjs/testing";
 import { afterEach, describe, expect, it } from "@jest/globals";
 
 // ESM/JSX-пакеты SecurityModule-графа (documents → @react-pdf/renderer, react)
@@ -43,6 +43,7 @@ describe("WhatsAppModule (M1 «Фундамент» + M2 провайдер)", (
   });
 
   it("предоставляет валидированную конфигурацию; фича выключена по умолчанию", async () => {
+    process.env["WHATSAPP_ENABLED"] = "false";
     const moduleRef = await testingModule().compile();
     const config = moduleRef.get<WhatsAppConfig>(WHATSAPP_CONFIG);
     expect(config.enabled).toBe(false);

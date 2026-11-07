@@ -151,7 +151,7 @@ describe("Stage 1 — computeAvailableOrderActions (returnToRequest)", () => {
       grantedAll,
     );
     expect(actions).not.toContain("returnToRequest");
-    expect(actions).toHaveLength(0);
+    expect(actions).toContain("close");
   });
 
   it("FULFILLED/CLOSED: returnToRequest недоступен (вне active-диапазона)", () => {
@@ -193,7 +193,7 @@ describe("Stage 1 — computeAvailableOrderActions (returnToRequest)", () => {
     );
     expect(actions).not.toContain("returnToRequest");
     expect(actions).toContain("send");
-    expect(actions).toContain("cancel");
+    expect(actions).toContain("requestCancellation");
   });
 
   it("permission map покрывает новую команду (type-safe Record<OrderAction>)", () => {

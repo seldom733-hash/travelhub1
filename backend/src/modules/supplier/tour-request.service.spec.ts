@@ -147,7 +147,7 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     expect(data.displayedCurrency).toBe("AZN");
     expect(data.displayedPrice).not.toBe(999999);
 
-    expect(h.assignment.assign).toHaveBeenCalledWith("r1");
+    expect(h.assignment.assign).toHaveBeenCalledWith("r1", undefined, { respectMode: true });
     expect(out.displayedPrice).toBe(1050);
     expect(out.status).toBe("NEW");
   });

@@ -169,6 +169,7 @@ function makeController(flights: any[], rate = "0.05", fxRates?: { resolveSafe: 
     flightRegistry as never,
     {} as never,
     pricing,
+    {} as never,
   );
   return { controller, azal, prisma, ruleService: ruleService as never };
 }

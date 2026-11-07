@@ -88,6 +88,7 @@ function makeRequestService(prisma: Record<string, any>): RequestService {
     { audit: jest.fn() } as unknown as SecurityService,
     { emit: jest.fn(), publishEvent: jest.fn(), publishPending: jest.fn() } as unknown as EventBusService,
     makeOrderService(prisma),
+    {} as never,
   );
 }
 

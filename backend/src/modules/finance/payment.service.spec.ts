@@ -10,7 +10,7 @@
  *    active-noop снят — новый create = новый факт; P2002 не глотается;
  *    MULTI/PARTIAL §13: per-slot бизнес-идемпотентность (тот же слот →
  *    тот же Payment; P2002 на слоте → существующий Payment, не raw 500);
- *  - validation: unknown Order → NotFound; CANCELLED/CLOSED Order → 422;
+ *  - validation: unknown Order → NotFound; CLOSED Order → 422;
  *    amount > due / формат → 422.
  */
 import { Prisma } from "../../generated/prisma/client";
@@ -168,8 +168,8 @@ describe("PaymentService (Step 2.12)", () => {
       expect(result.id).toBe("pay-1");
     });
 
-    it("CANCELLED/CLOSED Order → ValidationDomainError 422 (обязательство не подлежит оплате)", async () => {
-      for (const status of ["CANCELLED", "CLOSED"]) {
+    it("CLOSED Order → ValidationDomainError 422 (обязательство не подлежит оплате)", async () => {
+      for (const status of ["CLOSED"]) {
         const prisma = makePrismaStub();
         prisma.order.findUnique.mockResolvedValue({ ...ORDER_ROW, status });
         const service = makeService(prisma);

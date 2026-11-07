@@ -23,7 +23,11 @@ describe("canonicalHotelCategory", () => {
     );
   });
 
-  it.each(["1*", "2*", "3*", "Adults only", "Family", "HALAL", "Kids Go Free", "Recommend", "HV-1"])(
+  it.each(["1*", "2*", "3*"])("keeps low star %s", (raw) => {
+    expect(canonicalHotelCategory(raw)).toEqual({ kind: "STAR", label: raw, stars: Number(raw[0]) });
+  });
+
+  it.each(["Adults only", "Family", "HALAL", "Kids Go Free", "Recommend", "HV-1"])(
     "drops %s",
     (raw) => {
       expect(canonicalHotelCategory(raw)).toBeNull();

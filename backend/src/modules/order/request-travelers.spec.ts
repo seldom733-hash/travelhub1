@@ -14,10 +14,10 @@ describe("normalizeRequestTravelerInput (§6 Request validation)", () => {
         lastName: "Tester",
         birthDate: "1990-02-02",
       }),
-    ).toEqual({ firstName: "Ilya", lastName: "Tester", birthDate: "1990-02-02" });
+    ).toEqual({ firstName: "Ilya", lastName: "Tester", birthDate: "1990-02-02", citizenship: null, passportSeries: null, passportNumber: null, passportExpiry: null });
   });
 
-  it("§2.2: на выходе ТОЛЬКО FIO + birthDate (никаких passport-полей)", () => {
+  it("§2.2: passport-поля допустимы и нормализуются", () => {
     const out = normalizeRequestTravelerInput({
       firstName: "A",
       lastName: "B",
@@ -27,7 +27,7 @@ describe("normalizeRequestTravelerInput (§6 Request validation)", () => {
       passportExpiry: "2030-01-01",
       citizenship: "AZ",
     } as Record<string, unknown>);
-    expect(Object.keys(out).sort()).toEqual(["birthDate", "firstName", "lastName"]);
+    expect(Object.keys(out).sort()).toEqual(["birthDate", "citizenship", "firstName", "lastName", "passportExpiry", "passportNumber", "passportSeries"]);
   });
 
   it("отсутствующее/пустое/не-строковое имя → 422", () => {

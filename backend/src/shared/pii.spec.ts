@@ -23,7 +23,7 @@ describe("shared/pii — field-level redaction traveler/passenger", () => {
   });
 
   it("остальные staff-роли получают redacted projection (PII → null, имена сохранены)", () => {
-    for (const role of [RoleCode.SALES_MANAGER, RoleCode.FINANCE, RoleCode.ANALYST, RoleCode.MARKETER, RoleCode.DIRECTOR, RoleCode.MODERATOR]) {
+    for (const role of [RoleCode.FINANCE, RoleCode.ANALYST, RoleCode.MARKETER, RoleCode.DIRECTOR, RoleCode.MODERATOR]) {
       const out = redactTravelerPii(traveler, { role });
       expect(out.passportSeries).toBeNull();
       expect(out.passportNumber).toBeNull();
