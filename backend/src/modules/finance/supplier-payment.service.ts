@@ -215,7 +215,7 @@ export class SupplierPaymentService {
       const order = await this.prisma.order.findUnique({ where: { id: payoutContext.orderId }, select: { currency: true } });
       if (order && order.currency !== currency) {
         throw new ValidationDomainError(
-          `Supplier payment currency ${currency} does not match order currency ${order.currency}; multi-currency settlements per deal are not supported yet`,
+          `Supplier payment currency ${currency} does not match order currency ${order.currency}; cross-currency settlements are disabled (single-currency policy)`,
         );
       }
     }

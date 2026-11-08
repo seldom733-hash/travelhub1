@@ -135,6 +135,18 @@ describe("SupplierPaymentService — реестр платежей постав�
     expect(prisma.supplierObligation.updateMany).not.toHaveBeenCalled();
   });
 
+  it("create: валюта поставщика должна совпадать с валютой заказа (single-currency policy)", async () => {
+    const { service } = makeService({
+      order: { findUnique: jest.fn().mockResolvedValue({ currency: "AZN" }) },
+    });
+    await expect(
+      service.create(
+        { orderId: "ord-1", supplierCode: "SUMMERTOUR", amount: "10", currency: "EUR" },
+        ACTOR,
+      ),
+    ).rejects.toThrow(/cross-currency settlements are disabled/);
+  });
+
   it("create: превышение остатка обязательства → 422 (allocation rejected)", async () => {
     const { service, prisma } = makeService({
       supplierObligation: { ...makeService().prisma.supplierObligation, findFirst: jest.fn().mockResolvedValue(obligation({ remainingAmount: D(500) })) },

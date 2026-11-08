@@ -1,7 +1,7 @@
 # Navitravel — аудит жизненного цикла сделки
 
 Дата: 2026-11-08  
-Статус: **ЗАВЕРШЕНО (с ограничением FX)**. Все основные переходы жизненного цикла, отмена, частичные финансы, мультипоставщик, USD, порядок возвратов, нумерация, уведомления и закрытие проверены. Полный Jest suite зелёный — 2924/2924. Мультивалютные расчёты в одной сделке не поддерживаются и отклоняются с 422 (fail-closed).
+Статус: **ЗАВЕРШЕНО**. Все основные переходы жизненного цикла, отмена, частичные финансы, мультипоставщик, USD, порядок возвратов, нумерация, уведомления и закрытие проверены. Полный Jest suite зелёный — 2924/2924. Политика: одна сделка — одна валюта; cross-currency платежи отклоняются с 422.
 
 ## 1. Граф
 
@@ -184,38 +184,25 @@ clientDebt         = 0.00
 
 ## 9. Ограничения
 
-### Мультивалютная сделка — PARTIAL (fail-closed)
+### Мультивалютная сделка — запрещена политикой (PASS)
 
-`DealsService` по-прежнему суммирует суммы без проверки валюты:
-
-```text
-supplierPaid    = Σ supplierPayout.amount   (direction OUTGOING)
-supplierRefunded = Σ supplierPayout.amount  (direction INCOMING)
-clientReceived  = Σ payment.amount
-```
-
-Если поставщику оплачено в EUR, а продажа в USD, KPI сложил бы 60 EUR и 100 USD как числа.
-
-Добавлен fail-closed guard в `SupplierPaymentService.create`: платёж/возврат поставщику в валюте, отличной от валюты заказа, отклоняется:
+Принято решение: одна сделка — одна валюта. Платёж/возврат поставщику в валюте, отличной от валюты заказа, отклоняется.
 
 ```http
 422 Supplier payment currency EUR does not match order currency AZN;
-    multi-currency settlements per deal are not supported yet
+    cross-currency settlements are disabled (single-currency policy)
 ```
 
-Проверено через API на реальном заказе:
+Проверено:
 
 ```text
-order currency = AZN
-EUR supplier payment → 422
+API: order currency = AZN, EUR supplier payment → 422
+Unit: 19/19 supplier-payment tests PASS, включая новый guard
 ```
 
-Это предотвращает молчаливое искажение KPI, но не реализует мультивалютные расчёты. Для поддержки нужно решение:
+`DealsService` не складывает разные валюты, потому что такие движения не создаются. Ограничение: FX-сценарии намеренно не поддерживаются.
 
-- пересчитывать все операции в валюту сделки по зафиксированному курсу; или
-- хранить в KPI отдельные валютные корзины.
-
-Статус: **PARTIAL — fail-closed, multi-currency не поддерживается**.
+Статус: **PASS — single-currency policy, cross-currency rejected**.
 
 - E2E cancellation guard с фикстурой — PASS; без фикстуры тест vacuous.
 
@@ -233,7 +220,7 @@ Partial finance / penalties / writeoff PASS
 Multi-supplier                         PASS
 USD + refund ordering                  PASS
 Supplier refund before client          PASS
-Multi-currency in one deal             PARTIAL — fail-closed 422, FX не поддерживается
+Multi-currency in one deal             PASS — запрещено политикой, 422
 Booking/payment numbering              PASS
 Lifecycle notifications                PASS
 Full Jest suite                         PASS — 2924/2924
