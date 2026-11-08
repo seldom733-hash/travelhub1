@@ -1,7 +1,7 @@
 # Navitravel — аудит жизненного цикла сделки
 
 Дата: 2026-11-08  
-Статус: **ЗАВЕРШЕНО**. Все основные переходы жизненного цикла, отмена, частичные финансы, мультипоставщик, USD, порядок возвратов, нумерация, уведомления и закрытие проверены. Полный Jest suite зелёный — 2924/2924. Политика: одна сделка — одна валюта; cross-currency платежи отклоняются с 422.
+Статус: **ЗАВЕРШЕНО**. Все основные переходы жизненного цикла, отмена, частичные финансы, мультипоставщик, USD, порядок возвратов, нумерация, уведомления и закрытие проверены. Полный Jest suite зелёный — 2925/2925. Политика: одна сделка — одна валюта; cross-currency платежи отклоняются с 422.
 
 ## 1. Граф
 
@@ -116,7 +116,7 @@ booking-to-order.projection.spec.ts             PASS
 
 ```text
 Test Suites: 189 passed, 189 total
-Tests:       2924 passed, 2924 total
+Tests:       2925 passed, 2925 total
 ```
 
 `cancellation-close-guard.e2e.spec.ts` проверен с реальной cancelled-сделкой:
@@ -223,7 +223,7 @@ Supplier refund before client          PASS
 Multi-currency in one deal             PASS — запрещено политикой, 422
 Booking/payment numbering              PASS
 Lifecycle notifications                PASS
-Full Jest suite                         PASS — 2924/2924
+Full Jest suite                         PASS — 2925/2925
 Cancellation e2e fixture                PASS — реальная cancelled-сделка, 2/2
 ```
 
