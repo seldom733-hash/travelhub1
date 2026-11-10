@@ -182,7 +182,59 @@ clientDebt         = 0.00
 
 Сценарий PASS. Отмена после частичного выполнения разрешена и корректно закрывается при отсутствии долгов; финансовые последствия выполнённой услуги в этом прогоне не моделировались (без оплат).
 
-## 9. Ограничения
+## 9. Post-audit: сделка 16
+
+### Симптом
+
+В реестре сделка 16 показывала стадию «Заказ», хотя услуга уже была выполнена в Booking.
+
+### Причина
+
+`DealsService` определял стадию только по **активной** брони:
+
+```text
+activeBooking ? BOOKING : order ? ORDER : REQUEST
+```
+
+После `COMPLETED` бронь переставала быть активной, и стадия откатывалась в `ORDER`.
+
+Исправлено:
+
+```text
+booking ? BOOKING : order ? ORDER : REQUEST
+```
+
+Проверка API:
+
+```text
+было:  stage=ORDER,   stageLabel=Заказ
+стало: stage=BOOKING, stageLabel=Бронь
+```
+
+### Не закрыта финансово
+
+Сделка 16 имеет статус `FULFILLED`, а не `CLOSED`:
+
+```text
+Order.status        = FULFILLED
+financialStatus     = OPEN
+clientReceived      = 2461.79 AZN
+supplierPaid        = 0.00
+supplierDebt        = 2461.79 AZN
+```
+
+В истории заказа нет действия `close`. `FULFILLED` означает, что все услуги выполнены, но финансовое закрытие не выполнено.
+
+`close` был бы отклонён guard-ом:
+
+```text
+clientDebt=0, supplierDebt=2461.79, approval=NONE
+→ 409 cannot be completed/closed
+```
+
+Поэтому закрытие без оплаты поставщику **не разрешено**. Требуется оплата поставщику или документированное списание долга.
+
+## 10. Ограничения
 
 ### Мультивалютная сделка — запрещена политикой (PASS)
 
@@ -206,7 +258,7 @@ Unit: 19/19 supplier-payment tests PASS, включая новый guard
 
 - E2E cancellation guard с фикстурой — PASS; без фикстуры тест vacuous.
 
-## 9. Итог
+## 11. Итог
 
 ```text
 Request → Order → Booking              PASS
