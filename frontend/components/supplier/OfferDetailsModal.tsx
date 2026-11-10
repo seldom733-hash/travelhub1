@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { t, useLocale } from "@/lib/i18n";
 import Price from "@/components/public/Price";
-import { useCurrentUserStatus } from "@/lib/use-user";
+import { isAuthorizedCustomer, useCurrentUserStatus } from "@/lib/use-user";
 import {
   refreshSupplierPrice,
   refreshSupplierAvailability,
@@ -35,7 +35,8 @@ export default function OfferDetailsModal({
 }) {
   const locale = useLocale();
   const supplierLabels = useSupplierLabels("tours");
-  const { user } = useCurrentUserStatus();
+  const { user, ready } = useCurrentUserStatus();
+  const isClient = ready && isAuthorizedCustomer(user);
   const [customer, setCustomer] = useState({ firstName: "", lastName: "", phone: "", email: "" });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const prefilled = useRef(false);
@@ -76,24 +77,40 @@ export default function OfferDetailsModal({
   }, [user]);
 
   const normalizePhone = (value: string) => value.replace(/[\s()\-]/g, "").replace(/^00/, "+");
+
+  // For an authorized client the traveler is the account holder: use the
+  // session identity instead of asking to retype registration data.
+  const accountCustomer = (() => {
+    if (!isClient || !user) return null;
+    const parts = (user.fullName ?? "").trim().split(/\s+/).filter(Boolean);
+    return {
+      firstName: parts[0] ?? "",
+      lastName: parts.slice(1).join(" ") ?? "",
+      phone: user.phone ?? "",
+      email: user.email ?? "",
+    };
+  })();
+  const effectiveCustomer = accountCustomer ?? customer;
+
   const validateCustomer = () => {
     const next: Record<string, string> = {};
-    if (!customer.firstName.trim()) next.firstName = "Введите имя.";
-    if (!customer.lastName.trim()) next.lastName = "Введите фамилию.";
-    if (!/^\+[1-9]\d{7,14}$/.test(normalizePhone(customer.phone))) next.phone = "Введите корректный номер телефона с международным кодом.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email.trim())) next.email = "Введите корректный адрес электронной почты.";
+    if (!effectiveCustomer.firstName.trim()) next.firstName = "Введите имя.";
+    if (!effectiveCustomer.lastName.trim()) next.lastName = "Введите фамилию.";
+    if (!/^\+[1-9]\d{7,14}$/.test(normalizePhone(effectiveCustomer.phone))) next.phone = "Введите корректный номер телефона с международным кодом.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(effectiveCustomer.email.trim())) next.email = "Введите корректный адрес электронной почты.";
     setFieldErrors(next);
     return Object.keys(next).length === 0;
   };
   const isCustomerValid = () =>
-    customer.firstName.trim() !== "" &&
-    customer.lastName.trim() !== "" &&
-    /^\+[1-9]\d{7,14}$/.test(normalizePhone(customer.phone)) &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email.trim());
+    effectiveCustomer.firstName.trim() !== "" &&
+    effectiveCustomer.lastName.trim() !== "" &&
+    /^\+[1-9]\d{7,14}$/.test(normalizePhone(effectiveCustomer.phone)) &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(effectiveCustomer.email.trim());
 
   /** §9: revalidate before booking — never book a stale or gone offer. */
   const handleBook = async () => {
-    if (!validateCustomer()) return;
+    if (isClient && !isCustomerValid()) return;
+    if (!isClient && !validateCustomer()) return;
     setError(null);
     setBooking(true);
     try {
@@ -184,10 +201,10 @@ export default function OfferDetailsModal({
         idempotencyKey: idempotencyKey.current,
         source: "UNIVERSAL_SEARCH",
         customer: {
-          firstName: customer.firstName.trim(),
-          lastName: customer.lastName.trim(),
-          phone: normalizePhone(customer.phone),
-          email: customer.email.trim(),
+          firstName: effectiveCustomer.firstName.trim(),
+          lastName: effectiveCustomer.lastName.trim(),
+          phone: normalizePhone(effectiveCustomer.phone),
+          email: effectiveCustomer.email.trim(),
         },
       });
       setBooked({ referenceNumber: res.referenceNumber });
@@ -255,9 +272,14 @@ export default function OfferDetailsModal({
 
         <div className="mt-5 border-t border-white/10 pt-4">
           <h4 className="text-sm font-semibold text-white">Данные путешественника</h4>
-          {user && (
+          {isClient ? (
+            <p className="mt-1 text-xs text-neutral-400">
+              Данные заполнены из профиля и не редактируются здесь.{" "}
+              <a href="/account/profile" className="font-semibold text-emerald-400 underline">Изменить в профиле</a>
+            </p>
+          ) : user ? (
             <p className="mt-1 text-xs text-neutral-400">Используем данные вашего аккаунта. Проверьте их корректность.</p>
-          )}
+          ) : null}
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {[
               { key: "firstName", label: "Имя", type: "text", autoComplete: "given-name" },
@@ -271,14 +293,17 @@ export default function OfferDetailsModal({
                   type={field.type}
                   autoComplete={field.autoComplete}
                   placeholder={field.placeholder}
-                  value={customer[field.key as keyof typeof customer]}
+                  value={effectiveCustomer[field.key as keyof typeof effectiveCustomer]}
                   onChange={(e) => {
+                    if (isClient) return;
                     setCustomer((prev) => ({ ...prev, [field.key]: e.target.value }));
                     setFieldErrors((prev) => ({ ...prev, [field.key]: "" }));
                   }}
-                  onBlur={() => validateCustomer()}
+                  onBlur={() => { if (!isClient) validateCustomer(); }}
+                  readOnly={isClient}
+                  aria-readonly={isClient}
                   aria-invalid={Boolean(fieldErrors[field.key])}
-                  className={`mt-1 w-full rounded-lg border bg-white/5 px-3 py-2 text-sm text-white outline-none ${fieldErrors[field.key] ? "border-red-500/60" : "border-white/15 focus:border-emerald-500/60"}`}
+                  className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none ${isClient ? "cursor-not-allowed border-white/10 bg-white/10 text-neutral-300" : "bg-white/5 text-white"} ${fieldErrors[field.key] ? "border-red-500/60" : !isClient ? "border-white/15 focus:border-emerald-500/60" : ""}`}
                 />
                 {fieldErrors[field.key] && <span className="mt-1 block text-[11px] text-red-400">{fieldErrors[field.key]}</span>}
               </label>
@@ -322,7 +347,11 @@ export default function OfferDetailsModal({
 
         <div className="mt-6 flex flex-col items-stretch justify-end gap-3 sm:flex-row sm:items-center">
           {!isCustomerValid() && (
-            <span className="text-left text-[11px] text-amber-300 sm:mr-auto">Заполните данные путешественника, чтобы подать заявку.</span>
+            <span className="text-left text-[11px] text-amber-300 sm:mr-auto">
+              {isClient
+                ? "В профиле не хватает имени, фамилии, телефона или email — дополните профиль."
+                : "Заполните данные путешественника, чтобы подать заявку."}
+            </span>
           )}
           <button
             onClick={onClose}

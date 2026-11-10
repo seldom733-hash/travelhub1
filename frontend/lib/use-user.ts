@@ -101,3 +101,13 @@ export function useCurrentUserStatus(): { user: AuthUser | null; ready: boolean 
 export function useCurrentUser(): AuthUser | null {
   return useCurrentUserStatus().user;
 }
+
+/**
+ * Authorized buyer (self-service client), not staff.
+ * A linked CRM customer is the authoritative signal that this is a client
+ * account; BUYER alone is kept as a role guard for legacy sessions.
+ */
+export function isAuthorizedCustomer(user: AuthUser | null): boolean {
+  return Boolean(user && user.role === "BUYER" && user.customerId);
+}
+

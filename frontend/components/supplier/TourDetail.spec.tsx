@@ -23,7 +23,10 @@ vi.mock("@/lib/supplier-registry", () => ({
   useSupplierOptions: vi.fn(() => [{ code: "KOMPAS", name: "Kompas" }]),
   supplierLabel: vi.fn((_options: unknown, code: string) => code),
 }));
-vi.mock("@/lib/use-user", () => ({ useCurrentUser: vi.fn(() => null) }));
+vi.mock("@/lib/use-user", () => ({
+  useCurrentUser: vi.fn(() => null),
+  isAuthorizedCustomer: (u: any) => Boolean(u && u.role === "BUYER" && u.customerId),
+}));
 
 const getPriceCalendarMock = getPriceCalendar as ReturnType<typeof vi.fn>;
 

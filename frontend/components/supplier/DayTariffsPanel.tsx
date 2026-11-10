@@ -6,7 +6,7 @@ import {
   type SupplierPriceCalendarEntry,
   type SupplierPriceCalendarEntryOffer,
 } from "@/lib/supplier-api";
-import { useCurrentUser } from "@/lib/use-user";
+import { isAuthorizedCustomer, useCurrentUser } from "@/lib/use-user";
 import OfferRow, { type OfferCustomer, type OfferSummary } from "@/components/supplier/OfferRow";
 import { TravelerFields } from "@/components/supplier/OfferModal";
 
@@ -57,11 +57,13 @@ export default function DayTariffsPanel({
 }) {
   const locale = useLocale();
   const user = useCurrentUser();
+  const isClient = isAuthorizedCustomer(user);
+  const accountParts = (user?.fullName ?? "").trim().split(/\s+/).filter(Boolean);
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState(() => accountParts[0] ?? "");
+  const [lastName, setLastName] = useState(() => accountParts.slice(1).join(" ") ?? "");
+  const [phone, setPhone] = useState(() => user?.phone ?? "");
+  const [email, setEmail] = useState(() => user?.email ?? "");
 
   // §4.8.6: autofill from the existing identity (account) when available.
   useEffect(() => {
@@ -176,11 +178,16 @@ export default function DayTariffsPanel({
           <h4 className="mb-3 text-sm font-semibold text-slate-800">
             {t("offer.customer_title", locale)}
           </h4>
-          {user && (
+          {isClient ? (
+            <p className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+              Данные заполнены из профиля и не редактируются здесь.{" "}
+              <a href="/account/profile" className="font-semibold underline">Изменить в профиле</a>
+            </p>
+          ) : user ? (
             <p className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
               {t("offer.registered_hint", locale)}
             </p>
-          )}
+          ) : null}
           <TravelerFields
             firstName={firstName}
             lastName={lastName}
@@ -188,6 +195,7 @@ export default function DayTariffsPanel({
             email={email}
             phoneError={phoneError}
             emailError={emailError}
+            readOnly={isClient}
             onFirstName={setFirstName}
             onLastName={setLastName}
             onPhone={setPhone}

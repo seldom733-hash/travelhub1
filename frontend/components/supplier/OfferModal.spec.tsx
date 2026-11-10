@@ -19,7 +19,10 @@ vi.mock("@/lib/supplier-api", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/lib/supplier-api")>();
   return { ...mod, createTourRequest: vi.fn() };
 });
-vi.mock("@/lib/use-user", () => ({ useCurrentUser: vi.fn(() => null) }));
+vi.mock("@/lib/use-user", () => ({
+  useCurrentUser: vi.fn(() => null),
+  isAuthorizedCustomer: (u: any) => Boolean(u && u.role === "BUYER" && u.customerId),
+}));
 
 const createTourRequestMock = createTourRequest as ReturnType<typeof vi.fn>;
 const useCurrentUserMock = useCurrentUser as ReturnType<typeof vi.fn>;
@@ -145,6 +148,36 @@ describe("OfferModal customer block (4.8.6/4.8.7)", () => {
       "ali@example.com",
     );
     expect(screen.getByText(/Используем данные вашего аккаунта/)).toBeTruthy();
+  });
+
+  it("authorized BUYER: fields pre-filled, read-only and offer buttons active immediately", () => {
+    useCurrentUserMock.mockReturnValue({
+      id: "u2",
+      code: "USR-2",
+      username: "aysel",
+      phone: "+994501234567",
+      email: "aysel@example.com",
+      fullName: "Aysel Mammadova",
+      role: "BUYER",
+      roleTitle: "Client",
+      partnerId: null,
+      customerId: "c1",
+      permissions: [],
+    });
+
+    render(<OfferModal {...baseProps()} />);
+
+    const first = document.getElementById("offer-first-name") as HTMLInputElement;
+    const phone = document.getElementById("offer-phone") as HTMLInputElement;
+    expect(first.value).toBe("Aysel");
+    expect(first.readOnly).toBe(true);
+    expect(phone.value).toBe("+994501234567");
+    expect(phone.readOnly).toBe(true);
+    expect(screen.getByText(/Данные заполнены из профиля/)).toBeTruthy();
+
+    const buttons = submitButtons();
+    expect(buttons).toHaveLength(2);
+    for (const b of buttons) expect(b.disabled).toBe(false);
   });
 
   it("guest: empty state, no account hint", () => {

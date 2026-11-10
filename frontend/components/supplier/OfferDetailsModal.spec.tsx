@@ -30,8 +30,11 @@ vi.mock("@/lib/supplier-registry", () => ({
   useSupplierLabels: vi.fn(() => ({ KOMPAS: "Kompas" })),
 }));
 
+const mockUserState = vi.hoisted(() => ({ user: null as any }));
+
 vi.mock("@/lib/use-user", () => ({
-  useCurrentUserStatus: () => ({ user: null, ready: true }),
+  useCurrentUserStatus: () => ({ user: mockUserState.user, ready: true }),
+  isAuthorizedCustomer: (u: any) => Boolean(u && u.role === "BUYER" && u.customerId),
 }));
 
 const createTourRequestMock = createTourRequest as Mock;
@@ -79,6 +82,7 @@ function fillCustomer() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockUserState.user = null;
   refreshSupplierPriceMock.mockResolvedValue({
     amount: 1050,
     currency: "USD",
@@ -146,5 +150,40 @@ describe("OfferDetailsModal — request hint + contract fields (Phase 4)", () =>
   it("blocks submission until required customer fields are valid", () => {
     renderModal();
     expect((screen.getByRole("button", { name: "Подать заявку" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("authorized client: traveler fields are prefilled, read-only and submit is active", async () => {
+    mockUserState.user = {
+      id: "u1",
+      role: "BUYER",
+      customerId: "c1",
+      fullName: "Aysel Mammadova",
+      phone: "+994501234567",
+      email: "aysel@example.com",
+    };
+    renderModal();
+
+    const first = screen.getByLabelText("Имя *") as HTMLInputElement;
+    expect(first.value).toBe("Aysel");
+    expect(first.readOnly).toBe(true);
+    expect((screen.getByLabelText("Фамилия *") as HTMLInputElement).value).toBe("Mammadova");
+    expect((screen.getByLabelText("Телефон *") as HTMLInputElement).value).toBe("+994501234567");
+    expect((screen.getByLabelText("Email *") as HTMLInputElement).readOnly).toBe(true);
+
+    const submit = screen.getByRole("button", { name: "Подать заявку" }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(false);
+
+    fireEvent.click(submit);
+    await waitFor(() => expect(createTourRequestMock).toHaveBeenCalled());
+    expect(createTourRequestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: {
+          firstName: "Aysel",
+          lastName: "Mammadova",
+          phone: "+994501234567",
+          email: "aysel@example.com",
+        },
+      }),
+    );
   });
 });
