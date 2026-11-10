@@ -211,6 +211,8 @@ booking ? BOOKING : order ? ORDER : REQUEST
 стало: stage=BOOKING, stageLabel=Бронь
 ```
 
+Также `OrderStatus.FULFILLED` в UI переименован с «Завершён» на «Выполнен», чтобы не путать выполнение услуг с финансовым закрытием `CLOSED`.
+
 ### Не закрыта финансово
 
 Сделка 16 имеет статус `FULFILLED`, а не `CLOSED`:
