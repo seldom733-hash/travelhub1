@@ -69,6 +69,10 @@ interface PricingRow {
   markupRule: MarkupRule | undefined;
   commissionRule: CommissionRule | undefined;
 }
+interface SupplierOption {
+  code: string;
+  name: string;
+}
 interface FormState {
   key?: string;
   supplierCode: string;
@@ -116,6 +120,7 @@ export default function MarkupAdminPage() {
   const [commissionMatrix, setCommissionMatrix] = useState<CommissionMatrix | null>(null);
   const [markupRules, setMarkupRules] = useState<MarkupRule[]>([]);
   const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
+  const [allowedSuppliers, setAllowedSuppliers] = useState<Record<string, Set<string>>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -128,16 +133,24 @@ export default function MarkupAdminPage() {
     setLoading(true);
     setError("");
     try {
-      const [markup, commission, mr, cr] = await Promise.all([
+      const [markup, commission, mr, cr, tourSuppliers, hotelSuppliers, flightSuppliers] = await Promise.all([
         api.get<MarkupMatrix>("/pricing/markup-matrix"),
         api.get<CommissionMatrix>("/pricing/commission-matrix"),
         api.get<{ items: MarkupRule[] }>("/pricing/markup-rules?pageSize=100"),
         api.get<{ items: CommissionRule[] }>("/pricing/commission-rules?pageSize=100"),
+        api.get<SupplierOption[]>("/public/supplier/suppliers?service=tours"),
+        api.get<SupplierOption[]>("/public/supplier/suppliers?service=hotels"),
+        api.get<SupplierOption[]>("/public/supplier/suppliers?service=flights"),
       ]);
       setMarkupMatrix(markup);
       setCommissionMatrix(commission);
       setMarkupRules(mr.items ?? []);
       setCommissionRules(cr.items ?? []);
+      setAllowedSuppliers({
+        tours: new Set(tourSuppliers.map((s) => s.code)),
+        hotels: new Set(hotelSuppliers.map((s) => s.code)),
+        flights: new Set(flightSuppliers.map((s) => s.code)),
+      });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -162,6 +175,11 @@ export default function MarkupAdminPage() {
     const result: PricingRow[] = [];
     for (const [supplierCode, supplierName] of suppliers) {
       for (const serviceType of services) {
+        // Aviation suppliers (AZAL/Aviasales) must not appear for tours/hotels,
+        // and tour/hotel suppliers must not appear for flights. The registry
+        // of enabled suppliers is authoritative per service.
+        const allowed = allowedSuppliers[serviceType];
+        if (allowed && !allowed.has(supplierCode)) continue;
         const markup = markupMatrix?.cells.find((c) => c.supplierCode === supplierCode && c.serviceType === serviceType);
         const commission = commissionMatrix?.cells.find((c) => c.supplierCode === supplierCode && c.serviceType === serviceType);
         result.push({
@@ -177,7 +195,7 @@ export default function MarkupAdminPage() {
       }
     }
     return result.sort((a, b) => a.serviceType.localeCompare(b.serviceType) || a.supplierName.localeCompare(b.supplierName));
-  }, [markupMatrix, commissionMatrix, markupRules, commissionRules]);
+  }, [markupMatrix, commissionMatrix, markupRules, commissionRules, allowedSuppliers]);
 
   const visibleRows = useMemo(() => {
     const needle = search.trim().toLowerCase();

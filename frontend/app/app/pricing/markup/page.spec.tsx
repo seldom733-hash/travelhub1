@@ -61,6 +61,9 @@ beforeEach(() => {
     if (url === "/pricing/commission-matrix") return Promise.resolve(COMMISSION_MATRIX);
     if (url.startsWith("/pricing/markup-rules")) return Promise.resolve(MARKUP_RULES);
     if (url.startsWith("/pricing/commission-rules")) return Promise.resolve(COMMISSION_RULES);
+    if (url === "/public/supplier/suppliers?service=tours") return Promise.resolve([{ code: "KOMPAS", name: "Kompastour" }, { code: "ANEX", name: "Anextour" }]);
+    if (url === "/public/supplier/suppliers?service=hotels") return Promise.resolve([{ code: "ANEX", name: "Anextour" }]);
+    if (url === "/public/supplier/suppliers?service=flights") return Promise.resolve([{ code: "AZAL", name: "AZAL" }, { code: "AVIASALES", name: "Aviasales" }]);
     return Promise.reject(new Error(`unexpected GET ${url}`));
   });
   postMock.mockResolvedValue({ code: "MKR-NEW" });
@@ -80,6 +83,17 @@ describe("MarkupAdminPage — unified markup + commission table", () => {
     expect(screen.queryByText("Комиссионные")).toBeNull();
     // only one data table on the page
     expect(screen.getAllByRole("table")).toHaveLength(1);
+  });
+
+  it("keeps flight suppliers out of tours/hotels and vice versa", async () => {
+    render(<MarkupAdminPage />);
+    await waitFor(() => expect(screen.getAllByText("Kompastour").length).toBeGreaterThan(0));
+
+    const rows = screen.getAllByRole("row").map((row) => row.textContent ?? "");
+    expect(rows.some((row) => row.includes("AZAL") && row.includes("Авиабилеты"))).toBe(true);
+    expect(rows.some((row) => row.includes("AZAL") && row.includes("Туры"))).toBe(false);
+    expect(rows.some((row) => row.includes("Kompastour") && row.includes("Туры"))).toBe(true);
+    expect(rows.some((row) => row.includes("Kompastour") && row.includes("Авиабилеты"))).toBe(false);
   });
 
   it("opens a single edit panel prefilled with markup and commission", async () => {
