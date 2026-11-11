@@ -196,7 +196,7 @@ export default function DealDetailPage() {
   const effectiveRequestActions = readOnly ? {} : requestActions;
   const effectiveBookingActions = readOnly ? [] : bookingActions;
   const hasOutstandingDebt = Number(deal.clientDebt) > 0 || Number(deal.supplierDebt) > 0;
-  const serviceEndIso = deal.trip.dateTo ? String(deal.trip.dateTo).slice(0, 10) : null;
+  const serviceEndIso = deal.trip.dateTo ? String(deal.trip.dateTo).slice(0, 10) : deal.serviceDate ? String(deal.serviceDate).slice(0, 10) : null;
   const todayIso = new Date().toISOString().slice(0, 10);
   const closeBlockedByServiceDate = Boolean(serviceEndIso && deal.status !== "CANCELLED" && serviceEndIso >= todayIso);
   const effectiveOrderActions = readOnly || deal.stage === "BOOKING" ? [] : availableActions.filter((a) => !(a === "close" && (hasOutstandingDebt || closeBlockedByServiceDate)));
