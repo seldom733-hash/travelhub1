@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { chromium } from "playwright";
 import { parseAviasalesChunk } from "./aviasales.response-parser";
 import type { AviasalesChunk, AviasalesStartBody } from "./aviasales.types";
 import type { FlightOffer, FlightSearchQuery } from "../azal/flight.types";
@@ -24,6 +25,12 @@ export class AviasalesHttpService {
   private awt: string | null = null;
   private awtExpiresAt = 0;
   private hostIndex = 0;
+  /**
+   * Full browser cookie header + AWS WAF token. The API rejects a bare
+   * `_awt=...` now: it expects the same cookie string and `x-aws-waf-token`
+   * that the site itself sends.
+   */
+  private session: { cookie: string; waf: string; expiresAt: number } | null = null;
 
   async search(query: FlightSearchQuery): Promise<FlightOffer[]> {
     const searchId = await this.start(buildAviasalesStartBody(query));
@@ -113,6 +120,7 @@ export class AviasalesHttpService {
         if (response.status === 403) {
           this.awt = null;
           this.awtExpiresAt = 0;
+          this.session = null;
 
           const retried = await this.postOnce(host, path, body);
 
@@ -146,9 +154,10 @@ export class AviasalesHttpService {
     body: string,
   ): Promise<{ status: number; text: string; stopMarker: string | null }> {
     const awt = await this.ensureAwt(host);
+    const session = await this.ensureSession();
     const response = await fetch(`https://${host}${path}`, {
       method: "POST",
-      headers: AviasalesHttpService.headers(awt),
+      headers: AviasalesHttpService.headers(awt, session),
       body,
       signal: AbortSignal.timeout(AviasalesHttpService.REQUEST_TIMEOUT_MS),
     });
@@ -170,6 +179,57 @@ export class AviasalesHttpService {
     this.awtExpiresAt = Date.now() + AviasalesHttpService.AWT_TTL_MS;
 
     return this.awt;
+  }
+
+  /**
+   * The live site sends the whole `document.cookie` string in
+   * `x-origin-cookie` plus `x-aws-waf-token`. A generated `_awt` alone is
+   * rejected by AWS WAF with 403 "access denied". Read the browser session
+   * over CDP (same Chrome used by AZAL); env overrides allow a headless setup.
+   */
+  private async ensureSession(): Promise<{ cookie: string; waf: string }> {
+    const envCookie = process.env.AVIASALES_ORIGIN_COOKIE?.trim();
+    const envWaf = process.env.AVIASALES_WAF_TOKEN?.trim();
+    if (envCookie && envWaf) {
+      return { cookie: envCookie, waf: envWaf };
+    }
+
+    if (this.session && Date.now() < this.session.expiresAt) {
+      return { cookie: this.session.cookie, waf: this.session.waf };
+    }
+
+    const endpoint =
+      process.env.AVIASALES_CHROME_CDP_URL ||
+      process.env.AZAL_CHROME_CDP_URL ||
+      "http://127.0.0.1:9222";
+
+    let browser: Awaited<ReturnType<typeof chromium.connectOverCDP>> | null = null;
+    try {
+      browser = await chromium.connectOverCDP(endpoint);
+      const context = browser.contexts()[0];
+      if (!context) throw new Error("connected Chrome has no browser context");
+      const cookies = await context.cookies([
+        "https://www.aviasales.az/",
+        "https://tickets-api.aviasales.com/",
+      ]);
+      const cookie = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+      const waf = cookies.find((c) => c.name === "aws-waf-token")?.value ?? "";
+      if (!cookie.includes("_awt=") || !waf) {
+        throw new Error(
+          "Aviasales browser session has no _awt/aws-waf-token cookie; open https://www.aviasales.az/ and complete the WAF challenge",
+        );
+      }
+      this.session = { cookie, waf, expiresAt: Date.now() + 5 * 60_000 };
+      return { cookie, waf };
+    } catch (error) {
+      throw new Error(
+        `Cannot read Aviasales browser session over CDP at ${endpoint}. ` +
+          `Open https://www.aviasales.az/ in Chrome with --remote-debugging-port=9222 and keep it running. ` +
+          `Original error: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      await browser?.close().catch(() => undefined);
+    }
   }
 
   private async generateAwt(host: string): Promise<string> {
@@ -210,15 +270,19 @@ export class AviasalesHttpService {
   private static readonly FP_TIMEOUT_MS = 15_000;
   private static readonly AWT_TTL_MS = 10 * 60_000;
 
-  /** Exactly the six headers the live API was verified to require. */
-  private static headers(awt: string): Record<string, string> {
+  /** Headers the live site sends. `_awt` is used only as a fallback for the cookie string. */
+  private static headers(awt: string, session: { cookie: string; waf: string } | null): Record<string, string> {
+    const cookie = session?.cookie || `_awt=${awt}`;
     return {
       "content-type": "application/json",
+      accept: "application/json",
       origin: AviasalesHttpService.ORIGIN,
       referer: `${AviasalesHttpService.ORIGIN}/`,
+      authorization: "",
       "x-client-type": "web",
       "x-web-client": "web_desktop",
-      "x-origin-cookie": `_awt=${awt}`,
+      "x-origin-cookie": cookie,
+      ...(session?.waf ? { "x-aws-waf-token": session.waf } : {}),
     };
   }
 }
