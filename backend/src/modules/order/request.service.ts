@@ -1542,6 +1542,19 @@ export class RequestService {
         },
       });
 
+      // The new-deal reminder lives until the request becomes an Order.
+      // Mark it read (not delete) so it disappears from the unread badge
+      // without losing the audit trail of the notification.
+      await tx.userNotification.updateMany({
+        where: {
+          type: "DEAL_CREATED",
+          entityType: "Request",
+          entityId: requestId,
+          readAt: null,
+        },
+        data: { readAt: new Date() },
+      });
+
       await this.security.audit(tx as any, {
         userId: actor.id,
         username: actor.username,
