@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, useRef } from "react";
 import { t, useLocale } from "@/lib/i18n";
 import MonthlyCalendar from "@/components/supplier/MonthlyCalendar";
 import DayTariffsPanel from "@/components/supplier/DayTariffsPanel";
+import ServiceFacts from "@/components/supplier/ServiceFacts";
 import {
   type SupplierPriceCalendarEntry,
 } from "@/lib/supplier-api";
@@ -43,7 +44,6 @@ export default function HotelDetail({
   title,
   media,
   description,
-  attributeSections,
   onRequestCreated,
 }: {
   attributes: Record<string, unknown> | null;
@@ -297,28 +297,19 @@ export default function HotelDetail({
             </div>
           )}
 
-          {/* Attributes */}
-          {attributeSections && attributeSections.length > 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <h4 className="text-sm font-semibold text-slate-800">
-                {t("pdp.attributes_title", locale)}
-              </h4>
-              <div className="mt-3 space-y-3">
-                {attributeSections.map((s) => (
-                  <div key={s.section}>
-                    <h5 className="text-xs font-medium text-slate-500">{s.section}</h5>
-                    <dl className="mt-1 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
-                      {s.items.map((i) => (
-                        <div key={i.key} className="flex flex-col">
-                          <dt className="text-[10px] uppercase tracking-wide text-slate-400">{i.label}</dt>
-                          <dd className="whitespace-pre-line text-slate-700">{i.value}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {/* Service facts — human-readable, no technical attribute codes */}
+          {selectedEntry && (
+            <ServiceFacts
+              country={country}
+              city={city}
+              date={selectedEntry.date}
+              nights={nights}
+              adults={adults}
+              children={children}
+              offers={selectedEntry.offers}
+              price={selectedEntry.price}
+              currency={selectedEntry.currency}
+            />
           )}
         </div>
       </div>
