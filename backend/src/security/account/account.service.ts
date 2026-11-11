@@ -234,7 +234,7 @@ export class AccountService {
   /** Own-scope notifications for the Buyer Cabinet (price changes, statuses). */
   async getOwnNotifications(userId: string, page = 1, pageSize = 20) {
     const where = { recipientId: userId };
-    const [total, rows] = await Promise.all([
+    const [total, rows, unread] = await Promise.all([
       this.prisma.userNotification.count({ where }),
       this.prisma.userNotification.findMany({
         where,
@@ -246,6 +246,7 @@ export class AccountService {
           title: true, body: true, payload: true, readAt: true, createdAt: true,
         },
       }),
+      this.prisma.userNotification.count({ where: { recipientId: userId, readAt: null } }),
     ]);
     return {
       items: rows.map((r) => ({ ...r, createdAt: isoUtc(r.createdAt), readAt: isoOrNull(r.readAt) })),
@@ -253,7 +254,7 @@ export class AccountService {
       page,
       pageSize,
       hasMore: page * pageSize < total,
-      unread: rows.filter((r) => !r.readAt).length,
+      unread,
     };
   }
 
