@@ -70,7 +70,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
   const [hotelStars, setHotelStars] = useState<string[]>([]);
   // «Поставщики» picker: enabled tour suppliers from the backend;
   // empty selection = all suppliers.
-  const [supplierOptions, setSupplierOptions] = useState<Array<{ code: string; name: string; countries?: string[] }>>([]);
+  const [supplierOptions, setSupplierOptions] = useState<Array<{ code: string; name: string; partnerCode?: string; countries?: string[] }>>([]);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [suppliersOpen, setSuppliersOpen] = useState(false);
   const suppliersRef = useRef<HTMLDivElement>(null);
@@ -185,7 +185,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
     let alive = true;
     fetch("/api/v1/public/supplier/suppliers?service=tours", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((list: Array<{ code: string; name: string }>) => {
+      .then((list: Array<{ code: string; name: string; partnerCode?: string }>) => {
         if (alive) setSupplierOptions(Array.isArray(list) ? list : []);
       })
       .catch(() => {
@@ -524,7 +524,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
               >
                 {selectedSuppliers.length
                   ? selectedSuppliers
-                      .map((c) => supplierOptions.find((s) => s.code === c)?.name ?? c)
+                      .map((c) => supplierOptions.find((s) => s.code === c)?.partnerCode ?? c)
                       .slice(0, 2)
                       .join(", ") + (selectedSuppliers.length > 2 ? ` +${selectedSuppliers.length - 2}` : "")
                   : locale === "ru"
@@ -581,10 +581,10 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
                           className={`flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/5 ${active ? "bg-gold/10" : ""}`}
                         >
                           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gold/10 px-1 text-[12px] font-semibold text-gold">
-                            {s.code.slice(0, 4)}
+                            {s.partnerCode ? "PRN" : s.code.slice(0, 4)}
                           </span>
                           <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-white">
-                            {s.name}
+                            {s.partnerCode ?? s.code}
                           </span>
                           {active && <span className="text-[13px] text-gold">✓</span>}
                         </button>

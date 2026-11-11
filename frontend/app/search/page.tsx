@@ -264,6 +264,13 @@ function SearchResultsInner() {
       searchPromise
         .then((flightResult) => {
           if (!alive) return;
+          if (flightResult.errors?.length) {
+            setFlightError(
+              flightResult.errors
+                .map((e) => `${e.source ?? "Поставщик"}: ${String(e.message).split("\n")[0]}`)
+                .join(" · "),
+            );
+          }
           let flights = flightResult.flights;
           if (tariff !== "ALL") {
             flights = flights

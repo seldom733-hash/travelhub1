@@ -569,6 +569,7 @@ describe("SupplierAggregatorService.listSuppliersOfService (§4.7 registry SSOT)
       {
         code: "KOMPAS",
         name: "Kompastour",
+        partnerCode: "PRN-00000002",
         countries: [
           "TR", "EG", "AE", "MV", "TH", "IN", "ID", "LK", "GE", "CN", "SG",
           "MY", "KZ", "UZ", "US", "CH", "JP", "MU", "TZ", "QA", "KE", "AT", "SC",

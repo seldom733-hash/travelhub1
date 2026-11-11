@@ -26,14 +26,14 @@ const FLIGHT_RESULTS = read("components/marketplace/search/FlightResults.tsx");
 const REGISTRY_LIB = read("lib/supplier-registry.ts");
 const SUPPLIER_API = read("lib/supplier-api.ts");
 
-describe("supplierLabel — registry name with raw-code fallback", () => {
+describe("supplierLabel — CRM partner code with raw-code fallback", () => {
   const options: SupplierOption[] = [
-    { code: "ANEX", name: "ANEX (anextour.az)" },
-    { code: "KOMPAS", name: "KOMPAS (SAMO)" },
+    { code: "ANEX", name: "ANEX (anextour.az)", partnerCode: "PRN-00000003" },
+    { code: "KOMPAS", name: "KOMPAS (SAMO)", partnerCode: "PRN-00000002" },
   ];
 
-  it("resolves the registry name for a known code", () => {
-    expect(supplierLabel(options, "KOMPAS")).toBe("KOMPAS (SAMO)");
+  it("resolves the CRM partner code for a known supplier", () => {
+    expect(supplierLabel(options, "KOMPAS")).toBe("PRN-00000002");
   });
 
   it("falls back to the raw code when the registry has no entry", () => {

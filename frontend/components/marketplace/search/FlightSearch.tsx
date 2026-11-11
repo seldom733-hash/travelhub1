@@ -90,7 +90,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
   // registry is kept as its own option so the <select> never blanks out.
   const flightSuppliers = useSupplierOptions("flights");
   const supplierOptions = useMemo(() => {
-    const options = flightSuppliers.map((s) => ({ value: s.code, label: s.name }));
+    const options = flightSuppliers.map((s) => ({ value: s.code, label: s.partnerCode ?? s.code }));
     if (supplier && supplier !== "ALL" && !options.some((o) => o.value === supplier)) {
       options.unshift({ value: supplier, label: supplier });
     }

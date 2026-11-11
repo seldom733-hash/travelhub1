@@ -17,6 +17,8 @@ export type SupplierService = "tours" | "hotels" | "flights";
 export interface SupplierOption {
   code: string;
   name: string;
+  /** CRM partner code shown in the universal search instead of the name. */
+  partnerCode?: string;
 }
 
 const BASE = "/api/v1/public/supplier";
@@ -38,6 +40,7 @@ export function listSuppliers(service: SupplierService): Promise<SupplierOption[
         .map((entry) => ({
           code: entry.code,
           name: typeof entry.name === "string" && entry.name ? entry.name : entry.code,
+          ...(typeof entry.partnerCode === "string" && entry.partnerCode ? { partnerCode: entry.partnerCode } : {}),
         }))
         .sort((x, y) => x.code.localeCompare(y.code));
       cache.set(service, options);
@@ -53,10 +56,11 @@ export function listSuppliers(service: SupplierService): Promise<SupplierOption[
   return request;
 }
 
-/** Display label for a supplier code: registry name, raw code as fallback. */
+/** Display label for a supplier code: CRM partner code, adapter code fallback. */
 export function supplierLabel(options: SupplierOption[], code?: string | null): string {
   if (!code) return "";
-  return options.find((option) => option.code === code)?.name ?? code;
+  const option = options.find((o) => o.code === code);
+  return option?.partnerCode ?? code;
 }
 
 /** Registry options of a service (cached; [] until loaded / on failure). */
@@ -78,11 +82,11 @@ export function useSupplierOptions(service: SupplierService): SupplierOption[] {
   return options;
 }
 
-/** code → registry name map for a service (cached). */
+/** code → display label (CRM partner code) map for a service (cached). */
 export function useSupplierLabels(service: SupplierService): Record<string, string> {
   const options = useSupplierOptions(service);
   return useMemo(
-    () => Object.fromEntries(options.map((option) => [option.code, option.name])),
+    () => Object.fromEntries(options.map((option) => [option.code, option.partnerCode ?? option.code])),
     [options],
   );
 }

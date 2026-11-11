@@ -135,6 +135,7 @@ export interface FlightSearchResponse {
   requested?: FlightSearchRequest;
   summary?: unknown;
   flights: FlightOffer[];
+  errors?: Array<{ source?: string; message: string }>;
 }
 
 /**

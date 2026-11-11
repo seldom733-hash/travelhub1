@@ -595,17 +595,21 @@ export class SupplierAggregatorService {
   async listSuppliersOfService(serviceType: SupplierServiceType): Promise<Array<{
     code: string;
     name: string;
+    /** CRM partner code (PRN-00000001) — the only supplier identifier shown in search UI. */
+    partnerCode?: string;
     /** ISO-2 countries the supplier can search. Omitted = all countries. */
     countries?: string[];
   }>> {
     if (serviceType === "flights") {
-      return this.flightRegistry
-        .list()
-        .map((code) => {
+      const flights = this.flightRegistry.list();
+      const withPartnerCodes = await Promise.all(
+        flights.map(async (code) => {
           const supplier = this.flightRegistry.get(code);
-          return { code, name: supplier.name || code };
-        })
-        .sort((x, y) => x.code.localeCompare(y.code));
+          const crm = await this.crmPartnerForToken(code);
+          return { code, name: supplier.name || code, ...(crm?.code ? { partnerCode: crm.code } : {}) };
+        }),
+      );
+      return withPartnerCodes.sort((x, y) => x.code.localeCompare(y.code));
     }
     const entries = this.registry
       .getEntries()
@@ -635,11 +639,11 @@ export class SupplierAggregatorService {
       entries.map(async (entry) => {
         const crm = await this.crmPartnerForToken(entry.code);
         if (crm && !crm.active) return null;
-        return { code: entry.code, name: crm?.name ?? entry.name, countries: entry.countries };
+        return { code: entry.code, name: crm?.name ?? entry.name, ...(crm?.code ? { partnerCode: crm.code } : {}), countries: entry.countries };
       }),
     );
     return withCrmNames
-      .filter((e): e is { code: string; name: string; countries: string[] | undefined } => Boolean(e))
+      .filter((e): e is { code: string; name: string; partnerCode?: string; countries: string[] | undefined } => Boolean(e))
       .sort((x, y) => x.code.localeCompare(y.code));
   }
 
@@ -648,15 +652,15 @@ export class SupplierAggregatorService {
    * с таким токеном в CRM нет. Имя ищем по каноническому имени из
    * SUPPLIER_TOKEN_CRM_NAMES (единый источник с finance-курсами).
    */
-  private async crmPartnerForToken(token: string): Promise<{ name: string; active: boolean } | null> {
+  private async crmPartnerForToken(token: string): Promise<{ name: string; code: string; active: boolean } | null> {
     const canonical = SUPPLIER_TOKEN_CRM_NAMES[token.toUpperCase()];
     if (!canonical) return null;
     const partner = await this.prisma.partner.findFirst({
       where: { name: { equals: canonical, mode: "insensitive" } },
-      select: { name: true, status: true },
+      select: { name: true, code: true, status: true },
     });
     if (!partner) return null;
-    return { name: partner.name, active: partner.status === "ACTIVE" };
+    return { name: partner.name, code: partner.code, active: partner.status === "ACTIVE" };
   }
 
   /**
