@@ -1,10 +1,14 @@
 $ErrorActionPreference = "Stop"
 
-# AZAL Chrome / CDP configuration
+# AZAL + Aviasales Chrome / CDP configuration
+# Both suppliers use the same browser session over CDP:
+#   AZAL       — Cloudflare-protected UI, keep the AZAL tab open.
+#   Aviasales  — AWS WAF session cookies, keep the Aviasales tab open.
 $port = 9222
 $chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe"
 $profile = Join-Path $env:LOCALAPPDATA "Google\Chrome\AZAL-CDP"
 $azalUrl = "https://www.azal.az/"
+$aviasalesUrl = "https://www.aviasales.az/"
 $versionUrl = "http://127.0.0.1:$port/json/version"
 
 function Test-Cdp {
@@ -18,22 +22,28 @@ function Test-Cdp {
 }
 
 Write-Host ""
-Write-Host "=== TravelHub AZAL Chrome ===" -ForegroundColor Cyan
+Write-Host "=== TravelHub AZAL + Aviasales Chrome ===" -ForegroundColor Cyan
 Write-Host ""
 
 # 1. Reuse an already running Chrome/CDP session.
 if (Test-Cdp) {
     Write-Host "CDP is already available on port $port." -ForegroundColor Green
 
-    # Open AZAL in the existing CDP Chrome.
-    # We use Chrome's command line only if the profile is already running;
-    # this does not create/replace the user's existing Chrome session.
+    # Open both supplier tabs in the ALREADY RUNNING CDP browser. Do not start
+    # another Chrome with a different profile: that would create tabs outside
+    # the CDP session the backend reads.
     try {
-        Start-Process -FilePath $chrome -ArgumentList @($azalUrl)
+        $cdpBase = "http://127.0.0.1:$port"
+        Invoke-RestMethod -Method Put -Uri "$cdpBase/json/new?$([uri]::EscapeDataString($azalUrl))" -TimeoutSec 5 | Out-Null
+        Invoke-RestMethod -Method Put -Uri "$cdpBase/json/new?$([uri]::EscapeDataString($aviasalesUrl))" -TimeoutSec 5 | Out-Null
         Write-Host "AZAL opened: $azalUrl" -ForegroundColor Green
+        Write-Host "Aviasales opened: $aviasalesUrl" -ForegroundColor Green
     }
     catch {
-        Write-Host "CDP is ready, but AZAL could not be opened automatically." -ForegroundColor Yellow
+        Write-Host "CDP is ready, but supplier tabs could not be opened automatically." -ForegroundColor Yellow
+        Write-Host "Open these URLs manually in the CDP Chrome window:" -ForegroundColor Yellow
+        Write-Host "  $azalUrl" -ForegroundColor Yellow
+        Write-Host "  $aviasalesUrl" -ForegroundColor Yellow
     }
 
     exit 0
@@ -44,22 +54,24 @@ if (-not (Test-Path $chrome)) {
     throw "Google Chrome was not found: $chrome"
 }
 
-# 3. Create the dedicated AZAL profile directory.
+# 3. Create the dedicated supplier profile directory.
 New-Item -ItemType Directory -Force -Path $profile | Out-Null
 
 Write-Host "Starting Chrome with CDP..." -ForegroundColor Yellow
-Write-Host "Port   : $port"
-Write-Host "Profile: $profile"
-Write-Host "URL    : $azalUrl"
+Write-Host "Port    : $port"
+Write-Host "Profile : $profile"
+Write-Host "AZAL    : $azalUrl"
+Write-Host "Aviasales: $aviasalesUrl"
 Write-Host ""
 
-# 4. Start a dedicated Chrome profile with remote debugging and open AZAL.
+# 4. Start a dedicated Chrome profile with remote debugging and open both suppliers.
 Start-Process -FilePath $chrome -ArgumentList @(
     "--remote-debugging-port=$port",
     "--user-data-dir=$profile",
     "--no-first-run",
     "--no-default-browser-check",
-    $azalUrl
+    $azalUrl,
+    $aviasalesUrl
 )
 
 # 5. Wait until CDP is available.
@@ -81,6 +93,7 @@ if (-not $ready) {
 Write-Host ""
 Write-Host "CDP is ready: http://127.0.0.1:$port" -ForegroundColor Green
 Write-Host "AZAL opened automatically: $azalUrl" -ForegroundColor Green
+Write-Host "Aviasales opened automatically: $aviasalesUrl" -ForegroundColor Green
 Write-Host ""
 
 # 6. Show the current CDP browser information.
@@ -95,3 +108,5 @@ catch {
 
 Write-Host ""
 Write-Host "If AZAL shows a Cloudflare verification, complete it in Chrome once." -ForegroundColor Yellow
+Write-Host "If Aviasales asks for a WAF check, complete it in Chrome once." -ForegroundColor Yellow
+Write-Host "Keep both supplier tabs open while TravelHub is running." -ForegroundColor Yellow
