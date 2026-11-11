@@ -34,7 +34,7 @@ const label: Record<string, string> = {
   UNAVAILABLE: "Недоступно", EXPIRED: "Истёк", CUSTOMER_PAYMENT_TIMEOUT: "Клиент не оплатил вовремя",
   CANCELLED_BY_CUSTOMER: "Клиент отказался", IN_PROCESSING: "В работе", WAITING_FOR_DATA: "Ждём данные",
   READY_FOR_BOOKING: "Готова к брони", SENT_TO_BOOKING: "На бронировании", PARTIALLY_FULFILLED: "Частично исполнен",
-  FULFILLED: "Выполнен", READY_TO_CLOSE: "Готов к закрытию", CLOSED: "Закрыт", CANCELLED: "Отменён", CANCELLATION_REQUESTED: "Отмена запрошена", CANCELLATION_APPROVED: "Отмена согласована",
+  FULFILLED: "Завершён", READY_TO_CLOSE: "Готов к закрытию", CLOSED: "Закрыт", CANCELLED: "Отменён", CANCELLATION_REQUESTED: "Отмена запрошена", CANCELLATION_APPROVED: "Отмена согласована",
   PROBLEM: "Проблема", SUSPENDED: "Приостановлен", COMPLETED: "Завершён",
 };
 const financialLabel: Record<string, string> = {

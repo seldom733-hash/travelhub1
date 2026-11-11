@@ -1460,6 +1460,39 @@ export class OrderService {
     }
   }
 
+  /**
+   * Full closure is allowed only after the last service day has ended.
+   * Cancelled deals may be closed once their finances are settled (the service
+   * will not happen), but active deals must survive the return date.
+   */
+  private async assertServicePeriodEnded(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    code: string,
+    fallbackStart: Date | null,
+    orderStatus: string,
+  ): Promise<void> {
+    if (orderStatus === "CANCELLED") return;
+    const linked = await tx.request.findFirst({
+      where: { convertedOrderId: orderId },
+      select: { requestedServiceDate: true, productSnapshot: true },
+    });
+    const snapshot = (linked?.productSnapshot ?? {}) as Record<string, unknown>;
+    const offer = (snapshot.offer ?? {}) as Record<string, unknown>;
+    const nights = Math.max(0, Number(offer.nights ?? snapshot.nights ?? 0) || 0);
+    const start = linked?.requestedServiceDate ?? fallbackStart;
+    if (!start) return; // legacy order without a service date — no evidence to block on
+    const end = new Date(start.getTime());
+    end.setUTCDate(end.getUTCDate() + nights);
+    const endIso = end.toISOString().slice(0, 10);
+    const todayIso = new Date().toISOString().slice(0, 10);
+    if (endIso >= todayIso) {
+      throw new ConflictError(
+        `Order ${code} cannot be closed before the service end date ${endIso}; it can be completed now, but full closure is available after that date`,
+      );
+    }
+  }
+
   private computeTravelerCompleteness(
     pinned: TravelerFullRequirements | null,
     values: Partial<Record<TravelerField, string | Date | null | undefined>>,
@@ -1616,6 +1649,7 @@ export class OrderService {
         select: {
           id: true, code: true, referenceNumber: true, commerceSequence: true, customerId: true, status: true, version: true,
           amount: true, currency: true,
+          serviceDate: true,
           termsAcceptedAt: true, finalConfirmedAt: true, travelerCount: true,
           acquisitionSource: true, returnedToRequestAt: true,
           travelers: { select: { id: true, dataCompleteness: true } },
@@ -1655,9 +1689,10 @@ export class OrderService {
         if (activeBookings > 0) {
           throw new ConflictError(`Order ${order.code} cannot be ${action === "complete" ? "completed" : "closed"} while it has ${activeBookings} active booking(s)`);
         }
+        await this.assertOrderDebtsCleared(tx, orderId, order.code, order.amount, order.status);
       }
       if (action === "close") {
-        await this.assertOrderDebtsCleared(tx, orderId, order.code, order.amount, order.status);
+        await this.assertServicePeriodEnded(tx, orderId, order.code, order.serviceDate, order.status);
       }
 
       // Stage 1 (Order → Request): guards «назад» — только pre-send данные.
