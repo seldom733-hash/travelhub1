@@ -76,9 +76,17 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
       const inf = Number(sp.get("infants"));
       if (Number.isFinite(inf) && inf >= 0) setInfants(inf);
       const ages = sp.get("childAges");
-      if (ages) setChildAges(ages.split(",").map(Number).filter((n) => !Number.isNaN(n)));
+      if (ages) {
+        setChildAges(
+          ages.split(",").map(Number).filter((n) => !Number.isNaN(n)).map((n) => Math.min(11, Math.max(2, n))),
+        );
+      }
       const infantAgesParam = sp.get("infantAges");
-      if (infantAgesParam) setInfantAges(infantAgesParam.split(",").map(Number).filter((n) => !Number.isNaN(n)));
+      if (infantAgesParam) {
+        setInfantAges(
+          infantAgesParam.split(",").map(Number).filter((n) => !Number.isNaN(n)).map((n) => Math.min(1, Math.max(0, n))),
+        );
+      }
 
       const t = sp.get("tariff");
       if (t) setTariff(t);
@@ -291,7 +299,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
             onChange={(e) => {
               const val = Number(e.target.value);
               setChildren(val);
-              setChildAges(Array(val).fill(0));
+              setChildAges(Array(val).fill(2));
             }}
             className={PICKER_CONTROL}
           >
@@ -309,7 +317,11 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
           <select
             id="flight-infants"
             value={infants}
-            onChange={(e) => setInfants(Number(e.target.value))}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              setInfants(val);
+              setInfantAges(Array(val).fill(0));
+            }}
             className={PICKER_CONTROL}
           >
             {[0, 1, 2, 3].map((n) => (
@@ -337,15 +349,23 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
 
       {(children > 0 || infants > 0) && (
         <div className="flex flex-col gap-2">
+          <p className="text-xs text-neutral-500">{t("search.flight_ages_hint", locale)}</p>
           {children > 0 && (
-            <ChildAges count={children} ages={childAges} onChange={setChildAges} />
+            <ChildAges
+              count={children}
+              ages={childAges}
+              onChange={setChildAges}
+              minAge={2}
+              maxAge={11}
+            />
           )}
           {infants > 0 && (
             <ChildAges
               count={infants}
               ages={infantAges}
               onChange={setInfantAges}
-              maxAge={2}
+              minAge={0}
+              maxAge={1}
               labelKey="search.infant_n"
               ageAriaKey="search.infant_age_aria"
             />

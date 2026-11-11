@@ -8,6 +8,8 @@ interface ChildAgesProps {
   count: number;
   ages: number[];
   onChange: (ages: number[]) => void;
+  /** Minimum selectable age (default 0). */
+  minAge?: number;
   /** Maximum selectable age (default 17 for children). */
   maxAge?: number;
   /** i18n key for the per-picker label; `{n}` is replaced with the ordinal. */
@@ -26,14 +28,16 @@ function ageLabel(option: number, locale: Locale): string {
   return `${option} ${t("search.age_unit_many", locale)}`;
 }
 
-export default function ChildAges({ count, ages, onChange, maxAge = 17, labelKey = "search.child_n", ageAriaKey = "search.child_age_aria" }: ChildAgesProps) {
+export default function ChildAges({ count, ages, onChange, minAge = 0, maxAge = 17, labelKey = "search.child_n", ageAriaKey = "search.child_age_aria" }: ChildAgesProps) {
   const locale = useLocale();
   if (count <= 0) return null;
-  const ageOptions = AGE_OPTIONS.filter((age) => age <= maxAge);
+  const ageOptions = AGE_OPTIONS.filter((age) => age >= minAge && age <= maxAge);
 
-  // Ensure ages array matches count
-  const displayAges = ages.slice(0, count);
-  while (displayAges.length < count) displayAges.push(0);
+  // Ensure ages array matches count and stays inside the allowed range.
+  const displayAges = ages
+    .slice(0, count)
+    .map((age) => Math.min(maxAge, Math.max(minAge, Number.isFinite(age) ? age : minAge)));
+  while (displayAges.length < count) displayAges.push(minAge);
 
   const handleChange = (index: number, value: number) => {
     const newAges = [...displayAges];

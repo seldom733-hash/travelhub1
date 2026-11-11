@@ -174,6 +174,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "search.child_age_aria": { ru: "Возраст ребёнка {n}", az: "Uşaq {n} yaşı", en: "Child {n} age" },
   "search.infant_n": { ru: "Младенец {n}", az: "Körpə {n}", en: "Infant {n}" },
   "search.infant_age_aria": { ru: "Возраст младенца {n}", az: "Körpə {n} yaşı", en: "Infant {n} age" },
+  "search.flight_ages_hint": { ru: "Дети: 2–11 лет · Младенцы: до 2 лет", az: "Uşaqlar: 2–11 yaş · Körpələr: 2 yaşadək", en: "Children: 2–11 years · Infants: under 2" },
   "search.age_under_one": { ru: "< 1 года", az: "< 1 yaş", en: "< 1 year" },
   "search.age_one": { ru: "1 год", az: "1 yaş", en: "1 year" },
   "search.age_unit_few": { ru: "года", az: "yaş", en: "years" },
