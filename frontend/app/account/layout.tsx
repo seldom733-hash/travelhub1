@@ -32,11 +32,33 @@ export default function BuyerAccountLayout({ children }: { children: React.React
   const locale = useLocale();
   const [mounted, setMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const { brandName } = useGlobalBranding();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Unread counter for the client cabinet: polling + explicit refresh event
+  // from the notifications page after "read"/"read all".
+  useEffect(() => {
+    if (!mounted || !user || user.role !== "BUYER") return;
+    let alive = true;
+    const load = () => {
+      api
+        .get<{ unread: number }>("/account/notifications?pageSize=1")
+        .then((r) => { if (alive) setUnreadNotifications(Number(r.unread ?? 0)); })
+        .catch(() => undefined);
+    };
+    load();
+    const timer = window.setInterval(load, 15_000);
+    window.addEventListener("account-notifications-updated", load);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      window.removeEventListener("account-notifications-updated", load);
+    };
+  }, [mounted, user]);
 
   // Role gate (§3): только BUYER. Прочие authenticated роли уходят в свой home.
   useEffect(() => {
@@ -60,6 +82,7 @@ export default function BuyerAccountLayout({ children }: { children: React.React
     { href: "/account", label: t("account.overview", locale), exact: true },
     { href: "/account/profile", label: t("account.profile", locale) },
     { href: "/account/notifications", label: t("account.notifications", locale) },
+    { href: "/account/requests", label: t("crm.detail.requests", locale) },
     { href: "/account/orders", label: t("account.orders", locale) },
     { href: "/account/bookings", label: t("account.bookings", locale) },
     { href: "/account/payments", label: t("account.payments", locale) },
@@ -99,6 +122,11 @@ export default function BuyerAccountLayout({ children }: { children: React.React
                 }`}
               >
                 {item.label}
+                {item.href === "/account/notifications" && unreadNotifications > 0 && (
+                  <span className="ml-1.5 inline-flex min-w-4 animate-pulse items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-4 text-white motion-reduce:animate-none">
+                    {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>
@@ -165,6 +193,11 @@ export default function BuyerAccountLayout({ children }: { children: React.React
                     }`}
                   >
                     {item.label}
+                {item.href === "/account/notifications" && unreadNotifications > 0 && (
+                  <span className="ml-1.5 inline-flex min-w-4 animate-pulse items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-4 text-white motion-reduce:animate-none">
+                    {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                  </span>
+                )}
                   </Link>
                 </li>
               ))}

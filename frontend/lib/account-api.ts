@@ -111,6 +111,27 @@ export interface OwnOrdersResult {
   hasMore: boolean;
 }
 
+export interface OwnRequest {
+  id: string;
+  code: string;
+  referenceNumber: string;
+  status: string;
+  serviceTitle: string;
+  oldPrice: string | null;
+  newPrice: string | null;
+  currency: string;
+  priceChanged: boolean;
+  createdAt: string;
+}
+
+export interface OwnRequestsResult {
+  items: OwnRequest[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
 export interface OwnBookingsResult {
   items: OwnBooking[];
   total: number;
@@ -164,6 +185,15 @@ export const accountApi = {
   // ── Buyer Cabinet own-scope read-models (Step 1.13) ──────────────────────
   // Объектный scope всегда на сервере (actor.customerId); фронтенд никогда не
   // передаёт customerId — эти контракты принимают только own-данные.
+
+  /** Own-scope заявки (до заказа): услуга, цена и изменение цены. */
+  getRequests(q: { page?: number; pageSize?: number } = {}): Promise<OwnRequestsResult> {
+    const sp = new URLSearchParams();
+    if (q.page && q.page > 1) sp.set("page", String(q.page));
+    if (q.pageSize) sp.set("pageSize", String(q.pageSize));
+    const qs = sp.toString();
+    return api.get(`/account/requests${qs ? `?${qs}` : ""}`);
+  },
 
   /** Own-scope заказы: серверная пагинация (page/pageSize, hasMore). */
   getOrders(q: { page?: number; pageSize?: number } = {}): Promise<OwnOrdersResult> {

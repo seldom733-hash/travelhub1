@@ -95,6 +95,13 @@ export class AccountController {
     return this.account.getOwnOrders(user.id, query.page, query.pageSize);
   }
 
+  @RequirePermissions("account.order.read_own")
+  @Get("requests")
+  getOwnRequests(@CurrentUser() user: AuthedRequest["user"], @Query() query: OwnCabinetQuery) {
+    this.assertBuyerActor(user);
+    return this.account.getOwnRequests(user.id, query.page, query.pageSize);
+  }
+
   @Get("notifications")
   getOwnNotifications(@CurrentUser() user: AuthedRequest["user"], @Query() query: OwnCabinetQuery) {
     this.assertBuyerActor(user);

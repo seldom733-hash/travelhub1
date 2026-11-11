@@ -48,6 +48,7 @@ export default function AccountNotificationsPage() {
     if (row.readAt) return;
     try {
       await api.patch(`/account/notifications/${row.id}/read`, {});
+      window.dispatchEvent(new Event("account-notifications-updated"));
       await load();
     } catch (e) {
       setError((e as Error).message);
@@ -57,6 +58,7 @@ export default function AccountNotificationsPage() {
   const markAll = async () => {
     try {
       await api.patch("/account/notifications/read-all", {});
+      window.dispatchEvent(new Event("account-notifications-updated"));
       await load();
     } catch (e) {
       setError((e as Error).message);

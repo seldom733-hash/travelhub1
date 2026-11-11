@@ -22,6 +22,7 @@ export default function AccountOverviewPage() {
   const locale = useLocale();
   const [profile, setProfile] = useState<OwnProfile | null>(null);
   const [ordersTotal, setOrdersTotal] = useState<number | null>(null);
+  const [requestsTotal, setRequestsTotal] = useState<number | null>(null);
   const [bookingsTotal, setBookingsTotal] = useState<number | null>(null);
   const [error, setError] = useState("");
 
@@ -36,6 +37,12 @@ export default function AccountOverviewPage() {
       .catch((e: Error) => {
         if (alive) setError(e.message);
       });
+    accountApi
+      .getRequests()
+      .then((r) => {
+        if (alive) setRequestsTotal(r.total);
+      })
+      .catch(() => undefined);
     accountApi
       .getOrders()
       .then((r) => {
@@ -66,6 +73,13 @@ export default function AccountOverviewPage() {
   const completeness = Math.round((present / totalFields) * 100);
 
   const sections = [
+    {
+      href: "/account/requests",
+      title: t("crm.detail.requests", locale),
+      icon: "📝",
+      body: requestsTotal === null ? t("state.loading", locale) : requestsTotal > 0 ? `${requestsTotal}` : "Заявок пока нет",
+      ready: requestsTotal !== null,
+    },
     {
       href: "/account/orders",
       title: t("account.orders", locale),

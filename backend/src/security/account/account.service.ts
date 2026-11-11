@@ -181,6 +181,56 @@ export class AccountService {
    * клиент не может передать/подменить customerId — query/body игнорируются.
    */
 
+  /** Own-scope requests for the Buyer Cabinet (before they become orders). */
+  async getOwnRequests(userId: string, page = 1, pageSize = 20) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { customerId: true } });
+    if (!user?.customerId) return { items: [], total: 0, page, pageSize, hasMore: false };
+    const where = { customerId: user.customerId };
+    const [total, rows] = await Promise.all([
+      this.prisma.request.count({ where }),
+      this.prisma.request.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true, code: true, referenceNumber: true, status: true,
+          displayedPrice: true, displayedCurrency: true, confirmedPrice: true,
+          confirmedCurrency: true, supplierPriceProposal: true,
+          productId: true, productSnapshot: true, createdAt: true, updatedAt: true,
+        },
+      }),
+    ]);
+    const ids = [...new Set(rows.map((r) => r.productId).filter((v): v is string => Boolean(v)))];
+    const products = ids.length ? await this.prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, title: true } }) : [];
+    const titles = new Map(products.map((p) => [p.id, p.title]));
+    return {
+      items: rows.map((r) => {
+        const snap = (r.productSnapshot ?? {}) as Record<string, unknown>;
+        const oldPrice = r.displayedPrice?.toString() ?? null;
+        const newPrice = r.confirmedPrice?.toString() ?? r.supplierPriceProposal?.toString() ?? oldPrice;
+        const priceChanged = Boolean(r.supplierPriceProposal != null || (r.confirmedPrice != null && r.displayedPrice != null && r.confirmedPrice.toString() !== r.displayedPrice.toString()));
+        return {
+          id: r.id,
+          code: r.code,
+          referenceNumber: r.referenceNumber,
+          status: r.status,
+          serviceTitle: String(snap.productTitle ?? (r.productId ? titles.get(r.productId) : "") ?? "—").replace(/\s+/g, " ").trim(),
+          oldPrice,
+          newPrice,
+          currency: r.confirmedCurrency ?? r.displayedCurrency ?? "AZN",
+          priceChanged,
+          createdAt: isoUtc(r.createdAt),
+          updatedAt: isoUtc(r.updatedAt),
+        };
+      }),
+      total,
+      page,
+      pageSize,
+      hasMore: page * pageSize < total,
+    };
+  }
+
   /** Own-scope notifications for the Buyer Cabinet (price changes, statuses). */
   async getOwnNotifications(userId: string, page = 1, pageSize = 20) {
     const where = { recipientId: userId };
