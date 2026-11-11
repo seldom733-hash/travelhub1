@@ -215,11 +215,14 @@ function SearchResultsInner() {
       const childAges = params.childAges
         ? params.childAges.split(",").map(Number).filter((n) => !Number.isNaN(n))
         : undefined;
+      const infantAges = params.infantAges
+        ? params.infantAges.split(",").map(Number).filter((n) => !Number.isNaN(n))
+        : undefined;
       const returnDate = params.returnDate || params.return || undefined;
       const tariff = params.tariff || "ALL";
       const supplier = params.supplier || "ALL";
       const direct = params.direct === "1" || params.direct === "true";
-      const dedupKey = `${from}-${to}-${departureDate}-${tripType}-${adults}-${children}-${infants}-${childAges?.join(",") ?? ""}-${returnDate}-${tariff}-${supplier}-${direct ? "direct" : "all"}-${params._t ?? ""}`;
+      const dedupKey = `${from}-${to}-${departureDate}-${tripType}-${adults}-${children}-${infants}-${childAges?.join(",") ?? ""}-${infantAges?.join(",") ?? ""}-${returnDate}-${tariff}-${supplier}-${direct ? "direct" : "all"}-${params._t ?? ""}`;
       const requestId = ++flightRequestIdRef.current;
 
       setLoading(true);
@@ -254,6 +257,7 @@ function SearchResultsInner() {
             children,
             infants,
             ...(childAges && childAges.length ? { childAges: childAges.slice(0, children) } : {}),
+            ...(infantAges && infantAges.length ? { infantAges: infantAges.slice(0, infants) } : {}),
           },
           ...(returnDate ? { returnDate } : {}),
           ...(supplier !== "ALL" ? { supplier } : {}),

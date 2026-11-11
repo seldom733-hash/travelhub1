@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { CaretDown } from "@phosphor-icons/react";
 import { t, useLocale, type Locale } from "@/lib/i18n";
@@ -8,6 +8,12 @@ interface ChildAgesProps {
   count: number;
   ages: number[];
   onChange: (ages: number[]) => void;
+  /** Maximum selectable age (default 17 for children). */
+  maxAge?: number;
+  /** i18n key for the per-picker label; `{n}` is replaced with the ordinal. */
+  labelKey?: string;
+  /** i18n key for aria-label; `{n}` is replaced with the ordinal. */
+  ageAriaKey?: string;
 }
 
 const AGE_OPTIONS = Array.from({ length: 18 }, (_, i) => i); // 0-17
@@ -20,9 +26,10 @@ function ageLabel(option: number, locale: Locale): string {
   return `${option} ${t("search.age_unit_many", locale)}`;
 }
 
-export default function ChildAges({ count, ages, onChange }: ChildAgesProps) {
+export default function ChildAges({ count, ages, onChange, maxAge = 17, labelKey = "search.child_n", ageAriaKey = "search.child_age_aria" }: ChildAgesProps) {
   const locale = useLocale();
   if (count <= 0) return null;
+  const ageOptions = AGE_OPTIONS.filter((age) => age <= maxAge);
 
   // Ensure ages array matches count
   const displayAges = ages.slice(0, count);
@@ -39,16 +46,16 @@ export default function ChildAges({ count, ages, onChange }: ChildAgesProps) {
       {displayAges.map((age, index) => (
         <div key={index} className="flex flex-col items-center gap-0.5">
           <span className={`${PICKER_LABEL} text-center`}>
-            {t("search.child_n", locale).replace("{n}", String(index + 1))}
+            {t(labelKey, locale).replace("{n}", String(index + 1))}
           </span>
           <div className="relative">
             <select
               value={age}
               onChange={(e) => handleChange(index, Number(e.target.value))}
               className="appearance-none rounded-lg border border-dark-border bg-dark-card px-3 py-1.5 pr-7 text-[15px] text-white outline-none transition-colors focus:border-gold/50"
-              aria-label={t("search.child_age_aria", locale).replace("{n}", String(index + 1))}
+              aria-label={t(ageAriaKey, locale).replace("{n}", String(index + 1))}
             >
-              {AGE_OPTIONS.map((opt) => (
+              {ageOptions.map((opt) => (
                 <option key={opt} value={opt}>
                   {ageLabel(opt, locale)}
                 </option>

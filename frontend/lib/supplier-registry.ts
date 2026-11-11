@@ -56,11 +56,11 @@ export function listSuppliers(service: SupplierService): Promise<SupplierOption[
   return request;
 }
 
-/** Display label for a supplier code: CRM partner code, adapter code fallback. */
+/** Display label for a supplier code: registry name, raw code as fallback. */
 export function supplierLabel(options: SupplierOption[], code?: string | null): string {
   if (!code) return "";
   const option = options.find((o) => o.code === code);
-  return option?.partnerCode ?? code;
+  return option?.name ?? code;
 }
 
 /** Registry options of a service (cached; [] until loaded / on failure). */
@@ -82,11 +82,11 @@ export function useSupplierOptions(service: SupplierService): SupplierOption[] {
   return options;
 }
 
-/** code → display label (CRM partner code) map for a service (cached). */
+/** code → registry name map for a service (cached). */
 export function useSupplierLabels(service: SupplierService): Record<string, string> {
   const options = useSupplierOptions(service);
   return useMemo(
-    () => Object.fromEntries(options.map((option) => [option.code, option.partnerCode ?? option.code])),
+    () => Object.fromEntries(options.map((option) => [option.code, option.name])),
     [options],
   );
 }

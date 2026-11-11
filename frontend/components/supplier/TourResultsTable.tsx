@@ -5,6 +5,7 @@ import { t, useLocale } from "@/lib/i18n";
 import Price from "@/components/public/Price";
 import OfferDetailsModal from "@/components/supplier/OfferDetailsModal";
 import { useSupplierLabels } from "@/lib/supplier-registry";
+import { isPlatformStaff, useCurrentUser } from "@/lib/use-user";
 import type { AggregatedOffer, AggregatedSearchResult } from "@/lib/supplier-api";
 
 /**
@@ -151,6 +152,8 @@ export default function TourResultsTable({
 }) {
   const locale = useLocale();
   const supplierLabels = useSupplierLabels("tours");
+  const user = useCurrentUser();
+  const showSupplier = isPlatformStaff(user);
   const [sortKey, setSortKey] = useState<SortKey>("price");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [supplierFilter, setSupplierFilter] = useState("");
@@ -378,7 +381,7 @@ export default function TourResultsTable({
         <p className="mt-3 text-xs text-neutral-400">
           {pending
             ? t("tourSearch.finding_suppliers", locale)
-            : found.length > 0
+            : showSupplier && found.length > 0
               ? `${t("tourSearch.suppliers_found", locale)} ${found.join(", ")}`
               : t("tourSearch.searching_suppliers", locale)}
         </p>
@@ -433,10 +436,14 @@ export default function TourResultsTable({
     <div>
       {/* Supplier summary + searchId traceability (§13/§20) */}
       <p className="mb-3 text-sm text-neutral-500">
-        {Object.entries(result.perSupplier)
-          .map(([code, r]) => supplierStat(code, r))
-          .join(" · ")}
-        {" · "}
+        {showSupplier && (
+          <>
+            {Object.entries(result.perSupplier)
+              .map(([code, r]) => supplierStat(code, r))
+              .join(" · ")}
+            {" · "}
+          </>
+        )}
         {t("search.found", locale)}: {result.offers.length}
         <span className="ml-2 font-mono text-neutral-700">searchId: {searchId}</span>
       </p>
@@ -458,7 +465,7 @@ export default function TourResultsTable({
               <th className="px-4 pt-3 text-right">
                 {thSort("price", t("tourSearch.col_price", locale), true)}
               </th>
-              <th className="px-4 pt-3">{thSort("source", t("tourSearch.col_source", locale))}</th>
+              {showSupplier && <th className="px-4 pt-3">{thSort("source", t("tourSearch.col_source", locale))}</th>}
             </tr>
             {/* Filters live in the header row — one control per column */}
             <tr className="border-b border-white/10 bg-white/5">
@@ -581,21 +588,23 @@ export default function TourResultsTable({
                   aria-label={t("tourSearch.filter_price_max", locale)}
                 />
               </th>
-              <th className="px-4 pb-3 pt-1 font-normal">
-                <select
-                  value={supplierFilter}
-                  onChange={(e) => setSupplierFilter(e.target.value)}
-                  className={filterInput}
-                  aria-label={t("tourSearch.filter_supplier", locale)}
-                >
-                  <option value="">{t("tourSearch.filter_all_suppliers", locale)}</option>
-                  {suppliers.map((c) => (
-                    <option key={c} value={c}>
-                      {supplierLabels[c] ?? c}
-                    </option>
-                  ))}
-                </select>
-              </th>
+              {showSupplier && (
+                <th className="px-4 pb-3 pt-1 font-normal">
+                  <select
+                    value={supplierFilter}
+                    onChange={(e) => setSupplierFilter(e.target.value)}
+                    className={filterInput}
+                    aria-label={t("tourSearch.filter_supplier", locale)}
+                  >
+                    <option value="">{t("tourSearch.filter_all_suppliers", locale)}</option>
+                    {suppliers.map((c) => (
+                      <option key={c} value={c}>
+                        {supplierLabels[c] ?? c}
+                      </option>
+                    ))}
+                  </select>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -631,11 +640,13 @@ export default function TourResultsTable({
                     "—"
                   )}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3">
-                  <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-neutral-300">
-                    {supplierLabels[o.supplierCode] ?? o.supplierCode}
-                  </span>
-                </td>
+                {showSupplier && (
+                  <td className="whitespace-nowrap px-4 py-3">
+                    <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-neutral-300">
+                      {supplierLabels[o.supplierCode] ?? o.supplierCode}
+                    </span>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

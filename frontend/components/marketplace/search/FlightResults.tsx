@@ -2,6 +2,7 @@ import { useState } from "react";
 import { airlineNameOf, routeChain } from "@/lib/flight-api";
 import type { FlightFare, FlightOffer, FlightSegment } from "@/lib/flight-api";
 import { useSupplierLabels } from "@/lib/supplier-registry";
+import { isPlatformStaff, useCurrentUser } from "@/lib/use-user";
 import FlightOfferModal from "./FlightOfferModal";
 
 interface FlightResultsProps {
@@ -154,6 +155,8 @@ export default function FlightResults({
   const [familyFilter, setFamilyFilter] = useState<string>("ALL");
   const [selectedFlight, setSelectedFlight] = useState<FlightOffer | null>(null);
   const supplierLabels = useSupplierLabels("flights");
+  const user = useCurrentUser();
+  const showSupplier = isPlatformStaff(user);
   if (loading) {
     // §SKELETON-PARITY: загрузка рисует ТУ ЖЕ форму, что и результат — таблицу рейсов
     // (`:255-292`: `overflow-x-auto rounded-2xl border border-white/10`, `text-[11px]`,
@@ -313,7 +316,7 @@ export default function FlightResults({
                   </select>
                 </div>
               </th>
-              <th className="px-2 py-2">Поставщик</th>
+              {showSupplier && <th className="px-2 py-2">Поставщик</th>}
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("adults")}>Взрослые {arrow("adults")}</th>
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("children")}>Дети {arrow("children")}</th>
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("price")}>{hasInbound ? "Общая цена" : "Цена"} {arrow("price")}</th>
@@ -346,7 +349,7 @@ export default function FlightResults({
                   {hasInbound && <td className="px-2 py-2 text-white">{r.inFare ? `${fareAmount(r.inFare)} ${fareCurrency(r.inFare)}` : ""}</td>}
                   {hasInbound && <td className="px-2 py-2 text-neutral-300">{formatDuration(totalMins)}</td>}
                   <td className="px-2 py-2 text-white">{r.fareFamily} {baggage} {hand}</td>
-                  <td className="px-2 py-2 text-neutral-300">{supplierOf(r.out, supplierLabels)}</td>
+                  {showSupplier && <td className="px-2 py-2 text-neutral-300">{supplierOf(r.out, supplierLabels)}</td>}
                   <td className="px-2 py-2 text-white text-center">{r.out.requested?.passengers?.adults ?? 1}</td>
                   <td className="px-2 py-2 text-white text-center">{r.out.requested?.passengers?.children ?? 0}</td>
                   <td className="px-2 py-2 font-bold text-white">{r.total} {r.currency}</td>

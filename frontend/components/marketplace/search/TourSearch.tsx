@@ -18,6 +18,7 @@ import NightsSelect from "./NightsSelect";
 import HotelStarsSelect from "./HotelStarsSelect";
 import HotelFilterSelect from "./HotelFilterSelect";
 import { useClickOutside } from "./useClickOutside";
+import { isPlatformStaff, useCurrentUser } from "@/lib/use-user";
 import { usePanelMaxHeight } from "./usePanelMaxHeight";
 import {
   PICKER_CHECKBOX,
@@ -48,6 +49,8 @@ interface TourSearchProps {
 
 export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProps) {
   const locale = useLocale();
+  const user = useCurrentUser();
+  const showSuppliers = isPlatformStaff(user);
   const [from, setFrom] = useState<GeoDirectoryEntry | null>(null);
   const [toCountry, setToCountry] = useState<GeoDirectoryEntry | null>(null);
   const [toCity, setToCity] = useState<GeoDirectoryEntry | null>(null);
@@ -375,7 +378,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
       nightsFrom,
       nightsTo,
       hotelStars: hotelStars.length ? hotelStars : undefined,
-      suppliers: selectedSuppliers.length ? selectedSuppliers : undefined,
+      suppliers: showSuppliers && selectedSuppliers.length ? selectedSuppliers : undefined,
       adults,
       children,
       childAges: childAges.slice(0, children),
@@ -506,6 +509,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
 
         {/* Suppliers («Поставщики») — all tour suppliers, multi-select;
             empty = every supplier. */}
+        {showSuppliers && (
         <div className="min-w-[150px] max-w-[260px] flex-[0_1_260px]">
           <label htmlFor="tour-suppliers" className={PICKER_LABEL}>
             {locale === "ru" ? "Поставщики" : locale === "az" ? "Təchizatçılar" : "Suppliers"}
@@ -524,7 +528,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
               >
                 {selectedSuppliers.length
                   ? selectedSuppliers
-                      .map((c) => supplierOptions.find((s) => s.code === c)?.partnerCode ?? c)
+                      .map((c) => supplierOptions.find((s) => s.code === c)?.name ?? c)
                       .slice(0, 2)
                       .join(", ") + (selectedSuppliers.length > 2 ? ` +${selectedSuppliers.length - 2}` : "")
                   : locale === "ru"
@@ -581,10 +585,10 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
                           className={`flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/5 ${active ? "bg-gold/10" : ""}`}
                         >
                           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gold/10 px-1 text-[12px] font-semibold text-gold">
-                            {s.partnerCode ? "PRN" : s.code.slice(0, 4)}
+                            {s.code.slice(0, 4)}
                           </span>
                           <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-white">
-                            {s.partnerCode ?? s.code}
+                            {s.name}
                           </span>
                           {active && <span className="text-[13px] text-gold">✓</span>}
                         </button>
@@ -610,6 +614,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
             )}
           </div>
         </div>
+        )}
 
         {/* Hotel star categories — per-country supplier dictionaries */}
         <div className={PICKER_W_NIGHTS}>

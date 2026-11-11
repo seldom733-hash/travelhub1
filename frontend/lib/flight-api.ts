@@ -9,6 +9,8 @@ export interface FlightSearchRequest {
     infants: number;
     /** F1 (owner-confirmed): carried as data only — never priced client-side. */
     childAges?: number[];
+    /** Infant ages in years (0–2), parallel to `infants`. */
+    infantAges?: number[];
   };
   returnDate?: string;
   isStudent?: boolean;

@@ -18,6 +18,7 @@ import NightsSelect from "./NightsSelect";
 import { useClickOutside } from "./useClickOutside";
 import { usePanelMaxHeight } from "./usePanelMaxHeight";
 import { useWidestText } from "@/lib/measure-text";
+import { isPlatformStaff, useCurrentUser } from "@/lib/use-user";
 import {
   PICKER_CONTROL,
   PICKER_CONTROL_ICON,
@@ -53,6 +54,8 @@ interface HotelSearchProps {
  */
 export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchProps) {
   const locale = useLocale();
+  const user = useCurrentUser();
+  const showSuppliers = isPlatformStaff(user);
   // Destination as Master Geography entries (most specific wins).
   const [toCountry, setToCountry] = useState<GeoDirectoryEntry | null>(null);
   const [toCity, setToCity] = useState<GeoDirectoryEntry | null>(null);
@@ -355,7 +358,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
       adults,
       children,
       childAges: childAges.slice(0, children),
-      suppliers: selectedSuppliers.length ? selectedSuppliers : undefined,
+      suppliers: showSuppliers && selectedSuppliers.length ? selectedSuppliers : undefined,
       hotelStars: hotelStars.length ? hotelStars : undefined,
     });
   };
@@ -476,6 +479,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
 
         {/* Suppliers («Поставщики») — hotel suppliers from CRM partners,
             multi-select; empty = every supplier. */}
+        {showSuppliers && (
         <div className="min-w-[150px] max-w-[260px] flex-[0_1_260px]">
           <label htmlFor="hotel-suppliers" className={PICKER_LABEL}>
             {t("search.suppliers", locale)}
@@ -494,7 +498,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
               >
                 {selectedSuppliers.length
                   ? selectedSuppliers
-                      .map((c) => supplierOptions.find((s) => s.code === c)?.partnerCode ?? c)
+                      .map((c) => supplierOptions.find((s) => s.code === c)?.name ?? c)
                       .slice(0, 2)
                       .join(", ") + (selectedSuppliers.length > 2 ? ` +${selectedSuppliers.length - 2}` : "")
                   : t("search.all_suppliers", locale)}
@@ -547,10 +551,10 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
                           className={`flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/5 ${active ? "bg-gold/10" : ""}`}
                         >
                           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gold/10 px-1 text-[12px] font-semibold text-gold">
-                            {s.partnerCode ? "PRN" : s.code.slice(0, 4)}
+                            {s.code.slice(0, 4)}
                           </span>
                           <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-white">
-                            {s.partnerCode ?? s.code}
+                            {s.name}
                           </span>
                           {active && <span className="text-[13px] text-gold">✓</span>}
                         </button>
@@ -576,6 +580,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* Child ages */}

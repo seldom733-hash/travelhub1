@@ -111,3 +111,23 @@ export function isAuthorizedCustomer(user: AuthUser | null): boolean {
   return Boolean(user && user.role === "BUYER" && user.customerId);
 }
 
+/**
+ * Platform staff — the only audience allowed to see supplier identity
+ * (picker + supplier column) in the universal search.
+ */
+const PLATFORM_STAFF_ROLES = new Set([
+  "ADMIN",
+  "DIRECTOR",
+  "FINANCE",
+  "MARKETER",
+  "ANALYST",
+  "MODERATOR",
+  "SALES_MANAGER",
+  "SALES_HEAD",
+  "OPERATOR",
+]);
+
+export function isPlatformStaff(user: AuthUser | null): boolean {
+  return Boolean(user && PLATFORM_STAFF_ROLES.has(user.role));
+}
+

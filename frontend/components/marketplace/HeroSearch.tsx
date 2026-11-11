@@ -108,6 +108,7 @@ export default function HeroSearch({ enabledServices, defaultService, onTabChang
     if (ctx.children) sp.set("children", String(ctx.children));
     if (ctx.childAges?.length) sp.set("childAges", ctx.childAges.join(","));
     if (ctx.infants) sp.set("infants", String(ctx.infants));
+    if (ctx.infantAges?.length) sp.set("infantAges", ctx.infantAges.join(","));
     if (ctx.serviceClass) sp.set("class", ctx.serviceClass);
     if ((ctx as any).tariff && (ctx as any).tariff !== "ALL") sp.set("tariff", (ctx as any).tariff);
     if (ctx.supplier && ctx.supplier !== "ALL") sp.set("supplier", ctx.supplier);

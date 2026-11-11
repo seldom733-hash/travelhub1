@@ -96,6 +96,8 @@ export interface SearchContext {
   returnDate?: string;
   roundTrip?: boolean;
   infants?: number;
+  /** Infant ages in years (0–2), parallel to `infants`. */
+  infantAges?: number[];
   serviceClass?: string;
   direct?: boolean;
   tariff?: string;

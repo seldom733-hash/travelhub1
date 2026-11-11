@@ -10,6 +10,7 @@ import FlightDatePicker from "./FlightDatePicker";
 import { fetchAzalDirectory, fetchFlightCalendar, type FlightCalendarDayPrice } from "@/lib/flight-api";
 import { findFlightAirports, setRemoteAirports } from "@/lib/flight-locations";
 import { useSupplierOptions } from "@/lib/supplier-registry";
+import { isPlatformStaff, useCurrentUser } from "@/lib/use-user";
 import ChildAges from "./ChildAges";
 
 import { useWidestText } from "@/lib/measure-text";
@@ -31,6 +32,8 @@ interface FlightSearchProps {
 
 export default function FlightSearch({ onSearch }: FlightSearchProps) {
   const locale = useLocale();
+  const user = useCurrentUser();
+  const showSuppliers = isPlatformStaff(user);
   const [from, setFrom] = useState<import("@/lib/flight-locations").FlightAirport | null>(null);
   const [to, setTo] = useState<import("@/lib/flight-locations").FlightAirport | null>(null);
   // Default departure/return = today (platform-wide default for date fields).
@@ -41,6 +44,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
   const [children, setChildren] = useState(0);
   const [childAges, setChildAges] = useState<number[]>([]);
   const [infants, setInfants] = useState(0);
+  const [infantAges, setInfantAges] = useState<number[]>([]);
   const [direct, setDirect] = useState(false);
 
   // Restore the form from the URL so a second search on the results page
@@ -73,6 +77,8 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
       if (Number.isFinite(inf) && inf >= 0) setInfants(inf);
       const ages = sp.get("childAges");
       if (ages) setChildAges(ages.split(",").map(Number).filter((n) => !Number.isNaN(n)));
+      const infantAgesParam = sp.get("infantAges");
+      if (infantAgesParam) setInfantAges(infantAgesParam.split(",").map(Number).filter((n) => !Number.isNaN(n)));
 
       const t = sp.get("tariff");
       if (t) setTariff(t);
@@ -90,7 +96,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
   // registry is kept as its own option so the <select> never blanks out.
   const flightSuppliers = useSupplierOptions("flights");
   const supplierOptions = useMemo(() => {
-    const options = flightSuppliers.map((s) => ({ value: s.code, label: s.partnerCode ?? s.code }));
+    const options = flightSuppliers.map((s) => ({ value: s.code, label: s.name }));
     if (supplier && supplier !== "ALL" && !options.some((o) => o.value === supplier)) {
       options.unshift({ value: supplier, label: supplier });
     }
@@ -207,10 +213,11 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
       adults,
       children,
       childAges: childAges.slice(0, children),
+      infantAges: infantAges.slice(0, infants),
       infants,
       direct,
       tariff,
-      supplier,
+      supplier: showSuppliers ? supplier : "ALL",
     });
   };
 
@@ -328,6 +335,24 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
         )}
       </div>
 
+      {(children > 0 || infants > 0) && (
+        <div className="flex flex-col gap-2">
+          {children > 0 && (
+            <ChildAges count={children} ages={childAges} onChange={setChildAges} />
+          )}
+          {infants > 0 && (
+            <ChildAges
+              count={infants}
+              ages={infantAges}
+              onChange={setInfantAges}
+              maxAge={2}
+              labelKey="search.infant_n"
+              ageAriaKey="search.infant_age_aria"
+            />
+          )}
+        </div>
+      )}
+
       <div className={PICKER_ROW}>
         {/* Tariff (baggage) */}
         <div className="w-[260px] max-w-full">
@@ -374,7 +399,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
           {t("search.direct_flight", locale)}
         </label>
 
-        {/* Supplier */}
+        {showSuppliers && (
         <div className="w-[260px] min-w-[260px] max-w-[260px] flex-none">
           <label htmlFor="flight-supplier" className={PICKER_LABEL}>
             {t("search.supplier", locale)}
@@ -393,12 +418,8 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
             ))}
           </select>
         </div>
+        )}
       </div>
-
-      {/* Child ages */}
-      {children > 0 && (
-        <ChildAges count={children} ages={childAges} onChange={setChildAges} />
-      )}
 
       {/* Submit — right aligned at the same visual position as tours. */}
       <div className="relative z-[70] flex justify-end">
