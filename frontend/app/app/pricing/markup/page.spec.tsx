@@ -1,14 +1,9 @@
 // @vitest-environment jsdom
 /**
- * Supplier Markup (PHASE 4 §4.1/§4.2) — Admin matrix page.
- *
- * Рендер матрицы из API (строки/колонки приходят с backend, не хардкодятся);
- * клик по ячейке открывает create-form с prefill key; RBAC-гейт
- * pricing.markup.manage (без права — ни кнопок, ни кликабельных ячеек);
- * create → POST body; update-409 (CAS) показывает серверное сообщение;
- * нечисловая ставка блокируется клиентской валидацией (сервер — authority).
+ * Unified «Наценки и комиссионные» table: markup and commission live in one
+ * row/table, with a single edit panel.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { api } from "@/lib/api";
 import MarkupAdminPage from "./page";
@@ -17,180 +12,93 @@ const mocks = vi.hoisted(() => ({ canManage: true }));
 
 vi.mock("@/lib/api", () => ({
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
-  auth: { token: null, setToken: vi.fn(), clear: vi.fn(), subscribe: vi.fn() },
 }));
-
 vi.mock("@/lib/use-can", () => ({ useCan: () => mocks.canManage }));
 
 const getMock = api.get as Mock;
 const postMock = api.post as Mock;
-const patchMock = api.patch as Mock;
 
-const DRAFT_RULE = {
-  id: "r1",
-  code: "MKR-00000001",
-  supplierCode: "KOMPAS",
-  serviceType: "tours",
-  rate: "0.075",
-  status: "DRAFT",
-  version: 1,
-  effectiveFrom: "2026-01-01T00:00:00.000Z",
-  effectiveTo: null,
-  createdAt: "2026-10-01T00:00:00.000Z",
-  updatedAt: "2026-10-01T00:00:00.000Z",
-};
-
-const LIST = { items: [DRAFT_RULE], page: 1, pageSize: 20, total: 1 };
-
-const CONFIGURED_MATRIX = {
-  at: "2026-10-06T00:00:00.000Z",
-  services: ["tours"],
-  suppliers: [{ code: "KOMPAS", name: "Kompas Tour", enabled: true }],
+const MARKUP_MATRIX = {
+  services: ["tours", "flights"],
+  suppliers: [
+    { code: "KOMPAS", name: "Kompastour", enabled: true },
+    { code: "AZAL", name: "AZAL", enabled: true },
+  ],
   cells: [
-    {
-      supplierCode: "KOMPAS",
-      serviceType: "tours",
-      state: "CONFIGURED",
-      rate: "0.075",
-      ruleCode: "MKR-00000001",
-      ruleVersion: 1,
-    },
+    { supplierCode: "KOMPAS", serviceType: "tours", state: "CONFIGURED", rate: "0.03", ruleCode: "MKR-1", ruleVersion: 1 },
+    { supplierCode: "AZAL", serviceType: "flights", state: "CONFIGURED", rate: "0.025", ruleCode: "MKR-2", ruleVersion: 1 },
+  ],
+};
+const COMMISSION_MATRIX = {
+  services: ["tours", "flights"],
+  suppliers: [
+    { code: "KOMPAS", name: "Kompastour", enabled: true },
+    { code: "AZAL", name: "AZAL", enabled: true },
+  ],
+  cells: [
+    { supplierCode: "KOMPAS", serviceType: "tours", state: "CONFIGURED", commissionType: "PERCENT", rate: "0.07", fixedAmount: null, calculationBase: "SUPPLIER_BASE", ruleCode: "CMR-1" },
+    { supplierCode: "AZAL", serviceType: "flights", state: "CONFIGURED", commissionType: "PERCENT", rate: "0.05", fixedAmount: null, calculationBase: "SUPPLIER_BASE", ruleCode: "CMR-2" },
+  ],
+};
+const MARKUP_RULES = {
+  items: [
+    { id: "m1", code: "MKR-1", supplierCode: "KOMPAS", serviceType: "tours", rate: "0.03", status: "ACTIVE", version: 1 },
+    { id: "m2", code: "MKR-2", supplierCode: "AZAL", serviceType: "flights", rate: "0.025", status: "ACTIVE", version: 1 },
+  ],
+};
+const COMMISSION_RULES = {
+  items: [
+    { id: "c1", code: "CMR-1", supplierCode: "KOMPAS", serviceType: "tours", commissionType: "PERCENT", rate: "0.07", fixedAmount: null, fixedCurrency: null, calculationBase: "SUPPLIER_BASE", status: "ACTIVE", version: 1 },
+    { id: "c2", code: "CMR-2", supplierCode: "AZAL", serviceType: "flights", commissionType: "PERCENT", rate: "0.05", fixedAmount: null, fixedCurrency: null, calculationBase: "SUPPLIER_BASE", status: "ACTIVE", version: 1 },
   ],
 };
 
-const NOT_CONFIGURED_MATRIX = {
-  ...CONFIGURED_MATRIX,
-  cells: [
-    { supplierCode: "KOMPAS", serviceType: "tours", state: "NOT_CONFIGURED", rate: "0", ruleCode: null, ruleVersion: null },
-  ],
-};
-
-function mockRoutes(matrix: unknown = CONFIGURED_MATRIX) {
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.canManage = true;
   getMock.mockImplementation((url: string) => {
-    if (url.startsWith("/pricing/markup-matrix")) return Promise.resolve(matrix);
-    if (url.includes("/history")) return Promise.resolve({ items: [] });
-    if (url.startsWith("/pricing/markup-rules")) return Promise.resolve(LIST);
+    if (url === "/pricing/markup-matrix") return Promise.resolve(MARKUP_MATRIX);
+    if (url === "/pricing/commission-matrix") return Promise.resolve(COMMISSION_MATRIX);
+    if (url.startsWith("/pricing/markup-rules")) return Promise.resolve(MARKUP_RULES);
+    if (url.startsWith("/pricing/commission-rules")) return Promise.resolve(COMMISSION_RULES);
     return Promise.reject(new Error(`unexpected GET ${url}`));
   });
-  postMock.mockResolvedValue(DRAFT_RULE);
-  patchMock.mockResolvedValue(DRAFT_RULE);
-}
+  postMock.mockResolvedValue({ code: "MKR-NEW" });
+});
 
-const supplierInput = () => document.querySelector('input[list="markup-supplier-codes"]') as HTMLInputElement;
-const serviceInput = () => document.querySelector('input[list="markup-service-types"]') as HTMLInputElement;
-const rateInput = () => document.querySelector('input[placeholder="0.05"]') as HTMLInputElement;
-
-describe("MarkupAdminPage — Supplier × Service matrix + rules (§4.1/§4.2)", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.canManage = true;
-    mockRoutes();
-  });
-
-  it("рендерит матрицу из API: поставщик, rate в %, CONFIGURED без «не настроен»", async () => {
+describe("MarkupAdminPage — unified markup + commission table", () => {
+  it("renders one table with both rates and the combined final rule", async () => {
     render(<MarkupAdminPage />);
-    await waitFor(() => expect(getMock).toHaveBeenCalledWith("/pricing/markup-matrix"));
 
-    expect(screen.getByText("Kompas Tour")).toBeTruthy();
-    expect(screen.getAllByText("7.5%").length).toBeGreaterThan(0);
-    expect(screen.queryByText("не настроен")).toBeNull();
-    // rules list тоже загружен
-    expect(getMock).toHaveBeenCalledWith("/pricing/markup-rules?page=1&pageSize=20");
-    expect(screen.getByText("MKR-00000001")).toBeTruthy();
+    await waitFor(() => expect(screen.getAllByText("Kompastour").length).toBeGreaterThan(0));
+    expect(screen.getByText("3,00 %")).toBeTruthy();
+    expect(screen.getByText("7,00 %")).toBeTruthy();
+    expect(screen.getByText("Наценка 3,00 % + Комиссия 7,00 %")).toBeTruthy();
+    expect(screen.getByText("2,50 %")).toBeTruthy();
+    expect(screen.getByText("5,00 %")).toBeTruthy();
+    // no separate commission-only table/tab
+    expect(screen.queryByText("Комиссионные")).toBeNull();
+    // only one data table on the page
+    expect(screen.getAllByRole("table")).toHaveLength(1);
   });
 
-  it("NOT_CONFIGURED ячейка: 0% + «не настроен» (отличима от сконфигурированного 0%)", async () => {
-    mockRoutes(NOT_CONFIGURED_MATRIX);
+  it("opens a single edit panel prefilled with markup and commission", async () => {
     render(<MarkupAdminPage />);
-    await waitFor(() => expect(getMock).toHaveBeenCalledWith("/pricing/markup-matrix"));
+    await waitFor(() => expect(screen.getByText("Наценка (Markup)")).toBeTruthy());
 
-    expect(screen.getByText("0%")).toBeTruthy();
-    expect(screen.getByText("не настроен")).toBeTruthy();
+    fireEvent.click(screen.getAllByText("Изменить")[0]);
+
+    expect(screen.getByText("Изменить правило")).toBeTruthy();
+    expect((screen.getByDisplayValue("2.5") as HTMLInputElement).value).toBe("2.5");
+    expect((screen.getByDisplayValue("5") as HTMLInputElement).value).toBe("5");
   });
 
-  it("клик по ячейке (manage) открывает create-form с prefill поставщик+сервис", async () => {
-    render(<MarkupAdminPage />);
-    await waitFor(() => expect(getMock).toHaveBeenCalledWith("/pricing/markup-matrix"));
-
-    fireEvent.click(screen.getByTitle("MKR-00000001 v1"));
-    expect(supplierInput().value).toBe("KOMPAS");
-    expect(serviceInput().value).toBe("tours");
-    expect(screen.getByText("Новое правило наценки")).toBeTruthy();
-  });
-
-  it("без pricing.markup.manage: нет create/activate/edit, ячейка не кликабельна; history доступна (read)", async () => {
+  it("hides editing controls without pricing.markup.manage", async () => {
     mocks.canManage = false;
     render(<MarkupAdminPage />);
-    await waitFor(() => expect(getMock).toHaveBeenCalledWith("/pricing/markup-matrix"));
 
-    expect(screen.queryByText("Создать правило")).toBeNull();
-    expect(screen.queryByText("Активировать")).toBeNull();
-    expect(screen.queryByText("Изм.")).toBeNull();
-    expect(screen.getByText("История")).toBeTruthy();
-    const cell = screen.getByTitle("MKR-00000001 v1");
-    expect(cell.tagName).toBe("SPAN");
-  });
-
-  it("create: POST /pricing/markup-rules с body (server-authoritative валидация на бэке)", async () => {
-    render(<MarkupAdminPage />);
-    await waitFor(() => expect(getMock).toHaveBeenCalledWith("/pricing/markup-matrix"));
-
-    fireEvent.click(screen.getByText("Создать правило"));
-    fireEvent.change(supplierInput(), { target: { value: "KOMPAS" } });
-    fireEvent.change(serviceInput(), { target: { value: "tours" } });
-    fireEvent.change(rateInput(), { target: { value: "0.1" } });
-    fireEvent.click(screen.getByText("Сохранить"));
-
-    await waitFor(() =>
-      expect(postMock).toHaveBeenCalledWith("/pricing/markup-rules", {
-        supplierCode: "KOMPAS",
-        serviceType: "tours",
-        rate: "0.1",
-        effectiveFrom: undefined,
-        effectiveTo: undefined,
-      }),
-    );
-  });
-
-  it("клиентская валидация ставки: «10» (percent-as-number) блокирует отправку", async () => {
-    render(<MarkupAdminPage />);
-    await waitFor(() => expect(getMock).toHaveBeenCalledWith("/pricing/markup-matrix"));
-
-    fireEvent.click(screen.getByText("Создать правило"));
-    fireEvent.change(supplierInput(), { target: { value: "KOMPAS" } });
-    fireEvent.change(serviceInput(), { target: { value: "tours" } });
-    fireEvent.change(rateInput(), { target: { value: "10" } });
-    fireEvent.click(screen.getByText("Сохранить"));
-
-    await waitFor(() => expect(screen.getByText(/Ставка: 0 ≤ x < 1/)).toBeTruthy());
-    expect(postMock).not.toHaveBeenCalled();
-  });
-
-  it("update с stale версии: серверный 409 показывается и список перечитывается (CAS)", async () => {
-    render(<MarkupAdminPage />);
-    await waitFor(() => expect(getMock).toHaveBeenCalledWith("/pricing/markup-rules?page=1&pageSize=20"));
-
-    fireEvent.click(screen.getByText("Изм."));
-    expect(screen.getByText("Редактирование правила")).toBeTruthy();
-    patchMock.mockRejectedValueOnce(
-      new Error("MarkupRule MKR-00000001 was modified concurrently (expected v1, current v2) — reload and retry"),
-    );
-    fireEvent.click(screen.getByText("Сохранить"));
-
-    await waitFor(() => expect(screen.getByText(/was modified concurrently/)).toBeTruthy());
-    await waitFor(() =>
-      expect((getMock as Mock).mock.calls.filter((c) => String(c[0]).startsWith("/pricing/markup-rules")).length).toBeGreaterThan(1),
-    );
-  });
-
-  it("history открывается в панели (MarkupRuleHistory audit)", async () => {
-    render(<MarkupAdminPage />);
-    await waitFor(() => expect(getMock).toHaveBeenCalledWith("/pricing/markup-rules?page=1&pageSize=20"));
-
-    fireEvent.click(screen.getByText("История"));
-    await waitFor(() =>
-      expect(getMock).toHaveBeenCalledWith("/pricing/markup-rules/MKR-00000001/history"),
-    );
-    await waitFor(() => expect(screen.getByText("История изменений")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("Kompastour").length).toBeGreaterThan(0));
+    expect(screen.queryByText("+ Добавить правило")).toBeNull();
+    expect(screen.queryByText("Изменить")).toBeNull();
   });
 });

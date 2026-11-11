@@ -1,612 +1,470 @@
 "use client";
 
-/**
- * Supplier Markup (PHASE 4 §4.1/§4.2) — Admin «Supplier × Service» матрица
- * наценок + MarkupRule lifecycle UX.
- *
- * Матрица рендерится из GET /pricing/markup-matrix: строки/колонки приходят
- * из реестров поставщиков (SupplierAdapterRegistry ∪ FlightSupplierRegistry) —
- * на клиенте НЕТ хардкод-списков поставщиков/сервисов (Gate A). Ячейка
- * кликабельна только при pricing.markup.manage (create с prefill key);
- * NOT_CONFIGURED (0%) визуально отличим от CONFIGURED. Lifecycle:
- * create (DRAFT) → update (CAS expectedVersion → серверный 409 показывается
- * как ошибка + reload версий) → activate / archive + history.
- */
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { WorkspacePageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import PageHeader from "@/components/PageHeader";
-import StatusBadge from "@/components/StatusBadge";
 import PanelFrame from "@/components/PanelFrame";
-import Pagination from "@/components/Pagination";
-import CommissionRulesPanel from "@/components/pricing/CommissionRulesPanel";
-import { useLocale, t } from "@/lib/i18n";
+import { api } from "@/lib/api";
 import { useCan } from "@/lib/use-can";
-import {
-  formatRatePercent,
-  pricingApi,
-  type MarkupMatrix,
-  type MarkupRule,
-  type MarkupRuleHistoryItem,
-  type MarkupRuleList,
-} from "@/lib/pricing-api";
 
-interface FormState {
-  code?: string;
+type ServiceType = string;
+
+interface MarkupCell {
+  supplierCode: string;
+  serviceType: string;
+  state: "CONFIGURED" | "NOT_CONFIGURED";
+  rate: string;
+  ruleCode: string | null;
+  ruleVersion: number | null;
+}
+interface MarkupMatrix {
+  services: string[];
+  suppliers: Array<{ code: string; name: string; enabled: boolean }>;
+  cells: MarkupCell[];
+}
+interface CommissionCell {
+  supplierCode: string;
+  serviceType: string;
+  state: string;
+  commissionType: string;
+  rate: string | null;
+  fixedAmount: string | null;
+  calculationBase: string;
+  ruleCode: string | null;
+}
+interface CommissionMatrix {
+  services: string[];
+  suppliers: Array<{ code: string; name: string; enabled: boolean }>;
+  cells: CommissionCell[];
+}
+interface MarkupRule {
+  id: string;
+  code: string;
   supplierCode: string;
   serviceType: string;
   rate: string;
-  effectiveFrom: string;
-  effectiveTo: string;
-  expectedVersion?: number;
+  status: "DRAFT" | "ACTIVE" | "ARCHIVED";
+  version: number;
+}
+interface CommissionRule {
+  id: string;
+  code: string;
+  supplierCode: string;
+  serviceType: string;
+  commissionType: string;
+  rate: string | null;
+  fixedAmount: string | null;
+  fixedCurrency: string | null;
+  calculationBase: string;
+  status: "DRAFT" | "ACTIVE" | "ARCHIVED";
+  version: number;
+}
+interface PricingRow {
+  key: string;
+  supplierCode: string;
+  supplierName: string;
+  serviceType: string;
+  markup: MarkupCell | undefined;
+  commission: CommissionCell | undefined;
+  markupRule: MarkupRule | undefined;
+  commissionRule: CommissionRule | undefined;
+}
+interface FormState {
+  key?: string;
+  supplierCode: string;
+  serviceType: string;
+  markupPercent: string;
+  commissionPercent: string;
 }
 
-const EMPTY_FORM: FormState = {
-  supplierCode: "",
-  serviceType: "",
-  rate: "",
-  effectiveFrom: "",
-  effectiveTo: "",
+const EMPTY: FormState = { supplierCode: "", serviceType: "", markupPercent: "0", commissionPercent: "0" };
+const SERVICE_LABELS: Record<string, string> = {
+  tours: "Туры",
+  hotels: "Отели",
+  flights: "Авиабилеты",
+  sanatoriums: "Санатории",
+  visas: "Визы",
+  transfers: "Трансферы",
+  insurance: "Страхование",
+  excursions: "Экскурсии",
 };
 
-const PAGE_SIZE = 20;
-const RATE_RE = /^0(\.\d{1,6})?$/;
-
-const pad2 = (n: number) => String(n).padStart(2, "0");
-
-/** ISO → value для <input type="datetime-local"> (локальная зона браузера). */
-const isoToLocalInput = (iso: string | null | undefined): string => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+const serviceLabel = (service: string) => SERVICE_LABELS[service] ?? service;
+const num = (value: string | null | undefined) => Number(value ?? 0);
+const percent = (rate: string | null | undefined) => {
+  const n = num(rate) * 100;
+  if (!Number.isFinite(n)) return "0,00 %";
+  return `${n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} %`;
 };
-
-/** <input type="datetime-local"> value → ISO (или undefined = server default). */
-const localInputToIso = (value: string): string | undefined => {
-  if (!value.trim()) return undefined;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+const percentValue = (value: string) => {
+  const n = Number(String(value).replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
 };
+const rateToInput = (rate: string | null | undefined) =>
+  String(Number((num(rate) * 100).toFixed(2)));
+const decimalRate = (value: string) => String(percentValue(value) / 100);
 
-const shortDate = (iso: string | null): string => (iso ? iso.slice(0, 10) : "—");
+function statusOf(row: PricingRow): "ACTIVE" | "DRAFT" | "EMPTY" {
+  if (row.markupRule?.status === "ACTIVE" || row.commissionRule?.status === "ACTIVE") return "ACTIVE";
+  if (row.markupRule?.status === "DRAFT" || row.commissionRule?.status === "DRAFT") return "DRAFT";
+  return "EMPTY";
+}
 
-function MarkupAdminContent() {
-  const locale = useLocale();
+export default function MarkupAdminPage() {
   const canManage = useCan("pricing.markup.manage");
-
-  const [matrix, setMatrix] = useState<MarkupMatrix | null>(null);
-  const [list, setList] = useState<MarkupRuleList | null>(null);
-  const [page, setPage] = useState(1);
-  const [supplierFilter, setSupplierFilter] = useState("");
-  const [serviceFilter, setServiceFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [markupMatrix, setMarkupMatrix] = useState<MarkupMatrix | null>(null);
+  const [commissionMatrix, setCommissionMatrix] = useState<CommissionMatrix | null>(null);
+  const [markupRules, setMarkupRules] = useState<MarkupRule[]>([]);
+  const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [history, setHistory] = useState<{ code: string; items: MarkupRuleHistoryItem[] } | null>(null);
+  const [error, setError] = useState("");
+  const [serviceFilter, setServiceFilter] = useState("");
+  const [supplierFilter, setSupplierFilter] = useState("");
+  const [search, setSearch] = useState("");
+  const [form, setForm] = useState<FormState | null>(null);
 
-  const loadMatrix = useCallback(async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
     try {
-      setMatrix(await pricingApi.matrix());
+      const [markup, commission, mr, cr] = await Promise.all([
+        api.get<MarkupMatrix>("/pricing/markup-matrix"),
+        api.get<CommissionMatrix>("/pricing/commission-matrix"),
+        api.get<{ items: MarkupRule[] }>("/pricing/markup-rules?pageSize=100"),
+        api.get<{ items: CommissionRule[] }>("/pricing/commission-rules?pageSize=100"),
+      ]);
+      setMarkupMatrix(markup);
+      setCommissionMatrix(commission);
+      setMarkupRules(mr.items ?? []);
+      setCommissionRules(cr.items ?? []);
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setLoading(false);
     }
   }, []);
-
-  const loadRules = useCallback(
-    async (p: number, supplier: string, service: string, status: string) => {
-      setBusy(true);
-      try {
-        setList(
-          await pricingApi.rules.list({
-            page: p,
-            pageSize: PAGE_SIZE,
-            supplierCode: supplier || undefined,
-            serviceType: service || undefined,
-            status: status || undefined,
-          }),
-        );
-      } catch (e) {
-        setError((e as Error).message);
-        setList(null);
-      } finally {
-        setBusy(false);
-      }
-    },
-    [],
-  );
-
-  const reload = useCallback(
-    (p = page, supplier = supplierFilter, service = serviceFilter, status = statusFilter) => {
-      void loadMatrix();
-      void loadRules(p, supplier, service, status);
-    },
-    [loadMatrix, loadRules, page, supplierFilter, serviceFilter, statusFilter],
-  );
 
   useEffect(() => {
-    reload(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void load();
+  }, [load]);
 
-  const openCreate = (prefill: Partial<FormState> = {}) => {
-    setForm({ ...EMPTY_FORM, ...prefill });
-    setShowForm(true);
-    setError("");
-  };
+  const rows = useMemo<PricingRow[]>(() => {
+    const suppliers = new Map<string, string>();
+    for (const supplier of [...(markupMatrix?.suppliers ?? []), ...(commissionMatrix?.suppliers ?? [])]) {
+      if (!suppliers.has(supplier.code)) suppliers.set(supplier.code, supplier.name);
+    }
+    const services = new Set<string>([...(markupMatrix?.services ?? []), ...(commissionMatrix?.services ?? [])]);
+    const activeFor = <T extends { supplierCode: string; serviceType: string; status: string }>(rules: T[], supplier: string, service: string) =>
+      rules.find((r) => r.supplierCode === supplier && r.serviceType === service && r.status === "ACTIVE") ??
+      rules.find((r) => r.supplierCode === supplier && r.serviceType === service && r.status === "DRAFT");
 
-  const openEdit = (rule: MarkupRule) => {
-    setForm({
-      code: rule.code,
-      supplierCode: rule.supplierCode,
-      serviceType: rule.serviceType,
-      rate: rule.rate,
-      effectiveFrom: isoToLocalInput(rule.effectiveFrom),
-      effectiveTo: isoToLocalInput(rule.effectiveTo),
-      expectedVersion: rule.version,
+    const result: PricingRow[] = [];
+    for (const [supplierCode, supplierName] of suppliers) {
+      for (const serviceType of services) {
+        const markup = markupMatrix?.cells.find((c) => c.supplierCode === supplierCode && c.serviceType === serviceType);
+        const commission = commissionMatrix?.cells.find((c) => c.supplierCode === supplierCode && c.serviceType === serviceType);
+        result.push({
+          key: `${supplierCode}:${serviceType}`,
+          supplierCode,
+          supplierName,
+          serviceType,
+          markup,
+          commission,
+          markupRule: activeFor(markupRules, supplierCode, serviceType),
+          commissionRule: activeFor(commissionRules, supplierCode, serviceType),
+        });
+      }
+    }
+    return result.sort((a, b) => a.serviceType.localeCompare(b.serviceType) || a.supplierName.localeCompare(b.supplierName));
+  }, [markupMatrix, commissionMatrix, markupRules, commissionRules]);
+
+  const visibleRows = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return rows.filter((row) => {
+      if (serviceFilter && row.serviceType !== serviceFilter) return false;
+      if (supplierFilter && row.supplierCode !== supplierFilter) return false;
+      if (!needle) return true;
+      return `${row.supplierCode} ${row.supplierName} ${row.serviceType} ${serviceLabel(row.serviceType)}`.toLowerCase().includes(needle);
     });
-    setShowForm(true);
+  }, [rows, serviceFilter, supplierFilter, search]);
+
+  const openRow = (row: PricingRow) => {
+    if (!canManage) return;
     setError("");
+    setForm({
+      key: row.key,
+      supplierCode: row.supplierCode,
+      serviceType: row.serviceType,
+      markupPercent: rateToInput(row.markup?.rate),
+      commissionPercent: rateToInput(row.commission?.rate),
+    });
   };
 
-  const handleSave = async () => {
-    const supplierCode = form.supplierCode.trim();
-    const serviceType = form.serviceType.trim();
-    if (!supplierCode || !serviceType || !form.rate.trim()) {
-      setError(t("markup.form.required", locale));
+  const save = async () => {
+    if (!form) return;
+    if (!form.supplierCode || !form.serviceType) {
+      setError("Выберите поставщика и услугу.");
       return;
     }
-    if (!RATE_RE.test(form.rate.trim())) {
-      setError(t("markup.form.rate_invalid", locale));
+    const markupPercent = percentValue(form.markupPercent);
+    const commissionPercent = percentValue(form.commissionPercent);
+    if (markupPercent < 0 || markupPercent > 100 || commissionPercent < 0 || commissionPercent > 100) {
+      setError("Наценка и комиссия должны быть в диапазоне 0–100%.");
       return;
     }
     setSaving(true);
     setError("");
     try {
-      if (form.code) {
-        const effectiveTo = form.effectiveTo.trim();
-        await pricingApi.rules.update(form.code, {
-          rate: form.rate.trim(),
-          effectiveFrom: localInputToIso(form.effectiveFrom),
-          effectiveTo: effectiveTo ? localInputToIso(effectiveTo) ?? null : null,
-          expectedVersion: form.expectedVersion,
-        });
-      } else {
-        await pricingApi.rules.create({
-          supplierCode,
-          serviceType,
-          rate: form.rate.trim(),
-          effectiveFrom: localInputToIso(form.effectiveFrom),
-          effectiveTo: localInputToIso(form.effectiveTo),
-        });
-      }
-      setShowForm(false);
-      reload();
+      await saveMarkupRule(form.supplierCode, form.serviceType, markupPercent);
+      await saveCommissionRule(form.supplierCode, form.serviceType, commissionPercent);
+      setForm(null);
+      await load();
     } catch (e) {
-      // 409 (stale expectedVersion / overlap) — показать серверное сообщение
-      // и перечитать список, чтобы версии в UI были свежими.
       setError((e as Error).message);
-      reload();
     } finally {
       setSaving(false);
     }
   };
 
-  const handleActivate = async (rule: MarkupRule) => {
-    setError("");
-    try {
-      await pricingApi.rules.activate(rule.code);
-      reload();
-    } catch (e) {
-      setError((e as Error).message);
-      reload();
+  const saveMarkupRule = async (supplierCode: string, serviceType: string, markupPercent: number) => {
+    const existing = markupRules.find((r) => r.supplierCode === supplierCode && r.serviceType === serviceType && r.status !== "ARCHIVED");
+    const targetRate = decimalRate(String(markupPercent));
+    if (markupPercent <= 0) {
+      if (existing) await api.post(`/pricing/markup-rules/${existing.code}/archive`, {});
+      return;
     }
+    if (existing?.status === "DRAFT") {
+      await api.patch(`/pricing/markup-rules/${existing.code}`, { rate: targetRate, expectedVersion: existing.version });
+      await api.post(`/pricing/markup-rules/${existing.code}/activate`, {});
+      return;
+    }
+    if (existing?.status === "ACTIVE" && num(existing.rate) === Number(targetRate)) return;
+    if (existing) await api.post(`/pricing/markup-rules/${existing.code}/archive`, {});
+    const created = await api.post<MarkupRule>("/pricing/markup-rules", { supplierCode, serviceType, rate: targetRate });
+    await api.post(`/pricing/markup-rules/${created.code}/activate`, {});
   };
 
-  const handleArchive = async (rule: MarkupRule) => {
-    setError("");
-    try {
-      await pricingApi.rules.archive(rule.code);
-      reload();
-    } catch (e) {
-      setError((e as Error).message);
-      reload();
+  const saveCommissionRule = async (supplierCode: string, serviceType: string, commissionPercent: number) => {
+    const existing = commissionRules.find((r) => r.supplierCode === supplierCode && r.serviceType === serviceType && r.status !== "ARCHIVED");
+    const targetRate = decimalRate(String(commissionPercent));
+    if (commissionPercent <= 0) {
+      if (existing) await api.post(`/pricing/commission-rules/${existing.code}/archive`, {});
+      return;
     }
+    if (existing?.status === "DRAFT") {
+      await api.patch(`/pricing/commission-rules/${existing.code}`, {
+        rate: targetRate,
+        commissionType: "PERCENT",
+        calculationBase: "SUPPLIER_BASE",
+        expectedVersion: existing.version,
+      });
+      await api.post(`/pricing/commission-rules/${existing.code}/activate`, {});
+      return;
+    }
+    if (existing?.status === "ACTIVE" && num(existing.rate) === Number(targetRate)) return;
+    if (existing) await api.post(`/pricing/commission-rules/${existing.code}/archive`, {});
+    const created = await api.post<CommissionRule>("/pricing/commission-rules", {
+      supplierCode,
+      serviceType,
+      commissionType: "PERCENT",
+      rate: targetRate,
+      calculationBase: "SUPPLIER_BASE",
+    });
+    await api.post(`/pricing/commission-rules/${created.code}/activate`, {});
   };
 
-  const openHistory = async (rule: MarkupRule) => {
-    setError("");
-    try {
-      const res = await pricingApi.rules.history(rule.code);
-      setHistory({ code: rule.code, items: res.items });
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
+  const suppliers = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of rows) map.set(row.supplierCode, row.supplierName);
+    return [...map.entries()].map(([code, name]) => ({ code, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows]);
+  const services = useMemo(() => [...new Set(rows.map((r) => r.serviceType))].sort(), [rows]);
 
-  const cellOf = (supplierCode: string, serviceType: string) =>
-    matrix?.cells.find((c) => c.supplierCode === supplierCode && c.serviceType === serviceType);
-
-  const rules = list?.items ?? [];
+  if (loading) return <WorkspacePageSkeleton />;
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <PageHeader
-        title={t("nav.markup_matrix", locale)}
-        breadcrumbs={["TravelHub", t("nav.markup_matrix", locale)]}
+        title="Наценки и комиссионные"
+        breadcrumbs={["TravelHub", "Цены и правила", "Наценки и комиссионные"]}
         actions={
-          <button
-            type="button"
-            onClick={() => reload()}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
-          >
-            {t("admin.table.refresh", locale)}
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => void load()} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Обновить
+            </button>
+            {canManage && (
+              <button type="button" onClick={() => setForm({ ...EMPTY })} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                + Добавить правило
+              </button>
+            )}
+          </div>
         }
       />
 
-      <div className="space-y-6 p-6">
-        <CommissionRulesPanel />
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>
-        )}
+      <div className="space-y-4 p-6">
+        {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
 
-        {/* ── §4.1 Supplier × Service matrix ─────────────────────────────── */}
+        <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <label className="text-xs font-medium text-slate-600">
+            <span className="mb-1 block">Услуга</span>
+            <select value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} className="min-w-44 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900">
+              <option value="">Все услуги</option>
+              {services.map((service) => <option key={service} value={service}>{serviceLabel(service)}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-medium text-slate-600">
+            <span className="mb-1 block">Поставщик</span>
+            <select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)} className="min-w-48 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900">
+              <option value="">Все поставщики</option>
+              {suppliers.map((supplier) => <option key={supplier.code} value={supplier.code}>{supplier.name}</option>)}
+            </select>
+          </label>
+          <label className="min-w-64 flex-1 text-xs font-medium text-slate-600">
+            <span className="mb-1 block">Поиск</span>
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Поиск по поставщику / услуге / стране" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400" />
+          </label>
+          <span className="ml-auto text-xs text-slate-500">Всего правил: {visibleRows.length}</span>
+        </div>
+
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">{t("markup.matrix.title", locale)}</h2>
-            <span className="text-xs text-slate-500">{t("markup.matrix.hint", locale)}</span>
-          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-900">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-700">
                 <tr>
-                  <th className="px-4 py-2.5 font-medium">{t("markup.matrix.supplier", locale)}</th>
-                  {(matrix?.services ?? []).map((svc) => (
-                    <th key={svc} className="px-4 py-2.5 font-medium">
-                      {svc}
-                    </th>
-                  ))}
+                  <th className="px-4 py-3 font-semibold">№</th>
+                  <th className="px-4 py-3 font-semibold">Услуга</th>
+                  <th className="px-4 py-3 font-semibold">Поставщик</th>
+                  <th className="px-4 py-3 font-semibold">Страна / Регион</th>
+                  <th className="px-4 py-3 text-right font-semibold">Наценка (Markup)</th>
+                  <th className="px-4 py-3 text-right font-semibold">Комиссия (Commission)</th>
+                  <th className="px-4 py-3 font-semibold">Итоговое правило</th>
+                  <th className="px-4 py-3 font-semibold">Статус</th>
+                  <th className="px-4 py-3 font-semibold" />
                 </tr>
               </thead>
               <tbody>
-                {(matrix?.suppliers ?? []).map((supplier) => (
-                  <tr key={supplier.code} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                    <td className="px-4 py-2.5">
-                      <div className="font-mono text-xs font-semibold text-slate-900">{supplier.code}</div>
-                      <div className="text-xs text-slate-500">{supplier.name}</div>
-                    </td>
-                    {(matrix?.services ?? []).map((svc) => {
-                      const cell = cellOf(supplier.code, svc);
-                      if (!cell) {
-                        return (
-                          <td key={svc} className="px-4 py-2.5 text-slate-300">
-                            —
-                          </td>
-                        );
-                      }
-                      const configured = cell.state === "CONFIGURED";
-                      const inner = (
-                        <>
-                          <span className={`font-semibold ${configured ? "text-slate-900" : "text-slate-500"}`}>
-                            {formatRatePercent(cell.rate)}
-                          </span>
-                          {!configured && (
-                            <span className="ml-1 block text-[11px] text-slate-400">
-                              {t("markup.matrix.not_configured", locale)}
-                            </span>
-                          )}
-                        </>
-                      );
-                      const cls = `block w-full rounded-lg px-2 py-1 text-left text-sm transition-colors ${
-                        configured
-                          ? "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                          : "bg-slate-50 hover:bg-slate-100"
-                      }`;
-                      const title = cell.ruleCode
-                        ? `${cell.ruleCode} v${cell.ruleVersion ?? ""}`
-                        : t("markup.matrix.hint", locale);
-                      return (
-                        <td key={svc} className="px-4 py-2.5">
-                          {canManage ? (
-                            <button
-                              type="button"
-                              title={title}
-                              onClick={() => openCreate({ supplierCode: supplier.code, serviceType: svc })}
-                              className={cls}
-                            >
-                              {inner}
-                            </button>
-                          ) : (
-                            <span className={cls} title={title}>
-                              {inner}
-                            </span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-                {(matrix?.suppliers ?? []).length === 0 && (
-                  <tr>
-                    <td colSpan={(matrix?.services.length ?? 0) + 1} className="px-4 py-8 text-center text-sm text-slate-900">
-                      {t("markup.matrix.empty", locale)}
-                    </td>
-                  </tr>
+                {visibleRows.map((row, index) => {
+                  const status = statusOf(row);
+                  const markup = num(row.markup?.rate) > 0 ? percent(row.markup?.rate) : "0,00 %";
+                  const commission = num(row.commission?.rate) > 0 ? percent(row.commission?.rate) : "0,00 %";
+                  const finalRule = num(row.markup?.rate) > 0 && num(row.commission?.rate) > 0
+                    ? `Наценка ${markup} + Комиссия ${commission}`
+                    : num(row.markup?.rate) > 0
+                      ? `Наценка ${markup}`
+                      : num(row.commission?.rate) > 0
+                        ? `Комиссия ${commission}`
+                        : "Не настроено";
+                  return (
+                    <tr key={row.key} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/80">
+                      <td className="px-4 py-3 text-slate-500">{index + 1}</td>
+                      <td className="px-4 py-3 font-medium text-slate-900">{serviceLabel(row.serviceType)}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-slate-900">{row.supplierName}</div>
+                        <div className="font-mono text-[11px] text-slate-400">{row.supplierCode}</div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">Все страны</td>
+                      <td className="px-4 py-3 text-right">
+                        <button type="button" onClick={() => openRow(row)} disabled={!canManage} className="rounded-lg px-2 py-1 font-semibold text-slate-900 enabled:hover:bg-blue-50 disabled:cursor-default">
+                          {markup}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button type="button" onClick={() => openRow(row)} disabled={!canManage} className="rounded-lg px-2 py-1 font-semibold text-slate-900 enabled:hover:bg-blue-50 disabled:cursor-default">
+                          {commission}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                          num(row.markup?.rate) > 0 || num(row.commission?.rate) > 0
+                            ? "bg-amber-50 text-amber-800"
+                            : "bg-slate-100 text-slate-500"
+                        }`}>{finalRule}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+                          status === "ACTIVE"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : status === "DRAFT"
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-slate-100 text-slate-500"
+                        }`}>
+                          <span className={`size-1.5 rounded-full ${status === "ACTIVE" ? "bg-emerald-500" : status === "DRAFT" ? "bg-amber-500" : "bg-slate-400"}`} />
+                          {status === "ACTIVE" ? "Активно" : status === "DRAFT" ? "Черновик" : "Не настроено"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {canManage && (
+                          <button type="button" onClick={() => openRow(row)} className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                            Изменить
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {visibleRows.length === 0 && (
+                  <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-slate-500">Правил не найдено</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </section>
 
-        {/* ── §4.2 MarkupRule list ───────────────────────────────────────── */}
-        <section className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">{t("markup.rules.title", locale)}</h2>
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={supplierFilter}
-                onChange={(e) => {
-                  setSupplierFilter(e.target.value);
-                  setPage(1);
-                  reload(1, e.target.value, serviceFilter, statusFilter);
-                }}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-400"
-              >
-                <option value="">{t("markup.filter.all_suppliers", locale)}</option>
-                {(matrix?.suppliers ?? []).map((s) => (
-                  <option key={s.code} value={s.code}>
-                    {s.code}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={serviceFilter}
-                onChange={(e) => {
-                  setServiceFilter(e.target.value);
-                  setPage(1);
-                  reload(1, supplierFilter, e.target.value, statusFilter);
-                }}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-400"
-              >
-                <option value="">{t("markup.filter.all_services", locale)}</option>
-                {(matrix?.services ?? []).map((svc) => (
-                  <option key={svc} value={svc}>
-                    {svc}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPage(1);
-                  reload(1, supplierFilter, serviceFilter, e.target.value);
-                }}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-400"
-              >
-                <option value="">{t("markup.filter.all_statuses", locale)}</option>
-                <option value="DRAFT">DRAFT</option>
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="ARCHIVED">ARCHIVED</option>
-              </select>
-              {canManage && (
-                <button
-                  type="button"
-                  onClick={() => openCreate()}
-                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
-                >
-                  {t("markup.actions.create", locale)}
-                </button>
-              )}
-              {busy && <span className="text-xs text-slate-900">{t("admin.table.loading", locale)}</span>}
-            </div>
-          </div>
-
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-900">
-                <tr>
-                  <th className="px-4 py-2.5 font-medium">{t("markup.table.code", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("markup.table.supplier", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("markup.table.service", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("markup.table.rate", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("markup.table.status", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("markup.table.period", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("markup.table.version", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("markup.table.actions", locale)}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rules.map((rule) => (
-                  <tr key={rule.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                    <td className="px-4 py-2.5 font-mono text-xs font-semibold text-slate-900">{rule.code}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-slate-900">{rule.supplierCode}</td>
-                    <td className="px-4 py-2.5 text-xs text-slate-900">{rule.serviceType}</td>
-                    <td className="px-4 py-2.5 font-semibold text-slate-900">{formatRatePercent(rule.rate)}</td>
-                    <td className="px-4 py-2.5">
-                      <StatusBadge status={rule.status} />
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-slate-900">
-                      {shortDate(rule.effectiveFrom)} → {shortDate(rule.effectiveTo)}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-slate-900">v{rule.version}</td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex gap-2">
-                        {canManage && rule.status === "DRAFT" && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => openEdit(rule)}
-                              className="text-xs font-medium text-blue-600 hover:text-blue-800"
-                            >
-                              {t("markup.actions.edit", locale)}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleActivate(rule)}
-                              className="text-xs font-medium text-emerald-600 hover:text-emerald-800"
-                            >
-                              {t("markup.actions.activate", locale)}
-                            </button>
-                          </>
-                        )}
-                        {canManage && rule.status !== "ARCHIVED" && (
-                          <button
-                            type="button"
-                            onClick={() => void handleArchive(rule)}
-                            className="text-xs font-medium text-red-600 hover:text-red-800"
-                          >
-                            {t("markup.actions.archive", locale)}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => void openHistory(rule)}
-                          className="text-xs font-medium text-slate-600 hover:text-slate-800"
-                        >
-                          {t("markup.actions.history", locale)}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {rules.length === 0 && !busy && (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-900">
-                      {t("ops.empty_no_data", locale)}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {list && (
-            <Pagination page={page} pageSize={PAGE_SIZE} total={list.total} onPageChange={(p) => {
-              setPage(p);
-              reload(p);
-            }} />
-          )}
+        <section className="rounded-xl border border-blue-100 bg-blue-50/60 px-5 py-4 text-sm text-slate-700">
+          <div className="font-semibold text-slate-900">Как работает правило</div>
+          <p className="mt-1 leading-6">
+            Итоговая цена = цена поставщика × (1 + наценка). Комиссия — доход платформы, она не увеличивает цену для клиента.
+          </p>
+          <p className="mt-2 text-xs text-slate-500">
+            Пример: поставщик 1 000 AZN, наценка 2,50% → клиент 1 025 AZN; комиссия 7% → доход платформы 70 AZN.
+          </p>
         </section>
       </div>
 
-      {/* ── Create / edit rule panel (CAS) ───────────────────────────────── */}
-      {showForm && (
-        <PanelFrame
-          title={form.code ? t("markup.form.edit_title", locale) : t("markup.form.create_title", locale)}
-          subtitle={form.code ?? undefined}
-          onClose={() => {
-            setShowForm(false);
-          }}
-        >
-          <div className="space-y-3 p-4">
-            <label className="block text-xs font-medium text-slate-900">
-              {t("markup.form.supplier", locale)}
-              <input
-                list="markup-supplier-codes"
-                value={form.supplierCode}
-                disabled={Boolean(form.code)}
-                onChange={(e) => setForm((f) => ({ ...f, supplierCode: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-sm text-slate-900 outline-none focus:border-blue-400 disabled:bg-slate-50 disabled:text-slate-500"
-              />
-            </label>
-            <label className="block text-xs font-medium text-slate-900">
-              {t("markup.form.service", locale)}
-              <input
-                list="markup-service-types"
-                value={form.serviceType}
-                disabled={Boolean(form.code)}
-                onChange={(e) => setForm((f) => ({ ...f, serviceType: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-sm text-slate-900 outline-none focus:border-blue-400 disabled:bg-slate-50 disabled:text-slate-500"
-              />
-            </label>
-            <label className="block text-xs font-medium text-slate-900">
-              {t("markup.form.rate", locale)}
-              <input
-                value={form.rate}
-                onChange={(e) => setForm((f) => ({ ...f, rate: e.target.value }))}
-                placeholder="0.05"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-400"
-              />
-              <span className="mt-1 block text-[11px] text-slate-500">{t("markup.form.rate_hint", locale)}</span>
-            </label>
-            <label className="block text-xs font-medium text-slate-900">
-              {t("markup.form.effective_from", locale)}
-              <input
-                type="datetime-local"
-                value={form.effectiveFrom}
-                onChange={(e) => setForm((f) => ({ ...f, effectiveFrom: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-400"
-              />
-            </label>
-            <label className="block text-xs font-medium text-slate-900">
-              {t("markup.form.effective_to", locale)}
-              <input
-                type="datetime-local"
-                value={form.effectiveTo}
-                onChange={(e) => setForm((f) => ({ ...f, effectiveTo: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-400"
-              />
-            </label>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void handleSave()}
-              className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-            >
-              {saving ? t("admin.table.loading", locale) : t("markup.actions.save", locale)}
-            </button>
-          </div>
-          <datalist id="markup-supplier-codes">
-            {(matrix?.suppliers ?? []).map((s) => (
-              <option key={s.code} value={s.code} />
-            ))}
-          </datalist>
-          <datalist id="markup-service-types">
-            {(matrix?.services ?? []).map((svc) => (
-              <option key={svc} value={svc} />
-            ))}
-          </datalist>
-        </PanelFrame>
-      )}
-
-      {/* ── Rule history (MarkupRuleHistory audit) ───────────────────────── */}
-      {history && (
-        <PanelFrame
-          title={t("markup.history.title", locale)}
-          subtitle={history.code}
-          onClose={() => setHistory(null)}
-        >
-          <div className="divide-y divide-slate-100">
-            {history.items.map((item) => (
-              <div key={item.id} className="px-4 py-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-slate-900">
-                    {item.action} · v{item.version}
-                  </span>
-                  <span className="text-xs text-slate-500">{item.createdAt.slice(0, 19).replace("T", " ")}</span>
-                </div>
-                {item.comment && <div className="mt-0.5 text-xs text-slate-600">{item.comment}</div>}
-                {item.actorName && <div className="text-xs text-slate-500">{item.actorName}</div>}
-              </div>
-            ))}
-            {history.items.length === 0 && (
-              <div className="px-4 py-6 text-center text-sm text-slate-500">{t("markup.history.empty", locale)}</div>
-            )}
+      {form && (
+        <PanelFrame title={form.key ? "Изменить правило" : "Новое правило"} subtitle={form.key ? `${form.supplierCode} · ${serviceLabel(form.serviceType)}` : undefined} onClose={() => setForm(null)}>
+          <div className="space-y-4 p-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-medium text-slate-600">
+                <span className="mb-1 block">Поставщик</span>
+                <select value={form.supplierCode} disabled={Boolean(form.key)} onChange={(e) => setForm({ ...form, supplierCode: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 disabled:bg-slate-50">
+                  <option value="">Выберите поставщика</option>
+                  {suppliers.map((supplier) => <option key={supplier.code} value={supplier.code}>{supplier.name}</option>)}
+                </select>
+              </label>
+              <label className="text-xs font-medium text-slate-600">
+                <span className="mb-1 block">Услуга</span>
+                <select value={form.serviceType} disabled={Boolean(form.key)} onChange={(e) => setForm({ ...form, serviceType: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 disabled:bg-slate-50">
+                  <option value="">Выберите услугу</option>
+                  {services.map((service) => <option key={service} value={service}>{serviceLabel(service)}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-medium text-slate-600">
+                <span className="mb-1 block">Наценка (Markup), %</span>
+                <input type="number" min="0" max="100" step="0.01" value={form.markupPercent} onChange={(e) => setForm({ ...form, markupPercent: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400" />
+                <span className="mt-1 block text-[11px] text-slate-400">Увеличивает цену для клиента.</span>
+              </label>
+              <label className="text-xs font-medium text-slate-600">
+                <span className="mb-1 block">Комиссия (Commission), %</span>
+                <input type="number" min="0" max="100" step="0.01" value={form.commissionPercent} onChange={(e) => setForm({ ...form, commissionPercent: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400" />
+                <span className="mt-1 block text-[11px] text-slate-400">Доход платформы, не увеличивает цену.</span>
+              </label>
+            </div>
+            <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              Итоговое правило: наценка {percentValue(form.markupPercent).toLocaleString("ru-RU")}% + комиссия {percentValue(form.commissionPercent).toLocaleString("ru-RU")}%
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setForm(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600">Отмена</button>
+              <button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                {saving ? "Сохраняем…" : "Сохранить"}
+              </button>
+            </div>
           </div>
         </PanelFrame>
       )}
     </div>
-  );
-}
-
-export default function MarkupAdminPage() {
-  return (
-    <Suspense fallback={<WorkspacePageSkeleton />}>
-      <MarkupAdminContent />
-    </Suspense>
   );
 }
