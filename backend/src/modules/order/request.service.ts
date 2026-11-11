@@ -1547,7 +1547,10 @@ export class RequestService {
       // without losing the audit trail of the notification.
       await tx.userNotification.updateMany({
         where: {
-          type: "DEAL_CREATED",
+          OR: [
+            { type: "DEAL_CREATED" },
+            { type: { startsWith: "REQUEST_" } },
+          ],
           entityType: "Request",
           entityId: requestId,
           readAt: null,
