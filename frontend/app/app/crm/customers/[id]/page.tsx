@@ -13,7 +13,7 @@ import { useLocale, t, formatPrice } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
 import TableExportButton from "@/components/TableExportButton";
 
-type Tab = "overview" | "orders" | "bookings" | "payments" | "partners" | "refunds" | "notes" | "activity";
+type Tab = "overview" | "requests" | "orders" | "bookings" | "payments" | "partners" | "refunds" | "notes" | "activity";
 
 function useQueryState() {
   const [tab, setTab] = useState<Tab>("overview");
@@ -23,7 +23,7 @@ function useQueryState() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get("tab");
-    if (tabParam && ["overview", "orders", "bookings", "payments", "partners", "refunds", "notes", "activity"].includes(tabParam)) {
+    if (tabParam && ["overview", "requests", "orders", "bookings", "payments", "partners", "refunds", "notes", "activity"].includes(tabParam)) {
       setTab(tabParam as Tab);
     }
     const sortByParam = params.get("sortBy");
@@ -121,7 +121,7 @@ export default function Customer360Page() {
     );
   }
 
-  const tabs: Tab[] = ["overview", "activity", "orders", "bookings", "payments", "partners", "refunds", "notes"];
+  const tabs: Tab[] = ["overview", "requests", "activity", "orders", "bookings", "payments", "partners", "refunds", "notes"];
 
   return (
     <div className="flex h-full flex-col">
@@ -162,7 +162,8 @@ export default function Customer360Page() {
                 <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.col.email", locale)}</div><div className="break-all font-medium text-slate-700">{customer.email}</div></div>
                 <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.create.form.phone", locale)}</div><div className="font-medium text-slate-700">{customer.phone ?? "—"}</div></div>
               </div>
-              <div className="grid grid-cols-5 gap-3 text-xs">
+              <div className="grid grid-cols-3 gap-3 text-xs md:grid-cols-6">
+                <div className="rounded-lg bg-indigo-50 px-4 py-3 text-center"><div className="font-bold text-indigo-700">{customer.summary.totalRequests}</div><div className="text-indigo-500">Заявки</div></div>
                 <div className="rounded-lg bg-blue-50 px-4 py-3 text-center"><div className="font-bold text-blue-700">{customer.summary.totalOrders}</div><div className="text-blue-500">{t("crm.detail.total_orders", locale)}</div></div>
                 <div className="rounded-lg bg-green-50 px-4 py-3 text-center"><div className="font-bold text-green-700">{customer.summary.totalBookings}</div><div className="text-green-500">{t("crm.detail.total_bookings", locale)}</div></div>
                 <div className="rounded-lg bg-purple-50 px-4 py-3 text-center"><div className="font-bold text-purple-700">{customer.summary.totalPayments}</div><div className="text-purple-500">{t("crm.detail.total_payments", locale)}</div></div>
@@ -175,6 +176,50 @@ export default function Customer360Page() {
           {/* Activity — Timeline via CrmActivity read model */}
           {tab === "activity" && (
             <CustomerActivity customerId={id} />
+          )}
+
+          {/* Requests — first card before Orders */}
+          {tab === "requests" && (
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs font-medium text-slate-600">
+                Заявки клиента
+              </div>
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-4 py-2.5">Заявка</th>
+                    <th className="px-4 py-2.5">Услуга</th>
+                    <th className="px-4 py-2.5">Цена</th>
+                    <th className="px-4 py-2.5">Статус</th>
+                    <th className="px-4 py-2.5">Создана</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customer.requests.length > 0 ? customer.requests.map((r) => (
+                    <tr key={r.id} className="border-b border-slate-50 hover:bg-indigo-50/30">
+                      <td className="px-4 py-2.5">
+                        <div className="font-mono text-blue-600">{r.referenceNumber}</div>
+                        <div className="text-[11px] text-slate-400">{r.code}</div>
+                      </td>
+                      <td className="max-w-[280px] px-4 py-2.5 text-slate-700">{r.serviceTitle || "—"}</td>
+                      <td className="px-4 py-2.5">
+                        {r.priceChanged ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-slate-400 line-through">{formatPrice(r.oldPrice, r.currency, locale) ?? "—"}</span>
+                            <span className="font-semibold text-emerald-700">{formatPrice(r.newPrice, r.currency, locale) ?? "—"}</span>
+                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">Цена изменена</span>
+                          </div>
+                        ) : (
+                          <span className="font-medium text-slate-700">{formatPrice(r.newPrice ?? r.oldPrice, r.currency, locale) ?? "—"}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5"><StatusBadge status={r.status} /></td>
+                      <td className="px-4 py-2.5 text-slate-500">{new Date(r.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Заявок нет</td></tr>}
+                </tbody>
+              </table>
+            </div>
           )}
 
           {/* Orders — TABLE with sortable headers + server-side status filter */}

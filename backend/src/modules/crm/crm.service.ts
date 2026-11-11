@@ -1409,8 +1409,49 @@ export class CrmService {
       new Prisma.Decimal(0),
     );
 
+    const requests = await this.prisma.request.findMany({
+      where: { customerId: id },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: {
+        id: true, code: true, referenceNumber: true, status: true,
+        displayedPrice: true, displayedCurrency: true,
+        confirmedPrice: true, confirmedCurrency: true,
+        supplierPriceProposal: true, productId: true, productSnapshot: true,
+        createdAt: true, updatedAt: true,
+      },
+    });
+    const requestProductIds = [...new Set(requests.map((r) => r.productId).filter((v): v is string => Boolean(v)))];
+    const requestProducts = requestProductIds.length
+      ? await this.prisma.product.findMany({ where: { id: { in: requestProductIds } }, select: { id: true, title: true } })
+      : [];
+    const requestProductTitles = new Map(requestProducts.map((p) => [p.id, p.title]));
+    const requestRows = requests.map((r) => {
+      const snapshot = (r.productSnapshot ?? {}) as Record<string, unknown>;
+      const oldPrice = r.displayedPrice?.toString() ?? null;
+      const newPrice = r.confirmedPrice?.toString() ?? r.supplierPriceProposal?.toString() ?? oldPrice;
+      const priceChanged = Boolean(
+        (r.supplierPriceProposal != null) ||
+        (r.confirmedPrice != null && r.displayedPrice != null && r.confirmedPrice.toString() !== r.displayedPrice.toString()),
+      );
+      return {
+        id: r.id,
+        code: r.code,
+        referenceNumber: r.referenceNumber,
+        status: r.status,
+        serviceTitle: String(snapshot.productTitle ?? (r.productId ? requestProductTitles.get(r.productId) : "") ?? "—").replace(/\s+/g, " ").trim(),
+        oldPrice,
+        newPrice,
+        currency: r.confirmedCurrency ?? r.displayedCurrency ?? "AZN",
+        priceChanged,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      };
+    });
+
     return {
       ...customer,
+      requests: requestRows,
       orders,
       bookings,
       payments: enrichedPayments,
@@ -1445,6 +1486,7 @@ export class CrmService {
       },
       refunds: enrichedRefunds,
       summary: {
+        totalRequests: requestRows.length,
         totalOrders,
         totalBookings,
         totalPayments,

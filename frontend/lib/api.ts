@@ -205,6 +205,19 @@ export interface CustomerDetail extends Customer {
   contacts: { id: string; code: string; name: string; email: string | null; phone: string | null; role: string | null }[];
   history: { id: string; action: string; from: string | null; to: string | null; comment: string | null; createdAt: string }[];
   partnerRelations: PartnerCustomerRelation[];
+  requests: {
+    id: string;
+    code: string;
+    referenceNumber: string;
+    status: string;
+    serviceTitle: string;
+    oldPrice: string | null;
+    newPrice: string | null;
+    currency: string;
+    priceChanged: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }[];
   orders: { id: string; code: string; referenceNumber: string; number: string; status: string; paymentStatus: string; amount: string; paidAmount: string; currency: string; createdAt: string }[];
   bookings: { id: string; code: string; referenceNumber: string; status: string; amount: string; currency: string; orderId: string; productId: string; createdAt: string }[];
   payments: { id: string; code: string; referenceNumber: string; status: string; amount: string; currency: string; orderId: string; paymentMethod: string | null; orderCode: string; orderNumber: string | null; createdAt: string; paidAt: string | null }[];
@@ -234,7 +247,7 @@ export interface CustomerDetail extends Customer {
   }[];
   supplierSummary: { total: number; paidAzn: string; remainingAzn: string };
   refunds: { id: string; code: string; referenceNumber: string | null; amount: string; currency: string; status: string; reason: string | null; paymentId: string; orderId: string; paymentCode: string | null; orderCode: string | null; orderNumber: string | null; createdAt: string; processedAt: string | null }[];
-  summary: { totalOrders: number; totalBookings: number; totalPayments: number; totalRefunds: number };
+  summary: { totalRequests: number; totalOrders: number; totalBookings: number; totalPayments: number; totalRefunds: number };
 }
 
 export interface CustomerPartner {

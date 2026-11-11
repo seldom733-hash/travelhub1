@@ -1061,6 +1061,18 @@ export class RequestService {
       },
     });
 
+    await this.notifyRequestPriceChanged(
+      request.id,
+      request.referenceNumber,
+      request.customerId,
+      request.commerceSequence,
+      String((request.productSnapshot as Record<string, unknown> | null)?.productTitle ?? "Услуга"),
+      (request.confirmedPrice ?? request.displayedPrice)?.toString() ?? null,
+      platformPrice,
+      updated.confirmedCurrency ?? request.confirmedCurrency ?? request.displayedCurrency ?? "AZN",
+      updated.version,
+    );
+
     return this.requestDto(updated);
   }
 
@@ -1558,6 +1570,22 @@ export class RequestService {
         data: { readAt: new Date() },
       });
 
+      // The new-deal reminder lives until the request becomes an Order.
+      // Mark it read (not delete) so it disappears from the unread badge
+      // without losing the audit trail of the notification.
+      await tx.userNotification.updateMany({
+        where: {
+          OR: [
+            { type: "DEAL_CREATED" },
+            { type: { startsWith: "REQUEST_" } },
+          ],
+          entityType: "Request",
+          entityId: requestId,
+          readAt: null,
+        },
+        data: { readAt: new Date() },
+      });
+
       await this.security.audit(tx as any, {
         userId: actor.id,
         username: actor.username,
@@ -1825,6 +1853,50 @@ export class RequestService {
       version: r.version,
     };
   }
+  private async notifyRequestPriceChanged(
+    requestId: string,
+    referenceNumber: string,
+    customerId: string | null,
+    commerceSequence: string,
+    serviceTitle: string,
+    oldPrice: string | null,
+    newPrice: number,
+    currency: string,
+    version: number,
+  ): Promise<void> {
+    if (!customerId) return;
+    try {
+      const users = await this.prisma.user.findMany({
+        where: { status: "ACTIVE", customerId, role: { code: "BUYER" } },
+        select: { id: true },
+      });
+      if (users.length === 0) return;
+      const money = (value: string | number | null) => value == null ? "—" : String(value);
+      await this.prisma.userNotification.createMany({
+        data: users.map((u) => ({
+          recipientId: u.id,
+          type: "REQUEST_PRICE_CHANGED",
+          entityType: "Request",
+          entityId: requestId,
+          title: `Цена заявки изменена: ${referenceNumber}`,
+          body: `${serviceTitle}: ${money(oldPrice)} → ${money(newPrice)} ${currency}`,
+          payload: {
+            requestId,
+            referenceNumber,
+            sequence: commerceSequence,
+            oldPrice: oldPrice == null ? null : String(oldPrice),
+            newPrice: String(newPrice),
+            currency,
+          },
+          dedupeKey: `request-price-changed:${requestId}:${version}:${u.id}`,
+        })),
+        skipDuplicates: true,
+      });
+    } catch {
+      // Price notification must not roll back the commercial change.
+    }
+  }
+
   private async notifyDealCreated(requestId: string, referenceNumber: string, customerId: string | null): Promise<void> {
     try {
       const [users, customer] = await Promise.all([

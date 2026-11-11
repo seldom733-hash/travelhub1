@@ -95,6 +95,26 @@ export class AccountController {
     return this.account.getOwnOrders(user.id, query.page, query.pageSize);
   }
 
+  @Get("notifications")
+  getOwnNotifications(@CurrentUser() user: AuthedRequest["user"], @Query() query: OwnCabinetQuery) {
+    this.assertBuyerActor(user);
+    return this.account.getOwnNotifications(user.id, query.page, query.pageSize);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Patch("notifications/read-all")
+  markAllOwnNotificationsRead(@CurrentUser() user: AuthedRequest["user"]) {
+    this.assertBuyerActor(user);
+    return this.account.markAllOwnNotificationsRead(user.id);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Patch("notifications/:id/read")
+  markOwnNotificationRead(@CurrentUser() user: AuthedRequest["user"], @Req() req: Request) {
+    this.assertBuyerActor(user);
+    return this.account.markOwnNotificationRead(user.id, String((req.params as Record<string, string>).id));
+  }
+
   @RequirePermissions("account.booking.read_own")
   @Get("bookings")
   getOwnBookings(@CurrentUser() user: AuthedRequest["user"], @Query() query: OwnCabinetQuery) {

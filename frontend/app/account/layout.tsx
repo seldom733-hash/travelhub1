@@ -59,6 +59,7 @@ export default function BuyerAccountLayout({ children }: { children: React.React
   const nav = [
     { href: "/account", label: t("account.overview", locale), exact: true },
     { href: "/account/profile", label: t("account.profile", locale) },
+    { href: "/account/notifications", label: t("account.notifications", locale) },
     { href: "/account/orders", label: t("account.orders", locale) },
     { href: "/account/bookings", label: t("account.bookings", locale) },
     { href: "/account/payments", label: t("account.payments", locale) },

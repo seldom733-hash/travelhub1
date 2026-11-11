@@ -181,6 +181,48 @@ export class AccountService {
    * клиент не может передать/подменить customerId — query/body игнорируются.
    */
 
+  /** Own-scope notifications for the Buyer Cabinet (price changes, statuses). */
+  async getOwnNotifications(userId: string, page = 1, pageSize = 20) {
+    const where = { recipientId: userId };
+    const [total, rows] = await Promise.all([
+      this.prisma.userNotification.count({ where }),
+      this.prisma.userNotification.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true, type: true, entityType: true, entityId: true,
+          title: true, body: true, payload: true, readAt: true, createdAt: true,
+        },
+      }),
+    ]);
+    return {
+      items: rows.map((r) => ({ ...r, createdAt: isoUtc(r.createdAt), readAt: isoOrNull(r.readAt) })),
+      total,
+      page,
+      pageSize,
+      hasMore: page * pageSize < total,
+      unread: rows.filter((r) => !r.readAt).length,
+    };
+  }
+
+  async markOwnNotificationRead(userId: string, notificationId: string) {
+    await this.prisma.userNotification.updateMany({
+      where: { id: notificationId, recipientId: userId, readAt: null },
+      data: { readAt: new Date() },
+    });
+    return { ok: true };
+  }
+
+  async markAllOwnNotificationsRead(userId: string) {
+    await this.prisma.userNotification.updateMany({
+      where: { recipientId: userId, readAt: null },
+      data: { readAt: new Date() },
+    });
+    return { ok: true };
+  }
+
   /** Own-scope заказы (§7): Order.customerId == actor.customerId. Пагинация §8. */
   async getOwnOrders(userId: string, page = 1, pageSize = 20): Promise<OwnOrdersResult> {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { customerId: true } });
