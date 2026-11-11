@@ -181,6 +181,17 @@ export class AccountService {
    * клиент не может передать/подменить customerId — query/body игнорируются.
    */
 
+  /** Ownership guard for buyer-initiated Request decisions. */
+  async assertOwnRequest(userId: string, requestId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { customerId: true, username: true } });
+    if (!user?.customerId) throw new NotFoundError("Customer profile is not linked");
+    const request = await this.prisma.request.findUnique({ where: { id: requestId }, select: { id: true, customerId: true, status: true, referenceNumber: true } });
+    if (!request || request.customerId !== user.customerId) {
+      throw new NotFoundError(`Request ${requestId} not found`);
+    }
+    return { requestId: request.id, status: request.status, referenceNumber: request.referenceNumber, username: user.username };
+  }
+
   /** Own-scope requests for the Buyer Cabinet (before they become orders). */
   async getOwnRequests(userId: string, page = 1, pageSize = 20) {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { customerId: true } });

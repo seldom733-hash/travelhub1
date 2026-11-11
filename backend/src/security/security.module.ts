@@ -12,6 +12,7 @@ import { PartnerOnboardingController } from "./partner/partner-onboarding.contro
 import { LoginThrottleService } from "../shared/login-throttle.service";
 import { CrmModule } from "../modules/crm/crm.module";
 import { DocumentsModule } from "../modules/documents/documents.module";
+import { RequestModule } from "../modules/order/request.module";
 import { JwtAuthGuard } from "./auth/jwt-auth.guard";
 import { PermissionsGuard } from "./auth/permissions.guard";
 
@@ -37,6 +38,7 @@ import { PermissionsGuard } from "./auth/permissions.guard";
     }),
     CrmModule,
     DocumentsModule,
+    RequestModule,
   ],
   controllers: [AuthController, UsersController, AccountController, PartnerOnboardingController],
   providers: [SecurityService, AuthService, ActivationService, AccountService, PartnerOnboardingService, JwtAuthGuard, PermissionsGuard, LoginThrottleService],

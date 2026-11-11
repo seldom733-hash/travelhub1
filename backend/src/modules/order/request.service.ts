@@ -981,7 +981,9 @@ export class RequestService {
    * Supplier action: confirm current price.
    */
   async confirmPrice(requestId: string, actor: Actor, note?: string): Promise<Record<string, unknown>> {
-    return this.supplierAction(requestId, "CONFIRMED", "CONFIRMED", actor, note);
+    const result = await this.supplierAction(requestId, "CONFIRMED", "CONFIRMED", actor, note);
+    await this.notifyRequestPriceConfirmed(requestId);
+    return result;
   }
 
   /**
@@ -1586,6 +1588,22 @@ export class RequestService {
         data: { readAt: new Date() },
       });
 
+      // The new-deal reminder lives until the request becomes an Order.
+      // Mark it read (not delete) so it disappears from the unread badge
+      // without losing the audit trail of the notification.
+      await tx.userNotification.updateMany({
+        where: {
+          OR: [
+            { type: "DEAL_CREATED" },
+            { type: { startsWith: "REQUEST_" } },
+          ],
+          entityType: "Request",
+          entityId: requestId,
+          readAt: null,
+        },
+        data: { readAt: new Date() },
+      });
+
       await this.security.audit(tx as any, {
         userId: actor.id,
         username: actor.username,
@@ -1853,6 +1871,50 @@ export class RequestService {
       version: r.version,
     };
   }
+  private async notifyRequestPriceConfirmed(requestId: string): Promise<void> {
+    try {
+      const request = await this.prisma.request.findUnique({
+        where: { id: requestId },
+        select: {
+          id: true, referenceNumber: true, customerId: true, commerceSequence: true,
+          displayedPrice: true, confirmedPrice: true, confirmedCurrency: true,
+          displayedCurrency: true, productSnapshot: true,
+        },
+      });
+      if (!request?.customerId) return;
+      const users = await this.prisma.user.findMany({
+        where: { status: "ACTIVE", customerId: request.customerId, role: { code: "BUYER" } },
+        select: { id: true },
+      });
+      if (users.length === 0) return;
+      const price = (request.confirmedPrice ?? request.displayedPrice)?.toString() ?? null;
+      const currency = request.confirmedCurrency ?? request.displayedCurrency ?? "AZN";
+      const title = String((request.productSnapshot as Record<string, unknown> | null)?.productTitle ?? "Услуга").replace(/\s+/g, " ").trim();
+      await this.prisma.userNotification.createMany({
+        data: users.map((u) => ({
+          recipientId: u.id,
+          type: "REQUEST_PRICE_CONFIRMED",
+          entityType: "Request",
+          entityId: request.id,
+          title: `Цена заявки подтверждена: ${request.referenceNumber}`,
+          body: `${title}: ${price ?? "—"} ${currency}`,
+          payload: {
+            requestId: request.id,
+            referenceNumber: request.referenceNumber,
+            sequence: request.commerceSequence,
+            oldPrice: price,
+            newPrice: price,
+            currency,
+          },
+          dedupeKey: `request-price-confirmed:${request.id}:${price}:${u.id}`,
+        })),
+        skipDuplicates: true,
+      });
+    } catch {
+      // Notification must not roll back the price confirmation.
+    }
+  }
+
   private async notifyRequestPriceChanged(
     requestId: string,
     referenceNumber: string,

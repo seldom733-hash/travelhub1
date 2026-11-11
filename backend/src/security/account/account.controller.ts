@@ -1,8 +1,9 @@
-import { Body, Controller, ForbiddenException, Get, HttpCode, HttpStatus, Patch, Query, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpCode, HttpStatus, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { IsEmail, IsInt, IsOptional, IsString, Max, MaxLength, Min } from "class-validator";
 import { Type } from "class-transformer";
 import { AccountService, type OwnProfileResult, type UpdateOwnProfileInput } from "./account.service";
 import { DocumentsService } from "../../modules/documents/documents.service";
+import { RequestService } from "../../modules/order/request.service";
 import { CurrentUser, RequirePermissions } from "../auth/decorators";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { assertNoForbiddenKeys, PROFILE_FORBIDDEN_KEYS } from "../../shared/field-validation";
@@ -68,6 +69,7 @@ export class AccountController {
   constructor(
     private readonly account: AccountService,
     private readonly documents: DocumentsService,
+    private readonly requests: RequestService,
   ) {}
 
   /** Строгий role-gate: кабинет доступен ТОЛЬКО роли BUYER (§5, §3). */
@@ -100,6 +102,45 @@ export class AccountController {
   getOwnRequests(@CurrentUser() user: AuthedRequest["user"], @Query() query: OwnCabinetQuery) {
     this.assertBuyerActor(user);
     return this.account.getOwnRequests(user.id, query.page, query.pageSize);
+  }
+
+  /**
+   * Buyer decision on a confirmed/changed price. ACCEPT also tries to convert
+   * the request into an Order; DECLINE closes the request as cancelled by the
+   * customer.
+   */
+  @Post("requests/:id/decision")
+  @HttpCode(HttpStatus.OK)
+  async decideOwnRequest(
+    @CurrentUser() user: AuthedRequest["user"],
+    @Req() req: Request,
+    @Body() body: { decision?: "ACCEPT" | "DECLINE" },
+  ) {
+    this.assertBuyerActor(user);
+    const decision = body?.decision;
+    if (decision !== "ACCEPT" && decision !== "DECLINE") {
+      throw new BadRequestException("decision must be ACCEPT or DECLINE");
+    }
+    const requestId = String((req.params as Record<string, string>).id);
+    const own = await this.account.assertOwnRequest(user.id, requestId);
+    const actor = { id: user.id, username: own.username };
+    if (decision === "DECLINE") {
+      await this.requests.customerDecline(requestId, actor);
+      return { ok: true, decision, status: "CANCELLED_BY_CUSTOMER", closed: true };
+    }
+    await this.requests.customerAccept(requestId, actor);
+    try {
+      await this.requests.convertRequestToOrder(requestId, actor);
+      return { ok: true, decision, status: "CONVERTED", converted: true };
+    } catch (error) {
+      return {
+        ok: true,
+        decision,
+        status: "CUSTOMER_ACCEPTED",
+        converted: false,
+        message: error instanceof Error ? error.message : "Order conversion is pending",
+      };
+    }
   }
 
   @Get("notifications")

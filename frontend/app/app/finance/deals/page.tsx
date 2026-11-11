@@ -30,9 +30,9 @@ const KPI: KpiCard[] = [
 const EMPTY: DealKpi = { salesAmount: "0", costAmount: "0", grossMargin: "0", clientReceived: "0", clientDebt: "0", clientRefunded: "0", supplierPaid: "0", supplierDebt: "0", supplierRefunded: "0", clientPenalty: "0", supplierPenalty: "0", expectedIncome: "0", currentIncome: "0", cancelledSalesAmount: "0", lostIncome: "0", cancellationIncome: "0", cancellationLoss: "0", writeOffExpense: "0", cancelledCount: 0, currency: "AZN", count: 0 };
 const label: Record<string, string> = {
   NEW: "Новая", CHECKING: "Проверка", SUPPLIER_TIMEOUT: "Поставщик не ответил", PRICE_CHANGED: "Цена изменилась",
-  CUSTOMER_ACCEPTED: "Клиент согласовал", CONFIRMED: "Подтверждён", CONVERTED: "Сконвертирован", REJECTED: "Отклонён",
+  CUSTOMER_ACCEPTED: "Клиент подтвердил", CONFIRMED: "Подтверждён", CONVERTED: "Сконвертирован", REJECTED: "Отклонён",
   UNAVAILABLE: "Недоступно", EXPIRED: "Истёк", CUSTOMER_PAYMENT_TIMEOUT: "Клиент не оплатил вовремя",
-  CANCELLED_BY_CUSTOMER: "Отменён клиентом", IN_PROCESSING: "В работе", WAITING_FOR_DATA: "Ждём данные",
+  CANCELLED_BY_CUSTOMER: "Клиент отказался", IN_PROCESSING: "В работе", WAITING_FOR_DATA: "Ждём данные",
   READY_FOR_BOOKING: "Готова к брони", SENT_TO_BOOKING: "На бронировании", PARTIALLY_FULFILLED: "Частично исполнен",
   FULFILLED: "Выполнен", READY_TO_CLOSE: "Готов к закрытию", CLOSED: "Закрыт", CANCELLED: "Отменён", CANCELLATION_REQUESTED: "Отмена запрошена", CANCELLATION_APPROVED: "Отмена согласована",
   PROBLEM: "Проблема", SUSPENDED: "Приостановлен", COMPLETED: "Завершён",

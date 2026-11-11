@@ -27,6 +27,7 @@ export default function AccountNotificationsPage() {
   const [data, setData] = useState<NotificationsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [decisionBusy, setDecisionBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,6 +66,23 @@ export default function AccountNotificationsPage() {
     }
   };
 
+  const decide = async (row: NotificationRow, decision: "ACCEPT" | "DECLINE") => {
+    const requestId = String(row.payload?.requestId ?? row.entityId ?? "");
+    if (!requestId) return;
+    setDecisionBusy(row.id);
+    setError("");
+    try {
+      await api.post(`/account/requests/${requestId}/decision`, { decision });
+      await api.patch(`/account/notifications/${row.id}/read`, {});
+      window.dispatchEvent(new Event("account-notifications-updated"));
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDecisionBusy(null);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -93,12 +111,15 @@ export default function AccountNotificationsPage() {
 
       <div className="space-y-2">
         {data?.items.map((row) => {
-          const pricePayload = row.type === "REQUEST_PRICE_CHANGED" ? row.payload : null;
+          const pricePayload = row.type.startsWith("REQUEST_PRICE_") ? row.payload : null;
+          const actionable = row.type === "REQUEST_PRICE_CHANGED" || row.type === "REQUEST_PRICE_CONFIRMED";
           return (
-            <button
+            <div
               key={row.id}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => void markRead(row)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") void markRead(row); }}
               className={`block w-full rounded-xl border p-4 text-left transition-colors ${
                 row.readAt ? "border-slate-200 bg-white" : "border-blue-200 bg-blue-50/60 hover:bg-blue-50"
               }`}
@@ -124,7 +145,27 @@ export default function AccountNotificationsPage() {
                   {new Date(row.createdAt).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" })}
                 </span>
               </div>
-            </button>
+              {actionable && (
+                <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    disabled={decisionBusy === row.id}
+                    onClick={() => void decide(row, "ACCEPT")}
+                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    Подтвердить
+                  </button>
+                  <button
+                    type="button"
+                    disabled={decisionBusy === row.id}
+                    onClick={() => void decide(row, "DECLINE")}
+                    className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 disabled:opacity-50"
+                  >
+                    Отказаться
+                  </button>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>

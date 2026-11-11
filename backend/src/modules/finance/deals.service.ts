@@ -574,7 +574,7 @@ export class DealsService {
         cancelledSalesAmount: fixed(cancelledSalesAmount),
         lostIncome: fixed(lostIncome),
         currency: order?.currency ?? request.confirmedCurrency ?? request.displayedCurrency ?? "AZN",
-        financialStatus: settlement?.status ?? order?.financialStatus ?? "OPEN",
+        financialStatus: settlement?.status ?? order?.financialStatus ?? (["CANCELLED_BY_CUSTOMER", "REJECTED", "UNAVAILABLE", "EXPIRED"].includes(request.status) ? "CLOSED" : "OPEN"),
         paymentStatus: captured <= 0 ? "UNPAID" : captured >= sales ? "PAID" : "PARTIALLY_PAID",
         supplierPaymentStatus: supplierPaid <= 0 ? "UNPAID" : supplierPaid >= cost ? "PAID" : "PARTIALLY_PAID",
         cancellationReason: settlement?.cancellationReason ?? order?.cancellationReason ?? null,
