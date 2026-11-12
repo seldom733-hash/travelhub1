@@ -212,9 +212,7 @@ export default function CreatePaymentForm({
   const activeRefunded = clientRefunds
     .filter((refund) => ["REQUESTED", "APPROVED", "PROCESSED"].includes(refund.status))
     .reduce((sum, refund) => sum + Number(refund.amount), 0);
-  const displayedRefunded = clientRefunds.length > 0
-    ? historyRefunded
-    : Number(financials?.refundedAmount ?? 0);
+  const displayedRefunded = Math.max(historyRefunded, Number(financials?.refundedAmount ?? 0));
   const displayedTotal = Number(financials?.amount ?? 0);
   const netPaid = Math.max(0, displayedPaid - displayedRefunded);
   const displayedDue = Math.max(0, displayedTotal - netPaid);
