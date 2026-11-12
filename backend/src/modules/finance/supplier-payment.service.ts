@@ -222,6 +222,28 @@ export class SupplierPaymentService {
     if (direction === "INCOMING" && !payoutContext.orderId) {
       throw new ValidationDomainError("INCOMING supplier refund requires an orderId");
     }
+    if (direction === "INCOMING" && payoutContext.orderId) {
+      // A supplier refund cannot exceed what was actually paid to that supplier
+      // for this order, net of refunds already reserved/confirmed.
+      const [outgoingAgg, incomingAgg] = await Promise.all([
+        this.prisma.supplierPayout.aggregate({
+          where: { orderId: payoutContext.orderId, supplierCode, direction: "OUTGOING", status: "CONFIRMED" },
+          _sum: { amount: true },
+        }),
+        this.prisma.supplierPayout.aggregate({
+          where: { orderId: payoutContext.orderId, supplierCode, direction: "INCOMING", status: { in: ["PENDING", "CONFIRMED"] } },
+          _sum: { amount: true },
+        }),
+      ]);
+      const paidToSupplier = outgoingAgg._sum.amount ?? new Prisma.Decimal(0);
+      const alreadyRefunded = incomingAgg._sum.amount ?? new Prisma.Decimal(0);
+      const refundable = Prisma.Decimal.max(new Prisma.Decimal(0), paidToSupplier.minus(alreadyRefunded));
+      if (amount.greaterThan(refundable)) {
+        throw new ValidationDomainError(
+          `Supplier refund ${amount.toString()} exceeds refundable ${refundable.toString()} for order ${payoutContext.orderCode ?? payoutContext.orderId} (paid ${paidToSupplier.toString()}, already refunded ${alreadyRefunded.toString()})`,
+        );
+      }
+    }
 
     if (providerRef) {
       const existing = await this.prisma.supplierPayout.findUnique({ where: { providerRef } });

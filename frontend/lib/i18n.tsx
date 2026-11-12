@@ -2130,6 +2130,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   // ── MULTI/PARTIAL: редактируемая сумма + финансовый контекст заказа ────────
   "payments.create.order_total": { ru: "Стоимость заказа", az: "Sifariş məbləği", en: "Order total" },
   "payments.create.paid": { ru: "Оплачено", az: "Ödənilib", en: "Paid" },
+  "payments.create.refunded": { ru: "Возвращено", az: "Qaytarılıb", en: "Refunded" },
   "payments.create.due": { ru: "Осталось", az: "Qalıq", en: "Due" },
   "payments.create.amount_label": { ru: "Сумма платежа", az: "Ödəniş məbləği", en: "Payment amount" },
   "payments.create.amount_hint": { ru: "Не больше остатка к оплате, до 2 знаков после запятой", az: "Qalıq məbləğdən çox deyil, 2 simvola qədər", en: "Not more than the due balance, up to 2 decimal places" },

@@ -1261,9 +1261,10 @@ export class OrderService {
       where: { orderId: order.id },
     });
     const terminal = order.status === "CANCELLED";
+    const netPaidAmt = Prisma.Decimal.max(new Prisma.Decimal(0), paidAmt.minus(refundedAmt));
     const dueAmount = terminal
       ? new Prisma.Decimal(financialSettlement?.remainingToPay ?? 0)
-      : Prisma.Decimal.max(new Prisma.Decimal(0), totalAmt.minus(paidAmt));
+      : Prisma.Decimal.max(new Prisma.Decimal(0), totalAmt.minus(netPaidAmt));
     const refundableAmount = terminal && financialSettlement
       ? new Prisma.Decimal(financialSettlement.remainingToRefund)
       : Prisma.Decimal.max(new Prisma.Decimal(0), paidAmt.minus(refundedAmt));

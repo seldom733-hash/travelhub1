@@ -86,6 +86,7 @@ export default function CreatePaymentForm({
   const [direction, setDirection] = useState<"INCOME" | "EXPENSE">(defaultDirection);
   const [refundPayments, setRefundPayments] = useState<Array<{ id: string; code: string; amount: string; status: string }>>([]);
   const [clientPayments, setClientPayments] = useState<Array<{ id: string; code: string; amount: string; status: string }>>([]);
+  const [clientRefunds, setClientRefunds] = useState<Array<{ id: string; amount: string; status: string }>>([]);
   const [refundPaymentId, setRefundPaymentId] = useState("");
   const [reason, setReason] = useState("");
   const [initialNote, setInitialNote] = useState("");
@@ -155,9 +156,8 @@ export default function CreatePaymentForm({
       .then((f) => {
         if (!alive) return;
         setFinancials(f);
-        // dueAmount может отсутствовать в неполном DTO — не затираем ввод.
-        // Default = доступно к созданию (due − reserved): при активных платежах
-        // полный «Осталось» завышен относительно серверского due-guard.
+        // Immediate default from the server due (refund-aware in the canonical
+        // DTO); the derived effect below also accounts for refund rows.
         const available = availableToCreate(f);
         setAmount((prev) => (amountTouchedRef.current || available == null ? prev : available));
       })
@@ -176,18 +176,23 @@ export default function CreatePaymentForm({
   useEffect(() => {
     if (!open || !activeOrderId) return;
     let alive = true;
-    api.get<{ payments?: { payments?: Array<{ id: string; code: string; amount: string; status: string }> } }>(
+    api.get<{
+      payments?: { payments?: Array<{ id: string; code: string; amount: string; status: string }> };
+      refunds?: Array<{ id: string; amount: string; status: string }>;
+    }>(
       `/orders/${activeOrderId}/financial-history`,
     ).then((result) => {
       if (!alive) return;
       const all = result.payments?.payments ?? [];
       setClientPayments(all);
+      setClientRefunds(result.refunds ?? []);
       const captured = all.filter((payment) => payment.status === "CAPTURED");
       setRefundPayments(captured);
       setRefundPaymentId((current) => current || captured[0]?.id || "");
     }).catch(() => {
       if (alive) {
         setClientPayments([]);
+        setClientRefunds([]);
         setRefundPayments([]);
       }
     });
@@ -197,16 +202,37 @@ export default function CreatePaymentForm({
   const actualPaid = clientPayments
     .filter((payment) => ["CAPTURED", "PENDING", "AUTHORIZED"].includes(payment.status))
     .reduce((sum, payment) => sum + Number(payment.amount), 0);
+  const capturedPaid = clientPayments
+    .filter((payment) => payment.status === "CAPTURED")
+    .reduce((sum, payment) => sum + Number(payment.amount), 0);
   const displayedPaid = actualPaid > 0 ? actualPaid : Number(financials?.paidAmount ?? 0);
+  const historyRefunded = clientRefunds
+    .filter((refund) => refund.status === "PROCESSED")
+    .reduce((sum, refund) => sum + Number(refund.amount), 0);
+  const activeRefunded = clientRefunds
+    .filter((refund) => ["REQUESTED", "APPROVED", "PROCESSED"].includes(refund.status))
+    .reduce((sum, refund) => sum + Number(refund.amount), 0);
+  const displayedRefunded = clientRefunds.length > 0
+    ? historyRefunded
+    : Number(financials?.refundedAmount ?? 0);
   const displayedTotal = Number(financials?.amount ?? 0);
-  const displayedDue = Math.max(0, displayedTotal - displayedPaid);
+  const netPaid = Math.max(0, displayedPaid - displayedRefunded);
+  const displayedDue = Math.max(0, displayedTotal - netPaid);
+  const reservedAmount = Number(financials?.reservedAmount ?? 0);
+  const availableToPay = Math.max(0, displayedDue - reservedAmount);
+  const refundableAmount = Math.max(0, (capturedPaid > 0 ? capturedPaid : displayedPaid) - activeRefunded);
 
-  // Default «Сумма платежа» = фактический остаток (total − already paid).
+  // Default «Сумма платежа» = остаток долга клиента с учётом возвратов и
+  // активных (зарезервированных) платежей.
   // Не перетираем значение, если пользователь уже редактировал поле.
   useEffect(() => {
     if (!open || !financials || amountTouchedRef.current) return;
-    setAmount(displayedDue.toFixed(2));
-  }, [open, financials, displayedDue]);
+    if (direction === "EXPENSE") {
+      setAmount(refundableAmount.toFixed(2));
+      return;
+    }
+    setAmount(availableToPay.toFixed(2));
+  }, [open, financials, direction, availableToPay, refundableAmount]);
 
   // Order selector source (только когда заказ не предзадан).
   useEffect(() => {
@@ -246,8 +272,8 @@ export default function CreatePaymentForm({
   // Сервер (due-guard) остаётся authority в любом случае.
   const availableForValidation =
     direction === "EXPENSE"
-      ? displayedPaid.toFixed(2)
-      : (availableToCreate(financials) ?? displayedDue.toFixed(2));
+      ? refundableAmount.toFixed(2)
+      : availableToPay.toFixed(2);
   // Пустое поле допустимо: amount опционален сервер-side (платёж на весь
   // остаток); блокируем только НЕКОРРЕКТНОЕ непустое значение.
   const amountValid =
@@ -255,16 +281,6 @@ export default function CreatePaymentForm({
     !financialsLoading &&
     (trimmedAmount.length === 0 || isValidPaymentAmount(trimmedAmount, availableForValidation));
   const amountTouchedButInvalid = trimmedAmount.length > 0 && !isValidPaymentAmount(trimmedAmount, availableForValidation);
-  // Refund default = сумма фактически полученных платежей клиента, не остаток долга.
-  useEffect(() => {
-    if (!open || direction !== "EXPENSE") return;
-    const captured = clientPayments.filter((p) => p.status === "CAPTURED").reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    if (captured > 0) {
-      amountTouchedRef.current = false;
-      setAmount(captured.toFixed(2));
-    }
-  }, [open, direction, clientPayments]);
-
   const canSubmit =
     phase !== "submitting" &&
     phase !== "success" &&
@@ -277,6 +293,7 @@ export default function CreatePaymentForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return; // double-click / двойной POST — guarded
+    amountTouchedRef.current = true;
     setPhase("submitting");
     setErrorKey(null);
     setErrorMessage(null);
@@ -419,7 +436,7 @@ export default function CreatePaymentForm({
                   <div className="text-xs text-red-500">{t("payments.create.financials_error", locale)}</div>
                 ) : financials ? (
                   <>
-                    <dl className="grid grid-cols-3 gap-2 text-xs">
+                    <dl className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
                       <div>
                         <dt className="font-semibold uppercase tracking-wide text-slate-500">{t("payments.create.order_total", locale)}</dt>
                         <dd className="mt-0.5 text-sm text-slate-700" data-testid="create-payment-order-total">
@@ -430,6 +447,12 @@ export default function CreatePaymentForm({
                         <dt className="font-semibold uppercase tracking-wide text-slate-500">{t("payments.create.paid", locale)}</dt>
                         <dd className="mt-0.5 text-sm text-emerald-700" data-testid="create-payment-paid">
                           {fmtMoney(displayedPaid.toFixed(2), financials.currency, locale)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="font-semibold uppercase tracking-wide text-slate-500">{t("payments.create.refunded", locale)}</dt>
+                        <dd className="mt-0.5 text-sm text-rose-700" data-testid="create-payment-refunded">
+                          {fmtMoney(displayedRefunded.toFixed(2), financials.currency, locale)}
                         </dd>
                       </div>
                       <div>

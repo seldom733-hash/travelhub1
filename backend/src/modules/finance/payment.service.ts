@@ -171,9 +171,15 @@ export class PaymentService {
           where: { orderId: fresh.id, status: { in: [PaymentStatus.PENDING, PaymentStatus.AUTHORIZED] } },
           _sum: { amount: true },
         });
+        const refundedAgg = await tx.refund.aggregate({
+          where: { orderId: fresh.id, status: RefundStatus.PROCESSED },
+          _sum: { amount: true },
+        });
         const paidSum = paidAgg._sum.amount ?? new Prisma.Decimal(0);
+        const refundedSum = refundedAgg._sum.amount ?? new Prisma.Decimal(0);
         const reservedSum = reservedAgg._sum.amount ?? new Prisma.Decimal(0);
-        const available = new Prisma.Decimal(fresh.amount).minus(paidSum).minus(reservedSum);
+        const netPaidSum = Prisma.Decimal.max(new Prisma.Decimal(0), paidSum.minus(refundedSum));
+        const available = new Prisma.Decimal(fresh.amount).minus(netPaidSum).minus(reservedSum);
 
         // due-guard: 0 < amount <= available; без amount — весь остаток.
         let effectiveAmount: Prisma.Decimal;
@@ -183,7 +189,7 @@ export class PaymentService {
             throw new ValidationDomainError(
               `payment amount ${requestedAmount} exceeds remaining due ${available.toString()} for order ${fresh.code}` +
                 (available.lte(0)
-                  ? paidSum.gte(fresh.amount)
+                  ? netPaidSum.gte(fresh.amount)
                     ? " (order is fully paid)"
                     : " (remaining due reserved by active payments)"
                   : ""),
@@ -194,7 +200,7 @@ export class PaymentService {
           if (available.lte(0)) {
             throw new ValidationDomainError(
               `order ${fresh.code} has no remaining amount due ` +
-                (paidSum.gte(fresh.amount) ? "(fully paid)" : "(reserved by active payments)"),
+                (netPaidSum.gte(fresh.amount) ? "(fully paid)" : "(reserved by active payments)"),
             );
           }
           effectiveAmount = available;
