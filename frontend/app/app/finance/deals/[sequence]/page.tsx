@@ -884,6 +884,11 @@ function CancellationTab({ deal, onSaved }: { deal: DealRow; onSaved: () => void
   if (!deal.orderId) return <Empty text="Сначала создайте заказ" />;
   const body = { cancellationReason: reason, finalCustomerLiability: clientPenalty, clientPenaltyAmount: clientPenalty, supplierPenaltyAmount: supplierPenalty, penaltyAmount: clientPenalty, supplierPenaltyShare: supplierPenalty, platformPenaltyShare: String(Math.max(0, Number(clientPenalty) - Number(supplierPenalty))), reason: reasons.find(([k]) => k === reason)?.[1] ?? "Отмена" };
   async function calculate() {
+    const money = /^\d+(\.\d{1,2})?$/;
+    if (!money.test(clientPenalty) || !money.test(supplierPenalty)) {
+      setError("Введите штрафы в формате 0.00 — без пустых значений и лишних символов");
+      return;
+    }
     setBusy(true); setError("");
     try { setPreview(await api.post(`/orders/${deal.orderId}/financial-settlement/preview`, body)); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
@@ -909,8 +914,8 @@ function CancellationTab({ deal, onSaved }: { deal: DealRow; onSaved: () => void
     <div className="space-y-2 rounded-lg border border-[#e5e2da] p-3">
       <div className="flex items-center justify-between"><div className="text-[10px] font-semibold uppercase text-[#667085]">Условия отмены</div>{approval && <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold ${approval.status === "APPROVED" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : approval.status === "REJECTED" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>{approval.status}</span>}</div>
       <label className="grid gap-1 text-[11px]">Причина<select value={reason} onChange={(e) => setReason(e.target.value)} className="rounded border px-2 py-1.5">{reasons.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-      <label className="grid gap-1 text-[11px]">Штраф туриста<input value={clientPenalty} onChange={(e) => setClientPenalty(e.target.value)} inputMode="decimal" className="rounded border px-2 py-1.5" /></label>
-      <label className="grid gap-1 text-[11px]">Штраф поставщика<input value={supplierPenalty} onChange={(e) => setSupplierPenalty(e.target.value)} inputMode="decimal" className="rounded border px-2 py-1.5" /></label>
+      <label className="grid gap-1 text-[11px]">Штраф туриста<input value={clientPenalty} onChange={(e) => setClientPenalty(e.target.value.replace(/\s/g, "").replace(",", ".").replace(/[^\d.]/g, ""))} inputMode="decimal" className="rounded border px-2 py-1.5" /></label>
+      <label className="grid gap-1 text-[11px]">Штраф поставщика<input value={supplierPenalty} onChange={(e) => setSupplierPenalty(e.target.value.replace(/\s/g, "").replace(",", ".").replace(/[^\d.]/g, ""))} inputMode="decimal" className="rounded border px-2 py-1.5" /></label>
       <div className="flex gap-2"><button type="button" disabled={busy} onClick={() => void calculate()} className="rounded bg-[#0f6b5f] px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50">Рассчитать</button><button type="button" disabled={busy || !preview} onClick={() => void submit()} className="rounded border border-[#0f6b5f] px-3 py-1.5 text-[11px] font-semibold text-[#0f6b5f] disabled:opacity-50">На утверждение</button>{canApproveCancellation && <button type="button" disabled={busy} onClick={() => void approve()} className="rounded bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50">Утвердить</button>}<button type="button" disabled={busy} onClick={() => void reject()} className="rounded border border-rose-300 px-3 py-1.5 text-[11px] font-semibold text-rose-600 disabled:opacity-50">Отклонить</button></div>
       {error && <div className="rounded bg-rose-50 px-2 py-1 text-[10px] text-rose-700">{error}</div>}{notice && <div className="rounded bg-emerald-50 px-2 py-1 text-[10px] text-emerald-700">{notice}</div>}
     </div>
