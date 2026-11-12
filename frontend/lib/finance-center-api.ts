@@ -183,6 +183,7 @@ export interface SupplierPayment {
   comment: string | null;
   occurredAt: string;
   confirmedAt: string | null;
+  confirmedBy?: string | null;
   cancelledAt: string | null;
   actorId: string | null;
   version: number;

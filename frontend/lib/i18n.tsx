@@ -1167,7 +1167,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "nav.requests": { ru: "Заявки", az: "Sorğular", en: "Requests" },
   "nav.orders": { ru: "Заказы", az: "Sifarişlər", en: "Orders" },
   "nav.bookings": { ru: "Бронирования", az: "Bronlar", en: "Bookings" },
-  "nav.payments": { ru: "Платежи", az: "Ödənişlər", en: "Payments" },
+  "nav.payments": { ru: "Платежи и возвраты", az: "Ödənişlər və qaytarmalar", en: "Payments and refunds" },
   "nav.refunds": { ru: "Возвраты клиентам", az: "Müştəri qaytarmaları", en: "Client refunds" },
   "nav.finance": { ru: "Финансы", az: "Maliyyə", en: "Finance" },
   "nav.group.operations": { ru: "ОПЕРАЦИИ", az: "ƏMƏLİYYATLAR", en: "OPERATIONS" },

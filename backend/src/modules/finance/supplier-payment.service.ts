@@ -109,6 +109,7 @@ export interface SupplierPaymentDto {
   comment: string | null;
   occurredAt: string;
   confirmedAt: string | null;
+  confirmedBy: string | null;
   cancelledAt: string | null;
   actorId: string | null;
   version: number;
@@ -137,6 +138,7 @@ interface PaymentRow {
   comment: string | null;
   occurredAt: Date;
   confirmedAt: Date | null;
+  confirmedById: string | null;
   cancelledAt: Date | null;
   actorId: string | null;
   version: number;
@@ -1106,9 +1108,14 @@ export class SupplierPaymentService {
       ? await this.prisma.partner.findMany({ where: { id: { in: partnerIds } }, select: { id: true, code: true } })
       : [];
     const partnerCodes = new Map(partners.map((p) => [p.id, p.code]));
+    const confirmerIds = [...new Set(rows.map((r) => r.confirmedById).filter((id): id is string => !!id))];
+    const confirmers = confirmerIds.length
+      ? await this.prisma.user.findMany({ where: { id: { in: confirmerIds } }, select: { id: true, username: true, fullName: true } })
+      : [];
+    const confirmerNames = new Map(confirmers.map((u) => [u.id, u.fullName || u.username]));
 
     return rows.map((row) => {
-      return this.toDto(row, row.allocations, codes, obligationInfo, partnerCodes.get(row.partnerId ?? "") ?? null);
+      return this.toDto(row, row.allocations, codes, obligationInfo, partnerCodes.get(row.partnerId ?? "") ?? null, confirmerNames.get(row.confirmedById ?? "") ?? null);
     });
   }
 
@@ -1118,6 +1125,7 @@ export class SupplierPaymentService {
     codes: Map<string, string>,
     obligationInfo: Map<string, { id: string; code: string; sourceCurrency: string; fxRate: Prisma.Decimal | null }>,
     partnerCode: string | null,
+    confirmedBy: string | null,
   ): SupplierPaymentDto {
     const active = allocations.filter((a) => a.reversedAt == null);
     const allocated = active.reduce((sum, a) => sum.plus(a.aznAmount), new Prisma.Decimal(0));
@@ -1162,6 +1170,7 @@ export class SupplierPaymentService {
       comment: row.comment,
       occurredAt: row.occurredAt.toISOString(),
       confirmedAt: row.confirmedAt ? row.confirmedAt.toISOString() : null,
+      confirmedBy,
       cancelledAt: row.cancelledAt ? row.cancelledAt.toISOString() : null,
       actorId: row.actorId,
       version: row.version,

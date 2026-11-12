@@ -1,566 +1,254 @@
 "use client";
 
-/**
- * UI-C1.2F вЂ” Canonical Payments Operations Center tab (/app/payments).
- *
- * Vertical composition (ADR-OPS-014 / UI-C1.2F contract):
- *   OPERATIONS CENTER SHELL (breadcrumbs, tabs, period context)
- *   в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
- *   TOTAL                                  вЂ” ~15вЂ“20% larger, NOT full-width
- *   РЎРўРђРўРЈРЎР« РџР›РђРўР•Р–Р•Р™                       вЂ” 6/6 canonical PaymentStatus cards
- *   Р’РђР›Р®РўР«                                 вЂ” dynamic currency cards (server-authoritative)
- *   РЎРўРђРўРЈРЎР« Р’РћР—Р’Р РђРўРћР’                      вЂ” 4/4 canonical RefundStatus cards
- *   в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
- *   TOOLBAR: [Search][Reset][CSV][XLSX]
- *   TABLE
- *   PAGINATION
- *
- * KPI interaction model (В§9 / В§57):
- *   - One active card at a time (PaymentStatus XOR RefundStatus XOR currencyCard)
- *   - Clicked card filters TABLE ONLY вЂ” all other cards remain static overview values
- *   - Total resets card-level filter
- *   - URL state survives reload / Back / Forward
- *
- * UI-C1.2F.1F вЂ” table-header filtering:
- *   - Payment Status column header filter в†” paymentStatus (KPI same state)
- *   - Currency column header filter в†” currencyCard (KPI same state)
- *   - Refund Status: NO refund column exists in the actual table (row DTO has no
- *     refundStatus field) в†’ per audit-first rule NO invented header filter;
- *     refundStatus remains a full KPI-card + URL + server-query dimension.
- *   - Multi-dimension deep links (?paymentStatus+refundStatus / +currencyCard) are
- *     canonicalized deterministically (paymentStatus > refundStatus > currencyCard)
- *     with PURE render-time derivation + post-render router.replace вЂ” never a
- *     render-phase router/history mutation (same contract as UI-C1.2F.1D-R2).
- *
- * Backend contract (UI-C1.2E):
- *   GET /finance/payments в†’ { items, total, page, pageSize, hasMore, aggregates }
- *   aggregates = { total, paymentStatus{6}, refundStatus{4}, currency[{currency,count,amount}] }
- *
- * Currency-card compatibility (В§10):
- *   - `currency` = global/base scope (affects overview + table)
- *   - `currencyCard` = table-only active-card scope (overview unaffected)
- */
-
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { OperationsPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import OperationsCenterShell from "@/components/OperationsCenterShell";
 import { api } from "@/lib/api";
+import { useLocale, formatPrice, formatDate } from "@/lib/i18n";
 
-import Pagination from "@/components/Pagination";
-import { type SortDirection } from "@/components/SortableHeader";
-import TableHeaderFilter, { type FilterOption } from "@/components/TableHeaderFilter";
-import TableExportButton from "@/components/TableExportButton";
-import OperationsCenterShell, {
-  OperationsToolbarSlot,
-  OperationsRegistrySlot,
-  OperationsErrorState,
-  OperationsLoadingState,
-} from "@/components/OperationsCenterShell";
-import { useLocale, t, type Locale } from "@/lib/i18n";
-import { useCan } from "@/lib/use-can";
-import CreatePaymentForm from "@/components/finance/CreatePaymentForm";
-import PaymentsTable, { type PaymentsTableRow } from "@/components/finance/PaymentsTable";
+type Tab = "clients" | "suppliers";
 
-// в”Ђв”Ђ Canonical enum arrays (source: backend payments-registry.ts) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-
-const PAYMENT_STATUSES = ["PENDING", "AUTHORIZED", "CAPTURED", "FAILED", "CANCELLED", "REFUNDED"] as const;
-const REFUND_STATUSES = ["REQUESTED", "APPROVED", "PROCESSED", "FAILED"] as const;
-
-// в”Ђв”Ђ Locale helpers в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-
-function paymentStatusLabel(code: string, locale: Locale): string {
-  const key = `status.entity.${code}`;
-  const localized = t(key, locale);
-  return localized !== key ? localized : code.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function refundStatusLabel(code: string, locale: Locale): string {
-  const key = `status.entity.${code}`;
-  const localized = t(key, locale);
-  return localized !== key ? localized : code.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-/** Build PaymentStatus filter options for TableHeaderFilter from the canonical 6-value array. */
-function buildPaymentFilterOptions(locale: Locale): FilterOption[] {
-  return PAYMENT_STATUSES.map((s) => ({ value: s, label: paymentStatusLabel(s, locale) }));
-}
-
-/** Currency filter options — server-authoritative dynamic currency list (aggregates overview). */
-function currencyFilterOptions(agg?: PaymentAggregates): FilterOption[] {
-  return (agg?.currency ?? []).map((c) => ({ value: c.currency, label: c.currency }));
-}
-
-// в”Ђв”Ђ Payment row DTO (matches backend paymentDto enrichment) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-
-interface PaymentRow {
+interface ClientPayment {
   id: string;
   code: string;
   referenceNumber: string | null;
   orderId: string;
-  customerId: string | null;
-  partnerId: string | null;
+  orderReference: string | null;
+  amount: string;
+  currency: string;
+  paymentMethod: string | null;
+  status: string;
+  acceptedBy: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+interface ClientRefund {
+  id: string;
+  code: string;
+  referenceNumber: string | null;
+  orderId: string;
+  orderCode: string | null;
+  dealNumber: string | null;
   amount: string;
   currency: string;
   status: string;
-  paymentMethod: string | null;
-  providerRef: string | null;
-  paidAt: string | null;
-  failedAt: string | null;
-  cancelledAt: string | null;
-  version: number;
+  processedAt: string | null;
   createdAt: string;
-  orderReference: string | null;
-  // MULTI/PARTIAL В§7 enrichment (paymentDto list)
-  orderAmount: string | null;
-  ordinal: number | null;
-  remainingAfter: string | null;
-  acceptedBy: string | null;
 }
 
-interface PaymentAggregates {
-  total: number;
-  paymentStatus: Record<string, number>;
-  refundStatus: Record<string, number>;
-  currency: { currency: string; count: number; amount: string }[];
+interface SupplierPayment {
+  id: string;
+  code: string;
+  orderId: string | null;
+  orderCode: string | null;
+  direction: "OUTGOING" | "INCOMING";
+  amount: string;
+  currency: string;
+  method: string | null;
+  status: string;
+  confirmedBy?: string | null;
+  occurredAt: string;
+  createdAt: string;
 }
 
-interface PaymentListResponse {
-  items: PaymentRow[];
-  total: number;
-  page: number;
-  pageSize: number;
-  hasMore: boolean;
-  aggregates: PaymentAggregates;
+interface TableRow {
+  id: string;
+  deal: string;
+  code: string;
+  date: string;
+  amount: string;
+  currency: string;
+  method: string;
+  status: string;
+  acceptedBy: string;
+  kind: "payment" | "refund";
 }
 
-// в”Ђв”Ђ Main content component в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+const CLIENT_STATUS: Record<string, string> = {
+  PENDING: "Ожидает",
+  AUTHORIZED: "Авторизован",
+  CAPTURED: "Принят",
+  PAID: "Оплачен",
+  FAILED: "Ошибка",
+  CANCELLED: "Отменён",
+  REFUNDED: "Возвращён",
+  REQUESTED: "Отправлен на согласование",
+  APPROVED: "Согласован",
+  PROCESSED: "Исполнен",
+};
 
-function PaymentsContent({
-  initialSearch,
-  initialPaymentStatus,
-  initialRefundStatus,
-  initialCurrencyCard,
-  initialDateFrom,
-  initialDateTo,
-  initialSortBy,
-  initialSortDirection,
-  initialPage,
-}: {
-  initialSearch?: string;
-  initialPaymentStatus?: string;
-  initialRefundStatus?: string;
-  initialCurrencyCard?: string;
-  initialDateFrom?: string;
-  initialDateTo?: string;
-  initialSortBy?: string;
-  initialSortDirection?: SortDirection;
-  initialPage?: number;
-}) {
+const SUPPLIER_STATUS: Record<string, string> = {
+  PENDING: "Ожидает",
+  CONFIRMED: "Подтверждён",
+  CANCELLED: "Отменён",
+  FAILED: "Ошибка",
+};
+
+const METHOD: Record<string, string> = {
+  cash: "Наличные",
+  card: "Карта",
+  bank_transfer: "Банковский перевод",
+  bank: "Банковский перевод",
+  online: "Онлайн",
+  other: "Другое",
+};
+
+function statusLabel(value: string, kind: Tab): string {
+  return (kind === "clients" ? CLIENT_STATUS : SUPPLIER_STATUS)[value] ?? value;
+}
+
+function methodLabel(value: string | null): string {
+  if (!value) return "—";
+  return METHOD[value] ?? value;
+}
+
+function dateLabel(value: string | null): string {
+  if (!value) return "—";
+  return formatDate(value, "ru") ?? new Date(value).toLocaleDateString("ru-RU");
+}
+
+export default function PaymentsAndRefundsPage() {
   const locale = useLocale();
-
-  // в”Ђв”Ђ Create payment (prompt В§1: + РЎРѕР·РґР°С‚СЊ РїР»Р°С‚РµР¶, RBAC finance.payment.create) в”Ђ
-  const canCreatePayment = useCan("finance.payment.create");
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editingPayment, setEditingPayment] = useState<PaymentsTableRow | null>(null);
-
-  // в”Ђв”Ђ State в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-  const [data, setData] = useState<PaymentListResponse | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<Tab>("clients");
+  const [clientRows, setClientRows] = useState<TableRow[]>([]);
+  const [supplierRows, setSupplierRows] = useState<TableRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Search (live debounce)
-  const [searchDraft, setSearchDraft] = useState(initialSearch || "");
-  const [search, setSearch] = useState(initialSearch || "");
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Pagination
-  const [page, setPage] = useState(initialPage || 1);
-
-  // Active KPI card filters (one dimension at a time)
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState(initialPaymentStatus || "");
-  const [refundStatusFilter, setRefundStatusFilter] = useState(initialRefundStatus || "");
-  const [currencyCardFilter, setCurrencyCardFilter] = useState(initialCurrencyCard || "");
-
-  // Global scope filters (may re-scope overview)
-  const [dateFrom, setDateFrom] = useState(initialDateFrom || "");
-  const [dateTo, setDateTo] = useState(initialDateTo || "");
-
-  // UI-C1.2F.1B-R1: Sync dateFrom/dateTo when Header Period changes the URL.
   useEffect(() => {
-    setDateFrom(initialDateFrom || "");
-    setDateTo(initialDateTo || "");
-  }, [initialDateFrom, initialDateTo]);
-
-  // Sort
-  const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
-  const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
-
-  // в”Ђв”Ђ URL state (ADR-OPS-012) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-  const updateUrl = useCallback((params: Record<string, string | undefined>) => {
-    const sp = new URLSearchParams(window.location.search);
-    for (const [k, v] of Object.entries(params)) {
-      if (v) sp.set(k, v); else sp.delete(k);
-    }
-    const qs = sp.toString();
-    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
-  }, []);
-
-  // в”Ђв”Ђ Live search with debounce (~350ms) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-  const onSearchChange = useCallback((value: string) => {
-    setSearchDraft(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setSearch(value);
-      setPage(1);
-      updateUrl({ search: value || undefined, page: undefined });
-    }, 350);
-  }, [updateUrl]);
-
-  const onSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && debounceRef.current) {
-      clearTimeout(debounceRef.current);
-      setSearch(searchDraft);
-      setPage(1);
-      updateUrl({ search: searchDraft || undefined, page: undefined });
-    }
-  }, [searchDraft, updateUrl]);
-
-  // в”Ђв”Ђ KPI card click handlers в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-  const applyPaymentStatus = useCallback((code: string) => {
-    setPaymentStatusFilter(code);
-    setRefundStatusFilter("");
-    setCurrencyCardFilter("");
-    setPage(1);
-    updateUrl({
-      paymentStatus: code || undefined,
-      refundStatus: undefined,
-      currencyCard: undefined,
-      page: undefined,
-    });
-  }, [updateUrl]);
-
-  const applyRefundStatus = useCallback((code: string) => {
-    setRefundStatusFilter(code);
-    setPaymentStatusFilter("");
-    setCurrencyCardFilter("");
-    setPage(1);
-    updateUrl({
-      refundStatus: code || undefined,
-      paymentStatus: undefined,
-      currencyCard: undefined,
-      page: undefined,
-    });
-  }, [updateUrl]);
-
-  const applyCurrencyCard = useCallback((code: string) => {
-    setCurrencyCardFilter(code);
-    setPaymentStatusFilter("");
-    setRefundStatusFilter("");
-    setPage(1);
-    updateUrl({
-      currencyCard: code || undefined,
-      paymentStatus: undefined,
-      refundStatus: undefined,
-      page: undefined,
-    });
-  }, [updateUrl]);
-
-  const handleTotalClick = useCallback(() => {
-    setPaymentStatusFilter("");
-    setRefundStatusFilter("");
-    setCurrencyCardFilter("");
-    setPage(1);
-    updateUrl({
-      paymentStatus: undefined,
-      refundStatus: undefined,
-      currencyCard: undefined,
-      page: undefined,
-    });
-  }, [updateUrl]);
-
-  // UI-C1.2F.1B: Local date controls removed вЂ” period is Header-owned (GLOBAL scope).
-  // dateFrom/dateTo state is read from URL and passed to API; Header manages them.
-
-  // Reset clears registry-specific filters but PRESERVES Header Period.
-  const handleReset = useCallback(() => {
-    setSearchDraft("");
-    setSearch("");
-    setPaymentStatusFilter("");
-    setRefundStatusFilter("");
-    setCurrencyCardFilter("");
-    setPage(1);
-    updateUrl({
-      search: undefined, paymentStatus: undefined, refundStatus: undefined,
-      currencyCard: undefined, page: undefined,
-    });
-  }, [updateUrl]);
-
-  const handleSort = (field: string, direction: SortDirection) => {
-    setSortBy(field);
-    setSortDirection(direction);
-    setPage(1);
-    updateUrl({ sortBy: field, sortDirection: direction, page: undefined });
-  };
-
-  // в”Ђв”Ђ Data loading в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-  const load = useCallback(async () => {
-    setBusy(true);
+    let alive = true;
+    setLoading(true);
     setError("");
-    try {
-      const qs = new URLSearchParams();
-      if (search) qs.set("search", search);
-      if (paymentStatusFilter) qs.set("paymentStatus", paymentStatusFilter);
-      if (refundStatusFilter) qs.set("refundStatus", refundStatusFilter);
-      if (currencyCardFilter) qs.set("currencyCard", currencyCardFilter);
-      if (dateFrom) qs.set("dateFrom", dateFrom);
-      if (dateTo) qs.set("dateTo", dateTo);
-      if (sortBy) qs.set("sortBy", sortBy);
-      if (sortDirection) qs.set("sortDirection", sortDirection);
-      qs.set("page", String(page));
-      qs.set("pageSize", "20");
+    const load = async () => {
+      if (tab === "clients") {
+        const [payments, refunds] = await Promise.all([
+          api.get<{ items: ClientPayment[] }>("/finance/payments?pageSize=100"),
+          api.get<{ items: ClientRefund[] }>("/finance/refunds?pageSize=100"),
+        ]);
+        if (!alive) return;
+        const payRows: TableRow[] = (payments.items ?? []).map((p) => ({
+          id: `pay-${p.id}`,
+          deal: p.orderReference ?? p.orderId,
+          code: p.referenceNumber ?? p.code,
+          date: p.paidAt ?? p.createdAt,
+          amount: p.amount,
+          currency: p.currency,
+          method: methodLabel(p.paymentMethod),
+          status: statusLabel(p.status, "clients"),
+          acceptedBy: p.acceptedBy ?? "—",
+          kind: "payment",
+        }));
+        const refundRows: TableRow[] = (refunds.items ?? []).map((r) => ({
+          id: `ref-${r.id}`,
+          deal: r.orderCode ?? r.dealNumber ?? r.orderId,
+          code: r.referenceNumber ?? r.code,
+          date: r.processedAt ?? r.createdAt,
+          amount: r.amount,
+          currency: r.currency,
+          method: "—",
+          status: statusLabel(r.status, "clients"),
+          acceptedBy: "—",
+          kind: "refund",
+        }));
+        setClientRows([...payRows, ...refundRows].sort((a, b) => +new Date(b.date) - +new Date(a.date)));
+      } else {
+        const data = await api.get<{ items: SupplierPayment[] }>("/finance/supplier-payments?pageSize=100");
+        if (!alive) return;
+        const supplierRows: TableRow[] = (data.items ?? []).map((p) => ({
+          id: `sup-${p.id}`,
+          deal: p.orderCode ?? p.orderId ?? "—",
+          code: p.code,
+          date: p.occurredAt ?? p.createdAt,
+          amount: p.amount,
+          currency: p.currency,
+          method: methodLabel(p.method),
+          status: statusLabel(p.status, "suppliers"),
+          acceptedBy: p.confirmedBy ?? "—",
+          kind: p.direction === "INCOMING" ? "refund" : "payment",
+        }));
+        setSupplierRows(supplierRows.sort((a, b) => +new Date(b.date) - +new Date(a.date)));
+      }
+    };
+    void load()
+      .catch((e: Error) => { if (alive) setError(e.message); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [tab]);
 
-      const res = await api.get<PaymentListResponse>(`/finance/payments?${qs.toString()}`);
-      setData(res);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }, [search, paymentStatusFilter, refundStatusFilter, currencyCardFilter, dateFrom, dateTo, sortBy, sortDirection, page]);
-
-  useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [load]);
-
-  // Prompt В§3: РїРѕСЃР»Рµ СѓСЃРїРµС€РЅРѕРіРѕ СЃРѕР·РґР°РЅРёСЏ вЂ” РѕР±РЅРѕРІРёС‚СЊ registry. load() С‡РёС‚Р°РµС‚
-  // С‚РµРєСѓС‰РµРµ state (filters/search/sort/pagination) вЂ” РѕРЅРё СЃРѕС…СЂР°РЅСЏСЋС‚СЃСЏ.
-  const handlePaymentCreated = useCallback(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => {
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, []);
-
-  // в”Ђв”Ђ Derived state в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-  const agg = data?.aggregates;
-  const total = data?.total ?? 0;
-
-  const hasCardFilter = Boolean(paymentStatusFilter || refundStatusFilter || currencyCardFilter);
-  const filtersActive = hasCardFilter || search || dateFrom || dateTo;
-
-  // Sort state for SortableHeader
-  const sortState = sortBy ? { sortBy, sortDirection: sortDirection ?? ("desc" as SortDirection) } : null;
+  const rows = useMemo(() => (tab === "clients" ? clientRows : supplierRows), [tab, clientRows, supplierRows]);
 
   return (
     <OperationsCenterShell activeDomain="payments" visibleDomains={["payments"]}>
-      <div className="flex min-w-0 flex-1 items-start gap-4">
-        <div className="min-w-0 flex-1 space-y-4">
-          {/* в”Ђв”Ђ TOOLBAR в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */}
-          <OperationsToolbarSlot>
-            {canCreatePayment && (
-              <button
-                type="button"
-                data-testid="payments-create-button"
-                onClick={() => setCreateOpen(true)}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
-              >
-                {t("payments.create.button", locale)}
-              </button>
-            )}
-            <input
-              value={searchDraft}
-              onChange={(e) => onSearchChange(e.target.value)}
-              onKeyDown={onSearchKeyDown}
-              placeholder={t("payments.search.placeholder", locale)}
-              aria-label={t("payments.search.placeholder", locale)}
-              className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            />
-            {/* UI-C1.2F.1B: Local date controls removed вЂ” period is Header-owned. */}
-            <button
-              type="button"
-              onClick={handleReset}
-              disabled={!filtersActive}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {t("filters.reset", locale)}
-            </button>
-            {busy && <span className="text-xs text-slate-400">{t("common.loading", locale)}</span>}
-            <TableExportButton
-              exportUrl="/api/v1/finance/payments/export"
-              extraParams={{
-                ...(paymentStatusFilter ? { paymentStatus: paymentStatusFilter } : {}),
-                ...(refundStatusFilter ? { refundStatus: refundStatusFilter } : {}),
-                ...(currencyCardFilter ? { currencyCard: currencyCardFilter } : {}),
-                ...(dateFrom ? { dateFrom } : {}),
-                ...(dateTo ? { dateTo } : {}),
-                ...(search ? { search } : {}),
-              }}
-            />
-          </OperationsToolbarSlot>
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Платежи и возвраты</h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Платежи и возвраты клиентов и расчёты с поставщиками.
+          </p>
+        </div>
 
-          {error && <OperationsErrorState message={error} onRetry={() => void load()} />}
+        <div className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1">
+          <button
+            type="button"
+            data-testid="payments-tab-clients"
+            onClick={() => setTab("clients")}
+            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${tab === "clients" ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-50"}`}
+          >
+            Платежи и возвраты (клиенты)
+          </button>
+          <button
+            type="button"
+            data-testid="payments-tab-suppliers"
+            onClick={() => setTab("suppliers")}
+            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${tab === "suppliers" ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-50"}`}
+          >
+            Платежи и возвраты (поставщики)
+          </button>
+        </div>
 
-          {/* в”Ђв”Ђ TABLE в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */}
-          <OperationsRegistrySlot>
-            {!data && busy ? (
-              <OperationsLoadingState />
-            ) : (
-              <PaymentsTable
-                rows={(data?.items ?? []).map((p) => ({
-                  id: p.id,
-                  ordinal: p.ordinal,
-                  code: p.code,
-                  referenceNumber: p.referenceNumber,
-                  createdAt: p.createdAt,
-                  amount: p.amount,
-                  currency: p.currency,
-                  paymentMethod: p.paymentMethod,
-                  status: p.status,
-                  acceptedBy: p.acceptedBy,
-                  remainingAfter: p.remainingAfter,
-                  paymentHref: `/app/payments/${p.code}`,
-                  orderHref: p.orderId ? `/app/orders/${p.orderId}` : null,
-                  orderLabel: p.orderReference ?? (p.orderId ? `${p.orderId.slice(0, 8)}вЂ¦` : null),
-                }))}
-                locale={locale}
-                onEdit={(row) => setEditingPayment(row)}
-                emptyMessage={t("payments.table.empty", locale)}
-                sortState={sortState}
-                onSort={handleSort}
-                amountHeaderExtra={
-                  <TableHeaderFilter
-                    id="payments-filter-currency"
-                    label=""
-                    options={currencyFilterOptions(agg)}
-                    value={currencyCardFilter || ""}
-                    onChange={applyCurrencyCard}
-                    ariaLabel={t("finance.filter.all_currencies", locale)}
-                  />
-                }
-                statusHeaderExtra={
-                  <TableHeaderFilter
-                    id="payments-filter-status"
-                    label=""
-                    options={buildPaymentFilterOptions(locale)}
-                    value={paymentStatusFilter || ""}
-                    onChange={applyPaymentStatus}
-                    ariaLabel={t("finance.filter.all_statuses", locale)}
-                  />
-                }
-                onActionCompleted={handlePaymentCreated}
-              />
-            )}
-            {data && total > 0 && (
-              <Pagination
-                page={page}
-                pageSize={20}
-                total={total}
-                onPageChange={(p) => {
-                  setPage(p);
-                  updateUrl({ page: p > 1 ? String(p) : undefined });
-                }}
-              />
-            )}
-          </OperationsRegistrySlot>
+        {error && <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
+
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left text-xs">
+              <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                <tr>
+                  <th className="px-4 py-2.5 font-medium">Номер сделки</th>
+                  <th className="px-4 py-2.5 font-medium">Код</th>
+                  <th className="px-4 py-2.5 font-medium">Дата</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Сумма</th>
+                  <th className="px-4 py-2.5 font-medium">Форма оплаты</th>
+                  <th className="px-4 py-2.5 font-medium">Статус</th>
+                  <th className="px-4 py-2.5 font-medium">Кто принял</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">Загрузка…</td></tr>
+                ) : rows.length === 0 ? (
+                  <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">Записей нет</td></tr>
+                ) : rows.map((row) => (
+                  <tr key={row.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
+                    <td className="px-4 py-2.5 font-medium text-slate-700">{row.deal}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`rounded px-1.5 py-0.5 font-mono text-[11px] ${row.kind === "refund" ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>
+                        {row.code}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-500">{dateLabel(row.date)}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-slate-800">{formatPrice(row.amount, row.currency, locale) ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-slate-600">{row.method}</td>
+                    <td className="px-4 py-2.5">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">{row.status}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-600">{row.acceptedBy}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-
-      {/* + РЎРѕР·РґР°С‚СЊ РїР»Р°С‚РµР¶ вЂ” modal (prompt В§1/В§2) */}
-      {editingPayment && <EditPaymentModal row={editingPayment} onClose={() => setEditingPayment(null)} onSaved={() => { setEditingPayment(null); void load(); }} />}
-      <CreatePaymentForm
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onCreated={handlePaymentCreated}
-      />
     </OperationsCenterShell>
   );
-}
-
-// в”Ђв”Ђ Wrapper with URL params в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-
-function PaymentsWithParams() {
-  const sp = useSearchParams();
-  const router = useRouter();
-  const rawPage = parseInt(sp.get("page") ?? "", 10);
-
-  // UI-C1.2F.1F вЂ” deterministic canonicalization of multi-dimension deep links.
-  // The Payments KPI contract permits at most ONE active table-only dimension
-  // (paymentStatus XOR refundStatus XOR currencyCard). Render phase is PURE:
-  // when 2+ dimensions arrive together the UI immediately renders from the
-  // canonical values with deterministic precedence paymentStatus > refundStatus
-  // > currencyCard (mirrors the KPI group order) вЂ” no setState/router/history
-  // mutation during render. The URL is normalized ONCE post-render via
-  // router.replace (same contract as UI-C1.2F.1D-R2).
-  const rawPaymentStatus = sp.get("paymentStatus") ?? "";
-  const rawRefundStatus = sp.get("refundStatus") ?? "";
-  const rawCurrencyCard = sp.get("currencyCard") ?? "";
-  const multiDimensionConflict =
-    (rawPaymentStatus ? 1 : 0) + (rawRefundStatus ? 1 : 0) + (rawCurrencyCard ? 1 : 0) > 1;
-
-  const initialPaymentStatus = rawPaymentStatus;
-  const initialRefundStatus = multiDimensionConflict
-    ? (rawPaymentStatus ? "" : rawRefundStatus)
-    : rawRefundStatus;
-  const initialCurrencyCard = multiDimensionConflict
-    ? (rawPaymentStatus || rawRefundStatus ? "" : rawCurrencyCard)
-    : rawCurrencyCard;
-
-  // Post-render: normalize the URL once via the Next router so the browser URL,
-  // Next Router state, useSearchParams(), and Back/Forward stay synchronized.
-  useEffect(() => {
-    if (!multiDimensionConflict) return;
-
-    // Preserve ALL unrelated query params; clear only the losing KPI dims + page.
-    const params = new URLSearchParams(sp.toString());
-    params.delete("paymentStatus");
-    params.delete("refundStatus");
-    params.delete("currencyCard");
-    params.delete("page");
-    if (rawPaymentStatus) params.set("paymentStatus", rawPaymentStatus);
-    else if (rawRefundStatus) params.set("refundStatus", rawRefundStatus);
-    else if (rawCurrencyCard) params.set("currencyCard", rawCurrencyCard);
-    const qs = params.toString();
-    router.replace(qs ? `/app/payments?${qs}` : "/app/payments", { scroll: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [multiDimensionConflict]);
-
-  return (
-    <PaymentsContent
-      initialSearch={sp.get("search") ?? ""}
-      initialPaymentStatus={initialPaymentStatus}
-      initialRefundStatus={initialRefundStatus}
-      initialCurrencyCard={initialCurrencyCard}
-      initialDateFrom={sp.get("dateFrom") ?? ""}
-      initialDateTo={sp.get("dateTo") ?? ""}
-      initialSortBy={sp.get("sortBy") ?? undefined}
-      initialSortDirection={(sp.get("sortDirection") as SortDirection) ?? undefined}
-      initialPage={Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1}
-    />
-  );
-}
-
-export default function PaymentsPage() {
-  return (
-    <Suspense fallback={<OperationsPageSkeleton />}>
-      <PaymentsWithParams />
-    </Suspense>
-  );
-}
-
-function EditPaymentModal({ row, onClose, onSaved }: { row: PaymentsTableRow; onClose: () => void; onSaved: () => void }) {
-  const [amount, setAmount] = useState(row.amount);
-  const [method, setMethod] = useState(row.paymentMethod ?? "cash");
-  const [paidAt, setPaidAt] = useState(row.createdAt.slice(0, 10));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  async function save() {
-    setBusy(true); setError("");
-    try {
-      await api.patch(`/finance/payments/${row.code}`, { amount, paymentMethod: method, paidAt });
-      onSaved();
-    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
-  }
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}><div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}><h3 className="mb-1 text-base font-semibold">Редактировать платёж</h3><p className="mb-3 font-mono text-xs text-slate-500">{row.referenceNumber ?? row.code}</p><div className="grid gap-2"><label className="text-xs text-slate-500">Сумма<input value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" inputMode="decimal" /></label><label className="text-xs text-slate-500">Дата<input type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" /></label><label className="text-xs text-slate-500">Форма оплаты<select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"><option value="cash">Наличные</option><option value="card">Карта</option><option value="bank_transfer">Банковский перевод</option><option value="online">Онлайн</option></select></label>{error && <div className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700">{error}</div>}<div className="mt-2 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-3 py-2 text-xs">Отмена</button><button type="button" disabled={busy} onClick={() => void save()} className="rounded-lg bg-[#0f6b5f] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "Сохранение…" : "Сохранить"}</button></div></div></div></div>;
 }
