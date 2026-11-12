@@ -84,6 +84,37 @@ const SUPPLIER_STATUS: Record<string, string> = {
   FAILED: "Ошибка",
 };
 
+const TEXT: Record<string, { az: string; en: string }> = {
+  "Платежи и возвраты": { az: "Ödənişlər və qaytarmalar", en: "Payments and refunds" },
+  "Платежи и возвраты клиентов и расчёты с поставщиками.": { az: "Müştəri ödənişləri, qaytarmalar və təchizatçı hesablaşmaları.", en: "Client payments and refunds, supplier settlements." },
+  "Платежи и возвраты (клиенты)": { az: "Ödənişlər və qaytarmalar (müştərilər)", en: "Payments and refunds (clients)" },
+  "Платежи и возвраты (поставщики)": { az: "Ödənişlər və qaytarmalar (təchizatçılar)", en: "Payments and refunds (suppliers)" },
+  "Номер сделки": { az: "Sövdə nömrəsi", en: "Deal number" },
+  "Код": { az: "Kod", en: "Code" },
+  "Дата": { az: "Tarix", en: "Date" },
+  "Сумма": { az: "Məbləğ", en: "Amount" },
+  "Форма оплаты": { az: "Ödəniş forması", en: "Payment method" },
+  "Статус": { az: "Status", en: "Status" },
+  "Кто принял": { az: "Kim qəbul etdi", en: "Accepted by" },
+  "Загрузка…": { az: "Yüklənir…", en: "Loading…" },
+  "Записей нет": { az: "Qeyd yoxdur", en: "No records" },
+  "Наличные": { az: "Nağd", en: "Cash" },
+  "Карта": { az: "Kart", en: "Card" },
+  "Банковский перевод": { az: "Bank köçürməsi", en: "Bank transfer" },
+  "Онлайн": { az: "Onlayn", en: "Online" },
+  "Другое": { az: "Digər", en: "Other" },
+  "Ожидает": { az: "Gözləyir", en: "Pending" },
+  "Авторизован": { az: "Avtorizasiya edilib", en: "Authorized" },
+  "Принят": { az: "Qəbul edilib", en: "Accepted" },
+  "Оплачен": { az: "Ödənilib", en: "Paid" },
+  "Ошибка": { az: "Xəta", en: "Error" },
+  "Отменён": { az: "Ləğv edilib", en: "Cancelled" },
+  "Возвращён": { az: "Qaytarılıb", en: "Refunded" },
+  "Отправлен на согласование": { az: "Təsdiqə göndərilib", en: "Submitted for approval" },
+  "Согласован": { az: "Razılaşdırılıb", en: "Approved" },
+  "Исполнен": { az: "İcra edilib", en: "Processed" },
+  "Подтверждён": { az: "Təsdiqlənib", en: "Confirmed" },
+};
 const METHOD: Record<string, string> = {
   cash: "Наличные",
   card: "Карта",
@@ -93,13 +124,13 @@ const METHOD: Record<string, string> = {
   other: "Другое",
 };
 
-function statusLabel(value: string, kind: Tab): string {
-  return (kind === "clients" ? CLIENT_STATUS : SUPPLIER_STATUS)[value] ?? value;
+function statusLabel(value: string, kind: Tab, tr: (s: string) => string): string {
+  return tr((kind === "clients" ? CLIENT_STATUS : SUPPLIER_STATUS)[value] ?? value);
 }
 
-function methodLabel(value: string | null): string {
+function methodLabel(value: string | null, tr: (s: string) => string): string {
   if (!value) return "—";
-  return METHOD[value] ?? value;
+  return tr(METHOD[value] ?? value);
 }
 
 function dateLabel(value: string | null): string {
@@ -109,6 +140,7 @@ function dateLabel(value: string | null): string {
 
 export default function PaymentsAndRefundsPage() {
   const locale = useLocale();
+  const tr = (value: string) => locale === "az" ? TEXT[value]?.az ?? value : locale === "en" ? TEXT[value]?.en ?? value : value;
   const [tab, setTab] = useState<Tab>("clients");
   const [clientRows, setClientRows] = useState<TableRow[]>([]);
   const [supplierRows, setSupplierRows] = useState<TableRow[]>([]);
@@ -133,8 +165,8 @@ export default function PaymentsAndRefundsPage() {
           date: p.paidAt ?? p.createdAt,
           amount: p.amount,
           currency: p.currency,
-          method: methodLabel(p.paymentMethod),
-          status: statusLabel(p.status, "clients"),
+          method: methodLabel(p.paymentMethod, tr),
+          status: statusLabel(p.status, "clients", tr),
           acceptedBy: p.acceptedBy ?? "—",
           kind: "payment",
         }));
@@ -146,7 +178,7 @@ export default function PaymentsAndRefundsPage() {
           amount: r.amount,
           currency: r.currency,
           method: "—",
-          status: statusLabel(r.status, "clients"),
+          status: statusLabel(r.status, "clients", tr),
           acceptedBy: "—",
           kind: "refund",
         }));
@@ -161,8 +193,8 @@ export default function PaymentsAndRefundsPage() {
           date: p.occurredAt ?? p.createdAt,
           amount: p.amount,
           currency: p.currency,
-          method: methodLabel(p.method),
-          status: statusLabel(p.status, "suppliers"),
+          method: methodLabel(p.method, tr),
+          status: statusLabel(p.status, "suppliers", tr),
           acceptedBy: p.confirmedBy ?? "—",
           kind: p.direction === "INCOMING" ? "refund" : "payment",
         }));
@@ -181,9 +213,9 @@ export default function PaymentsAndRefundsPage() {
     <OperationsCenterShell activeDomain="payments" visibleDomains={["payments"]}>
       <div className="space-y-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Платежи и возвраты</h2>
+          <h2 className="text-xl font-bold text-slate-900">{tr("Платежи и возвраты")}</h2>
           <p className="mt-0.5 text-sm text-slate-500">
-            Платежи и возвраты клиентов и расчёты с поставщиками.
+            {tr("Платежи и возвраты клиентов и расчёты с поставщиками.")}
           </p>
         </div>
 
@@ -213,20 +245,20 @@ export default function PaymentsAndRefundsPage() {
             <table className="w-full min-w-[900px] text-left text-xs">
               <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
                 <tr>
-                  <th className="px-4 py-2.5 font-medium">Номер сделки</th>
-                  <th className="px-4 py-2.5 font-medium">Код</th>
-                  <th className="px-4 py-2.5 font-medium">Дата</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Сумма</th>
-                  <th className="px-4 py-2.5 font-medium">Форма оплаты</th>
-                  <th className="px-4 py-2.5 font-medium">Статус</th>
-                  <th className="px-4 py-2.5 font-medium">Кто принял</th>
+                  <th className="px-4 py-2.5 font-medium">{tr("Номер сделки")}</th>
+                  <th className="px-4 py-2.5 font-medium">{tr("Код")}</th>
+                  <th className="px-4 py-2.5 font-medium">{tr("Дата")}</th>
+                  <th className="px-4 py-2.5 text-right font-medium">{tr("Сумма")}</th>
+                  <th className="px-4 py-2.5 font-medium">{tr("Форма оплаты")}</th>
+                  <th className="px-4 py-2.5 font-medium">{tr("Статус")}</th>
+                  <th className="px-4 py-2.5 font-medium">{tr("Кто принял")}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">Загрузка…</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">{tr("Загрузка…")}</td></tr>
                 ) : rows.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">Записей нет</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">{tr("Записей нет")}</td></tr>
                 ) : rows.map((row) => (
                   <tr key={row.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
                     <td className="px-4 py-2.5 font-medium text-slate-700">{row.deal}</td>
