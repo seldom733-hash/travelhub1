@@ -1411,7 +1411,7 @@ export class OrderService {
    *    (историческое правило bulk PATCH — заказы вне D3-потока).
    */
   private async assertOrderDebtsCleared(tx: Prisma.TransactionClient, orderId: string, code: string, amount: Prisma.Decimal, status: OrderStatus) {
-    const [payments, refunds, pendingRefunds, obligations, order, outgoing, incoming, writeOffs, clientWriteOffs, approval, supplierTerms] = await Promise.all([
+    const [payments, refunds, pendingRefunds, obligations, order, outgoing, incoming, writeOffs, clientWriteOffs, approval, supplierTerms, settlement] = await Promise.all([
       tx.payment.aggregate({ where: { orderId, status: { in: ["CAPTURED", "REFUNDED"] } }, _sum: { amount: true } }),
       tx.refund.aggregate({ where: { orderId, status: "PROCESSED" }, _sum: { amount: true } }),
       tx.refund.aggregate({ where: { orderId, status: { in: ["REQUESTED", "APPROVED"] } }, _sum: { amount: true } }),
@@ -1423,12 +1423,21 @@ export class OrderService {
       tx.clientDebtWriteOff.aggregate({ where: { orderId }, _sum: { amount: true } }),
       tx.cancellationApproval.findFirst({ where: { orderId }, orderBy: { createdAt: "desc" } }) as any,
       tx.orderCancellationSupplierTerm.findMany({ where: { orderId } }) as any,
+      tx.orderFinancialSettlement.findUnique({ where: { orderId } }),
     ]);
     const captured = new Prisma.Decimal(payments._sum.amount ?? 0);
     const refunded = new Prisma.Decimal(refunds._sum.amount ?? 0);
     const pendingRefund = new Prisma.Decimal(pendingRefunds._sum.amount ?? 0);
-    const baseClientDebt = status === "CANCELLED" ? new Prisma.Decimal(0) : Prisma.Decimal.max(new Prisma.Decimal(0), new Prisma.Decimal(amount).minus(captured.minus(refunded)));
-    const clientDebt = Prisma.Decimal.max(new Prisma.Decimal(0), baseClientDebt.minus(new Prisma.Decimal(clientWriteOffs._sum.amount ?? 0)));
+    // Client money is never silently retained by closure. For a cancelled
+    // deal the final customer liability is taken from the settlement (0 if
+    // none); for an active deal it is the order amount. Any positive balance
+    // above that liability is money still owed back to the client.
+    const netClientReceived = Prisma.Decimal.max(new Prisma.Decimal(0), captured.minus(refunded).minus(new Prisma.Decimal(clientWriteOffs._sum.amount ?? 0)));
+    const finalCustomerLiability = status === "CANCELLED"
+      ? new Prisma.Decimal(settlement?.finalCustomerLiability ?? 0)
+      : new Prisma.Decimal(amount);
+    const clientDebt = Prisma.Decimal.max(new Prisma.Decimal(0), finalCustomerLiability.minus(netClientReceived));
+    const clientRefundDue = Prisma.Decimal.max(new Prisma.Decimal(0), netClientReceived.minus(finalCustomerLiability));
     const snap = (order?.commercialSnapshot ?? {}) as Record<string, unknown>;
     let cost = Number(snap.netSupplierCost ?? snap.supplierPrice ?? 0);
     if (cost <= 0) {
@@ -1454,9 +1463,9 @@ export class OrderService {
     const supplierRefundShortfall = supplierTerms.reduce((sum: number, term: any) => sum + Math.max(0, Number(term.supplierRefundAgreed) - Number(term.supplierRefundActual)), 0);
     const clientRefundShortfall = supplierTerms.reduce((sum: number, term: any) => sum + Math.max(0, Number(term.clientRefundAgreed) - Number(term.clientRefundActual)), 0);
     const approvalBlocked = approval ? approval.status !== "APPROVED" : false;
-    if (!clientDebt.isZero() || !supplierDebt.isZero() || !pendingRefund.isZero() || supplierRefundShortfall > 0 || clientRefundShortfall > 0 || approvalBlocked) {
+    if (!clientDebt.isZero() || !clientRefundDue.isZero() || !supplierDebt.isZero() || !pendingRefund.isZero() || supplierRefundShortfall > 0 || clientRefundShortfall > 0 || approvalBlocked) {
       throw new ConflictError(
-        `Order ${code} cannot be completed/closed: clientDebt=${clientDebt.toString()}, supplierDebt=${supplierDebt.toString()}, pendingRefund=${pendingRefund.toString()}, supplierRefundShortfall=${supplierRefundShortfall.toFixed(2)}, clientRefundShortfall=${clientRefundShortfall.toFixed(2)}, approval=${approval?.status ?? "NONE"}`,
+        `Order ${code} cannot be completed/closed: clientDebt=${clientDebt.toString()}, clientRefundDue=${clientRefundDue.toString()}, supplierDebt=${supplierDebt.toString()}, pendingRefund=${pendingRefund.toString()}, supplierRefundShortfall=${supplierRefundShortfall.toFixed(2)}, clientRefundShortfall=${clientRefundShortfall.toFixed(2)}, approval=${approval?.status ?? "NONE"}`,
       );
     }
   }
