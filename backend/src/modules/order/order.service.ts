@@ -124,12 +124,12 @@ const TRANSITIONS: Record<string, { from: OrderStatus[]; to: OrderStatus }> = {
   // orderAction: 409, если СВОБОДНЫХ items нет (все заняты активными бронями).
   send: { from: ["READY_FOR_BOOKING", "WAITING_FOR_FIRST_PAYMENT", "PARTIALLY_FULFILLED"], to: "SENT_TO_BOOKING" },
   complete: { from: ["SENT_TO_BOOKING", "PARTIALLY_FULFILLED"], to: "FULFILLED" },
-  close: { from: ["FULFILLED", "READY_TO_CLOSE", "CANCELLED"], to: "CLOSED" },
+  close: { from: ["FULFILLED", "READY_TO_CLOSE", "CANCELLED", "CANCELLATION_APPROVED"], to: "CLOSED" },
   requestCancellation: { from: [...ACTIVE_STATUSES, "WAITING_FOR_FIRST_PAYMENT", "FULFILLED", "READY_TO_CLOSE"], to: "CANCELLATION_REQUESTED" },
   approveCancellation: { from: ["CANCELLATION_REQUESTED"], to: "CANCELLATION_APPROVED" },
   rejectCancellation: { from: ["CANCELLATION_REQUESTED"], to: "IN_PROCESSING" },
   cancel: { from: ["CANCELLATION_APPROVED"], to: "CANCELLED" },
-  reopen: { from: ["CANCELLED"], to: "IN_PROCESSING" },
+  reopen: { from: ["CANCELLED", "CANCELLATION_APPROVED"], to: "IN_PROCESSING" },
   problem: { from: ACTIVE_STATUSES.filter((s) => s !== "PROBLEM"), to: "PROBLEM" },
   suspend: { from: ACTIVE_STATUSES.filter((s) => s !== "SUSPENDED"), to: "SUSPENDED" },
   // Stage 1 (Order → Request, только назад): тот же active-диапазон, что и
@@ -1436,8 +1436,9 @@ export class OrderService {
     // deal the final customer liability is taken from the settlement (0 if
     // none); for an active deal it is the order amount. Any positive balance
     // above that liability is money still owed back to the client.
+    const cancellationStatus = status === "CANCELLED" || status === "CANCELLATION_APPROVED";
     const netClientReceived = Prisma.Decimal.max(new Prisma.Decimal(0), captured.minus(refunded).minus(new Prisma.Decimal(clientWriteOffs._sum.amount ?? 0)));
-    const finalCustomerLiability = status === "CANCELLED"
+    const finalCustomerLiability = cancellationStatus
       ? new Prisma.Decimal(settlement?.finalCustomerLiability ?? 0)
       : new Prisma.Decimal(amount);
     const clientDebt = Prisma.Decimal.max(new Prisma.Decimal(0), finalCustomerLiability.minus(netClientReceived));
@@ -1458,7 +1459,7 @@ export class OrderService {
     const supplierPaidTotal = Number(outgoing._sum.amount ?? 0);
     const supplierRefundedTotal = Number(incoming._sum.amount ?? 0);
     const useObligationCost = obligationCost > 0 && obligationCost < Number(amount);
-    const baseSupplierDebt = status === "CANCELLED"
+    const baseSupplierDebt = cancellationStatus
       ? Math.max(0, supplierPaidTotal - supplierRefundedTotal)
       : useObligationCost && obligationDebt > 0
         ? obligationDebt
@@ -1467,9 +1468,17 @@ export class OrderService {
     const supplierRefundShortfall = supplierTerms.reduce((sum: number, term: any) => sum + Math.max(0, Number(term.supplierRefundAgreed) - Number(term.supplierRefundActual)), 0);
     const clientRefundShortfall = supplierTerms.reduce((sum: number, term: any) => sum + Math.max(0, Number(term.clientRefundAgreed) - Number(term.clientRefundActual)), 0);
     const approvalBlocked = approval ? approval.status !== "APPROVED" : false;
-    if (!clientDebt.isZero() || !clientRefundDue.isZero() || !supplierDebt.isZero() || !pendingRefund.isZero() || supplierRefundShortfall > 0 || clientRefundShortfall > 0 || approvalBlocked) {
+    // Cancelled deals close only when the retained money is explicitly
+    // recognised as penalties: client net paid = client penalty, and supplier
+    // net paid = platform/supplier penalty. Income is their difference.
+    const clientPenalty = new Prisma.Decimal(settlement?.clientPenaltyAmount ?? 0);
+    const supplierPenalty = new Prisma.Decimal(settlement?.supplierPenaltyAmount ?? 0);
+    const supplierNetPaid = new Prisma.Decimal(Math.max(0, supplierPaidTotal - supplierRefundedTotal));
+    const clientPenaltyMismatch = cancellationStatus && netClientReceived.minus(clientPenalty).abs().greaterThan(new Prisma.Decimal("0.01"));
+    const supplierPenaltyMismatch = cancellationStatus && supplierNetPaid.minus(supplierPenalty).abs().greaterThan(new Prisma.Decimal("0.01"));
+    if (!clientDebt.isZero() || !clientRefundDue.isZero() || !supplierDebt.isZero() || !pendingRefund.isZero() || supplierRefundShortfall > 0 || clientRefundShortfall > 0 || approvalBlocked || clientPenaltyMismatch || supplierPenaltyMismatch) {
       throw new ConflictError(
-        `Order ${code} cannot be completed/closed: clientDebt=${clientDebt.toString()}, clientRefundDue=${clientRefundDue.toString()}, supplierDebt=${supplierDebt.toString()}, pendingRefund=${pendingRefund.toString()}, supplierRefundShortfall=${supplierRefundShortfall.toFixed(2)}, clientRefundShortfall=${clientRefundShortfall.toFixed(2)}, approval=${approval?.status ?? "NONE"}`,
+        `Order ${code} cannot be completed/closed: clientDebt=${clientDebt.toString()}, clientRefundDue=${clientRefundDue.toString()}, supplierDebt=${supplierDebt.toString()}, pendingRefund=${pendingRefund.toString()}, clientPenalty=${clientPenalty.toString()}, supplierPenalty=${supplierPenalty.toString()}, supplierRefundShortfall=${supplierRefundShortfall.toFixed(2)}, clientRefundShortfall=${clientRefundShortfall.toFixed(2)}, approval=${approval?.status ?? "NONE"}`,
       );
     }
   }
@@ -1486,7 +1495,7 @@ export class OrderService {
     fallbackStart: Date | null,
     orderStatus: string,
   ): Promise<void> {
-    if (orderStatus === "CANCELLED") return;
+    if (orderStatus === "CANCELLED" || orderStatus === "CANCELLATION_APPROVED") return;
     const linked = await tx.request.findFirst({
       where: { convertedOrderId: orderId },
       select: { requestedServiceDate: true, productSnapshot: true },
@@ -1854,7 +1863,10 @@ export class OrderService {
       }
       if (action === "confirm") data.confirmedAt = milestoneNow;
       else if (action === "complete") data.fulfilledAt = milestoneNow;
-      else if (action === "close") data.closedAt = milestoneNow;
+      else if (action === "close") {
+        data.closedAt = milestoneNow;
+        if (order.status === "CANCELLATION_APPROVED") data.cancelledAt = milestoneNow;
+      }
       else if (action === "cancel" || action === "returnToRequest") data.cancelledAt = milestoneNow;
       if (action === "returnToRequest") data.returnedToRequestAt = milestoneNow;
       if (action === "requestCancellation") { data.cancellationReason = reason; data.cancellationComment = reason; data.cancellationRequestedAt = milestoneNow; data.cancellationRequestedById = actorId ?? null; }

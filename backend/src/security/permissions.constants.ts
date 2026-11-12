@@ -445,6 +445,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // Роль читает финансовые данные через order.read/booking.read (суммы) и получит
     // customer-контекст вместе с Phase-2 finance endpoints по принципу grant-with-endpoint.
     "order.read",
+    "order.close",
     "booking.read",
     // Step 2.2 (N2 review): FINANCE сохраняет ТОЛЬКО sales.sale.read (sale-level
     // visibility, финансовая релевантность для будущей сверки); Lead/Opportunity/
