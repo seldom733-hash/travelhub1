@@ -365,11 +365,11 @@ export default function MarkupAdminPage() {
         actions={
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => void load()} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-              Обновить
+              {tr("Обновить")}
             </button>
             {canManage && (
               <button type="button" onClick={() => setForm({ ...EMPTY })} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
-                + Добавить правило
+                + {tr("Добавить правило")}
               </button>
             )}
           </div>
