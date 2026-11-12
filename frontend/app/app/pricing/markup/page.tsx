@@ -84,7 +84,7 @@ interface FormState {
 
 const EMPTY: FormState = { supplierCode: "", serviceType: "", markupPercent: "0", commissionPercent: "0" };
 const LABELS: Record<string, { az: string; en: string }> = {
-  "Наценки и комиссионные": { az: "Əlavələr və komissiyalar", en: "Markups and commissions" },
+  "Наценки и комиссионные": { az: "Marjalar və komissiyalar", en: "Markups and commissions" },
   "Цены и правила": { az: "Qiymətlər və qaydalar", en: "Prices and rules" },
   "Обновить": { az: "Yenilə", en: "Refresh" },
   "Добавить правило": { az: "Qayda əlavə et", en: "Add rule" },
@@ -470,7 +470,7 @@ export default function MarkupAdminPage() {
                       <td className="px-4 py-3 text-right">
                         {canManage && (
                           <button type="button" onClick={() => openRow(row)} className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
-                            Изменить
+                            {tr("Изменить")}
                           </button>
                         )}
                       </td>

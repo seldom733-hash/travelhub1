@@ -226,7 +226,7 @@ export default function PaymentsAndRefundsPage() {
             onClick={() => setTab("clients")}
             className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${tab === "clients" ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-50"}`}
           >
-            Платежи и возвраты (клиенты)
+            {tr("Платежи и возвраты (клиенты)")}
           </button>
           <button
             type="button"
@@ -234,7 +234,7 @@ export default function PaymentsAndRefundsPage() {
             onClick={() => setTab("suppliers")}
             className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${tab === "suppliers" ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-50"}`}
           >
-            Платежи и возвраты (поставщики)
+            {tr("Платежи и возвраты (поставщики)")}
           </button>
         </div>
 
