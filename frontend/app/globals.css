@@ -23,7 +23,7 @@
   --th-card: #fbfcf8;
   --th-border: #d5e0d2;
   --th-text: #1d2a20;
-  --th-muted: #64746a;
+  --th-muted: #000000;
   --th-accent: #3f7a36;
   --th-accent-ink: #ffffff;
   --th-radius-card: 18px;
@@ -250,7 +250,7 @@ h3,
   --th-card: #fbfcf8;
   --th-border: #d5e0d2;
   --th-text: #1d2a20;
-  --th-muted: #64746a;
+  --th-muted: #000000;
   --th-accent: #3f7a36;
   --th-accent-ink: #ffffff;
   --th-letter-spacing: 0.005em;
@@ -383,4 +383,32 @@ h3,
 .public-shell .text-slate-900,
 .public-shell .text-slate-800 {
   color: var(--th-text) !important;
+}
+
+
+/* Global readability: every muted/grey UI label is rendered in black.
+   Only text colours are overridden; backgrounds, borders and semantic
+   success/warning/danger colours remain untouched. */
+:where(
+  [class*="text-slate-"],
+  [class*="text-gray-"],
+  [class*="text-zinc-"],
+  [class*="text-neutral-"],
+  [class*="text-stone-"],
+  [class*="text-[#667085]"],
+  [class*="text-[#98a2b3]"],
+  [class*="text-[#475467]"],
+  [class*="text-[#344054]"],
+  [class*="text-[#101828]"],
+  [class*="text-[#6b7280]"],
+  [class*="text-[#9ca3af]"],
+  [class*="text-[#94a3b8]"],
+  [class*="text-[#64748b]"],
+  [class*="text-[#475569]"],
+  [class*="text-[#334155]"],
+  [class*="text-[#0f172a]"],
+  [class*="text-[#1f2937]"],
+  [class*="text-[#374151]"]
+) {
+  color: #000 !important;
 }
