@@ -882,7 +882,7 @@ function CancellationTab({ deal, onSaved }: { deal: DealRow; onSaved: () => void
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   if (!deal.orderId) return <Empty text="Сначала создайте заказ" />;
-  const body = { cancellationReason: reason, clientPenaltyAmount: clientPenalty, supplierPenaltyAmount: supplierPenalty, penaltyAmount: clientPenalty, supplierPenaltyShare: supplierPenalty, platformPenaltyShare: String(Math.max(0, Number(clientPenalty) - Number(supplierPenalty))), reason: reasons.find(([k]) => k === reason)?.[1] ?? "Отмена" };
+  const body = { cancellationReason: reason, finalCustomerLiability: clientPenalty, clientPenaltyAmount: clientPenalty, supplierPenaltyAmount: supplierPenalty, penaltyAmount: clientPenalty, supplierPenaltyShare: supplierPenalty, platformPenaltyShare: String(Math.max(0, Number(clientPenalty) - Number(supplierPenalty))), reason: reasons.find(([k]) => k === reason)?.[1] ?? "Отмена" };
   async function calculate() {
     setBusy(true); setError("");
     try { setPreview(await api.post(`/orders/${deal.orderId}/financial-settlement/preview`, body)); }
