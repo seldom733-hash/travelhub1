@@ -328,7 +328,12 @@ export class OrderController {
   @Get("orders/:id/travelers")
   @RequirePermissions("order.read")
   getOrderTravelers(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
-    return this.orders.getOrderTravelers(id, { role: actor.role as never });
+    // TravelerCollectionPanel (frontend) ожидает полный view:
+    // { pinnedRequirements, termsAcceptedAt, travelerDataCompletedAt,
+    //   finalConfirmedAt, travelerCount, travelers, passportExpiry }.
+    // До этого маршрут отдавал «голый» массив travelers → панель падала с
+    // "t.travelers is not iterable" и сбор данных туристов был недоступен.
+    return this.orders.getPinnedRequirements(id, { role: actor.role as never });
   }
 
   @Post("orders/:id/travelers")
