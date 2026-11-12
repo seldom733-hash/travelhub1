@@ -71,7 +71,7 @@ export default function CreatePaymentForm({
   onClose: () => void;
   /** Фиксированный контекст заказа (Order/Booking detail); без него — селект. */
   presetOrder?: PaymentFormPresetOrder | null;
-  onCreated?: (payment: CreatedPayment) => void;
+  onCreated?: (payment?: CreatedPayment) => void;
   /** Refund action opens the expense tab; regular payment opens income. */
   defaultDirection?: "INCOME" | "EXPENSE";
 }) {
@@ -310,6 +310,7 @@ export default function CreatePaymentForm({
           reason: trimmedReason,
           ...(initialNote.trim() ? { initialNote: initialNote.trim() } : {}),
         });
+        onCreated?.();
         setPhase("success");
         closeTimerRef.current = setTimeout(onClose, 900);
         return;
