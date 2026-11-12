@@ -648,13 +648,27 @@ function HistoryTab({ deal }: { deal: DealRow }) {
   const locale = useLocale();
   const [items, setItems] = React.useState<Array<any>>([]);
   const [loading, setLoading] = React.useState(true);
-  const actionLabels: Record<string, string> = { "finance.payment.edited": "Платёж клиента изменён", "finance.supplier_payment.edited": "Расчёт с поставщиком изменён", "finance.supplier_payment.confirmed": "Расчёт с поставщиком подтверждён", "finance.supplier_payment.created": "Расчёт с поставщиком создан", "finance.supplier_payment.cancelled": "Расчёт с поставщиком отменён", "finance.supplier_payment.allocation_reversed": "Распределение сторнировано", "finance.supplier_payment.allocated": "Распределение изменено", "finance.refund.edited": "Возврат изменён", "traveler_added": "Турист добавлен", "traveler_updated": "Данные туриста изменены", "traveler_removed": "Турист удалён", "created": "Создано", "updated": "Изменено", "process": "Заказ принят в работу", "markWaitingData": "Ожидает данные", "resumeProcessing": "Возвращён в работу", "confirm": "Заказ подтверждён", "final_confirm": "Данные туристов подтверждены", "order.returned_to_request": "Заказ возвращён в заявку", "order.updated": "Заказ изменён", "request.updated": "Заявка изменена" };
+  const actionLabels: Record<string, string> = { "requestCancellation": "Запрошена отмена заказа", "approveCancellation": "Отмена согласована", "rejectCancellation": "В отмене отказано", "cancel": "Заказ отменён", "reopen": "Заказ возвращён в работу", "reopened_invalid_close": "Закрытие отменено", "refund_processed": "Возврат получен", "payment_captured": "Оплата получена", "finance.cancellation.supplier_terms_saved": "Условия по поставщикам сохранены", "finance.refund.created": "Возврат создан", "finance.refund.approved": "Возврат согласован", "finance.refund.processed": "Возврат исполнен", "finance.refund.failed": "Возврат отклонён", "finance.settlement.confirmed": "Финансовое урегулирование подтверждено", "finance.settlement.approved": "Финансовое урегулирование утверждено", "finance.payment.edited": "Платёж клиента изменён", "finance.supplier_payment.edited": "Расчёт с поставщиком изменён", "finance.supplier_payment.confirmed": "Расчёт с поставщиком подтверждён", "finance.supplier_payment.created": "Расчёт с поставщиком создан", "finance.supplier_payment.cancelled": "Расчёт с поставщиком отменён", "finance.supplier_payment.allocation_reversed": "Распределение сторнировано", "finance.supplier_payment.allocated": "Распределение изменено", "finance.refund.edited": "Возврат изменён", "traveler_added": "Турист добавлен", "traveler_updated": "Данные туриста изменены", "traveler_removed": "Турист удалён", "created": "Создано", "updated": "Изменено", "process": "Заказ принят в работу", "markWaitingData": "Ожидает данные", "resumeProcessing": "Возвращён в работу", "confirm": "Заказ подтверждён", "final_confirm": "Данные туристов подтверждены", "order.returned_to_request": "Заказ возвращён в заявку", "order.updated": "Заказ изменён", "request.updated": "Заявка изменена" };
   const resourceLabels: Record<string, string> = { SupplierPayout: "Расчёт с поставщиком", Payment: "Платёж", Refund: "Возврат", Request: "Заявка", Order: "Заказ", Booking: "Бронь" };
   const valueLabels: Record<string, string> = { Confirmed: "Подтверждён", Customer: "Клиент", Accepted: "Принят", PROCESSED: "Исполнен", REQUESTED: "Запрошен", APPROVED: "Подтверждён", CANCELLED: "Отменён", FULFILLED: "Исполнен", COMPLETE: "Полные", INCOMPLETE: "Неполные" };
-  const fieldLabels: Record<string, string> = { code: "Код", actor: "Пользователь", aznAmount: "Сумма, AZN", allocationCount: "Распределений", fromAmount: "Было", toAmount: "Стало", fromStatus: "Статус был", toStatus: "Статус стал", reason: "Причина" };
+  const fieldLabels: Record<string, string> = { comment: "Комментарий", code: "Код", actor: "Пользователь", aznAmount: "Сумма, AZN", allocationCount: "Распределений", fromAmount: "Было", toAmount: "Стало", fromStatus: "Статус был", toStatus: "Статус стал", reason: "Причина" };
+  function historyComment(text: string): string {
+    const t = (value: string) => dealText(locale, value);
+    if (text.startsWith("Запрошена отмена заказа:")) return `${t("Запрошена отмена заказа")}: ${text.slice("Запрошена отмена заказа:".length).trim()}`;
+    if (text.startsWith("Закрытие отменено:")) {
+      const m = text.match(/остаток\s+([\d.]+)\s+AZN/);
+      return `${t("Закрытие отменено")}: ${t("у клиента остаток")} ${m?.[1] ?? ""} AZN — ${t("требуется возврат или признание доходом/штрафом")}`;
+    }
+    if (text.startsWith("Возврат получен")) return text.replace("Возврат получен", t("Возврат получен"));
+    if (text.startsWith("Оплата получена")) return text.replace("Оплата получена", t("Оплата получена"));
+    if (text.startsWith("Заявка конвертирована в заказ")) return text.replace("Заявка конвертирована в заказ", t("Заявка конвертирована в заказ"));
+    if (text.startsWith("Клиент принял условия")) return text.replace("Клиент принял условия", t("Клиент принял условия"));
+    if (text.startsWith("Поставщик:")) return text.replace("Поставщик:", t("Поставщик") + ":");
+    return t(text);
+  }
   function detailsText(details: any): string {
     if (!details || typeof details !== "object") return "—";
-    return Object.entries(details).filter(([key]) => key !== "correlation").map(([key, value]) => `${dealText(locale, fieldLabels[key] ?? key)}: ${typeof value === "object" ? JSON.stringify(value) : dealText(locale, valueLabels[String(value)] ?? String(value))}`).join(" · ");
+    return Object.entries(details).filter(([key]) => key !== "correlation").map(([key, value]) => `${dealText(locale, fieldLabels[key] ?? key)}: ${typeof value === "object" ? JSON.stringify(value) : key === "comment" ? historyComment(String(value)) : dealText(locale, valueLabels[String(value)] ?? String(value))}`).join(" · ");
   }
   React.useEffect(() => {
     let alive = true;
