@@ -258,7 +258,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen">
       {/* ── Sidebar ── */}
       <aside
-        className={`thin-scroll sticky top-0 flex h-screen shrink-0 flex-col overflow-y-auto bg-slate-900 text-slate-200 transition-all duration-200 ${sidebarWidth}`}
+        className={`app-sidebar thin-scroll sticky top-0 flex h-screen shrink-0 flex-col overflow-y-auto bg-slate-900 text-slate-200 transition-all duration-200 ${sidebarWidth}`}
       >
         {/* Logo / Brand */}
         <Link

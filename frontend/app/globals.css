@@ -412,3 +412,12 @@ h3,
 ) {
   color: #000 !important;
 }
+
+/* Dark left navigation: all labels must stay white after the global black-text pass. */
+.app-sidebar,
+.app-sidebar * {
+  color: #ffffff !important;
+}.app-sidebar .bg-blue-500,
+.app-sidebar .bg-blue-600 {
+  color: #ffffff !important;
+}
