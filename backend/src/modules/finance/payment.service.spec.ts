@@ -25,6 +25,7 @@ import type { EventBusService } from "../../eventbus/eventbus.service";
 interface PrismaStub {
   order: { findUnique: jest.Mock };
   payment: { findFirst: jest.Mock; findUnique: jest.Mock; create: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock; aggregate: jest.Mock };
+  refund: { aggregate: jest.Mock };
   paymentHistory: { create: jest.Mock };
   operationalNote: { create: jest.Mock };
   $transaction: jest.Mock;
@@ -72,6 +73,7 @@ function makePrismaStub(): PrismaStub {
       aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }),
     },
     paymentHistory: { create: jest.fn().mockResolvedValue({ id: "h1" }) },
+    refund: { aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }) },
     operationalNote: { create: jest.fn().mockImplementation((args: any) => Promise.resolve({ id: "note-1", ...args.data })) },
     $transaction: jest.fn(),
     $executeRaw: jest.fn().mockResolvedValue(0),
