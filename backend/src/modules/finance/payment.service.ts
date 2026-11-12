@@ -427,10 +427,16 @@ export class PaymentService {
             _sum: { amount: true },
           });
           const capturedSum = others._sum.amount ?? new Prisma.Decimal(0);
-          if (capturedSum.add(payment.amount).greaterThan(order.amount)) {
+          const refundedAgg = await tx.refund.aggregate({
+            where: { orderId: payment.orderId, status: RefundStatus.PROCESSED },
+            _sum: { amount: true },
+          });
+          const refundedSum = refundedAgg._sum.amount ?? new Prisma.Decimal(0);
+          const netCapturedSum = Prisma.Decimal.max(new Prisma.Decimal(0), capturedSum.minus(refundedSum));
+          if (netCapturedSum.add(payment.amount).greaterThan(order.amount)) {
             throw new ValidationDomainError(
               `payment amount ${payment.amount.toString()} exceeds remaining due for order ${order.code} ` +
-                `(overpayment protection: captured ${capturedSum.toString()} + this ${payment.amount.toString()} > total ${order.amount.toString()})`,
+                `(overpayment protection: net captured ${netCapturedSum.toString()} + this ${payment.amount.toString()} > total ${order.amount.toString()}, refunded ${refundedSum.toString()})`,
             );
           }
         }
