@@ -381,6 +381,27 @@ export class PaymentService {
     return this.transition(code, PaymentStatus.CANCELLED, "cancelledAt", "cancelled", "finance.payment.cancelled", DomainEvents.PaymentCancelled, actor);
   }
 
+  /** Hard-delete only an unconfirmed, refund-free payment (finance/admin). */
+  async deletePayment(code: string, actor: Actor): Promise<{ deleted: true }> {
+    const payment = await this.prisma.payment.findUnique({ where: { code } });
+    if (!payment) throw new NotFoundError(`Payment ${code} not found`);
+    if (!["PENDING", "AUTHORIZED", "FAILED", "CANCELLED"].includes(payment.status)) {
+      throw new ConflictError(`Payment ${code} is ${payment.status}; refund it before deletion`);
+    }
+    const refunds = await this.prisma.refund.count({ where: { paymentId: payment.id } });
+    if (refunds > 0) throw new ConflictError(`Payment ${code} has refunds; it cannot be deleted`);
+    await this.security.audit(this.prisma as any, {
+      userId: actor.id,
+      username: actor.username,
+      action: "finance.payment.deleted",
+      resource: "Payment",
+      resourceId: payment.id,
+      details: { code, orderId: payment.orderId, amount: payment.amount.toString(), status: payment.status },
+    });
+    await this.prisma.payment.delete({ where: { id: payment.id } });
+    return { deleted: true };
+  }
+
   /**
    * Единый CAS-переход (паттерн Order/Booking): from-guard PENDING +
    * updateMany where id+status+version → ровно один победитель; повторный

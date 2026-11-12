@@ -551,6 +551,12 @@ export class FinanceController {
     return this.supplierPayments.cancel(code, dto.reason ?? null, actor);
   }
 
+  @Delete("supplier-payments/:code")
+  @RequirePermissions("finance.payment.delete")
+  async deleteSupplierPayment(@Param("code") code: string, @CurrentUser() actor: { id: string; username: string }) {
+    return this.supplierPayments.delete(code, actor);
+  }
+
   // ── Tax (finance.tax.manage) ────────────────────────────────────────────────
 
   @Get("taxes")
@@ -780,6 +786,12 @@ export class FinanceController {
   @RequirePermissions("finance.payment.manage")
   async cancelPayment(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.payments.cancelPayment(code, { id: actor.id, username: actor.username });
+  }
+
+  @Delete("payments/:code")
+  @RequirePermissions("finance.payment.delete")
+  async deletePayment(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.payments.deletePayment(code, { id: actor.id, username: actor.username });
   }
 
   // ── Refund (Step 2.13 — provider-neutral Refund runtime) ───────────────────

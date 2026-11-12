@@ -525,8 +525,24 @@ export class SupplierPaymentService {
     return this.getByCodeOrId(payment.code);
   }
 
-  async cancel(codeOrId: string, reason: string | null, actor: Actor): Promise<SupplierPaymentDto> {
-    const payment = await this.load(codeOrId);
+  async delete(codeOrId: string, actor: Actor): Promise<{ deleted: true }> {
+    const payment = await this.prisma.supplierPayout.findUnique({ where: { code: codeOrId }, include: { allocations: true } });
+    if (!payment) throw new NotFoundError(`Supplier payment ${codeOrId} not found`);
+    if (payment.status !== "PENDING") throw new ConflictError(`Supplier payment ${codeOrId} is ${payment.status}; only PENDING can be deleted`);
+    if (payment.allocations.length > 0) throw new ConflictError(`Supplier payment ${codeOrId} has allocations; remove them first`);
+    await this.security.audit(this.prisma as any, {
+      userId: actor.id,
+      username: actor.username,
+      action: "finance.supplier_payment.deleted",
+      resource: "SupplierPayout",
+      resourceId: payment.id,
+      details: { code: payment.code, orderId: payment.orderId, amount: payment.amount.toString() },
+    });
+    await this.prisma.supplierPayout.delete({ where: { id: payment.id } });
+    return { deleted: true };
+  }
+
+  async cancel(codeOrId: string, reason: string | null, actor: Actor): Promise<SupplierPaymentDto> {    const payment = await this.load(codeOrId);
     if (payment.status === "CANCELLED") return this.getByCodeOrId(payment.code);
 
     const cancelledAt = new Date();
