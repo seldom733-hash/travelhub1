@@ -882,7 +882,8 @@ function CancellationTab({ deal, onSaved }: { deal: DealRow; onSaved: () => void
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   if (!deal.orderId) return <Empty text="Сначала создайте заказ" />;
-  const body = { cancellationReason: reason, finalCustomerLiability: clientPenalty, clientPenaltyAmount: clientPenalty, supplierPenaltyAmount: supplierPenalty, penaltyAmount: clientPenalty, supplierPenaltyShare: supplierPenalty, platformPenaltyShare: String(Math.max(0, Number(clientPenalty) - Number(supplierPenalty))), reason: reasons.find(([k]) => k === reason)?.[1] ?? "Отмена" };
+  const platformPenalty = (Math.round((Number(clientPenalty) - Number(supplierPenalty)) * 100) / 100).toFixed(2);
+  const body = { cancellationReason: reason, finalCustomerLiability: clientPenalty, clientPenaltyAmount: clientPenalty, supplierPenaltyAmount: supplierPenalty, penaltyAmount: clientPenalty, supplierPenaltyShare: supplierPenalty, platformPenaltyShare: platformPenalty, reason: reasons.find(([k]) => k === reason)?.[1] ?? "Отмена" };
   async function calculate() {
     const money = /^\d+(\.\d{1,2})?$/;
     if (!money.test(clientPenalty) || !money.test(supplierPenalty)) {
