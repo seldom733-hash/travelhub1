@@ -847,6 +847,12 @@ export class FinanceController {
     return this.refunds.failRefund(code, { id: actor.id, username: actor.username });
   }
 
+  @Delete("refunds/:code")
+  @RequirePermissions("finance.refund.delete")
+  async deleteRefund(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.refunds.deleteRefund(code, { id: actor.id, username: actor.username });
+  }
+
   // ── Dispute (Step 2.13A — provider-neutral Chargeback/Dispute Foundation) ──
   // Dispute — Finance-owned aggregate (DSP-*). Source authority — CAPTURED
   // Payment (currency/orderId server-derived verbatim; amount server-validated

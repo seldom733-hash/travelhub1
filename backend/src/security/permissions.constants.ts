@@ -135,6 +135,7 @@ export const PERMISSIONS = {
   "finance.payment.manage": "Управление платежом (confirm/fail/cancel)",
   "finance.payment.delete": "Удаление ошибочных платежей",
   "finance.refund.read": "Чтение возвратов",
+  "finance.refund.delete": "Удаление ошибочных возвратов",
   // Step 2.13: Refund runtime — create/process/fail (lifecycle execution).
   // approve (согласование REQUESTED → APPROVED) — отдельное право
   // finance.refund.approve (шаг approval workflow, как в каталоге 2.10).
@@ -462,6 +463,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // поставщику (миграция 20261025160000).
     "finance.supplier_payment.confirm",
     "finance.refund.read",
+    "finance.refund.delete",
     "finance.refund.write",
     "finance.refund.approve",
     "finance.refund.execute",

@@ -257,6 +257,32 @@ export class RefundService {
     return this.refundDto(updated);
   }
 
+  async deleteRefund(code: string, actor: Actor): Promise<{ deleted: true }> {
+    const refund = await this.prisma.refund.findUnique({ where: { code } });
+    if (!refund) throw new NotFoundError(`Refund ${code} not found`);
+    await this.security.audit(this.prisma as any, {
+      userId: actor.id,
+      username: actor.username,
+      action: "finance.refund.deleted",
+      resource: "Refund",
+      resourceId: refund.id,
+      details: { code, orderId: refund.orderId, amount: refund.amount.toString(), status: refund.status },
+    });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.document.deleteMany({ where: { sourceId: refund.id } });
+      await tx.refund.delete({ where: { id: refund.id } });
+      const agg = await tx.refund.aggregate({
+        where: { orderId: refund.orderId, status: "PROCESSED" },
+        _sum: { amount: true },
+      });
+      await tx.order.update({
+        where: { id: refund.orderId },
+        data: { refundedAmount: agg._sum.amount ?? new Prisma.Decimal(0) },
+      });
+    });
+    return { deleted: true };
+  }
+
   async approveRefund(code: string, actor: Actor): Promise<Record<string, unknown>> {
     return this.transition(code, RefundStatus.APPROVED, RefundStatus.REQUESTED, "approvedAt", "approved", "finance.refund.approved", DomainEvents.RefundApproved, actor);
   }
