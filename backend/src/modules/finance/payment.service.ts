@@ -385,11 +385,6 @@ export class PaymentService {
   async deletePayment(code: string, actor: Actor): Promise<{ deleted: true }> {
     const payment = await this.prisma.payment.findUnique({ where: { code } });
     if (!payment) throw new NotFoundError(`Payment ${code} not found`);
-    if (!["PENDING", "AUTHORIZED", "FAILED", "CANCELLED"].includes(payment.status)) {
-      throw new ConflictError(`Payment ${code} is ${payment.status}; refund it before deletion`);
-    }
-    const refunds = await this.prisma.refund.count({ where: { paymentId: payment.id } });
-    if (refunds > 0) throw new ConflictError(`Payment ${code} has refunds; it cannot be deleted`);
     await this.security.audit(this.prisma as any, {
       userId: actor.id,
       username: actor.username,
@@ -398,7 +393,28 @@ export class PaymentService {
       resourceId: payment.id,
       details: { code, orderId: payment.orderId, amount: payment.amount.toString(), status: payment.status },
     });
-    await this.prisma.payment.delete({ where: { id: payment.id } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.payment.delete({ where: { id: payment.id } });
+      // Payment documents belong to the deleted fact. Refunds stay as
+      // order-level facts (they are not tied to a specific payment).
+      await tx.document.deleteMany({ where: { sourceId: payment.id } });
+      const [paidAgg, refundAgg, order] = await Promise.all([
+        tx.payment.aggregate({ where: { orderId: payment.orderId, status: { in: [PaymentStatus.CAPTURED, PaymentStatus.REFUNDED] } }, _sum: { amount: true } }),
+        tx.refund.aggregate({ where: { orderId: payment.orderId, status: "PROCESSED" }, _sum: { amount: true } }),
+        tx.order.findUnique({ where: { id: payment.orderId }, select: { amount: true } }),
+      ]);
+      const paid = paidAgg._sum.amount ?? new Prisma.Decimal(0);
+      const refunded = refundAgg._sum.amount ?? new Prisma.Decimal(0);
+      const total = order?.amount ?? new Prisma.Decimal(0);
+      await tx.order.update({
+        where: { id: payment.orderId },
+        data: {
+          paidAmount: paid,
+          refundedAmount: refunded,
+          paymentStatus: paid.gte(total) ? "PAID" : paid.gt(0) ? "PARTIALLY_PAID" : "UNPAID",
+        },
+      });
+    });
     return { deleted: true };
   }
 
