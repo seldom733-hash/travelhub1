@@ -97,6 +97,7 @@ export type OrderAction =
   | "approveCancellation"
   | "rejectCancellation"
   | "cancel"
+  | "reopen"
   | "problem"
   | "suspend"
   | "returnToRequest";
@@ -128,6 +129,7 @@ const TRANSITIONS: Record<string, { from: OrderStatus[]; to: OrderStatus }> = {
   approveCancellation: { from: ["CANCELLATION_REQUESTED"], to: "CANCELLATION_APPROVED" },
   rejectCancellation: { from: ["CANCELLATION_REQUESTED"], to: "IN_PROCESSING" },
   cancel: { from: ["CANCELLATION_APPROVED"], to: "CANCELLED" },
+  reopen: { from: ["CANCELLED"], to: "IN_PROCESSING" },
   problem: { from: ACTIVE_STATUSES.filter((s) => s !== "PROBLEM"), to: "PROBLEM" },
   suspend: { from: ACTIVE_STATUSES.filter((s) => s !== "SUSPENDED"), to: "SUSPENDED" },
   // Stage 1 (Order → Request, только назад): тот же active-диапазон, что и
@@ -162,6 +164,7 @@ const ACTION_LABELS: Record<OrderAction, string> = {
   approveCancellation: "Отмена согласована",
   rejectCancellation: "В отмене отказано",
   cancel: "Заказ отменён",
+  reopen: "Заказ возвращён в работу",
   problem: "Заказ помечен проблемным",
   suspend: "Заказ приостановлен",
   returnToRequest: "Заказ возвращён в заявку",
@@ -181,6 +184,7 @@ export const ACTION_PERMISSIONS: Record<OrderAction, string> = {
   approveCancellation: "finance.settlement.manage",
   rejectCancellation: "finance.settlement.manage",
   cancel: "order.cancel",
+  reopen: "order.cancel",
   problem: "order.edit_noncritical",
   suspend: "order.suspend",
   returnToRequest: "order.cancel",
@@ -1822,12 +1826,32 @@ export class OrderService {
         const activeBookings = await tx.booking.count({ where: { orderId, status: { notIn: BOOKING_TERMINAL } } });
         if (activeBookings > 0) targetStatus = "SENT_TO_BOOKING";
       }
+      if (action === "reopen") {
+        const prior = await tx.orderHistory.findFirst({
+          where: { orderId, action: { in: ["requestCancellation", "cancel"] } },
+          orderBy: { createdAt: "desc" },
+          select: { from: true },
+        });
+        const restore = prior?.from;
+        targetStatus = restore && !["CANCELLED", "CANCELLATION_REQUESTED", "CANCELLATION_APPROVED", "CLOSED"].includes(restore)
+          ? restore as OrderStatus
+          : "IN_PROCESSING";
+      }
       const data: Prisma.OrderUpdateManyMutationInput = {
         status: targetStatus,
         version: { increment: 1 },
         updatedBy: actor ?? null,
       };
       const milestoneNow = new Date();
+      if (action === "reopen") {
+        data.cancelledAt = null;
+        data.cancellationRequestedAt = null;
+        data.cancellationApprovedAt = null;
+        data.cancellationRequestedById = null;
+        data.cancellationApprovedById = null;
+        data.cancellationReason = null;
+        data.cancellationComment = null;
+      }
       if (action === "confirm") data.confirmedAt = milestoneNow;
       else if (action === "complete") data.fulfilledAt = milestoneNow;
       else if (action === "close") data.closedAt = milestoneNow;
