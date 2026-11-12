@@ -200,7 +200,7 @@ function DocumentsContent({
   const typeCounts = (data?.aggregates?.type ?? {}) as Record<string, number>;
 
   return (
-    <OperationsCenterShell activeDomain="documents">
+    <OperationsCenterShell activeDomain="documents" visibleDomains={["documents"]}>
       <div className="flex min-w-0 flex-1 items-start gap-4">
         <div className="min-w-0 flex-1 space-y-4">
           {/* KPI */}
