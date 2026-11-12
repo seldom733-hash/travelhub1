@@ -178,14 +178,14 @@ export default function CreatePaymentForm({
     let alive = true;
     api.get<{
       payments?: { payments?: Array<{ id: string; code: string; amount: string; status: string }> };
-      refunds?: Array<{ id: string; amount: string; status: string }>;
+      refunds?: { refunds?: Array<{ id: string; amount: string; status: string }> };
     }>(
       `/orders/${activeOrderId}/financial-history`,
     ).then((result) => {
       if (!alive) return;
       const all = result.payments?.payments ?? [];
       setClientPayments(all);
-      setClientRefunds(result.refunds ?? []);
+      setClientRefunds(result.refunds?.refunds ?? []);
       const captured = all.filter((payment) => payment.status === "CAPTURED");
       setRefundPayments(captured);
       setRefundPaymentId((current) => current || captured[0]?.id || "");
