@@ -94,6 +94,7 @@ class OrderActionDto {
     "approveCancellation",
     "rejectCancellation",
     "cancel",
+    "reopen",
     "problem",
     "suspend",
     "returnToRequest",

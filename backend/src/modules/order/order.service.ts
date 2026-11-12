@@ -1828,7 +1828,7 @@ export class OrderService {
       }
       if (action === "reopen") {
         const prior = await tx.orderHistory.findFirst({
-          where: { orderId, action: { in: ["requestCancellation", "cancel"] } },
+          where: { orderId, action: "requestCancellation" },
           orderBy: { createdAt: "desc" },
           select: { from: true },
         });
