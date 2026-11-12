@@ -57,16 +57,22 @@ function OperationsCenterTabs({
   tabId,
   panelId,
   periodSearchParams,
+  visibleDomains,
 }: {
   activeDomain: OperationsDomain;
   permissions: string[];
   tabId: string;
   panelId: string;
   periodSearchParams: string;
+  visibleDomains?: OperationsDomain[];
 }) {
   const locale = useLocale();
   const listRef = useRef<HTMLDivElement>(null);
-  const tabs = OPS_TABS.filter((tab) => !tab.permission || permissions.includes(tab.permission));
+  const tabs = OPS_TABS.filter(
+    (tab) =>
+      (!visibleDomains || visibleDomains.includes(tab.id)) &&
+      (!tab.permission || permissions.includes(tab.permission)),
+  );
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft" && e.key !== "Home" && e.key !== "End") return;
@@ -203,10 +209,12 @@ function HeaderPeriodControl() {
 export default function OperationsCenterShell({
   activeDomain,
   headerActions,
+  visibleDomains,
   children,
 }: {
   activeDomain: OperationsDomain;
   headerActions?: React.ReactNode;
+  visibleDomains?: OperationsDomain[];
   children: React.ReactNode;
 }) {
   const locale = useLocale();
@@ -256,6 +264,7 @@ export default function OperationsCenterShell({
             tabId={tabId}
             panelId={panelId}
             periodSearchParams={periodSearchParams}
+            visibleDomains={visibleDomains}
           />
         </div>
       </header>

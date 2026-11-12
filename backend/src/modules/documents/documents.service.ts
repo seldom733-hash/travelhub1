@@ -20,7 +20,7 @@ export interface CreateDocumentInput {
   type: DocumentType;
   sourceId?: string | null;
   code?: string | null;
-  bookingId: string;
+  bookingId?: string | null;
   orderId: string;
   customerId?: string | null;
   serviceDate?: Date | null;
@@ -75,7 +75,7 @@ export class DocumentsService {
         type: input.type,
         sourceId: input.sourceId ?? null,
         status: "NOT_ISSUED",
-        bookingId: input.bookingId,
+        bookingId: input.bookingId ?? null,
         orderId: input.orderId,
         customerId: input.customerId ?? null,
         serviceDate: input.serviceDate ?? null,

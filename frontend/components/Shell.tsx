@@ -51,7 +51,6 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     headingKey: "nav.group.finance",
     items: [
-      { href: "/app/finance/overview", icon: "📉", labelKey: "nav.finance_overview", permission: "finance.overview.read" },
       { href: "/app/finance/deals", icon: "📊", labelKey: "nav.finance_deals", permission: "finance.overview.read" },
       { href: "/app/payments", icon: "💳", labelKey: "nav.payments", permission: "finance.payment.read" },
       { href: "/app/finance/refunds", icon: "↩️", labelKey: "nav.refunds", permission: "finance.refund.read" },
@@ -83,13 +82,6 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/app/geography", icon: "🗺", labelKey: "nav.geography", permission: "geography.read" },
       { href: "/app/hotel-directory", icon: "🏨", labelKey: "nav.hotels", permission: "hotel_directory.read" },
-    ],
-  },
-  {
-    headingKey: "nav.group.partner_network",
-    items: [
-      { href: "/app/partners/onboarding", icon: "📋", labelKey: "nav.partner_onboarding", permission: "partner.onboarding.review" },
-      { href: "/app/seller-profiles", icon: "🛡", labelKey: "nav.seller_profiles", permission: "seller_public_profile.review" },
     ],
   },
   {

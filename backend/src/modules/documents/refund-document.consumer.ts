@@ -46,12 +46,9 @@ export class RefundDocumentConsumer {
           return;
         }
 
-        // Find the booking for this order
+        // Find the booking for this order (optional: payment/refund documents
+        // may exist at Order stage before any Booking is created).
         const booking = await tx.booking.findFirst({ where: { orderId: p.orderId }, orderBy: { createdAt: "desc" } });
-        if (!booking) {
-          await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });
-          return;
-        }
 
         // Check if refund document already exists (idempotent)
         const existing = await tx.document.findFirst({
@@ -65,24 +62,24 @@ export class RefundDocumentConsumer {
         // Create Refund Document
         const { id: documentId, code } = await this.documents.createDocument(tx, {
           type: "REFUND",
-          bookingId: booking.id,
+          bookingId: booking?.id ?? null,
           orderId: p.orderId,
           customerId: order.customerId,
           totalAmount: order.amount,
           paidAmount: order.paidAmount,
-          currency: booking.currency,
+          currency: booking?.currency ?? order.currency,
           paymentStatus: order.paymentStatus,
         });
 
         // Build snapshot
         const snapshot = {
           code,
-          bookingCode: booking.code,
+          bookingCode: booking?.code ?? "",
           orderCode: order.code,
           originalPaidAmount: order.paidAmount?.toString() ?? null,
           refundAmount: p.amount ?? null,
           refundedAmount: order.refundedAmount?.toString() ?? null,
-          currency: booking.currency,
+          currency: booking?.currency ?? order.currency,
           paymentStatus: order.paymentStatus,
           refundDate: new Date().toISOString(),
           refundCode: p.code,
@@ -92,7 +89,7 @@ export class RefundDocumentConsumer {
         await this.documents.issueDocument(tx, documentId, `RefundProcessed (${p.code})`, snapshot);
 
         // If full refund, invalidate active Voucher
-        if (order.paidAmount && order.refundedAmount.greaterThanOrEqualTo(order.paidAmount)) {
+        if (booking && order.paidAmount && order.refundedAmount.greaterThanOrEqualTo(order.paidAmount)) {
           const activeVoucher = await tx.document.findFirst({
             where: { bookingId: booking.id, type: "VOUCHER", status: "ISSUED" },
           });

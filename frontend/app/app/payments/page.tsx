@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 /**
  * UI-C1.2F вЂ” Canonical Payments Operations Center tab (/app/payments).
@@ -45,7 +45,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { OperationsPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import CommerceKpiCard from "@/components/commerce/CommerceKpiCard";
+
 import Pagination from "@/components/Pagination";
 import { type SortDirection } from "@/components/SortableHeader";
 import TableHeaderFilter, { type FilterOption } from "@/components/TableHeaderFilter";
@@ -56,7 +56,7 @@ import OperationsCenterShell, {
   OperationsErrorState,
   OperationsLoadingState,
 } from "@/components/OperationsCenterShell";
-import { useLocale, t, LOCALE_TAGS, type Locale } from "@/lib/i18n";
+import { useLocale, t, type Locale } from "@/lib/i18n";
 import { useCan } from "@/lib/use-can";
 import CreatePaymentForm from "@/components/finance/CreatePaymentForm";
 import PaymentsTable, { type PaymentsTableRow } from "@/components/finance/PaymentsTable";
@@ -85,16 +85,9 @@ function buildPaymentFilterOptions(locale: Locale): FilterOption[] {
   return PAYMENT_STATUSES.map((s) => ({ value: s, label: paymentStatusLabel(s, locale) }));
 }
 
-/** Currency filter options вЂ” server-authoritative dynamic currency list (aggregates overview). */
+/** Currency filter options — server-authoritative dynamic currency list (aggregates overview). */
 function currencyFilterOptions(agg?: PaymentAggregates): FilterOption[] {
   return (agg?.currency ?? []).map((c) => ({ value: c.currency, label: c.currency }));
-}
-
-function fmtMoney(amount: string | number | null | undefined, currency: string | null | undefined, locale: Locale): string {
-  if (amount == null) return "вЂ”";
-  const value = typeof amount === "string" ? Number(amount) : amount;
-  if (!Number.isFinite(value)) return String(amount);
-  return `${value.toLocaleString(LOCALE_TAGS[locale], { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency ?? ""}`.trim();
 }
 
 // в”Ђв”Ђ Payment row DTO (matches backend paymentDto enrichment) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
@@ -352,7 +345,6 @@ function PaymentsContent({
 
   // в”Ђв”Ђ Derived state в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
   const agg = data?.aggregates;
-  const overviewTotal = agg?.total ?? data?.total ?? 0;
   const total = data?.total ?? 0;
 
   const hasCardFilter = Boolean(paymentStatusFilter || refundStatusFilter || currencyCardFilter);
@@ -362,79 +354,9 @@ function PaymentsContent({
   const sortState = sortBy ? { sortBy, sortDirection: sortDirection ?? ("desc" as SortDirection) } : null;
 
   return (
-    <OperationsCenterShell activeDomain="payments">
+    <OperationsCenterShell activeDomain="payments" visibleDomains={["payments"]}>
       <div className="flex min-w-0 flex-1 items-start gap-4">
         <div className="min-w-0 flex-1 space-y-4">
-          {/* в”Ђв”Ђ TOTAL KPI в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */}
-          <div className="w-fit max-w-full">
-            <CommerceKpiCard
-              variant="total"
-              label={t("payments.kpi.total", locale)}
-              value={overviewTotal}
-              active={!hasCardFilter}
-              helpId="payments.kpi.total"
-              onClick={handleTotalClick}
-            />
-          </div>
-
-          {/* в”Ђв”Ђ PAYMENT STATUS GROUP (6/6) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */}
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {t("payments.group.payment_statuses", locale)}
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-              {PAYMENT_STATUSES.map((code) => (
-                <CommerceKpiCard
-                  key={code}
-                  label={paymentStatusLabel(code, locale)}
-                  value={agg?.paymentStatus?.[code] ?? 0}
-                  active={paymentStatusFilter === code}
-                  helpId={`payments.status.${code.toLowerCase()}`}
-                  onClick={() => applyPaymentStatus(code)}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* в”Ђв”Ђ CURRENCY GROUP (dynamic) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */}
-          {agg?.currency && agg.currency.length > 0 && (
-            <div>
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {t("payments.group.currencies", locale)}
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                {agg.currency.map((c) => (
-                  <CommerceKpiCard
-                    key={c.currency}
-                    label={`${c.currency}`}
-                    value={`${c.count} · ${fmtMoney(c.amount, c.currency, locale)}`}
-                    active={currencyCardFilter === c.currency}
-                    onClick={() => applyCurrencyCard(c.currency)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* в”Ђв”Ђ REFUND STATUS GROUP (4/4) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */}
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {t("payments.group.refund_statuses", locale)}
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {REFUND_STATUSES.map((code) => (
-                <CommerceKpiCard
-                  key={code}
-                  label={refundStatusLabel(code, locale)}
-                  value={agg?.refundStatus?.[code] ?? 0}
-                  active={refundStatusFilter === code}
-                  helpId={`payments.refund.status.${code.toLowerCase()}`}
-                  onClick={() => applyRefundStatus(code)}
-                />
-              ))}
-            </div>
-          </div>
-
           {/* в”Ђв”Ђ TOOLBAR в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */}
           <OperationsToolbarSlot>
             {canCreatePayment && (

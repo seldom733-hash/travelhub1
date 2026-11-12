@@ -34,9 +34,8 @@ export class FinancialDocumentConsumer {
         const order = await tx.order.findUnique({ where: { id: p.orderId } });
         if (!order) return;
         const booking = await tx.booking.findFirst({ where: { orderId: p.orderId }, orderBy: { createdAt: "desc" } });
-        if (!booking) return;
-        const { id, code } = await this.documents.createDocument(tx, { code: p.referenceNumber, type: "PARTIAL_PAYMENT", sourceId: p.id, bookingId: booking.id, orderId: order.id, customerId: order.customerId, totalAmount: p.amount, paidAmount: p.amount, currency: p.currency, paymentStatus: "CAPTURED" });
-        await this.documents.issueDocument(tx, id, "DocumentBackfill (Payment)", { code, bookingCode: booking.code, orderCode: order.code, serviceName: "Travel services", totalAmount: p.amount.toString(), paidAmount: p.amount.toString(), remainingAmount: "0.00", currency: p.currency, paymentStatus: "CAPTURED" });
+        const { id, code } = await this.documents.createDocument(tx, { code: p.referenceNumber, type: "PARTIAL_PAYMENT", sourceId: p.id, bookingId: booking?.id ?? null, orderId: order.id, customerId: order.customerId, totalAmount: p.amount, paidAmount: p.amount, currency: p.currency, paymentStatus: "CAPTURED" });
+        await this.documents.issueDocument(tx, id, "DocumentBackfill (Payment)", { code, bookingCode: booking?.code ?? "", orderCode: order.code, serviceName: "Travel services", totalAmount: p.amount.toString(), paidAmount: p.amount.toString(), remainingAmount: "0.00", currency: p.currency, paymentStatus: "CAPTURED" });
       }).catch((e) => this.logger.error(`Backfill payment ${p.id}: ${e}`));
     }
     const refunds = await this.prisma.refund.findMany({ where: { status: { not: "FAILED" } }, select: { id: true, code: true, referenceNumber: true, orderId: true, amount: true, currency: true } });
@@ -46,9 +45,8 @@ export class FinancialDocumentConsumer {
         const order = await tx.order.findUnique({ where: { id: r.orderId } });
         if (!order) return;
         const booking = await tx.booking.findFirst({ where: { orderId: r.orderId }, orderBy: { createdAt: "desc" } });
-        if (!booking) return;
-        const { id, code } = await this.documents.createDocument(tx, { code: r.referenceNumber ?? undefined, type: "REFUND", sourceId: r.id, bookingId: booking.id, orderId: order.id, customerId: order.customerId, totalAmount: r.amount, paidAmount: r.amount, currency: r.currency, paymentStatus: "PROCESSED" });
-        await this.documents.issueDocument(tx, id, "DocumentBackfill (Refund)", { code, bookingCode: booking.code, orderCode: order.code, originalPaidAmount: order.paidAmount.toString(), refundAmount: r.amount.toString(), refundedAmount: order.refundedAmount.toString(), currency: r.currency, paymentStatus: "PROCESSED", refundDate: new Date().toISOString(), refundCode: r.code });
+        const { id, code } = await this.documents.createDocument(tx, { code: r.referenceNumber ?? undefined, type: "REFUND", sourceId: r.id, bookingId: booking?.id ?? null, orderId: order.id, customerId: order.customerId, totalAmount: r.amount, paidAmount: r.amount, currency: r.currency, paymentStatus: "PROCESSED" });
+        await this.documents.issueDocument(tx, id, "DocumentBackfill (Refund)", { code, bookingCode: booking?.code ?? "", orderCode: order.code, originalPaidAmount: order.paidAmount.toString(), refundAmount: r.amount.toString(), refundedAmount: order.refundedAmount.toString(), currency: r.currency, paymentStatus: "PROCESSED", refundDate: new Date().toISOString(), refundCode: r.code });
       }).catch((e) => this.logger.error(`Backfill refund ${r.id}: ${e}`));
     }
     const payouts = await this.prisma.supplierPayout.findMany({ where: { status: { not: "CANCELLED" }, orderId: { not: null } }, select: { id: true, code: true, orderId: true, amount: true, currency: true, direction: true } });
@@ -58,13 +56,12 @@ export class FinancialDocumentConsumer {
         const order = await tx.order.findUnique({ where: { id: p.orderId! } });
         if (!order) return;
         const booking = await tx.booking.findFirst({ where: { orderId: order.id }, orderBy: { createdAt: "desc" } });
-        if (!booking) return;
         const type = p.direction === "INCOMING" ? "REFUND" : "PARTIAL_PAYMENT";
-        const { id, code } = await this.documents.createDocument(tx, { code: p.code, type, sourceId: p.id, bookingId: booking.id, orderId: order.id, customerId: order.customerId, totalAmount: p.amount, paidAmount: p.amount, currency: p.currency, paymentStatus: "CONFIRMED" });
+        const { id, code } = await this.documents.createDocument(tx, { code: p.code, type, sourceId: p.id, bookingId: booking?.id ?? null, orderId: order.id, customerId: order.customerId, totalAmount: p.amount, paidAmount: p.amount, currency: p.currency, paymentStatus: "CONFIRMED" });
         if (type === "REFUND") {
-          await this.documents.issueDocument(tx, id, "DocumentBackfill (SupplierPayout)", { code, bookingCode: booking.code, orderCode: order.code, originalPaidAmount: p.amount.toString(), refundAmount: p.amount.toString(), refundedAmount: p.amount.toString(), currency: p.currency, paymentStatus: "CONFIRMED", refundDate: new Date().toISOString(), refundCode: p.code });
+          await this.documents.issueDocument(tx, id, "DocumentBackfill (SupplierPayout)", { code, bookingCode: booking?.code ?? "", orderCode: order.code, originalPaidAmount: p.amount.toString(), refundAmount: p.amount.toString(), refundedAmount: p.amount.toString(), currency: p.currency, paymentStatus: "CONFIRMED", refundDate: new Date().toISOString(), refundCode: p.code });
         } else {
-          await this.documents.issueDocument(tx, id, "DocumentBackfill (SupplierPayout)", { code, bookingCode: booking.code, orderCode: order.code, serviceName: "Supplier settlement", totalAmount: p.amount.toString(), paidAmount: p.amount.toString(), remainingAmount: "0.00", currency: p.currency, paymentStatus: "CONFIRMED" });
+          await this.documents.issueDocument(tx, id, "DocumentBackfill (SupplierPayout)", { code, bookingCode: booking?.code ?? "", orderCode: order.code, serviceName: "Supplier settlement", totalAmount: p.amount.toString(), paidAmount: p.amount.toString(), remainingAmount: "0.00", currency: p.currency, paymentStatus: "CONFIRMED" });
         }
       }).catch((e) => this.logger.error(`Backfill payout ${p.id}: ${e}`));
     }
@@ -82,16 +79,15 @@ export class FinancialDocumentConsumer {
         const order = await tx.order.findUnique({ where: { id: p.orderId } });
         if (!order) return;
         const booking = await tx.booking.findFirst({ where: { orderId: p.orderId }, orderBy: { createdAt: "desc" } });
-        if (!booking) return;
         const paymentRow = await tx.payment.findUnique({ where: { id: p.paymentId }, select: { referenceNumber: true } });
         const { id, code } = await this.documents.createDocument(tx, {
           code: paymentRow?.referenceNumber ?? undefined,
-          type: "PARTIAL_PAYMENT", sourceId: p.paymentId, bookingId: booking.id, orderId: order.id,
+          type: "PARTIAL_PAYMENT", sourceId: p.paymentId, bookingId: booking?.id ?? null, orderId: order.id,
           customerId: order.customerId, totalAmount: new Prisma.Decimal(p.amount), paidAmount: new Prisma.Decimal(p.amount),
           currency: p.currency, paymentStatus: "CAPTURED",
         });
         await this.documents.issueDocument(tx, id, `PaymentCaptured (${p.code})`, {
-          code, bookingCode: booking.code, orderCode: order.code, serviceName: "Travel services",
+          code, bookingCode: booking?.code ?? "", orderCode: order.code, serviceName: "Travel services",
           totalAmount: p.amount, paidAmount: p.amount,
           remainingAmount: "0.00", currency: p.currency, paymentStatus: "CAPTURED",
         });
@@ -118,13 +114,12 @@ export class FinancialDocumentConsumer {
         const order = await tx.order.findUnique({ where: { id: payout.orderId } });
         if (!order) return;
         const booking = await tx.booking.findFirst({ where: { orderId: order.id }, orderBy: { createdAt: "desc" } });
-        if (!booking) return;
         const { id, code } = await this.documents.createDocument(tx, {
-          code: payout.code, type, sourceId: p.payoutId, bookingId: booking.id, orderId: order.id, customerId: order.customerId,
+          code: payout.code, type, sourceId: p.payoutId, bookingId: booking?.id ?? null, orderId: order.id, customerId: order.customerId,
           totalAmount: payout.amount, paidAmount: payout.amount, currency: p.currency, paymentStatus: "CONFIRMED",
         });
         await this.documents.issueDocument(tx, id, `SupplierPayoutCreated (${p.payoutCode})`, {
-          code, bookingCode: booking.code, orderCode: order.code, serviceName: "Supplier settlement",
+          code, bookingCode: booking?.code ?? "", orderCode: order.code, serviceName: "Supplier settlement",
           totalAmount: order.amount.toString(), paidAmount: p.amount, remainingAmount: null,
           currency: p.currency, paymentStatus: order.paymentStatus,
         });

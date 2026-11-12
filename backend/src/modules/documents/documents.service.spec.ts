@@ -127,6 +127,20 @@ describe("DocumentsService", () => {
 
       expect(ids.nextCode).toHaveBeenCalledWith(prisma, "RFD");
     });
+    it("creates an order-level PAYMENT document without a Booking", async () => {
+      prisma.document.create.mockResolvedValue({ id: "doc-4", code: "PPD-00000002" });
+
+      await (service as any).createDocument(prisma, {
+        type: "PARTIAL_PAYMENT",
+        orderId: "ord-1",
+      });
+
+      expect(prisma.document.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ bookingId: null, orderId: "ord-1", type: "PARTIAL_PAYMENT" }),
+        }),
+      );
+    });
   });
 
   describe("invalidateDocument", () => {

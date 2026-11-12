@@ -6170,7 +6170,7 @@ model Document {
   status DocumentStatus @default(NOT_ISSUED)
 
   // Ownership chain: Document → Booking → Order → Customer → User (Buyer)
-  bookingId  String // ref booking.Booking (no FK — ADR-0001)
+  bookingId  String? // ref booking.Booking (no FK — ADR-0001); NULL = order-level financial document
   orderId    String // ref order.Order (no FK — ADR-0001)
   /// Source financial fact id (Payment/Refund/SupplierPayout) for idempotency.
   sourceId   String?
