@@ -82,7 +82,7 @@ export class OrderFinancialSettlementService {
     if (!context.terminalKind) {
       throw new ValidationDomainError("Financial settlement is allowed only for a cancelled or completed order");
     }
-    if (context.terminalKind === "CANCELLED" && !context.order.cancelledAt) {
+    if (context.terminalKind === "CANCELLED" && !context.order.cancelledAt && context.order.status !== "CANCELLATION_APPROVED") {
       throw new ValidationDomainError("Cancellation is not confirmed (cancelledAt is missing)");
     }
     if (input.finalCustomerLiability == null && context.terminalKind === "CANCELLED") {
@@ -568,7 +568,7 @@ export class OrderFinancialSettlementService {
       pendingPaymentsCount: pendingPayments,
       activeRefundsCount: activeRefunds,
       ledgerComplete: paymentLedger === paymentIds.length && refundLedger === refundIds.length,
-      terminalKind: order.status === "CANCELLED" ? "CANCELLED" : ["FULFILLED", "CLOSED"].includes(order.status) ? "COMPLETED" : null,
+      terminalKind: ["CANCELLED", "CANCELLATION_APPROVED"].includes(order.status) ? "CANCELLED" : ["FULFILLED", "CLOSED"].includes(order.status) ? "COMPLETED" : null,
     };
   }
 
