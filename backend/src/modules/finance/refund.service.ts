@@ -121,20 +121,24 @@ export class RefundService {
         });
         if (existing) return this.refundDto(existing);
 
-        // Over-refund protection (CRITICAL): serialized по paymentId — два
-        // concurrent частичных refund'а не могут вместе превысить payment.amount
-        // (advisory xact lock освобождается на commit/rollback tx; проект-паттерн
-        // atomic capacity — как reserveAvailability, но без мутации Payment).
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`refund:${payment.id}`}))`;
-        const agg = await tx.refund.aggregate({
+        // Over-refund protection (CRITICAL): refund is measured against the
+        // TOTAL captured payments of the order, not one selected payment.
+        // Serialize all order refunds so concurrent partials cannot over-refund.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`order-refunds:${payment.orderId}`}))`;
+        const paidAgg = await tx.payment.aggregate({
+          where: { orderId: payment.orderId, status: { in: ["CAPTURED", "REFUNDED"] } },
           _sum: { amount: true },
-          where: { paymentId: payment.id, status: { notIn: TERMINAL_RELEASE } },
         });
-        const refunded = agg._sum.amount ?? new Prisma.Decimal(0);
-        const refundable = new Prisma.Decimal(payment.amount).minus(refunded);
+        const refundedAgg = await tx.refund.aggregate({
+          _sum: { amount: true },
+          where: { orderId: payment.orderId, status: { notIn: TERMINAL_RELEASE } },
+        });
+        const paidTotal = paidAgg._sum.amount ?? new Prisma.Decimal(0);
+        const refunded = refundedAgg._sum.amount ?? new Prisma.Decimal(0);
+        const refundable = new Prisma.Decimal(paidTotal).minus(refunded);
         if (amountDecimal.greaterThan(refundable)) {
           throw new ConflictError(
-            `Refund ${amount} exceeds refundable ${refundable.toString()} for payment ${payment.code} (already refunded ${refunded.toString()})`,
+            `Refund ${amount} exceeds refundable ${refundable.toString()} for order ${payment.orderId} (captured ${paidTotal.toString()}, already refunded ${refunded.toString()})`,
           );
         }
 

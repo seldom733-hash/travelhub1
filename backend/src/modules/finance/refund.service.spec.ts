@@ -18,7 +18,7 @@ import type { SecurityService } from "../../security/security.service";
 import type { EventBusService } from "../../eventbus/eventbus.service";
 
 interface PrismaStub {
-  payment: { findUnique: jest.Mock };
+  payment: { findUnique: jest.Mock; aggregate: jest.Mock };
   order: { findUnique: jest.Mock };
   partnerStorefront: { findUnique: jest.Mock };
   refund: {
@@ -66,7 +66,10 @@ const REFUND_ROW = {
 
 function makePrismaStub(): PrismaStub {
   const prisma: PrismaStub = {
-    payment: { findUnique: jest.fn().mockResolvedValue(PAYMENT_ROW) },
+    payment: {
+      findUnique: jest.fn().mockResolvedValue(PAYMENT_ROW),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { amount: new Prisma.Decimal("150.00") } }),
+    },
     order: { findUnique: jest.fn().mockResolvedValue({ acquisitionSource: "MARKETPLACE", sellerPartnerId: null }) },
     partnerStorefront: { findUnique: jest.fn().mockResolvedValue(null) },
     refund: {
@@ -121,10 +124,10 @@ describe("RefundService (Step 2.13)", () => {
           }),
         }),
       );
-      // Over-refund serialization: advisory lock по paymentId + SUM(non-FAILED).
+      // Over-refund serialization: advisory lock + SUM(non-FAILED) по заказу.
       expect(prisma.$executeRaw).toHaveBeenCalled();
       expect(prisma.refund.aggregate).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { paymentId: "pay-1", status: { notIn: ["FAILED"] } } }),
+        expect.objectContaining({ where: { orderId: "ord-1", status: { notIn: ["FAILED"] } } }),
       );
     });
 
