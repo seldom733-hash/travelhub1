@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { formatPrice } from "@/lib/i18n";
+import { formatPrice, useLocale } from "@/lib/i18n";
+import { dealText, dealStatus } from "@/lib/deals-i18n";
 import { api } from "@/lib/api";
 import { dealsApi, type DealRow } from "@/lib/deals-api";
 import { documentsApi, type DocumentListItem } from "@/lib/documents-api";
@@ -52,6 +53,7 @@ const BOOKING_ACTION_LABELS: Record<string, string> = {
 
 export default function DealDetailPage() {
   const user = useCurrentUser();
+  const locale = useLocale();
   const canConfirmClientPayments = Boolean(user?.permissions.includes("finance.payment.manage"));
   const canConfirmSupplierPayments = Boolean(user?.permissions.includes("finance.supplier_payment.confirm"));
   const canApproveRefunds = Boolean(user?.permissions.includes("finance.refund.approve"));
@@ -282,24 +284,24 @@ export default function DealDetailPage() {
       <div className="border-b border-[#e5e2da] bg-white px-4 py-3 lg:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="mb-1 flex items-center gap-1 text-[11px] text-[#98a2b3]"><Link href="/app/finance/deals" className="hover:text-[#0f6b5f]">Финансы</Link><span>/</span><Link href="/app/finance/deals" className="hover:text-[#0f6b5f]">Реестр продаж и взаиморасчётов</Link><span>/</span><span className="text-[#667085]">Сделка № {deal.sequence}</span></div>
+            <div className="mb-1 flex items-center gap-1 text-[11px] text-[#98a2b3]"><Link href="/app/finance/deals" className="hover:text-[#0f6b5f]">{dealText(locale, "Финансы")}</Link><span>/</span><Link href="/app/finance/deals" className="hover:text-[#0f6b5f]">{dealText(locale, "Реестр продаж и взаиморасчётов")}</Link><span>/</span><span className="text-[#667085]">{dealText(locale, "Сделка №")} {deal.sequence}</span></div>
             <div className="flex flex-wrap items-center gap-3">
               <Link href="/app/finance/deals" className="text-lg text-[#667085]">‹</Link>
-              <h1 style={{ fontFamily: "var(--font-body), Manrope, sans-serif" }} className="font-sans text-[24px] font-semibold tracking-tight text-[#101828]">Сделка № {deal.sequence}</h1>
-              <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">Стадия: {deal.stageLabel}</span>
-              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusTone(deal.status)}`}>{statusRu(deal.status)}</span>
+              <h1 style={{ fontFamily: "var(--font-body), Manrope, sans-serif" }} className="font-sans text-[24px] font-semibold tracking-tight text-[#101828]">{dealText(locale, "Сделка №")} {deal.sequence}</h1>
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">{dealText(locale, "Стадия:")} {dealText(locale, deal.stageLabel)}</span>
+              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusTone(deal.status)}`}>{dealStatus(locale, deal.status)}</span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link href="/app/finance/deals" className="rounded-lg border border-[#e5e2da] bg-white px-3 py-2 text-xs font-medium text-[#344054]">‹ К списку</Link>
+            <Link href="/app/finance/deals" className="rounded-lg border border-[#e5e2da] bg-white px-3 py-2 text-xs font-medium text-[#344054]">‹ {dealText(locale, "К списку")}</Link>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[#667085]">
-          <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f]">Заявка · {deal.requestCode}</span>
-          <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f]">Заказ · {deal.orderCode ?? "не создан"}</span>
-          <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f]">Бронь · {deal.bookingCode ?? "не создана"}</span>
-          <span className="ml-auto">Создано: {new Date(deal.createdAt).toLocaleString("ru-RU")}</span>
-          <span>Менеджер: {deal.manager ?? "—"}</span>
+          <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f]">{dealText(locale, "Заявка")} · {deal.requestCode}</span>
+          <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f]">{dealText(locale, "Заказ")} · {deal.orderCode ?? dealText(locale, "не создан")}</span>
+          <span className="rounded-full bg-[#f2faf7] px-2 py-1 font-mono text-[#0f6b5f]">{dealText(locale, "Бронь")} · {deal.bookingCode ?? dealText(locale, "не создана")}</span>
+          <span className="ml-auto">{dealText(locale, "Создано:")} {new Date(deal.createdAt).toLocaleString(locale === "az" ? "az-AZ" : locale === "en" ? "en-GB" : "ru-RU")}</span>
+          <span>{dealText(locale, "Менеджер:")} {deal.manager ?? "—"}</span>
         </div>
       </div>
 
@@ -377,7 +379,7 @@ export default function DealDetailPage() {
             </div>
 
             <section className="rounded-xl border border-[#e5e2da] bg-white shadow-sm">
-              <div className="flex flex-wrap gap-1 border-b border-[#f0eee8] px-2 pt-2">{TABS.map(([key, label]) => <button key={key} type="button" onClick={() => setTab(key)} className={`border-b-2 px-2 py-2 text-[11px] font-medium ${tab === key ? "border-[#0f6b5f] text-[#0f6b5f]" : "border-transparent text-[#667085]"}`}>{label}</button>)}</div>
+              <div className="flex flex-wrap gap-1 border-b border-[#f0eee8] px-2 pt-2">{TABS.map(([key, label]) => <button key={key} type="button" onClick={() => setTab(key)} className={`border-b-2 px-2 py-2 text-[11px] font-medium ${tab === key ? "border-[#0f6b5f] text-[#0f6b5f]" : "border-transparent text-[#667085]"}`}>{dealText(locale, label)}</button>)}</div>
               <div className="p-4 text-xs">{tab === "overview" && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><Info label="Общий номер" value={deal.sequence} /><Info label="Заявка" value={deal.requestCode} /><Info label="Заказ" value={deal.orderCode ?? "—"} /><Info label="Бронь" value={deal.bookingCode ?? "—"} /><Info label="Стадия" value={deal.stageLabel} /><Info label="Статус" value={statusRu(deal.status)} /><Info label="Дата услуги" value={dateFrom} /><Info label="Окончание услуги" value={dateTo} /><Info label="Сумма продажи" value={money(deal.salesAmount, deal.currency)} /><Info label="Себестоимость" value={money(deal.costAmount, deal.currency)} /><Info label="Фин. статус" value={deal.financialStatus} /><Info label="Оплата клиента" value={deal.paymentStatus} /><Info label="Оплата поставщику" value={deal.supplierPaymentStatus} /></div>}{tab === "services" && <div className="space-y-2">{deal.services.map((s) => <div key={s.id} className="flex justify-between border-b border-[#f0eee8] py-2"><span>{s.title}</span><span className="font-mono">{money(s.clientPrice, deal.currency)} / {money(s.cost, deal.currency)}</span></div>)}</div>}{tab === "client" && <SimpleRows rows={[...deal.payments.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), "Оплата клиента", money(p.amount, p.currency), p.method ?? "—", statusRu(p.status)]), ...deal.refunds.map((r) => [new Date(r.date).toLocaleDateString("ru-RU"), "Возврат клиенту", `−${money(r.amount, r.currency)}`, r.method ?? "—", statusRu(r.status)])]} head={["Дата", "Тип", "Сумма", "Метод", "Статус"]} />}{tab === "supplier" && <SimpleRows rows={deal.payouts.map((p) => [new Date(p.date).toLocaleDateString("ru-RU"), p.direction === "INCOMING" ? "Возврат от поставщика" : "Оплата поставщику", money(p.amount, p.currency), p.method ?? "—", statusRu(p.status)])} head={["Дата", "Тип", "Сумма", "Метод", "Статус"]} />}{tab === "penalties" && <div className="space-y-3"><div className="space-y-2"><Info label="Штраф клиента" value={money(deal.clientPenalty, deal.currency)} /><Info label="Штраф поставщика" value={money(deal.supplierPenalty, deal.currency)} /><Info label="Возвращено клиенту" value={money(deal.clientRefundTotal, deal.currency)} /><Info label="Возврат поставщика" value={money(deal.supplierRefunded, deal.currency)} /></div><CancellationTab deal={deal} onSaved={() => setReload((v) => v + 1)} /></div>}{tab === "docs" && <DocumentsTab deal={deal} />}{tab === "communications" && <CommunicationsTab deal={deal} />}{tab === "history" && <HistoryTab deal={deal} />}</div>
             </section>
           </div>
@@ -406,8 +408,8 @@ export default function DealDetailPage() {
   );
 }
 
-function Header({ title, right }: { title: string; right?: React.ReactNode }) { return <div className="flex items-center justify-between border-b border-[#f0eee8] px-3 py-2.5"><h3 className="text-xs font-semibold text-[#101828]">{title}</h3><div className="flex items-center gap-2">{right}</div></div>; }
-function InfoCard({ title, icon, action, children }: { title: string; icon: string; action?: React.ReactNode; children: React.ReactNode }) { return <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span className="flex items-center gap-1.5"><span className="text-[#0f6b5f]">{icon}</span>{title}</span>{action}</div>{children}</div>; }
+function Header({ title, right }: { title: string; right?: React.ReactNode }) { const locale = useLocale(); return <div className="flex items-center justify-between border-b border-[#f0eee8] px-3 py-2.5"><h3 className="text-xs font-semibold text-[#101828]">{dealText(locale, title)}</h3><div className="flex items-center gap-2">{right}</div></div>; }
+function InfoCard({ title, icon, action, children }: { title: string; icon: string; action?: React.ReactNode; children: React.ReactNode }) { const locale = useLocale(); return <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm"><div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-[#667085]"><span className="flex items-center gap-1.5"><span className="text-[#0f6b5f]">{icon}</span>{dealText(locale, title)}</span>{action}</div>{children}</div>; }
 function FlowStep({ title, code, state, detail }: { title: string; code: string | null; state: "done" | "current" | "todo"; detail: string }) { return <div className={`flex-1 rounded-xl border p-3 ${state === "current" ? "border-[#0f6b5f] bg-[#eef8f3]" : state === "done" ? "border-emerald-200 bg-emerald-50" : "border-[#e5e2da] bg-white"}`}><div className="text-[10px] uppercase tracking-wide text-[#667085]">{title}</div><div className="mt-1 font-mono text-xs font-semibold text-[#101828]">{code ?? "Не создан"}</div><div className="mt-1 text-[10px] text-[#667085]">{detail}</div></div>; }
 function Arrow() { return <div className="hidden items-center px-1 text-[#98a2b3] md:flex">→</div>; }
 function FinRow({ label, value, tone }: { label: string; value: string; tone?: string }) { return <div className="flex items-center justify-between border-b border-[#d9e6e1] py-1 text-[11px] last:border-0"><span className="text-[#667085]">{label}</span><span className={`font-mono text-xs font-semibold ${tone ?? "text-[#101828]"}`}>{value}</span></div>; }
@@ -415,7 +417,7 @@ function Mini({ label, value }: { label: string; value: string }) { return <div 
 function Panel({ title, action, totals, children }: { title: string; action?: React.ReactNode; totals: Array<[string, string]>; children: React.ReactNode }) { return <section className="rounded-xl border border-[#e5e2da] bg-white shadow-sm"><Header title={title} right={action} /><div className="p-3">{children}<div className="mt-2 space-y-1 border-t border-[#f0eee8] pt-2 text-[10px]">{totals.map(([l, v]) => <div key={l} className="flex justify-between"><span className="text-[#98a2b3]">{l}</span><span className="font-mono font-semibold text-[#344054]">{v}</span></div>)}</div></div></section>; }
 function SimpleRows({ rows, head }: { rows: React.ReactNode[][]; head: string[] }) { if (rows.length === 0) return <Empty text="Нет данных" />; return <table className="w-full text-left text-[10px]"><thead className="text-[#98a2b3]"><tr>{head.map((h) => <th key={h} className="py-1 font-medium">{h}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={i} className="border-t border-[#f0eee8]">{r.map((c, j) => <td key={j} className={`py-1.5 ${j === 1 ? "font-mono" : ""}`}>{c}</td>)}</tr>)}</tbody></table>; }
 function Line({ label, value }: { label: string; value: string }) { return <div className="flex justify-between py-2"><span className="text-[#667085]">{label}</span><span className="font-mono font-semibold text-[#344054]">{value}</span></div>; }
-function Info({ label, value }: { label: string; value: string }) { return <div className="flex justify-between border-b border-[#f0eee8] py-1.5"><span className="text-[#98a2b3]">{label}</span><span className="font-medium text-[#344054]">{value}</span></div>; }
+function Info({ label, value }: { label: string; value: string }) { const locale = useLocale(); return <div className="flex justify-between border-b border-[#f0eee8] py-1.5"><span className="text-[#98a2b3]">{dealText(locale, label)}</span><span className="font-medium text-[#344054]">{value}</span></div>; }
 function Empty({ text }: { text: string }) { return <div className="rounded-lg border border-dashed border-[#e5e2da] bg-[#fbfaf7] px-3 py-4 text-[10px] text-[#98a2b3]">{text}</div>; }
 function Timeline({ title, code, date, tone }: { title: string; code: string | null; date: string; tone: "done" | "current" | "todo" }) { return <div className="relative flex gap-2 pb-3 last:pb-0"><span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full text-[8px] text-white ${tone === "done" ? "bg-emerald-600" : tone === "current" ? "bg-[#0f6b5f]" : "bg-[#d0d5dd]"}`}>{tone === "done" ? "✓" : "•"}</span><div><div className="text-[10px] font-medium text-[#344054]">{title}</div><div className="font-mono text-[9px] text-[#98a2b3]">{code ?? "—"}</div><div className="text-[9px] text-[#98a2b3]">{date}</div></div></div>; }
 
