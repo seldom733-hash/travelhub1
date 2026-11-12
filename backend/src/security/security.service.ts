@@ -67,11 +67,29 @@ export class SecurityService implements OnModuleInit {
       });
     }
 
+    // ADMIN is the platform superuser: guarantee every permission, including
+    // finance.payment.manage / finance.refund.approve / finance.refund.execute
+    // and supplier-payment confirmation, survives permissions added later.
+    await this.ensureAdminPermissions();
+
     // Step 3.2: RolePermission rows = persisted effective state.
     // Startup seed НЕ выполняет toAdd/toRevoke для RolePermission.
     // Default assignments создаются one-time Prisma migration.
     // Admin grant/revoke (Stage C) сохраняется между restarts.
     this.logger.log("RBAC roles/permissions seeded");
+  }
+
+  /** ADMIN must always hold the complete permission catalog. */
+  private async ensureAdminPermissions(): Promise<void> {
+    const [admin, permissions] = await Promise.all([
+      this.prisma.role.findUnique({ where: { code: RoleCode.ADMIN }, select: { id: true } }),
+      this.prisma.permission.findMany({ select: { id: true } }),
+    ]);
+    if (!admin) return;
+    await this.prisma.rolePermission.createMany({
+      data: permissions.map((p) => ({ roleId: admin.id, permissionId: p.id })),
+      skipDuplicates: true,
+    });
   }
 
   /** Создание администратора по умолчанию (идемпотентно). */

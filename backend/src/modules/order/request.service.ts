@@ -1085,6 +1085,41 @@ export class RequestService {
     return this.supplierAction(requestId, "REJECTED", "REJECTED", actor, reason);
   }
 
+  /** Manager cancellation of a request at any pre-conversion stage. */
+  async cancelRequest(requestId: string, actor: Actor, reason?: string): Promise<Record<string, unknown>> {
+    const request = await this.prisma.request.findUnique({ where: { id: requestId } });
+    if (!request) throw new NotFoundException(`Request ${requestId} not found`);
+    const terminal = ["CONVERTED", "REJECTED", "UNAVAILABLE", "EXPIRED", "CANCELLED_BY_CUSTOMER"];
+    if (terminal.includes(request.status)) {
+      throw new BadRequestException(`Cannot cancel request in status ${request.status}`);
+    }
+    const now = new Date();
+    const updated = await this.prisma.request.update({
+      where: { id: requestId },
+      data: {
+        status: "REJECTED",
+        rejectedAt: now,
+        rejectedBy: "manager",
+        rejectionReason: reason ?? "Отменено менеджером",
+        supplierDecision: "REJECTED",
+        supplierRespondedAt: now,
+        version: { increment: 1 },
+      },
+    });
+    await this.prisma.requestHistory.create({
+      data: {
+        requestId,
+        action: "cancelled_by_manager",
+        from: request.status,
+        to: "REJECTED",
+        actorId: actor.id,
+        actorName: actor.username,
+        comment: reason ?? "Заявка отменена менеджером",
+      },
+    });
+    return this.requestDto(updated);
+  }
+
   /**
    * Supplier action: mark unavailable.
    */

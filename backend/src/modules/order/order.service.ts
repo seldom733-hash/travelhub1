@@ -124,7 +124,7 @@ const TRANSITIONS: Record<string, { from: OrderStatus[]; to: OrderStatus }> = {
   send: { from: ["READY_FOR_BOOKING", "WAITING_FOR_FIRST_PAYMENT", "PARTIALLY_FULFILLED"], to: "SENT_TO_BOOKING" },
   complete: { from: ["SENT_TO_BOOKING", "PARTIALLY_FULFILLED"], to: "FULFILLED" },
   close: { from: ["FULFILLED", "READY_TO_CLOSE", "CANCELLED"], to: "CLOSED" },
-  requestCancellation: { from: ACTIVE_STATUSES, to: "CANCELLATION_REQUESTED" },
+  requestCancellation: { from: [...ACTIVE_STATUSES, "WAITING_FOR_FIRST_PAYMENT", "FULFILLED", "READY_TO_CLOSE"], to: "CANCELLATION_REQUESTED" },
   approveCancellation: { from: ["CANCELLATION_REQUESTED"], to: "CANCELLATION_APPROVED" },
   rejectCancellation: { from: ["CANCELLATION_REQUESTED"], to: "IN_PROCESSING" },
   cancel: { from: ["CANCELLATION_APPROVED"], to: "CANCELLED" },

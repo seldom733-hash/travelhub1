@@ -317,6 +317,16 @@ export class RequestController {
     return this.requestService.markUnavailable(id, { id: user.id, username: user.username }, body.reason);
   }
 
+  @Post(":id/cancel")
+  @RequirePermissions("order.edit_noncritical")
+  cancel(
+    @CurrentUser() user: any,
+    @Param("id") id: string,
+    @Body() body: { reason?: string },
+  ) {
+    return this.requestService.cancelRequest(id, { id: user.id, username: user.username }, body.reason);
+  }
+
   /**
    * Supplier Markup Phase 4 §4.3 (Live Sales): server-authoritative
    * individual discount (отдельный grants-пермишен, не order.edit_noncritical).
