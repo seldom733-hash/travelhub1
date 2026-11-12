@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { formatPrice, useLocale } from "@/lib/i18n";
 import { dealText, dealStatus, dealFinancial } from "@/lib/deals-i18n";
@@ -124,11 +125,11 @@ export default function DealsPage() {
         )}
 
         <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm">
-          <div className="flex flex-wrap items-center gap-2"><div className="relative min-w-[320px] flex-1"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">⌕</span><input value={query.search} onChange={(e) => setFilter({ search: e.target.value })} placeholder="Поиск по номеру/коду (заявка, заказ, бронь), ФИО клиента или телефону" className="w-full rounded-lg border border-[#e5e2da] bg-[#fbfaf7] py-2 pl-9 pr-3 text-xs outline-none focus:border-[#0f6b5f]" /></div><span className="text-[10px] text-[#98a2b3]">Например:</span>{["00000001", "mkt-ord-00000001", "Алиев Эльвин", "+994 50 123 45 67"].map((h) => <button key={h} type="button" onClick={() => setFilter({ search: h })} className="rounded-full border border-[#e5e2da] bg-[#fbfaf7] px-2 py-1 text-[10px] text-[#475467]">{h}</button>)}<button type="button" onClick={() => setFilter({ statusGroup: query.statusGroup === "cancelled" ? "" : "cancelled", status: "" })} className={`rounded-full border px-2 py-1 text-[10px] ${query.statusGroup === "cancelled" ? "border-rose-300 bg-rose-50 text-rose-700" : "border-[#e5e2da] bg-[#fbfaf7] text-[#475467]"}`}>Только отмены</button></div>
+          <div className="flex flex-wrap items-center gap-2"><div className="relative min-w-[320px] flex-1"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">⌕</span><input value={query.search} onChange={(e) => setFilter({ search: e.target.value })} placeholder={dealText(locale, "Поиск по номеру/коду (заявка, заказ, бронь), ФИО клиента или телефону")} className="w-full rounded-lg border border-[#e5e2da] bg-[#fbfaf7] py-2 pl-9 pr-3 text-xs outline-none focus:border-[#0f6b5f]" /></div><span className="text-[10px] text-[#98a2b3]">{dealText(locale, "Например:")}</span>{["00000001", "mkt-ord-00000001", "Алиев Эльвин", "+994 50 123 45 67"].map((h) => <button key={h} type="button" onClick={() => setFilter({ search: h })} className="rounded-full border border-[#e5e2da] bg-[#fbfaf7] px-2 py-1 text-[10px] text-[#475467]">{h}</button>)}<button type="button" onClick={() => setFilter({ statusGroup: query.statusGroup === "cancelled" ? "" : "cancelled", status: "" })} className={`rounded-full border px-2 py-1 text-[10px] ${query.statusGroup === "cancelled" ? "border-rose-300 bg-rose-50 text-rose-700" : "border-[#e5e2da] bg-[#fbfaf7] text-[#475467]"}`}>{dealText(locale, "Только отмены")}</button></div>
           <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[#f0eee8] pt-2">
-            {[["", "Все заявки"], ["my", "Только мои"]].map(([value, label]) => <button key={value} type="button" onClick={() => setFilter({ scope: value })} className={`rounded-full border px-3 py-1 text-[10px] font-medium ${query.scope === value ? "border-[#0f6b5f] bg-[#eef8f3] text-[#0f6b5f]" : "border-[#e5e2da] bg-white text-[#475467]"}`}>{label}</button>)}
+            {[["", dealText(locale, "Все заявки")], ["my", dealText(locale, "Только мои")]].map(([value, label]) => <button key={value} type="button" onClick={() => setFilter({ scope: value })} className={`rounded-full border px-3 py-1 text-[10px] font-medium ${query.scope === value ? "border-[#0f6b5f] bg-[#eef8f3] text-[#0f6b5f]" : "border-[#e5e2da] bg-white text-[#475467]"}`}>{label}</button>)}
             <span className="mx-1 h-4 w-px bg-[#e5e2da]" />
-            {[["", "Все статусы"], ["open", "Открытые"], ["closed", "Закрытые"], ["cancelled", "Отменённые"]].map(([value, label]) => <button key={value} type="button" onClick={() => setFilter({ state: value, statusGroup: "" })} className={`rounded-full border px-3 py-1 text-[10px] font-medium ${query.state === value ? "border-[#0f6b5f] bg-[#eef8f3] text-[#0f6b5f]" : "border-[#e5e2da] bg-white text-[#475467]"}`}>{label}</button>)}
+            {[["", dealText(locale, "Все статусы")], ["open", dealText(locale, "Открытые")], ["closed", dealText(locale, "Закрытые")], ["cancelled", dealText(locale, "Отменённые")]].map(([value, label]) => <button key={value} type="button" onClick={() => setFilter({ state: value, statusGroup: "" })} className={`rounded-full border px-3 py-1 text-[10px] font-medium ${query.state === value ? "border-[#0f6b5f] bg-[#eef8f3] text-[#0f6b5f]" : "border-[#e5e2da] bg-white text-[#475467]"}`}>{label}</button>)}
           </div>
           <div className="mt-2 grid gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
             <Sel label="Страна" value={query.country} onChange={(v) => setFilter({ country: v })}><option value="">Все страны</option>{(data?.facets.countries ?? []).map((c) => <option key={c} value={c}>{c}</option>)}</Sel>
@@ -139,7 +140,7 @@ export default function DealsPage() {
             <Sel label="Оплата клиента" value={query.clientPayment} onChange={(v) => setFilter({ clientPayment: v })}><option value="">Все</option><option value="UNPAID">Не оплачено</option><option value="PARTIALLY_PAID">Частично</option><option value="PAID">Оплачено</option></Sel>
             <Sel label="Оплата поставщику" value={query.supplierPayment} onChange={(v) => setFilter({ supplierPayment: v })}><option value="">Все</option><option value="UNPAID">Не оплачено</option><option value="PARTIALLY_PAID">Частично</option><option value="PAID">Оплачено</option></Sel>
             <Sel label="Фин. статус" value={query.financialStatus} onChange={(v) => setFilter({ financialStatus: v })}><option value="">Все</option>{Object.entries(financialLabel).map(([value]) => <option key={value} value={value}>{dealFinancial(locale, value)}</option>)}</Sel>
-            <button type="button" onClick={() => setAdvanced((v) => !v)} className="rounded-lg border border-[#e5e2da] px-2 py-1.5 text-[11px] text-[#475467]">Ещё фильтры</button>
+            <button type="button" onClick={() => setAdvanced((v) => !v)} className="rounded-lg border border-[#e5e2da] px-2 py-1.5 text-[11px] text-[#475467]">{dealText(locale, "Ещё фильтры")}</button>
           </div>
           {advanced && <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[#f0eee8] pt-2"><select value={query.dateField} onChange={(e) => setFilter({ dateField: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5 text-[11px]"><option value="createdAt">Дата создания</option><option value="serviceDate">Дата поездки</option><option value="financial">Дата фин. операции</option></select><input type="date" value={query.dateFrom} onChange={(e) => setFilter({ dateFrom: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><span className="text-[#98a2b3]">—</span><input type="date" value={query.dateTo} onChange={(e) => setFilter({ dateTo: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5 text-[11px]" /><select value={query.serviceType} onChange={(e) => setFilter({ serviceType: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5 text-[11px]"><option value="">Тип услуги</option><option value="TOUR">Тур</option><option value="HOTEL">Отель</option><option value="FLIGHT">Авиабилет</option><option value="CRUISE">Круиз</option><option value="TRANSFER">Трансфер</option><option value="INSURANCE">Страховка</option></select></div>}
         </div>
@@ -165,7 +166,18 @@ export default function DealsPage() {
   );
 }
 
-function Sel({ label, value, onChange, children }: { label: string; value?: string; onChange?: (v: string) => void; children: React.ReactNode }) { const locale = useLocale(); return <label className="block min-w-0"><span className="mb-0.5 block truncate text-[9px] uppercase tracking-wide text-[#98a2b3]">{dealText(locale, label)}</span><select value={value ?? ""} onChange={(e) => onChange?.(e.target.value)} className="w-full rounded-lg border border-[#e5e2da] bg-white px-2 py-1.5 text-[11px]">{children}</select></label>; }
+function Sel({ label, value, onChange, children }: { label: string; value?: string; onChange?: (v: string) => void; children: React.ReactNode }) {
+  const locale = useLocale();
+  const localized = React.Children.map(children, (child) => {
+    if (React.isValidElement(child) && typeof (child.props as { children?: unknown }).children === "string") {
+      return React.cloneElement(child as React.ReactElement<any>, {
+        children: dealText(locale, (child.props as { children: string }).children),
+      });
+    }
+    return child;
+  });
+  return <label className="block min-w-0"><span className="mb-0.5 block truncate text-[9px] uppercase tracking-wide text-[#98a2b3]">{dealText(locale, label)}</span><select value={value ?? ""} onChange={(e) => onChange?.(e.target.value)} className="w-full rounded-lg border border-[#e5e2da] bg-white px-2 py-1.5 text-[11px]">{localized}</select></label>;
+}
 
 function SortTh({ text, sortKey, by, direction, onSort, right }: { text: string; sortKey: string; by: string; direction: string; onSort: (key: string) => void; right?: boolean }) {
   const locale = useLocale();

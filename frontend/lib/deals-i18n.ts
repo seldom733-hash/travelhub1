@@ -103,6 +103,18 @@ const AZ: Record<string, string> = {
   "Цена поставщика": "Təchizatçı qiyməti",
   "Доход": "Gəlir",
   "Валюта": "Valyuta",
+  "Оповещения": "Bildirişlər",
+  "Новая сделка": "Yeni sövdə",
+  "Сообщение клиента": "Müştəri mesajı",
+  "Неизвестный номер": "Naməlum nömrə",
+  "Проблема": "Problem",
+  "Приостановлена": "Dayandırılıb",
+  "Возобновлена": "Bərpa edilib",
+  "Запрошена отмена": "Ləğv sorğusu",
+  "Отмена согласована": "Ləğv təsdiqlənib",
+  "Отменена": "Ləğv edilib",
+  "Выполнена": "İcra edilib",
+  "Закрыта": "Bağlanıb",
 };
 
 const EN: Record<string, string> = {
@@ -203,6 +215,18 @@ const EN: Record<string, string> = {
   "Цена поставщика": "Supplier cost",
   "Доход": "Income",
   "Валюта": "Currency",
+  "Оповещения": "Notifications",
+  "Новая сделка": "New deal",
+  "Сообщение клиента": "Client message",
+  "Неизвестный номер": "Unknown number",
+  "Проблема": "Problem",
+  "Приостановлена": "Suspended",
+  "Возобновлена": "Resumed",
+  "Запрошена отмена": "Cancellation requested",
+  "Отмена согласована": "Cancellation approved",
+  "Отменена": "Cancelled",
+  "Выполнена": "Fulfilled",
+  "Закрыта": "Closed",
 };
 
 export const DEAL_STATUS: Record<string, { az: string; en: string }> = {
@@ -221,6 +245,7 @@ export const DEAL_STATUS: Record<string, { az: string; en: string }> = {
   IN_PROCESSING: { az: "İşlənir", en: "In processing" },
   WAITING_FOR_DATA: { az: "Məlumat gözlənilir", en: "Waiting for data" },
   READY_FOR_BOOKING: { az: "Rezervasiyaya hazırdır", en: "Ready for booking" },
+  WAITING_FOR_FIRST_PAYMENT: { az: "İlk ödəniş gözlənilir", en: "Waiting for first payment" },
   SENT_TO_BOOKING: { az: "Rezervasiyada", en: "Sent to booking" },
   PARTIALLY_FULFILLED: { az: "Qismən icra edilib", en: "Partially fulfilled" },
   FULFILLED: { az: "Tamamlanıb", en: "Completed" },
