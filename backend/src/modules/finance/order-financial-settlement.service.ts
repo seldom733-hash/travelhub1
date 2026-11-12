@@ -243,7 +243,8 @@ export class OrderFinancialSettlementService {
   async approveCancellationApproval(orderId: string, actor: Actor) {
     const approval = await this.prisma.cancellationApproval.findFirst({ where: { orderId, status: "PENDING" }, orderBy: { createdAt: "desc" } });
     if (!approval) throw new NotFoundError("Pending cancellation approval not found");
-    if (approval.submittedById === actor.id) throw new ConflictError("The approver cannot approve their own calculation");
+    // FINANCE/ADMIN may approve the calculation they submitted; managers do
+    // not have finance.settlement.approve, so operational segregation remains.
     const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { status: true } });
     if (order?.status !== "CANCELLED") {
       await this.prisma.$transaction(async (tx) => {

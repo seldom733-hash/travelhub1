@@ -862,7 +862,14 @@ function CancellationTab({ deal, onSaved }: { deal: DealRow; onSaved: () => void
   const [approval, setApproval] = React.useState<any>(null);
   React.useEffect(() => {
     if (!deal.orderId) return;
-    api.get<any>(`/orders/${deal.orderId}/cancellation/approval`).then(setApproval).catch(() => undefined);
+    api.get<any>(`/orders/${deal.orderId}/cancellation/approval`).then((row) => {
+      setApproval(row);
+      if (row?.status === "PENDING" && row.input) {
+        if (row.input.clientPenaltyAmount != null) setClientPenalty(String(row.input.clientPenaltyAmount));
+        if (row.input.supplierPenaltyAmount != null) setSupplierPenalty(String(row.input.supplierPenaltyAmount));
+        if (row.input.cancellationReason) setReason(String(row.input.cancellationReason));
+      }
+    }).catch(() => undefined);
     api.get<any[]>(`/orders/${deal.orderId}/cancellation/supplier-terms`).then((rows) => {
       if (rows.length > 0) setTerms(rows);
       else {
