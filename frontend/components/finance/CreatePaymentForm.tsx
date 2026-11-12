@@ -86,7 +86,7 @@ export default function CreatePaymentForm({
   const [direction, setDirection] = useState<"INCOME" | "EXPENSE">(defaultDirection);
   const [refundPayments, setRefundPayments] = useState<Array<{ id: string; code: string; amount: string; status: string }>>([]);
   const [clientPayments, setClientPayments] = useState<Array<{ id: string; code: string; amount: string; status: string }>>([]);
-  const [clientRefunds, setClientRefunds] = useState<Array<{ id: string; amount: string; status: string }>>([]);
+  const [clientRefunds, setClientRefunds] = useState<Array<{ id: string; paymentId?: string | null; amount: string; status: string }>>([]);
   const [refundPaymentId, setRefundPaymentId] = useState("");
   const [reason, setReason] = useState("");
   const [initialNote, setInitialNote] = useState("");
@@ -120,6 +120,7 @@ export default function CreatePaymentForm({
     setDirection(defaultDirection);
     setRefundPayments([]);
     setClientPayments([]);
+    setClientRefunds([]);
     setRefundPaymentId("");
     setReason("");
     setInitialNote("");
@@ -178,7 +179,7 @@ export default function CreatePaymentForm({
     let alive = true;
     api.get<{
       payments?: { payments?: Array<{ id: string; code: string; amount: string; status: string }> };
-      refunds?: { refunds?: Array<{ id: string; amount: string; status: string }> };
+      refunds?: { refunds?: Array<{ id: string; paymentId?: string | null; amount: string; status: string }> };
     }>(
       `/orders/${activeOrderId}/financial-history`,
     ).then((result) => {
@@ -212,13 +213,19 @@ export default function CreatePaymentForm({
   const activeRefunded = clientRefunds
     .filter((refund) => ["REQUESTED", "APPROVED", "PROCESSED"].includes(refund.status))
     .reduce((sum, refund) => sum + Number(refund.amount), 0);
+  const selectedRefundPayment = refundPayments.find((payment) => payment.id === refundPaymentId);
+  const selectedRefunded = clientRefunds
+    .filter((refund) => refund.paymentId === refundPaymentId && ["REQUESTED", "APPROVED", "PROCESSED"].includes(refund.status))
+    .reduce((sum, refund) => sum + Number(refund.amount), 0);
   const displayedRefunded = Math.max(historyRefunded, Number(financials?.refundedAmount ?? 0));
   const displayedTotal = Number(financials?.amount ?? 0);
   const netPaid = Math.max(0, displayedPaid - displayedRefunded);
   const displayedDue = Math.max(0, displayedTotal - netPaid);
   const reservedAmount = Number(financials?.reservedAmount ?? 0);
   const availableToPay = Math.max(0, displayedDue - reservedAmount);
-  const refundableAmount = Math.max(0, (capturedPaid > 0 ? capturedPaid : displayedPaid) - activeRefunded);
+  const refundableAmount = selectedRefundPayment
+    ? Math.max(0, Number(selectedRefundPayment.amount) - selectedRefunded)
+    : Math.max(0, (capturedPaid > 0 ? capturedPaid : displayedPaid) - activeRefunded);
 
   // Default «Сумма платежа» = остаток долга клиента с учётом возвратов и
   // активных (зарезервированных) платежей.
@@ -230,7 +237,7 @@ export default function CreatePaymentForm({
       return;
     }
     setAmount(availableToPay.toFixed(2));
-  }, [open, financials, direction, availableToPay, refundableAmount]);
+  }, [open, financials, direction, refundPaymentId, availableToPay, refundableAmount]);
 
   // Order selector source (только когда заказ не предзадан).
   useEffect(() => {
@@ -323,6 +330,11 @@ export default function CreatePaymentForm({
       onCreated?.(payment);
       closeTimerRef.current = setTimeout(onClose, 900);
     } catch (err) {
+      if (direction === "EXPENSE") {
+        setErrorMessage((err as Error).message || "Не удалось создать возврат");
+        setPhase("idle");
+        return;
+      }
       const key = paymentCreateErrorKey(err);
       if (key) setErrorKey(key);
       else setErrorMessage((err as Error).message || t("payments.create.error.generic", locale));
@@ -366,9 +378,39 @@ export default function CreatePaymentForm({
         </div>
 
         {direction === "EXPENSE" && (
-          <p className="mb-3 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-            Возврат будет привязан к последнему оплаченному платежу клиента автоматически.
-          </p>
+          <div className="mb-3 space-y-2 rounded-lg border border-rose-100 bg-rose-50 p-3">
+            <p className="text-xs text-rose-700">
+              Выберите платёж, из которого возвращаются деньги клиенту.
+            </p>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-rose-700" htmlFor="refund-payment-id">
+              Платёж для возврата
+            </label>
+            <select
+              id="refund-payment-id"
+              data-testid="refund-payment-id"
+              value={refundPaymentId}
+              onChange={(e) => {
+                amountTouchedRef.current = false;
+                setRefundPaymentId(e.target.value);
+              }}
+              disabled={submitting || refundPayments.length === 0}
+              className="w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs text-slate-900"
+            >
+              {refundPayments.length === 0 ? (
+                <option value="">Нет подтверждённых платежей</option>
+              ) : refundPayments.map((payment) => {
+                const used = clientRefunds
+                  .filter((r) => r.paymentId === payment.id && ["REQUESTED", "APPROVED", "PROCESSED"].includes(r.status))
+                  .reduce((sum, r) => sum + Number(r.amount), 0);
+                const left = Math.max(0, Number(payment.amount) - used);
+                return (
+                  <option key={payment.id} value={payment.id}>
+                    {payment.code} · {fmtMoney(payment.amount, presetCurrency ?? financials?.currency ?? null, locale)} · доступно {fmtMoney(left.toFixed(2), presetCurrency ?? financials?.currency ?? null, locale)}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
         )}
 
         {success ? (

@@ -1365,7 +1365,7 @@ export class OrderService {
       where: { orderId },
       select: {
         id: true, code: true, referenceNumber: true, status: true,
-        amount: true, currency: true, reason: true,
+        amount: true, currency: true, reason: true, paymentId: true,
         requestedAt: true, approvedAt: true, processedAt: true, failedAt: true,
         createdAt: true, isActiveRefund: true,
       },
