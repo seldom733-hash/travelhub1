@@ -172,6 +172,8 @@ export interface PublicListQuery {
   geoCountry?: string;
   geoCity?: string;
   geoResort?: string;
+  /** Исключить GDS-туры/отели из выдачи. */
+  excludeGds?: boolean;
 }
 
 export class PublicApiError extends Error {
@@ -211,6 +213,7 @@ export function buildPublicQuery(q: PublicListQuery = {}): string {
   if (q.geoCountry) sp.set("geoCountry", q.geoCountry);
   if (q.geoCity) sp.set("geoCity", q.geoCity);
   if (q.geoResort) sp.set("geoResort", q.geoResort);
+  if (q.excludeGds) sp.set("excludeGds", "1");
   for (const [k, v] of Object.entries(q.f ?? {})) {
     if (v !== undefined && v !== "") sp.set(`f[${k}]`, v);
   }
@@ -244,7 +247,8 @@ export const publicApi = {
   },
   getProduct: (slugOrId: string): Promise<PublicProductDetail> => http<PublicProductDetail>(`/products/${encodeURIComponent(slugOrId)}`),
   listCategories: (): Promise<PublicCategory[]> => http<PublicCategory[]>("/categories"),
-  listDestinations: (): Promise<PublicDestination[]> => http<PublicDestination[]>("/destinations"),
+  listDestinations: (excludeGds = false): Promise<PublicDestination[]> =>
+    http<PublicDestination[]>(`/destinations${excludeGds ? "?excludeGds=1" : ""}`),
   getCategory: (slug: string): Promise<PublicCategory> => http<PublicCategory>(`/categories/${encodeURIComponent(slug)}`),
   getCategoryFilters: (slug: string): Promise<PublicFilterMetadata> =>
     http<PublicFilterMetadata>(`/categories/${encodeURIComponent(slug)}/filters`),

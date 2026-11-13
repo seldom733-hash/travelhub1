@@ -218,6 +218,8 @@ export interface PublicProductListQuery {
   category?: string;
   /** Поддерживаемые режимы: newest | price_asc | price_desc (валидируется в сервисе). */
   sort?: string;
+  /** Исключить GDS-туры/отели из выдачи. */
+  excludeGds?: boolean;
   page?: number;
   pageSize?: number;
   /** Category-specific attribute filters: f[days]=7, f[language]=en (требует category). */

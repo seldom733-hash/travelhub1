@@ -11,6 +11,7 @@ import { useConstructorPublished } from "@/lib/use-constructor-published";
 import { useLocale } from "@/lib/i18n";
 import { publicApi, type PublicDestination, type PublicListResult } from "@/lib/public-api";
 import { countryFlagUrl, destinationLabel } from "@/lib/destinations";
+import GdsFilter from "@/components/marketplace/GdsFilter";
 
 const COPY = {
   ru: { back: "Все направления", tours: "Туры", hotels: "Отели", emptyTours: "Для этой страны пока нет опубликованных туров.", emptyHotels: "Для этой страны пока нет опубликованных отелей.", notFound: "Направление не найдено.", error: "Не удалось загрузить предложения.", more: "Показать ещё", shown: "Показано" },
@@ -35,6 +36,7 @@ export default function DestinationCountryPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [pageNumber, setPageNumber] = useState(1);
   const [error, setError] = useState("");
+  const [withoutGds, setWithoutGds] = useState(false);
 
   const headerConfig = (page?.headerConfig ?? null) as MarketplaceHeaderConfig | null;
   const brandName = page ? resolveBrandName(headerConfig) : "";
@@ -65,12 +67,12 @@ export default function DestinationCountryPage() {
     setPageNumber(1);
     setError("");
     setResult(null);
-    publicApi.listProducts({ category: tab === "tours" ? "tours" : "accommodation", geoCountry: code, sort: "price_asc", page: 1, pageSize: PAGE_SIZE })
+    publicApi.listProducts({ category: tab === "tours" ? "tours" : "accommodation", geoCountry: code, sort: "price_asc", page: 1, pageSize: PAGE_SIZE, excludeGds: withoutGds })
       .then((data) => { if (alive) setResult(data); })
       .catch((e) => { if (alive) setError((e as Error).message); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [code, tab, destination]);
+  }, [code, tab, destination, withoutGds]);
 
   const loadMore = async () => {
     if (!result || loadingMore || result.items.length >= result.total) return;
@@ -84,6 +86,7 @@ export default function DestinationCountryPage() {
         sort: "price_asc",
         page: nextPage,
         pageSize: PAGE_SIZE,
+        excludeGds: withoutGds,
       });
       setResult((previous) => previous
         ? { ...data, items: [...previous.items, ...data.items] }
@@ -118,7 +121,9 @@ export default function DestinationCountryPage() {
                   <p className="mt-1 text-sm text-neutral-400">{destination.tours} {copy.tours.toLowerCase()} · {destination.hotels} {copy.hotels.toLowerCase()}</p>
                 </div>
               </div>
-              <div className="inline-flex rounded-xl border border-dark-border bg-dark-surface p-1" role="tablist" aria-label={`${copy.tours}/${copy.hotels}`}>
+              <div className="flex items-center gap-3">
+                <GdsFilter checked={withoutGds} onChange={setWithoutGds} />
+                <div className="inline-flex rounded-xl border border-dark-border bg-dark-surface p-1" role="tablist" aria-label={`${copy.tours}/${copy.hotels}`}>
                 <button
                   type="button"
                   role="tab"
@@ -137,6 +142,7 @@ export default function DestinationCountryPage() {
                 >
                   <Buildings size={15} /> {copy.hotels}
                 </button>
+              </div>
               </div>
             </div>
 

@@ -9,6 +9,7 @@ import { useConstructorPublished } from "@/lib/use-constructor-published";
 import { useLocale } from "@/lib/i18n";
 import { publicApi, type PublicDestination } from "@/lib/public-api";
 import { countryFlagUrl, destinationLabel } from "@/lib/destinations";
+import GdsFilter from "@/components/marketplace/GdsFilter";
 
 const COPY = {
   ru: { title: "Направления", subtitle: "Страны, куда уже есть опубликованные туры или отели.", tours: "туров", hotels: "отелей", empty: "Пока нет опубликованных направлений.", error: "Не удалось загрузить направления." },
@@ -22,14 +23,16 @@ export default function DestinationsPage() {
   const { page } = useConstructorPublished("marketplace-home");
   const [destinations, setDestinations] = useState<PublicDestination[] | null>(null);
   const [error, setError] = useState("");
+  const [withoutGds, setWithoutGds] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    publicApi.listDestinations()
+    setDestinations(null);
+    publicApi.listDestinations(withoutGds)
       .then((items) => { if (alive) setDestinations(items); })
       .catch((e) => { if (alive) setError((e as Error).message); });
     return () => { alive = false; };
-  }, []);
+  }, [withoutGds]);
 
   const headerConfig = (page?.headerConfig ?? null) as MarketplaceHeaderConfig | null;
   const brandName = page ? resolveBrandName(headerConfig) : "";
@@ -43,6 +46,9 @@ export default function DestinationsPage() {
           <div>
             <h1 className="text-3xl font-bold text-white">{copy.title}</h1>
             <p className="mt-1 text-sm text-neutral-400">{copy.subtitle}</p>
+          </div>
+          <div className="ml-auto">
+            <GdsFilter checked={withoutGds} onChange={setWithoutGds} />
           </div>
         </div>
 

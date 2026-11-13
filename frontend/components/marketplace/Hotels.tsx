@@ -8,6 +8,7 @@ import { publicApi, type PublicProductCard } from "@/lib/public-api";
 import { useHotelPhoto } from "@/lib/hotel-photo";
 import GdsBadge from "@/components/public/GdsBadge";
 import BlockBadge from "@/components/public/BlockBadge";
+import GdsFilter from "./GdsFilter";
 import SupplierCodeBadge from "@/components/public/SupplierCodeBadge";
 import { categoryLabel } from "@/lib/category-label";
 
@@ -100,15 +101,18 @@ export default function Hotels() {
   const [hotels, setHotels] = useState<PublicProductCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [withoutGds, setWithoutGds] = useState(false);
 
   useEffect(() => {
     let alive = true;
+    setLoading(true);
+    setError(false);
     // Server-side `category` filter (see Tours.tsx): filtering by type over an
     // unfiltered newest-50 page silently yields zero items once another product
     // type dominates that window, and the section would render `null`. Category
     // filtering happens in SQL over the full published set (2857 hotels).
     void publicApi
-      .listProducts({ category: "accommodation", sort: "price_asc", pageSize: 50 })
+      .listProducts({ category: "accommodation", sort: "price_asc", pageSize: 50, excludeGds: withoutGds })
       .then((r) => {
         if (alive) {
           const hotelsOnly = r.items.filter((item) => item.type === "HOTEL").slice(0, 6);
@@ -123,10 +127,10 @@ export default function Hotels() {
         }
       });
     return () => { alive = false; };
-  }, []);
+  }, [withoutGds]);
 
-  // Don't render section at all if empty or error
-  if (!loading && (hotels.length === 0 || error)) return null;
+  // Keep the toggle visible when the filtered list is empty.
+  if (!loading && (hotels.length === 0 || error) && !withoutGds) return null;
 
   return (
     <section className="bg-dark-card/30 th-section">
@@ -141,13 +145,16 @@ export default function Hotels() {
               {t("marketplace.hotels_subtitle", locale)}
             </p>
           </div>
-          <Link
-            href="/search?category=hotels&sort=price_asc"
-            className="hidden items-center gap-1.5 text-sm text-gold transition-colors hover:text-gold-light sm:flex"
-          >
-            {t("marketplace.all_hotels", locale)}
-            <ArrowRight size={16} weight="light" />
-          </Link>
+          <div className="flex items-center gap-3">
+            <GdsFilter checked={withoutGds} onChange={setWithoutGds} className="hidden sm:inline-flex" />
+            <Link
+              href={`/search?category=hotels&sort=price_asc${withoutGds ? "&withoutGds=1" : ""}`}
+              className="hidden items-center gap-1.5 text-sm text-gold transition-colors hover:text-gold-light sm:flex"
+            >
+              {t("marketplace.all_hotels", locale)}
+              <ArrowRight size={16} weight="light" />
+            </Link>
+          </div>
         </div>
 
         {/* Loading skeleton */}
@@ -167,12 +174,18 @@ export default function Hotels() {
             ))}
           </div>
         )}
+        {!loading && hotels.length === 0 && withoutGds && (
+          <p className="rounded-2xl border border-white/10 bg-white/5 px-5 py-8 text-center text-sm text-neutral-400">
+            Нет отелей без GDS
+          </p>
+        )}
 
         {/* Mobile all hotels link */}
         {!loading && hotels.length > 0 && (
-          <div className="mt-8 text-center sm:hidden">
+          <div className="mt-8 flex items-center justify-center gap-3 sm:hidden">
+            <GdsFilter checked={withoutGds} onChange={setWithoutGds} />
             <Link
-              href="/search?category=hotels&sort=price_asc"
+              href={`/search?category=hotels&sort=price_asc${withoutGds ? "&withoutGds=1" : ""}`}
               className="inline-flex items-center gap-1.5 text-sm text-gold transition-colors hover:text-gold-light"
             >
               {t("marketplace.all_hotels", locale)}

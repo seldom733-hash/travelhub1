@@ -20,6 +20,7 @@ import {
   type AggregatedSearchResult,
 } from "@/lib/supplier-api";
 import ProductCard from "@/components/public/ProductCard";
+import GdsFilter from "@/components/marketplace/GdsFilter";
 import { ProductGridSkeleton } from "@/components/public/Skeletons";
 import FlightResults from "@/components/marketplace/search/FlightResults";
 import {
@@ -126,6 +127,7 @@ function SearchResultsInner() {
   }, [service]);
   const q = searchParams.get("q") || "";
   const sort = searchParams.get("sort") || "newest";
+  const withoutGds = searchParams.get("withoutGds") === "1";
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
   const params = parseParams(searchParams);
   const nightsRange = parseNightsRange(params);
@@ -402,6 +404,7 @@ function SearchResultsInner() {
         sort,
         page,
         pageSize: 12,
+        excludeGds: withoutGds,
       })
       .then((r) => {
         if (!alive) return;
@@ -419,9 +422,17 @@ function SearchResultsInner() {
     // locale НЕ в зависимостях: смена языка — это только перерисовка UI (t(...)),
     // к запросам к поставщикам она не относится (язык в API не передаётся).
     // Раньше locale здесь перезапускал поиск заново при каждом переключении языка.
-  }, [service, q, sort, page, JSON.stringify(params), liveMode, serviceEnabled]);
+  }, [service, q, sort, page, JSON.stringify(params), liveMode, serviceEnabled, withoutGds]);
 
   const totalPages = result ? Math.max(1, Math.ceil(result.total / 12)) : 1;
+
+  const toggleWithoutGds = () => {
+    const sp = new URLSearchParams(searchParams.toString());
+    if (withoutGds) sp.delete("withoutGds");
+    else sp.set("withoutGds", "1");
+    sp.delete("page");
+    router.push(`/search?${sp.toString()}`);
+  };
 
   const updatePage = (newPage: number) => {
     const sp = new URLSearchParams(searchParams.toString());
@@ -461,11 +472,14 @@ function SearchResultsInner() {
             результаты прошлой услуги не показываем (см. formService выше). */}
         {resultsVisible && liveMode && (
           <div className="mt-6">
-            <h1 className="mb-3 font-serif text-xl font-semibold text-white sm:text-2xl">
-              {service === "hotels"
-                ? t("search.results_title", locale)
-                : t("tourSearch.results_title", locale)}
-            </h1>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h1 className="font-serif text-xl font-semibold text-white sm:text-2xl">
+                {service === "hotels"
+                  ? t("search.results_title", locale)
+                  : t("tourSearch.results_title", locale)}
+              </h1>
+              <GdsFilter checked={withoutGds} onChange={() => toggleWithoutGds()} />
+            </div>
             <TourResultsTable
               result={liveResult}
               searchId={searchId}
@@ -473,6 +487,7 @@ function SearchResultsInner() {
               error={error}
               resolvedSuppliers={resolvedSuppliers}
               departureCity={liveDepartureCity}
+              hideGds={withoutGds}
             />
           </div>
         )}
@@ -480,15 +495,18 @@ function SearchResultsInner() {
         {/* Results header — catalog/flights only; in live mode the table
             already renders the single «Результаты поиска» heading above. */}
         {resultsVisible && !liveMode && (
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <h1 className="font-serif text-xl font-semibold text-white sm:text-2xl">
             {t("search.results_title", locale)}
           </h1>
-          {result && (
-            <span className="text-sm text-neutral-500">
-              {t("search.found", locale)}: {result.total}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            <GdsFilter checked={withoutGds} onChange={() => toggleWithoutGds()} />
+            {result && (
+              <span className="text-sm text-neutral-500">
+                {t("search.found", locale)}: {result.total}
+              </span>
+            )}
+          </div>
           {service === "flights" && flightResults && (
             <span className="text-sm text-neutral-500">
               {t("search.found", locale)}: {flightResults.flights.length}

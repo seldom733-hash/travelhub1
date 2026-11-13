@@ -321,6 +321,7 @@ export class PublicCatalogService {
       geoCountry: query.geoCountry?.trim().toUpperCase() || undefined,
       geoCity: query.geoCity?.trim().toUpperCase() || undefined,
       geoResort: query.geoResort?.trim().toUpperCase() || undefined,
+      excludeGds: query.excludeGds === true,
       sort,
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -358,7 +359,7 @@ export class PublicCatalogService {
    * accommodation. Aggregated server-side so the destinations page does not
    * have to pull the whole catalog into the browser.
    */
-  async listDestinations(): Promise<Array<{
+  async listDestinations(excludeGds = false): Promise<Array<{
     code: string;
     names: Record<string, string>;
     tours: number;
@@ -376,6 +377,7 @@ export class PublicCatalogService {
         AND p."publishedAt" IS NOT NULL
         AND gc."status" = 'ACTIVE'
         AND c."slug" IN ('tours', 'accommodation')
+        AND (${excludeGds} = false OR p."isGds" = false)
         AND EXISTS (
           SELECT 1 FROM catalog."ProductPublicationChannel" pc
           WHERE pc."productId" = p."id" AND pc."channel" = 'MARKETPLACE'
@@ -744,6 +746,7 @@ export class PublicCatalogService {
     geoCountry?: string;
     geoCity?: string;
     geoResort?: string;
+    excludeGds?: boolean;
     sort: PublicSortMode;
     skip: number;
     take: number;
@@ -756,6 +759,9 @@ export class PublicCatalogService {
     ];
     if (input.categorySlug) {
       conds.push(Prisma.sql`c."slug" = ${input.categorySlug}`);
+    }
+    if (input.excludeGds) {
+      conds.push(Prisma.sql`p."isGds" = false`);
     }
     if (input.q) {
       const like = `%${input.q}%`;

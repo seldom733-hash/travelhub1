@@ -9,6 +9,7 @@ import { useHotelPhoto } from "@/lib/hotel-photo";
 import SupplierCodeBadge from "@/components/public/SupplierCodeBadge";
 import GdsBadge from "@/components/public/GdsBadge";
 import BlockBadge from "@/components/public/BlockBadge";
+import GdsFilter from "./GdsFilter";
 import { categoryLabel } from "@/lib/category-label";
 
 function TourCardSkeleton() {
@@ -104,9 +105,12 @@ export default function Tours() {
   const [tours, setTours] = useState<PublicProductCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [withoutGds, setWithoutGds] = useState(false);
 
   useEffect(() => {
     let alive = true;
+    setLoading(true);
+    setError(false);
     // Server-side `category` filter: the newest-50 window is currently filled
     // entirely by HOTEL products (they were ingested after the tours), so a
     // client-side `type` filter over an unfiltered page silently yields zero
@@ -115,7 +119,7 @@ export default function Tours() {
     // longer be pushed out of the window by another product type.
     // Skip the first 6 (shown in Hot Tours) to avoid duplication.
     void publicApi
-      .listProducts({ category: "tours", sort: "price_asc", pageSize: 50 })
+      .listProducts({ category: "tours", sort: "price_asc", pageSize: 50, excludeGds: withoutGds })
       .then((r) => {
         if (alive) {
           const items = r.items.filter((item) => item.type === "TOUR");
@@ -134,10 +138,11 @@ export default function Tours() {
         }
       });
     return () => { alive = false; };
-  }, []);
+  }, [withoutGds]);
 
-  // Don't render section at all if empty or error
-  if (!loading && (tours.length === 0 || error)) return null;
+  // Don't render section at all if empty or error (unless the GDS filter is
+  // active — then the toggle must stay visible so it can be switched off).
+  if (!loading && (tours.length === 0 || error) && !withoutGds) return null;
 
   return (
     <section className="bg-dark th-section">
@@ -152,13 +157,16 @@ export default function Tours() {
               {t("marketplace.tours_subtitle", locale)}
             </p>
           </div>
-          <Link
-            href="/search?category=tours&sort=price_asc"
-            className="hidden items-center gap-1.5 text-sm text-gold transition-colors hover:text-gold-light sm:flex"
-          >
-            {t("marketplace.all_tours", locale)}
-            <ArrowRight size={16} weight="light" />
-          </Link>
+          <div className="flex items-center gap-3">
+            <GdsFilter checked={withoutGds} onChange={setWithoutGds} className="hidden sm:inline-flex" />
+            <Link
+              href={`/search?category=tours&sort=price_asc${withoutGds ? "&withoutGds=1" : ""}`}
+              className="hidden items-center gap-1.5 text-sm text-gold transition-colors hover:text-gold-light sm:flex"
+            >
+              {t("marketplace.all_tours", locale)}
+              <ArrowRight size={16} weight="light" />
+            </Link>
+          </div>
         </div>
 
         {/* Loading skeleton */}
@@ -178,12 +186,18 @@ export default function Tours() {
             ))}
           </div>
         )}
+        {!loading && tours.length === 0 && withoutGds && (
+          <p className="rounded-2xl border border-white/10 bg-white/5 px-5 py-8 text-center text-sm text-neutral-400">
+            Нет туров без GDS
+          </p>
+        )}
 
         {/* Mobile all tours link */}
         {!loading && tours.length > 0 && (
-          <div className="mt-8 text-center sm:hidden">
+          <div className="mt-8 flex items-center justify-center gap-3 sm:hidden">
+            <GdsFilter checked={withoutGds} onChange={setWithoutGds} />
             <Link
-              href="/search?category=tours&sort=price_asc"
+              href={`/search?category=tours&sort=price_asc${withoutGds ? "&withoutGds=1" : ""}`}
               className="inline-flex items-center gap-1.5 text-sm text-gold transition-colors hover:text-gold-light"
             >
               {t("marketplace.all_tours", locale)}

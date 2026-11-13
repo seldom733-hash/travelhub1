@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Query, Res } from "@nestjs/common";
-import { IsISO8601, IsObject, IsOptional, IsString, Min } from "class-validator";
-import { Type } from "class-transformer";
+import { IsBoolean, IsISO8601, IsObject, IsOptional, IsString, Min } from "class-validator";
+import { Transform, Type } from "class-transformer";
 import { Response } from "express";
 import { Public } from "../../../security/auth/decorators";
 import { NotFoundError } from "../../../shared/errors";
@@ -23,6 +23,11 @@ export class PublicProductListDto implements PublicProductListQuery {
   @IsOptional()
   @IsString()
   sort?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true" || value === "1")
+  @IsBoolean()
+  excludeGds?: boolean;
 
   @IsOptional()
   @Type(() => Number)
@@ -87,8 +92,8 @@ export class PublicCatalogController {
   /** Страны, где есть опубликованные туры/отели Marketplace. */
   @Get("public/destinations")
   @Public()
-  listDestinations() {
-    return this.publicCatalog.listDestinations();
+  listDestinations(@Query("excludeGds") excludeGds?: string) {
+    return this.publicCatalog.listDestinations(excludeGds === "1" || excludeGds === "true");
   }
 
   /** PDP: детали опубликованного продукта по id или стабильному public slug. */

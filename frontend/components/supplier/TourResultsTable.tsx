@@ -165,6 +165,7 @@ export default function TourResultsTable({
   error,
   resolvedSuppliers,
   departureCity,
+  hideGds = false,
 }: {
   result: AggregatedSearchResult | null;
   searchId: string;
@@ -174,6 +175,8 @@ export default function TourResultsTable({
   resolvedSuppliers?: string[] | null;
   /** City of departure from the search query — forwarded to the offer card. */
   departureCity?: string;
+  /** Exclude offers marked as GDS. */
+  hideGds?: boolean;
 }) {
   const locale = useLocale();
   const supplierLabels = useSupplierLabels("tours");
@@ -266,6 +269,7 @@ export default function TourResultsTable({
   const rows = useMemo(() => {
     const norm = (s?: string) => clean(s).toUpperCase();
     let list = [...(result?.offers ?? [])];
+    if (hideGds) list = list.filter((o) => !offerIsGds(o));
     if (supplierFilter) list = list.filter((o) => o.supplierCode === supplierFilter);
     if (mealFilter) list = list.filter((o) => normalizeMeal(o.meal) === mealFilter);
     if (dateFilter) list = list.filter((o) => o.departureDate === dateFilter);
@@ -331,6 +335,7 @@ export default function TourResultsTable({
     result,
     sortKey,
     sortDir,
+    hideGds,
     supplierFilter,
     mealFilter,
     dateFilter,
