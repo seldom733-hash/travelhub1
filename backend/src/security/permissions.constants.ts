@@ -19,6 +19,7 @@ export const PERMISSIONS = {
   // Конструктор туров: партнёр предлагает запись справочника (тип номера/вида)
   // со статусом PENDING — утверждает модератор (approve/merge/reject).
   "catalog.dictionary.propose": "Предложение записи справочника типов/видов (PARTNER, PENDING → модерация)",
+  "catalog.dictionary.manage": "Создание, изменение и удаление записей справочников (только ADMIN)",
   // ── Catalog ───────────────────────────────────────────────────────────
   "catalog.product.read": "Чтение продуктов",
   "catalog.product.read_for_moderation": "Чтение продуктов для модерации (MODERATOR)",
@@ -652,7 +653,6 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "account.profile.read",
     "account.profile.update",
     "catalog.product.read",
-    "catalog.dictionary.propose",
     "catalog.product.read_own",
     "crm.customer.read",
     "crm.customer.write",
@@ -722,7 +722,6 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "account.profile.read",
     "account.profile.update",
     "catalog.product.read",
-    "catalog.dictionary.propose",
     "catalog.product.read_own",
     "crm.customer.read",
     "crm.customer.write",

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Prisma, RoleCode } from "../../../generated/prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
@@ -1127,7 +1127,7 @@ export class TourBuilderService {
 
     const sortOrder = entries.length ? Math.max(...entries.map((e) => e.sortOrder ?? 0)) + 1 : 0;
     const names = { [lang]: name };
-    const createData = { code, names, sortOrder, status: "PENDING" as const, createdBy: actor.id };
+    const createData = { code, names, sortOrder, status: "ACTIVE" as const, createdBy: actor.id };
     const entry =
       dictType === "room-types"
         ? await this.prisma.roomType.create({ data: createData })
@@ -1143,6 +1143,38 @@ export class TourBuilderService {
 
     await this.audit(actor, "tour_builder.dictionary_entry_proposed", dictType, entry.id, { type: dictType, name, lang, code });
     return entry;
+  }
+
+  private dictionaryDelegate(type: "room-types" | "view-types" | "meal-types" | "placement-types" | "airline-classes" | "baggage-allowances") {
+    const model = type === "room-types" ? "roomType" : type === "view-types" ? "viewType" : type === "meal-types" ? "mealType" : type === "placement-types" ? "placementType" : type === "airline-classes" ? "airlineClass" : "baggageAllowance";
+    return (this.prisma as any)[model];
+  }
+
+  async updateDictionaryEntry(actor: AuthUser, type: string, id: string, input: { name?: string; lang?: string | null }) {
+    const dictType = this.parseDictionaryType(type);
+    const name = (input.name ?? "").trim();
+    if (name.length < 2) throw new ValidationDomainError("name: минимум 2 символа");
+    const lang = input.lang && ["ru", "en", "az"].includes(input.lang) ? input.lang : "ru";
+    const delegate = this.dictionaryDelegate(dictType);
+    const existing = await delegate.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException("Dictionary entry not found");
+    const entries = await this.dictionaryEntries(dictType, ["ACTIVE", "PENDING"]);
+    const [similar] = findSimilarCandidates(name, entries.filter((e) => e.id !== id), { minScore: 0.8, limit: 1 });
+    if (similar) throw new ConflictError(`Похожая запись уже есть в справочнике: ${similar.code}`);
+    const names = { ...(existing.names as Record<string, string>), [lang]: name };
+    const updated = await delegate.update({ where: { id }, data: { names, updatedBy: actor.id, status: "ACTIVE" } });
+    await this.audit(actor, "tour_builder.dictionary_entry_updated", dictType, id, { name, lang });
+    return updated;
+  }
+
+  async deleteDictionaryEntry(actor: AuthUser, type: string, id: string) {
+    const dictType = this.parseDictionaryType(type);
+    const delegate = this.dictionaryDelegate(dictType);
+    const existing = await delegate.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException("Dictionary entry not found");
+    await delegate.delete({ where: { id } });
+    await this.audit(actor, "tour_builder.dictionary_entry_deleted", dictType, id, { code: existing.code });
+    return { deleted: true };
   }
 }
 

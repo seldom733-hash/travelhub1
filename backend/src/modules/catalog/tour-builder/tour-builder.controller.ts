@@ -356,8 +356,29 @@ export class TourBuilderDictionariesController {
   }
 
   @Post("entries")
-  @RequirePermissions("catalog.dictionary.propose")
+  @RequirePermissions("catalog.dictionary.manage")
   propose(@Body() dto: ProposeDictionaryEntryDto, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.builder.proposeDictionaryEntry(actor, dto);
+  }
+
+  @Patch(":type/:id")
+  @RequirePermissions("catalog.dictionary.manage")
+  updateEntry(
+    @Param("type") type: string,
+    @Param("id") id: string,
+    @Body() body: { name?: string; lang?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.builder.updateDictionaryEntry(actor, type, id, body);
+  }
+
+  @Delete(":type/:id")
+  @RequirePermissions("catalog.dictionary.manage")
+  deleteEntry(
+    @Param("type") type: string,
+    @Param("id") id: string,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.builder.deleteDictionaryEntry(actor, type, id);
   }
 }
