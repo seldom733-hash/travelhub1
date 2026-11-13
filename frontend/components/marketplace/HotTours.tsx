@@ -7,6 +7,7 @@ import { t, useLocale, formatDateShort, formatPrice } from "@/lib/i18n";
 import { publicApi, type PublicProductCard } from "@/lib/public-api";
 import { useHotelPhoto } from "@/lib/hotel-photo";
 import SupplierCodeBadge from "@/components/public/SupplierCodeBadge";
+import GdsBadge from "@/components/public/GdsBadge";
 import { categoryLabel } from "@/lib/category-label";
 
 function HotTourCardSkeleton() {
@@ -51,6 +52,7 @@ function HotTourCard({ card }: { card: PublicProductCard }) {
         ) : (
           <div className="flex h-full w-full items-center justify-center text-4xl text-neutral-600">🗺</div>
         )}
+        {card.isGds && <GdsBadge className="absolute left-3 top-3 z-10" />}
         <div className="destination-overlay absolute inset-0" />
       </div>
 

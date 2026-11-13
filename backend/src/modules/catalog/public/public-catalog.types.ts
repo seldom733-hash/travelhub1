@@ -126,6 +126,8 @@ export interface PublicProductCard {
    *  конструктора и для всех поставщиков этого отеля. Файла может не быть —
    *  фронт проверяет и показывает иконку-фолбэк. */
   hotelImage?: string | null;
+  /** GDS tour program marker (tours only). */
+  isGds?: boolean;
   /** Discovery-availability (§12); null, если строк Availability нет. */
   availabilitySummary: PublicAvailabilitySummary | null;
   /** Seller-safe проекция (§8, Step 1.11); null — идентичность скрыта/не задана. */
@@ -180,6 +182,8 @@ export interface PublicProductDetail {
      * null — фото ещё нет, фронт показывает placeholder.
      */
     hotelImage?: string | null;
+  /** GDS tour program marker (tours only). */
+  isGds?: boolean;
   };
   media: PublicMedia[];
 }

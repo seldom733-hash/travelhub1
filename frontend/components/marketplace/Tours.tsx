@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -7,6 +7,7 @@ import { t, useLocale, formatDateShort, formatPrice } from "@/lib/i18n";
 import { publicApi, type PublicProductCard } from "@/lib/public-api";
 import { useHotelPhoto } from "@/lib/hotel-photo";
 import SupplierCodeBadge from "@/components/public/SupplierCodeBadge";
+import GdsBadge from "@/components/public/GdsBadge";
 import { categoryLabel } from "@/lib/category-label";
 
 function TourCardSkeleton() {
@@ -54,6 +55,7 @@ function TourCard({ card }: { card: PublicProductCard }) {
             <Compass size={40} weight="light" />
           </div>
         )}
+        {card.isGds && <GdsBadge className="absolute left-3 top-3 z-10" />}
         <div className="destination-overlay absolute inset-0" />
       </div>
 

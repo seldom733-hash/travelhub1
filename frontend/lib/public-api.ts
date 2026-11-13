@@ -81,6 +81,8 @@ export interface PublicProductCard {
   partnerCode?: string | null;
   /** Local hotel photo (frontend/public/hotels/<tourinc>-<hotelKey>.jpg); may 404 — check before showing. */
   hotelImage?: string | null;
+  /** GDS tour program marker (tours only). */
+  isGds?: boolean;
   availabilitySummary: PublicAvailabilitySummary | null;
   seller: PublicSeller | null;
   publishedAt: string;

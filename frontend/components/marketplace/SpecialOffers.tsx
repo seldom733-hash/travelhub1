@@ -7,6 +7,7 @@ import { t, useLocale, formatPrice } from "@/lib/i18n";
 import { publicApi, type PublicProductCard } from "@/lib/public-api";
 import { useHotelPhoto } from "@/lib/hotel-photo";
 import SupplierCodeBadge from "@/components/public/SupplierCodeBadge";
+import GdsBadge from "@/components/public/GdsBadge";
 import { categoryLabel } from "@/lib/category-label";
 
 const SERVICE_BADGES: Record<string, { ru: string; az: string; en: string }> = {
@@ -66,6 +67,7 @@ function OfferCard({ card }: { card: PublicProductCard }) {
             <Tag size={28} weight="light" />
           </div>
         )}
+        {card.isGds && <GdsBadge className="absolute left-3 top-3 z-10" />}
         <div className="destination-overlay absolute inset-0" />
         {/* Service badge */}
         {badge && (

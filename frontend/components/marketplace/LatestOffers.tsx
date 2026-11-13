@@ -7,6 +7,7 @@ import { t, useLocale, formatDate, formatPrice } from "@/lib/i18n";
 import { publicApi, type PublicProductCard } from "@/lib/public-api";
 import { useHotelPhoto } from "@/lib/hotel-photo";
 import SupplierCodeBadge from "@/components/public/SupplierCodeBadge";
+import GdsBadge from "@/components/public/GdsBadge";
 import { categoryLabel } from "@/lib/category-label";
 
 function LatestOfferCardSkeleton() {
@@ -77,6 +78,7 @@ function LatestOfferCard({ card }: { card: PublicProductCard }) {
         ) : (
           <div className="flex h-full w-full items-center justify-center text-4xl text-neutral-600">🗺</div>
         )}
+        {card.isGds && <GdsBadge className="absolute left-3 top-3 z-10" />}
         <div className="destination-overlay absolute inset-0" />
         {relativeTime && (
           <span className="absolute left-3 top-3 rounded-full bg-dark/70 px-2.5 py-1 text-[11px] font-medium text-neutral-300 backdrop-blur-sm">

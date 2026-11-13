@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { t, useLocale, formatDateShort } from "@/lib/i18n";
 import { useMarketplaceCardImpression } from "@/lib/behavioral-events";
+import GdsBadge from "./GdsBadge";
 import type { PublicProductCard } from "@/lib/public-api";
 import { availabilityText } from "@/lib/marketplace-utils";
 import { categoryLabel } from "@/lib/category-label";
@@ -70,6 +71,7 @@ export default function ProductCard({ card, position = 0 }: { card: PublicProduc
         ) : (
           <div className="flex h-full w-full items-center justify-center text-4xl text-neutral-600">{icon}</div>
         )}
+        {card.isGds && <GdsBadge className="absolute left-3 top-3 z-10" />}
         <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-dark-card/80 to-transparent" />
         {availability.tone === "limited" && (
           <span className="absolute right-3 top-3 rounded-full bg-gold px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-dark">

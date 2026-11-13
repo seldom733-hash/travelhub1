@@ -356,6 +356,9 @@ model Product {
   id          String        @id @default(uuid())
   code        String        @unique // PRD-00000001 (нейтральный публичный идентификатор → URL /products/PRD-*)
   type        ProductType
+  /// GDS tour program marker (tours only). Derived from the supplier tour
+  /// program, not from a hotel rate.
+  isGds       Boolean       @default(false)
   title       String
   slug        String        @unique
   /// Supplier-native stable key (sync natural key, e.g. "KAZUNION-3548-4105").
@@ -423,6 +426,7 @@ model Product {
   geoAirportId String?
 
   @@index([status])
+  @@index([isGds])
   /// Public Marketplace listing: WHERE status+publishedAt, ORDER BY publishedAt DESC.
   /// Без этого индекса выдача сортирует все ≈18k PUBLISHED-строк (Seq Scan + Sort).
   @@index([status, publishedAt])

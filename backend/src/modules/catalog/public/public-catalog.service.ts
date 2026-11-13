@@ -119,6 +119,7 @@ interface PublicProductRow {
   title: string;
   description: string | null;
   type: string;
+  isGds: boolean;
   publishedAt: Date | null;
   partnerId: string | null;
   attributes: Prisma.JsonValue | null;
@@ -1049,6 +1050,7 @@ export class PublicCatalogService {
         publishedAt: row.publishedAt!.toISOString(),
         version: row.version,
         hotelImage: hotel?.imageUrl ?? null,
+        isGds: row.isGds === true,
       },
       media,
     };
@@ -1220,6 +1222,7 @@ export class PublicCatalogService {
       room: (row.attributes as any)?.rooms?.[0] ?? (row.attributes as any)?.room ?? null,
       meal: (row.attributes as any)?.meals?.[0] ?? (row.attributes as any)?.meal ?? null,
       hotelImage: registryEntry?.imageUrl ?? null,
+      isGds: row.isGds === true,
       supplierCode: (row.attributes as any)?.supplierCode ?? null,
       partnerCode,
       availabilitySummary: availability,
