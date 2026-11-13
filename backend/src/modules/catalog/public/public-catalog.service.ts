@@ -120,6 +120,8 @@ interface PublicProductRow {
   description: string | null;
   type: string;
   isGds: boolean;
+  isGdsHotel: boolean;
+  isBlock: boolean;
   publishedAt: Date | null;
   partnerId: string | null;
   attributes: Prisma.JsonValue | null;
@@ -1051,6 +1053,8 @@ export class PublicCatalogService {
         version: row.version,
         hotelImage: hotel?.imageUrl ?? null,
         isGds: row.isGds === true,
+        isGdsHotel: row.isGdsHotel === true,
+        isBlock: row.isBlock === true,
       },
       media,
     };
@@ -1223,6 +1227,8 @@ export class PublicCatalogService {
       meal: (row.attributes as any)?.meals?.[0] ?? (row.attributes as any)?.meal ?? null,
       hotelImage: registryEntry?.imageUrl ?? null,
       isGds: row.isGds === true,
+      isGdsHotel: row.isGdsHotel === true,
+      isBlock: row.isBlock === true,
       supplierCode: (row.attributes as any)?.supplierCode ?? null,
       partnerCode,
       availabilitySummary: availability,

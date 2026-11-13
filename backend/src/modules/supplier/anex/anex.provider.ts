@@ -66,6 +66,14 @@ export interface AnexHotel {
   townKey?: number | string;
 }
 
+export interface AnexTourProgram {
+  id: number;
+  name: string;
+  gdsTransport?: number | string;
+  gdsHotel?: number | string;
+  withRegularFreight?: number | string;
+}
+
 /**
  * Resolved hotel-category filter shared by the tour and hotel adapters.
  * - ids:     native STARLIST ids sent to /search (server-side filter)
@@ -183,6 +191,16 @@ export class AnexProvider {
   states(): Promise<AnexState[]> {
     return this.cached("states", STATES_TTL_MS, () =>
       this.fetchJson<AnexState[]>("/samo/searchtour/States", { TOWNFROMINC: ANEX_TOWNFROMINC }),
+    );
+  }
+
+  /** Tour programs with supplier-owned GDS/block flags. */
+  tours(stateInc: string): Promise<AnexTourProgram[]> {
+    return this.cached(`tours:${stateInc}`, DICT_TTL_MS, () =>
+      this.fetchJson<AnexTourProgram[]>("/samo/searchtour/Tours", {
+        TOWNFROMINC: ANEX_TOWNFROMINC,
+        STATEINC: stateInc,
+      }),
     );
   }
 

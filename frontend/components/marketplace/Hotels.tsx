@@ -6,6 +6,8 @@ import { ArrowRight, Buildings } from "@phosphor-icons/react";
 import { t, useLocale, formatPrice, formatDateShort } from "@/lib/i18n";
 import { publicApi, type PublicProductCard } from "@/lib/public-api";
 import { useHotelPhoto } from "@/lib/hotel-photo";
+import GdsBadge from "@/components/public/GdsBadge";
+import BlockBadge from "@/components/public/BlockBadge";
 import SupplierCodeBadge from "@/components/public/SupplierCodeBadge";
 import { categoryLabel } from "@/lib/category-label";
 
@@ -53,6 +55,8 @@ function HotelCard({ card }: { card: PublicProductCard }) {
             <Buildings size={40} weight="light" />
           </div>
         )}
+        {card.isGdsHotel && <GdsBadge className="absolute left-3 top-3 z-10" />}
+        {card.isBlock && <BlockBadge className="absolute left-3 top-9 z-10" />}
         <div className="destination-overlay absolute inset-0" />
       </div>
 

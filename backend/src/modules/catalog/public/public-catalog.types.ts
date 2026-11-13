@@ -128,6 +128,8 @@ export interface PublicProductCard {
   hotelImage?: string | null;
   /** GDS tour program marker (tours only). */
   isGds?: boolean;
+  isGdsHotel?: boolean;
+  isBlock?: boolean;
   /** Discovery-availability (§12); null, если строк Availability нет. */
   availabilitySummary: PublicAvailabilitySummary | null;
   /** Seller-safe проекция (§8, Step 1.11); null — идентичность скрыта/не задана. */
@@ -184,6 +186,8 @@ export interface PublicProductDetail {
     hotelImage?: string | null;
   /** GDS tour program marker (tours only). */
   isGds?: boolean;
+  isGdsHotel?: boolean;
+  isBlock?: boolean;
   };
   media: PublicMedia[];
 }

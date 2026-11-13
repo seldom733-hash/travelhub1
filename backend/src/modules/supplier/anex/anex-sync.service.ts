@@ -192,6 +192,8 @@ export class AnexSyncService {
           supplierBaseCurrency: currency,
           currency,
           supplierCode: "ANEX",
+          tourInc: offers[0].rawMetadata?.tourInc,
+          tourName: offers[0].rawMetadata?.tourName,
           country,
           departureCity: "Baku",
         };
@@ -275,6 +277,8 @@ export class AnexSyncService {
       }
     }
 
+    await this.refreshProgramFlags();
+
     const syncDuration = Date.now() - syncStart;
     this.logger.log(
       `ANEX sync complete in ${syncDuration}ms: ${result.countriesDiscovered} countries, ` +
@@ -283,6 +287,39 @@ export class AnexSyncService {
     );
 
     return result;
+  }
+
+  /**
+   * Resolve ANEX tour-program flags (gdsTransport/gdsHotel/withRegularFreight)
+   * and apply them to every ANEX product. This runs after each catalog sync,
+   * so newly synced tours get the same GDS/BLOCK markers as existing ones.
+   */
+  private async refreshProgramFlags(): Promise<void> {
+    try {
+      const states = await this.anexProvider.states();
+      let updated = 0;
+      for (const state of states) {
+        const programs = await this.anexProvider.tours(String(state.id));
+        for (const program of programs) {
+          const isGds = Number(program.gdsTransport) === 1;
+          const isGdsHotel = Number(program.gdsHotel) === 1;
+          const isBlock = Number(program.withRegularFreight) === 0;
+          const count = await this.prisma.$executeRaw`
+            UPDATE "catalog"."Product"
+            SET "isGds" = ${isGds},
+                "isGdsHotel" = ${isGdsHotel},
+                "isBlock" = ${isBlock},
+                "updatedAt" = now()
+            WHERE "attributes"->>'supplierCode' = 'ANEX'
+              AND "attributes"->>'tourInc' = ${String(program.id)}
+          `;
+          updated += Number(count);
+        }
+      }
+      if (updated > 0) this.logger.log(`ANEX program flags refreshed for ${updated} products`);
+    } catch (err) {
+      this.logger.warn(`ANEX program flags refresh failed: ${(err as Error).message}`);
+    }
   }
 
   private formatDate(d: Date): string {

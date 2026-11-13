@@ -83,6 +83,8 @@ export interface PublicProductCard {
   hotelImage?: string | null;
   /** GDS tour program marker (tours only). */
   isGds?: boolean;
+  isGdsHotel?: boolean;
+  isBlock?: boolean;
   availabilitySummary: PublicAvailabilitySummary | null;
   seller: PublicSeller | null;
   publishedAt: string;

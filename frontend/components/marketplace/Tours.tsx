@@ -8,6 +8,7 @@ import { publicApi, type PublicProductCard } from "@/lib/public-api";
 import { useHotelPhoto } from "@/lib/hotel-photo";
 import SupplierCodeBadge from "@/components/public/SupplierCodeBadge";
 import GdsBadge from "@/components/public/GdsBadge";
+import BlockBadge from "@/components/public/BlockBadge";
 import { categoryLabel } from "@/lib/category-label";
 
 function TourCardSkeleton() {
@@ -56,6 +57,8 @@ function TourCard({ card }: { card: PublicProductCard }) {
           </div>
         )}
         {card.isGds && <GdsBadge className="absolute left-3 top-3 z-10" />}
+        {card.isGdsHotel && <GdsBadge className="absolute left-3 top-3 z-10" />}
+        {card.isBlock && <BlockBadge className="absolute left-3 top-9 z-10" />}
         <div className="destination-overlay absolute inset-0" />
       </div>
 
