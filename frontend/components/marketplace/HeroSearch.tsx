@@ -5,6 +5,7 @@ import { t, useLocale } from "@/lib/i18n";
 import type { ServiceType, SearchContext } from "@/lib/search-engine";
 import { SEARCH_SERVICES } from "@/lib/search-services";
 import { useRouter } from "next/navigation";
+import GdsFilter from "./GdsFilter";
 
 // Service-specific search forms
 import TourSearch from "./search/TourSearch";
@@ -67,6 +68,7 @@ export default function HeroSearch({ enabledServices, defaultService, onTabChang
       : orderedTabs[0]?.key ?? "tours";
 
   const [activeTab, setActiveTab] = useState<ServiceType>(initialTab);
+  const [withoutGds, setWithoutGds] = useState(false);
   // Вкладки и услуга по умолчанию приходят из конфига асинхронно (страница
   // результатов грузит searchConfig после монтирования). Пока пользователь сам
   // не переключил вкладку, следуем за конфигом; после ручного выбора — нет.
@@ -115,6 +117,7 @@ export default function HeroSearch({ enabledServices, defaultService, onTabChang
     if (ctx.roundTrip) sp.set("roundTrip", "1");
     if (ctx.direct) sp.set("direct", "1");
     if (ctx.language) sp.set("lang", ctx.language);
+    if (withoutGds) sp.set("withoutGds", "1");
     // Tours → universal live search across Summer + KOMPAS (§1) and hotels →
     // supplier live search (ANEX hotels): results come from supplier live
     // availability, not the static catalog.
@@ -177,13 +180,16 @@ export default function HeroSearch({ enabledServices, defaultService, onTabChang
           ))}
         </div>
         {(activeTab === "tours" || activeTab === "hotels") && (
-          <button
-            type="button"
-            onClick={() => setResetSignal((n) => n + 1)}
-            className="rounded-full px-3 py-1.5 text-[13px] font-medium text-neutral-400 transition-colors hover:text-white"
-          >
-            {t("search.reset_all", locale)}
-          </button>
+          <div className="flex items-center gap-2">
+            <GdsFilter checked={withoutGds} onChange={setWithoutGds} />
+            <button
+              type="button"
+              onClick={() => setResetSignal((n) => n + 1)}
+              className="rounded-full px-3 py-1.5 text-[13px] font-medium text-neutral-400 transition-colors hover:text-white"
+            >
+              {t("search.reset_all", locale)}
+            </button>
+          </div>
         )}
       </div>
 
