@@ -49,8 +49,17 @@ const starOfMeta = (raw?: Record<string, unknown>): string => {
 const offerStar = (o: Pick<AggregatedOffer, "hotel" | "rawMetadata">): string =>
   starOf(o.hotel) || starOfMeta(o.rawMetadata);
 
+/** Summertour programs that the supplier marks as GDS (TOURINC 256/238). */
+const SUMMER_GDS_PROGRAMS = new Set(["256", "238"]);
+
 /** Supplier program markers in live results (title/program/metadata). */
 const offerIsGds = (o: AggregatedOffer): boolean => {
+  const program = String(
+    (o.rawMetadata as Record<string, unknown> | undefined)?.tourKey ??
+      o.tour ??
+      "",
+  );
+  if (o.supplierCode === "SUMMERTOUR" && SUMMER_GDS_PROGRAMS.has(program)) return true;
   const text = [o.tour, o.tourIncName, o.rawMetadata?.tourName, o.rawMetadata?.programName]
     .filter((v): v is string => typeof v === "string")
     .join(" ");
