@@ -5,6 +5,8 @@ import { t, useLocale } from "@/lib/i18n";
 import Price from "@/components/public/Price";
 import OfferDetailsModal from "@/components/supplier/OfferDetailsModal";
 import { useSupplierLabels } from "@/lib/supplier-registry";
+import GdsBadge from "@/components/public/GdsBadge";
+import BlockBadge from "@/components/public/BlockBadge";
 import { isPlatformStaff, useCurrentUser } from "@/lib/use-user";
 import type { AggregatedOffer, AggregatedSearchResult } from "@/lib/supplier-api";
 
@@ -46,6 +48,20 @@ const starOfMeta = (raw?: Record<string, unknown>): string => {
 /** Best hotel-category token: name parse first, supplier metadata fallback. */
 const offerStar = (o: Pick<AggregatedOffer, "hotel" | "rawMetadata">): string =>
   starOf(o.hotel) || starOfMeta(o.rawMetadata);
+
+/** Supplier program markers in live results (title/program/metadata). */
+const offerIsGds = (o: AggregatedOffer): boolean => {
+  const text = [o.tour, o.tourIncName, o.rawMetadata?.tourName, o.rawMetadata?.programName]
+    .filter((v): v is string => typeof v === "string")
+    .join(" ");
+  return /(^|[^a-z0-9])gds([^a-z0-9]|$)/i.test(text);
+};
+const offerIsBlock = (o: AggregatedOffer): boolean => {
+  const text = [o.tour, o.tourIncName, o.rawMetadata?.tourName, o.rawMetadata?.programName]
+    .filter((v): v is string => typeof v === "string")
+    .join(" ");
+  return /(^|[^a-z0-9])(block|блок)([^a-z0-9]|$)/i.test(text);
+};
 
 /**
  * Check-out date of an offer = check-in/departure date + nights.
@@ -623,8 +639,12 @@ export default function TourResultsTable({
                     : "—"}
                 </td>
                 <td className="px-4 py-3 text-right text-neutral-200">{o.nights}</td>
-                <td className="max-w-[240px] truncate px-4 py-3 text-neutral-100">
-                  {clean(o.hotel)}
+                <td className="max-w-[260px] px-4 py-3 text-neutral-100">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="truncate">{clean(o.hotel)}</span>
+                    {offerIsGds(o) && <GdsBadge className="shrink-0" />}
+                    {offerIsBlock(o) && <BlockBadge className="shrink-0" />}
+                  </div>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-neutral-300">
                   {offerStar(o) || "—"}
