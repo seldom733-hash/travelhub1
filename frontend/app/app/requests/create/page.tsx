@@ -146,7 +146,7 @@ export default function CreateRequestPage() {
   const [currency, setCurrency] = useState("AZN");
   const [serviceStart, setServiceStart] = useState("");
   const [serviceEnd, setServiceEnd] = useState("");
-  const [dictionary, setDictionary] = useState<{ mealTypes: DictionaryEntry[]; roomTypes: DictionaryEntry[]; placementTypes: DictionaryEntry[]; viewTypes: DictionaryEntry[] }>({ mealTypes: [], roomTypes: [], placementTypes: [], viewTypes: [] });
+  const [dictionary, setDictionary] = useState<{ mealTypes: DictionaryEntry[]; roomTypes: DictionaryEntry[]; placementTypes: DictionaryEntry[]; viewTypes: DictionaryEntry[]; airlineClasses: DictionaryEntry[]; baggageAllowances: DictionaryEntry[] }>({ mealTypes: [], roomTypes: [], placementTypes: [], viewTypes: [], airlineClasses: [], baggageAllowances: [] });
   const [countries, setCountries] = useState<GeoCountry[]>([]);
   const [cities, setCities] = useState<GeoCity[]>([]);
   const [selectedCountryId, setSelectedCountryId] = useState("");
@@ -193,7 +193,7 @@ export default function CreateRequestPage() {
       api.get<any>("/tour-builder/dictionaries").catch(() => null),
       api.get<any>("/geo/countries").catch(() => null),
     ]).then(([dict, geo]) => {
-      if (dict) setDictionary({ mealTypes: dict.mealTypes ?? [], roomTypes: dict.roomTypes ?? [], placementTypes: dict.placementTypes ?? [], viewTypes: dict.viewTypes ?? [] });
+      if (dict) setDictionary({ mealTypes: dict.mealTypes ?? [], roomTypes: dict.roomTypes ?? [], placementTypes: dict.placementTypes ?? [], viewTypes: dict.viewTypes ?? [], airlineClasses: dict.airlineClasses ?? [], baggageAllowances: dict.baggageAllowances ?? [] });
       const rows = Array.isArray(geo) ? geo : geo?.value ?? [];
       setCountries(rows);
     }).catch(() => undefined);
@@ -373,7 +373,7 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
   service: ServiceDraft; locale: string; suppliers: Supplier[]; primarySupplierCode: string;
   hotelQuery: string; setHotelQuery: (v: string) => void; hotelOptions: ProductOption[];
   onSelectHotel: (p: ProductOption) => void; onChange: (patch: Partial<ServiceDraft>) => void; onData: (field: string, value: string) => void;
-  dictionary: { mealTypes: DictionaryEntry[]; roomTypes: DictionaryEntry[]; placementTypes: DictionaryEntry[]; viewTypes: DictionaryEntry[] };
+  dictionary: { mealTypes: DictionaryEntry[]; roomTypes: DictionaryEntry[]; placementTypes: DictionaryEntry[]; viewTypes: DictionaryEntry[]; airlineClasses: DictionaryEntry[]; baggageAllowances: DictionaryEntry[] };
   countries: GeoCountry[]; cities: GeoCity[]; selectedCountryId: string; setSelectedCountryId: (v: string) => void;
 }) {
   const tr = (ru: string, az: string, en: string) => (locale === "az" ? az : locale === "en" ? en : ru);
@@ -408,8 +408,8 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
       <label className={label}>{tr("Вылет", "Uçuş", "Departure")}<input type="datetime-local" className={input} value={seg.departureDate} onChange={(e) => { const rows = [...segments]; rows[i] = { ...seg, departureDate: e.target.value }; saveSegments(rows); }} /></label>
       <label className={label}>{tr("Прибытие", "Gəliş", "Arrival")}<input type="datetime-local" className={input} value={seg.arrivalDate} onChange={(e) => { const rows = [...segments]; rows[i] = { ...seg, arrivalDate: e.target.value }; saveSegments(rows); }} /></label>
       <label className={label}>{tr("Авиакомпания", "Aviaşirkət", "Airline")}<input className={input} value={seg.airline ?? ""} onChange={(e) => { const rows = [...segments]; rows[i] = { ...seg, airline: e.target.value }; saveSegments(rows); }} /></label>
-      <label className={label}>{tr("Класс", "Sinif", "Class")}<input className={input} value={seg.class ?? ""} onChange={(e) => { const rows = [...segments]; rows[i] = { ...seg, class: e.target.value }; saveSegments(rows); }} /></label>
-      <label className={label}>{tr("Багаж", "Baqaj", "Baggage")}<input className={input} value={seg.baggage ?? ""} onChange={(e) => { const rows = [...segments]; rows[i] = { ...seg, baggage: e.target.value }; saveSegments(rows); }} /></label>
+      <label className={label}>{tr("Класс", "Sinif", "Class")}<select className={input} value={seg.class ?? ""} onChange={(e) => { const rows = [...segments]; rows[i] = { ...seg, class: e.target.value }; saveSegments(rows); }}><option value="">{tr("Выберите", "Seçin", "Select")}</option>{dictionary.airlineClasses.map((x) => <option key={x.code} value={x.code}>{x.names[locale] ?? x.names.ru ?? x.code}</option>)}</select></label>
+      <label className={label}>{tr("Багаж", "Baqaj", "Baggage")}<select className={input} value={seg.baggage ?? ""} onChange={(e) => { const rows = [...segments]; rows[i] = { ...seg, baggage: e.target.value }; saveSegments(rows); }}><option value="">{tr("Выберите", "Seçin", "Select")}</option>{dictionary.baggageAllowances.map((x) => <option key={x.code} value={x.code}>{x.names[locale] ?? x.names.ru ?? x.code}</option>)}</select></label>
       <label className={label}>{tr("Ручная кладь", "Əl yükü", "Carry-on")}<input className={input} value={seg.carryOn ?? ""} onChange={(e) => { const rows = [...segments]; rows[i] = { ...seg, carryOn: e.target.value }; saveSegments(rows); }} /></label>
     </div></div>)}<div className="flex gap-2"><button type="button" className="rounded border px-3 py-1.5 text-xs" onClick={() => { const reversed = { ...segments[0], from: segments[0]?.to ?? "", to: segments[0]?.from ?? "" }; saveSegments([...segments, reversed]); }}>+ {tr("Добавить обратный рейс", "Geri uçuş əlavə et", "Add return flight")}</button><button type="button" className="rounded border px-3 py-1.5 text-xs" onClick={() => saveSegments([...segments, { from: "", to: "", departureDate: "", arrivalDate: "", airline: "", class: "", baggage: "", carryOn: "" }])}>+ {tr("Добавить сегмент", "Seqment əlavə et", "Add segment")}</button></div></div>;
   }

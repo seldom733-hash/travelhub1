@@ -204,7 +204,7 @@ class QuoteDto {
 }
 
 class ProposeDictionaryEntryDto {
-  @IsIn(["room-types", "view-types"])
+  @IsIn(["room-types", "view-types", "meal-types", "placement-types", "airline-classes", "baggage-allowances"])
   type!: string;
 
   @IsString() @IsNotEmpty() @MaxLength(120)

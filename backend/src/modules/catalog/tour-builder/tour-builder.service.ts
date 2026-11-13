@@ -1039,21 +1039,31 @@ export class TourBuilderService {
 
   /* ── 6. Справочники (типы номеров/видов) для шага «Проживание» ─────────── */
 
-  private parseDictionaryType(type: string): "room-types" | "view-types" {
-    if (type === "room-types" || type === "view-types") return type;
+  private parseDictionaryType(type: string): "room-types" | "view-types" | "meal-types" | "placement-types" | "airline-classes" | "baggage-allowances" {
+    if (["room-types", "view-types", "meal-types", "placement-types", "airline-classes", "baggage-allowances"].includes(type)) {
+      return type as "room-types" | "view-types" | "meal-types" | "placement-types" | "airline-classes" | "baggage-allowances";
+    }
     throw new ValidationDomainError(`Unknown dictionary type: ${type}`);
   }
 
-  private async dictionaryEntries(type: "room-types" | "view-types", statuses: Array<"ACTIVE" | "PENDING">) {
+  private async dictionaryEntries(type: "room-types" | "view-types" | "meal-types" | "placement-types" | "airline-classes" | "baggage-allowances", statuses: Array<"ACTIVE" | "PENDING">) {
     const where = { status: { in: statuses } };
     const orderBy = [{ sortOrder: "asc" as const }, { code: "asc" as const }];
     const select = { id: true, code: true, names: true, sortOrder: true } as const;
     if (type === "room-types") return this.prisma.roomType.findMany({ where, orderBy, select });
+    if (type === "meal-types") return this.prisma.mealType.findMany({ where, orderBy, select });
+    if (type === "placement-types") return this.prisma.placementType.findMany({ where, orderBy, select });
+    if (type === "airline-classes") return this.prisma.airlineClass.findMany({ where, orderBy, select });
+    if (type === "baggage-allowances") return this.prisma.baggageAllowance.findMany({ where, orderBy, select });
     return this.prisma.viewType.findMany({ where, orderBy, select });
   }
 
-  private async dictionaryCodeTaken(type: "room-types" | "view-types", code: string): Promise<boolean> {
+  private async dictionaryCodeTaken(type: "room-types" | "view-types" | "meal-types" | "placement-types" | "airline-classes" | "baggage-allowances", code: string): Promise<boolean> {
     if (type === "room-types") return !!(await this.prisma.roomType.findUnique({ where: { code }, select: { id: true } }));
+    if (type === "meal-types") return !!(await this.prisma.mealType.findUnique({ where: { code }, select: { id: true } }));
+    if (type === "placement-types") return !!(await this.prisma.placementType.findUnique({ where: { code }, select: { id: true } }));
+    if (type === "airline-classes") return !!(await this.prisma.airlineClass.findUnique({ where: { code }, select: { id: true } }));
+    if (type === "baggage-allowances") return !!(await this.prisma.baggageAllowance.findUnique({ where: { code }, select: { id: true } }));
     return !!(await this.prisma.viewType.findUnique({ where: { code }, select: { id: true } }));
   }
 
@@ -1061,14 +1071,16 @@ export class TourBuilderService {
   async getDictionaries() {
     const select = { id: true, code: true, names: true, sortOrder: true } as const;
     const orderBy = [{ sortOrder: "asc" as const }, { code: "asc" as const }];
-    const [roomTypes, viewTypes, mealTypes, placementTypes, pendingRoomTypes] = await Promise.all([
+    const [roomTypes, viewTypes, mealTypes, placementTypes, airlineClasses, baggageAllowances, pendingRoomTypes] = await Promise.all([
       this.prisma.roomType.findMany({ where: { status: "ACTIVE" }, orderBy, select }),
       this.prisma.viewType.findMany({ where: { status: "ACTIVE" }, orderBy, select }),
       this.prisma.mealType.findMany({ where: { status: "ACTIVE" }, orderBy, select }),
       this.prisma.placementType.findMany({ where: { status: "ACTIVE" }, orderBy, select }),
+      this.prisma.airlineClass.findMany({ where: { status: "ACTIVE" }, orderBy, select }),
+      this.prisma.baggageAllowance.findMany({ where: { status: "ACTIVE" }, orderBy, select }),
       this.prisma.roomType.findMany({ where: { status: "PENDING" }, orderBy, select }),
     ]);
-    return { roomTypes, viewTypes, mealTypes, placementTypes, pendingRoomTypes };
+    return { roomTypes, viewTypes, mealTypes, placementTypes, airlineClasses, baggageAllowances, pendingRoomTypes };
   }
 
   /** Похожие записи (ACTIVE+PENDING) — ответ на дубль/подсказку ввода. */
@@ -1109,15 +1121,25 @@ export class TourBuilderService {
       }
     }
     if (!code) {
-      code = await this.ids.nextCode(this.prisma, dictType === "room-types" ? "RT" : "VW");
+      const prefix = dictType === "room-types" ? "RT" : dictType === "meal-types" ? "MT" : dictType === "placement-types" ? "PT" : dictType === "airline-classes" ? "AC" : dictType === "baggage-allowances" ? "BG" : "VW";
+      code = await this.ids.nextCode(this.prisma, prefix);
     }
 
     const sortOrder = entries.length ? Math.max(...entries.map((e) => e.sortOrder ?? 0)) + 1 : 0;
     const names = { [lang]: name };
+    const createData = { code, names, sortOrder, status: "PENDING" as const, createdBy: actor.id };
     const entry =
       dictType === "room-types"
-        ? await this.prisma.roomType.create({ data: { code, names, sortOrder, status: "PENDING", createdBy: actor.id } })
-        : await this.prisma.viewType.create({ data: { code, names, sortOrder, status: "PENDING", createdBy: actor.id } });
+        ? await this.prisma.roomType.create({ data: createData })
+        : dictType === "meal-types"
+          ? await this.prisma.mealType.create({ data: createData })
+          : dictType === "placement-types"
+            ? await this.prisma.placementType.create({ data: createData })
+            : dictType === "airline-classes"
+              ? await this.prisma.airlineClass.create({ data: createData })
+              : dictType === "baggage-allowances"
+                ? await this.prisma.baggageAllowance.create({ data: createData })
+                : await this.prisma.viewType.create({ data: createData });
 
     await this.audit(actor, "tour_builder.dictionary_entry_proposed", dictType, entry.id, { type: dictType, name, lang, code });
     return entry;

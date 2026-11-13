@@ -5,15 +5,19 @@ import { api } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
 
 interface Entry { id: string; code: string; names: Record<string, string>; status?: string }
-interface Data { mealTypes: Entry[]; roomTypes: Entry[]; placementTypes: Entry[]; viewTypes: Entry[]; pendingRoomTypes?: Entry[] }
+interface Data { mealTypes: Entry[]; roomTypes: Entry[]; placementTypes: Entry[]; viewTypes: Entry[]; airlineClasses: Entry[]; baggageAllowances: Entry[]; pendingRoomTypes?: Entry[] }
 
 export default function DictionariesPage() {
   const locale = useLocale();
-  const [data, setData] = useState<Data>({ mealTypes: [], roomTypes: [], placementTypes: [], viewTypes: [] });
+  const [data, setData] = useState<Data>({ mealTypes: [], roomTypes: [], placementTypes: [], viewTypes: [], airlineClasses: [], baggageAllowances: [] });
   const [countries, setCountries] = useState<Entry[]>([]);
   const [cities, setCities] = useState<Entry[]>([]);
   const [countryId, setCountryId] = useState("");
   const [error, setError] = useState("");
+  const [addType, setAddType] = useState("room-types");
+  const [addName, setAddName] = useState("");
+  const [addBusy, setAddBusy] = useState(false);
+  const [addNotice, setAddNotice] = useState("");
   const tr = (ru: string, az: string, en: string) => (locale === "az" ? az : locale === "en" ? en : ru);
 
   useEffect(() => {
@@ -32,11 +36,40 @@ export default function DictionariesPage() {
   }, [countryId]);
 
   const name = (entry: Entry) => entry.names[locale] ?? entry.names.ru ?? entry.names.en ?? entry.code;
+  async function addEntry() {
+    setAddNotice(""); setError("");
+    if (addName.trim().length < 2) { setError(tr("Введите название (минимум 2 символа)", "Ad daxil edin (ən azı 2 simvol)", "Enter a name (at least 2 characters)")); return; }
+    setAddBusy(true);
+    try {
+      await api.post("/tour-builder/dictionaries/entries", { type: addType, name: addName.trim(), lang: locale === "az" ? "az" : locale === "en" ? "en" : "ru" });
+      setAddName("");
+      setAddNotice(tr("Запись отправлена на проверку платформы", "Qeyd platformanın yoxlamasına göndərildi", "Entry submitted for platform review"));
+      const dict = await api.get<Data>("/tour-builder/dictionaries");
+      setData(dict);
+    } catch (e) { setError((e as Error).message); } finally { setAddBusy(false); }
+  }
   const table = (title: string, rows: Entry[]) => <section className="rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b px-4 py-3 text-sm font-semibold">{title}</div><div className="max-h-80 overflow-auto"><table className="w-full text-left text-xs"><thead className="sticky top-0 bg-slate-50 text-slate-500"><tr><th className="px-4 py-2">{tr("Код", "Kod", "Code")}</th><th className="px-4 py-2">{tr("Название", "Ad", "Name")}</th><th className="px-4 py-2">{tr("Статус", "Status", "Status")}</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id} className="border-t"><td className="px-4 py-2 font-mono">{row.code}</td><td className="px-4 py-2">{name(row)}</td><td className="px-4 py-2">{row.status ?? "ACTIVE"}</td></tr>)}</tbody></table></div></section>;
 
   return <div className="space-y-4 p-4 lg:p-6">
     <div><h1 className="text-2xl font-semibold">{tr("Справочники", "Lüğətlər", "Dictionaries")}</h1><p className="mt-1 text-sm text-slate-500">{tr("Единые справочники платформы. Значения используются при создании запросов.", "Platformanın vahid lüğətləri. Sorğu yaradarkən istifadə olunur.", "Platform dictionaries used when creating requests.")}</p></div>
     {error && <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
+    <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <h2 className="mb-2 text-sm font-semibold">{tr("Добавить новый тип", "Yeni növ əlavə et", "Add a new type")}</h2>
+      <p className="mb-3 text-xs text-slate-500">{tr("Платформа проверит дубли с учётом языка и опечаток. Новая запись сначала отправляется на модерацию.", "Platforma dil və yazı səhvlərini nəzərə alaraq dublikatları yoxlayacaq. Yeni qeyd əvvəlcə moderasiyaya göndərilir.", "The platform checks duplicates across languages and typos. New entries go to moderation first.")}</p>
+      <div className="grid gap-2 sm:grid-cols-[220px_1fr_auto]">
+        <select className="rounded-lg border px-3 py-2 text-sm" value={addType} onChange={(e) => setAddType(e.target.value)}>
+          <option value="room-types">{tr("Типы номеров", "Otaq növləri", "Room types")}</option>
+          <option value="placement-types">{tr("Типы размещения", "Yerləşmə növləri", "Accommodation types")}</option>
+          <option value="meal-types">{tr("Типы питания", "Qidalanma növləri", "Meal types")}</option>
+          <option value="view-types">{tr("Виды из номера", "Mənzərə növləri", "View types")}</option>
+          <option value="airline-classes">{tr("Классы авиабилетов", "Aviabilet sinifləri", "Airline classes")}</option>
+          <option value="baggage-allowances">{tr("Нормы багажа", "Baqaj normaları", "Baggage allowances")}</option>
+        </select>
+        <input className="rounded-lg border px-3 py-2 text-sm" value={addName} onChange={(e) => setAddName(e.target.value)} placeholder={tr("Название нового типа", "Yeni növün adı", "New type name")} />
+        <button type="button" disabled={addBusy} onClick={() => void addEntry()} className="rounded-lg bg-[#0f6b5f] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{addBusy ? tr("Проверка…", "Yoxlanılır…", "Checking…") : tr("Добавить", "Əlavə et", "Add")}</button>
+      </div>
+      {addNotice && <div className="mt-2 rounded bg-emerald-50 px-2 py-1 text-xs text-emerald-700">{addNotice}</div>}
+    </section>
     <section className="rounded-xl border border-slate-200 bg-white p-4">
       <h2 className="mb-3 text-sm font-semibold">{tr("Страны и города", "Ölkələr və şəhərlər", "Countries and cities")}</h2>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -49,6 +82,8 @@ export default function DictionariesPage() {
       {table(tr("Типы размещения", "Yerləşmə növləri", "Accommodation types"), data.placementTypes)}
       {table(tr("Типы номеров", "Otaq növləri", "Room types"), data.roomTypes)}
       {table(tr("Виды из номера", "Mənzərə növləri", "View types"), data.viewTypes)}
+      {table(tr("Классы авиабилетов", "Aviabilet sinifləri", "Airline classes"), data.airlineClasses)}
+      {table(tr("Нормы багажа", "Baqaj normaları", "Baggage allowances"), data.baggageAllowances)}
     </div>
   </div>;
 }

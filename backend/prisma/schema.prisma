@@ -549,6 +549,40 @@ model HotelCategory {
   @@schema("catalog")
 }
 
+/// Класс авиабилета (Economy, Business, First…).
+model AirlineClass {
+  id        String         @id @default(uuid())
+  code      String         @unique
+  names     Json // { ru, en, az }
+  sortOrder Int            @default(0)
+  status    CategoryStatus @default(ACTIVE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([status])
+  @@index([sortOrder])
+  @@schema("catalog")
+}
+
+/// Норма багажа / ручной клади (23 кг, 1 место, Cabin bag…).
+model BaggageAllowance {
+  id        String         @id @default(uuid())
+  code      String         @unique
+  names     Json // { ru, en, az }
+  sortOrder Int            @default(0)
+  status    CategoryStatus @default(ACTIVE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([status])
+  @@index([sortOrder])
+  @@schema("catalog")
+}
+
 /// Тип номера: Standard, Deluxe, Suite, Family…
 model RoomType {
   id        String         @id @default(uuid())
