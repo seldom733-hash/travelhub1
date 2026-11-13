@@ -461,6 +461,8 @@ export interface PriceCalendarEntryOffer {
   transport?: string;
   /** True when the program has no return segment (e.g., TOURINC 254). */
   oneWay?: boolean;
+  /** Extra transport included in this offer price (Summertour GDS + AZAL). */
+  flightAddon?: PriceAddon;
 }
 
 export interface PriceCalendarEntry {

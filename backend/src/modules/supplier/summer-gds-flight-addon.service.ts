@@ -119,6 +119,18 @@ export class SummerGdsFlightAddonService {
         ...entry,
         price: round2(entry.price + addon),
         currency: "AZN",
+        offers: entry.offers?.map((offer) => ({
+          ...offer,
+          price: round2(offer.price + addon),
+          currency: "AZN",
+          flightAddon: {
+            source: "AZAL",
+            amount: addon,
+            currency: "AZN",
+            departureDate: entry.date,
+            returnDate: addDays(entry.date, nights),
+          },
+        })),
         flightAddon: {
           source: "AZAL",
           amount: addon,
