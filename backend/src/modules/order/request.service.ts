@@ -344,7 +344,9 @@ export class RequestService {
       }
     }
     if (dto.assignedManagerId) {
+      const selfAssignment = dto.assignedManagerId === actor.id;
       const canAssign =
+        selfAssignment ||
         (await this.security.hasPermission(actor.id ?? "", "request.assignment.manage")) ||
         (await this.security.hasPermission(actor.id ?? "", "request.assignment.reassign"));
       if (!canAssign) throw new ForbiddenException("You cannot assign a manager for this request");
