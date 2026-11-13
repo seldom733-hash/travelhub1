@@ -1106,9 +1106,9 @@ export class TourBuilderService {
     const lang = input.lang && ["ru", "en", "az"].includes(input.lang) ? input.lang : "ru";
 
     const entries = await this.dictionaryEntries(dictType, ["ACTIVE", "PENDING"]);
-    const [exact] = findSimilarCandidates(name, entries, { minScore: 1, limit: 1 });
+    const [exact] = findSimilarCandidates(name, entries, { minScore: 0.8, limit: 1 });
     if (exact) {
-      throw new ConflictError(`Такая запись уже есть в справочнике: ${exact.code} — используйте существующую (см. похожие)`);
+      throw new ConflictError(`Похожая запись уже есть в справочнике: ${exact.code} — используйте существующую (см. похожие)`);
     }
 
     let code = normalizeTypeName(name);
