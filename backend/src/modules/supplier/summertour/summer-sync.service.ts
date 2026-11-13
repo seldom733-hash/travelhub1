@@ -12,6 +12,7 @@ import { IdsService } from "../../../shared/ids.service";
 import { SupplierOfferService } from "../supplier-offer.service";
 import { SummertourNewAdapter } from "./summertour-new.adapter";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
+import { SummerGdsFlightAddonService } from "../summer-gds-flight-addon.service";
 import type { SupplierSearchQuery, SupplierOffer } from "../supplier.types";
 
 export interface SyncResult {
@@ -90,6 +91,7 @@ export class SummerSyncService {
     private readonly offerService: SupplierOfferService,
     private readonly summertour: SummertourNewAdapter,
     private readonly pricing: SupplierPricingService,
+    private readonly flightAddon: SummerGdsFlightAddonService,
     private readonly ids: IdsService,
   ) {}
 
@@ -394,21 +396,41 @@ export class SummerSyncService {
     // Preserves backward compat with existing SUMMERTOUR-{tourKey}-{hotelKey} cards
     const productCode = `SUMMERTOUR-${tourIncValue}-${hotelKey}`;
 
-    // Find minimum price across all offers
+    // Find minimum price across all offers. For GDS cards, price only the
+    // cheapest package offer and add the AZAL round trip for its dates —
+    // pricing every offer would multiply flight lookups per card.
     const validOffers = offers.filter((o) => o.price.amount > 0);
-    let minPrice = validOffers.length > 0
-      ? Math.min(...validOffers.map((o) => o.price.amount))
-      : 0;
-    const currency = validOffers[0]?.price.currency ?? "USD";
-    // Markup boundary (§9): Tariff/startingPrice are customer-facing —
-    // write the PUBLIC price (already-priced feeds pass through).
-    if (minPrice > 0 && !offers.some((o) => o.pricing)) {
-      minPrice = await this.pricing.publicAmountFor(
-        minPrice,
-        currency,
-        this.summertour.code,
-        "tours",
-      );
+    const isGds = tourIncValue === "256" || tourIncValue === "238";
+    const cheapest = validOffers.reduce<SupplierOffer | null>(
+      (best, offer) => (!best || offer.price.amount < best.price.amount ? offer : best),
+      null,
+    );
+    let minPrice = 0;
+    let currency = cheapest?.price.currency ?? "USD";
+    if (cheapest) {
+      if (isGds) {
+        const [priced] = await this.pricing.applyToOffers(
+          [cheapest],
+          this.summertour.code,
+          "tours",
+        );
+        const [withAir] = await this.flightAddon.applyToOffers(priced ? [priced] : [], {
+          adults: 2,
+          children: 0,
+        });
+        minPrice = withAir?.price.amount ?? priced?.price.amount ?? 0;
+        currency = withAir?.price.currency ?? priced?.price.currency ?? currency;
+      } else {
+        minPrice = cheapest.price.amount;
+        if (!offers.some((o) => o.pricing)) {
+          minPrice = await this.pricing.publicAmountFor(
+            minPrice,
+            currency,
+            this.summertour.code,
+            "tours",
+          );
+        }
+      }
     }
 
     // Build title
@@ -435,6 +457,7 @@ export class SummerSyncService {
       tourKey: offers[0]?.rawMetadata?.tourKey,
       tourIncValue,
       tourIncName: identity.tourIncName,
+      isGds,
       country: "Turkey",
       countryCode: identity.countryCode,
       resort: identity.resort,
@@ -462,7 +485,7 @@ export class SummerSyncService {
       await this.prisma.$transaction(async (tx: any) => {
         await tx.product.update({
           where: { id: existing.id },
-          data: { title, attributes, updatedAt: new Date() },
+          data: { title, attributes, isGds, updatedAt: new Date() },
         });
 
         // Update tariff price if changed
@@ -499,10 +522,11 @@ export class SummerSyncService {
       const prdCode = await this.ids.nextCode(tx, "PRD");
       const idResult = await tx.$queryRaw<{ id: string }[]>`
         INSERT INTO "catalog"."Product" (
-          "id", "code", "supplierRef", "type", "title", "slug", "status", "version",
+          "id", "code", "supplierRef", "type", "isGds", "title", "slug", "status", "version",
           "categoryId", "attributes", "partnerId", "publishedAt", "createdAt", "updatedAt"
         ) VALUES (
           gen_random_uuid(), ${prdCode}, ${productCode}, 'TOUR'::"catalog"."ProductType",
+          ${isGds},
           ${title}, ${slug}, 'PUBLISHED'::"catalog"."ProductStatus", 1,
           ${categoryId}, ${JSON.stringify(attributes)}::jsonb, ${partnerId},
           now(), now(), now()
