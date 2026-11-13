@@ -1101,6 +1101,19 @@ export class PublicCatalogService {
         canonicalName: ref.hotel?.name?.trim() || null,
       });
     }
+    const missing = [...pairs.values()].filter((p) => !map.has(`${p.supplierCode}\u0000${p.externalKey}`));
+    if (missing.length > 0) {
+      const photos = await this.prisma.hotelPhotoRef.findMany({
+        where: { OR: missing.map((p) => ({ supplierCode: p.supplierCode, externalKey: p.externalKey })) },
+        select: { supplierCode: true, externalKey: true, photoFile: true, photoUpdatedAt: true, canonicalName: true },
+      });
+      for (const photo of photos) {
+        map.set(`${photo.supplierCode}\u0000${photo.externalKey}`, {
+          imageUrl: hotelPhotoUrl(photo.photoFile, photo.photoUpdatedAt),
+          canonicalName: photo.canonicalName?.trim() || null,
+        });
+      }
+    }
     return map;
   }
 
@@ -1113,7 +1126,17 @@ export class PublicCatalogService {
       where: { supplierCode_externalKey: { supplierCode, externalKey } },
       select: { hotel: { select: { name: true, photoFile: true, photoUpdatedAt: true } } },
     });
-    if (!ref?.hotel) return null;
+    if (!ref?.hotel) {
+      const photo = await this.prisma.hotelPhotoRef.findUnique({
+        where: { supplierCode_externalKey: { supplierCode, externalKey } },
+        select: { photoFile: true, photoUpdatedAt: true, canonicalName: true },
+      });
+      if (!photo) return null;
+      return {
+        imageUrl: hotelPhotoUrl(photo.photoFile, photo.photoUpdatedAt),
+        canonicalName: photo.canonicalName?.trim() || null,
+      };
+    }
     return {
       imageUrl: ref.hotel.photoFile ? hotelPhotoUrl(ref.hotel.photoFile, ref.hotel.photoUpdatedAt) : null,
       canonicalName: ref.hotel.name?.trim() || null,

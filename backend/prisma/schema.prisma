@@ -1119,6 +1119,24 @@ model Hotel {
   @@schema("catalog")
 }
 
+/// Photo cache for supplier hotel references whose canonical hotel is not in
+/// the curated `Hotel` directory. Keeps tour cards illustrated without
+/// re-adding removed hotel records to the directory.
+model HotelPhotoRef {
+  id             String    @id @default(uuid())
+  supplierCode   String
+  externalKey    String
+  photoFile      String
+  photoUpdatedAt DateTime?
+  canonicalName  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([supplierCode, externalKey])
+  @@index([supplierCode])
+  @@schema("catalog")
+}
+
 /// Внешний идентификатор гостиницы у поставщика → единая запись Hotel.
 /// (supplierCode, externalKey) уникален: один supplier-native id = один отель,
 /// поэтому отель из тура и отель из услуги «Отели» с тем же ключом — одна запись.
