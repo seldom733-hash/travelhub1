@@ -1088,6 +1088,8 @@ model Hotel {
   /// Никогда не сопоставляем только по имени: в паре всегда страна и город.
   normalizedName String
   stars          Int?
+  /// Original category label when the source is not a star rating (APRT, BOUTQ).
+  categoryLabel  String?
   countryCode    String @default("")
   countryName    String @default("")
   cityName       String @default("")

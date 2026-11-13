@@ -4,9 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
 
-interface HotelRow { id: string; name: string; suppliers: string[]; countryName?: string; cityName?: string; stars?: number | null }
-
-const SUPPLIERS = ["ANEX", "KOMPAS", "SUMMERTOUR", "KAZUNION", "VOYAGER"];
+interface HotelRow { id: string; name: string; suppliers: string[]; countryCode?: string; countryName?: string; cityName?: string; resortName?: string; stars?: number | null; categoryLabel?: string | null }
 
 export default function HotelsReferencePage() {
   const locale = useLocale();
@@ -18,8 +16,7 @@ export default function HotelsReferencePage() {
   const tr = (ru: string, az: string, en: string) => (locale === "az" ? az : locale === "en" ? en : ru);
 
   useEffect(() => {
-    const params = new URLSearchParams({ suppliers: SUPPLIERS.join(","), limit: "2000" });
-    api.get<HotelRow[]>(`/geo/supplier-hotels?${params.toString()}`)
+    api.get<HotelRow[]>(`/hotel-directory/hotels?limit=2000`)
       .then((data) => setRows(Array.isArray(data) ? data : []))
       .catch((e) => setError((e as Error).message));
   }, []);
@@ -29,7 +26,7 @@ export default function HotelsReferencePage() {
 
   function exportXls() {
     const head = ["ID", tr("Наименование", "Ad", "Name"), tr("Страна", "Ölkə", "Country"), tr("Город/курорт", "Şəhər/kurort", "City/resort"), tr("Категория", "Kateqoriya", "Category"), tr("Поставщики", "Təchizatçılar", "Suppliers")];
-    const body = filtered.map((r) => [r.id, r.name, r.countryName ?? "", r.cityName ?? "", r.stars ?? "", (r.suppliers ?? []).join(", ")]);
+    const body = filtered.map((r) => [r.id, r.name, r.countryName ?? "", r.cityName ?? "", r.categoryLabel ?? (r.stars ? String(r.stars) : ""), (r.suppliers ?? []).join(", ")]);
     const html = `<table><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr>${body.map((row) => `<tr>${row.map((c) => `<td>${String(c).replaceAll("&", "&amp;").replaceAll("<", "&lt;")}</td>`).join("")}</tr>`).join("")}</table>`;
     const url = URL.createObjectURL(new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel;charset=utf-8" }));
     const a = document.createElement("a"); a.href = url; a.download = "hotels.xls"; a.click(); URL.revokeObjectURL(url);

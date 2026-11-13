@@ -84,6 +84,24 @@ export class HotelDirectoryService {
     });
   }
 
+  async listHotels(query: { q?: string; country?: string; limit?: number }) {
+    const where: Prisma.HotelWhereInput = {};
+    if (query.q?.trim()) where.name = { contains: query.q.trim(), mode: "insensitive" };
+    if (query.country?.trim()) {
+      where.OR = [
+        { countryCode: query.country.trim() },
+        { countryName: { equals: query.country.trim(), mode: "insensitive" } },
+      ];
+    }
+    const rows = await this.prisma.hotel.findMany({
+      where,
+      orderBy: [{ countryName: "asc" }, { cityName: "asc" }, { name: "asc" }],
+      take: Math.min(query.limit ?? 5000, 20000),
+      select: { id: true, name: true, countryCode: true, countryName: true, cityName: true, resortName: true, stars: true, categoryLabel: true },
+    });
+    return rows.map((row) => ({ ...row, suppliers: [] as string[] }));
+  }
+
   list(type: HotelDirectoryType, status?: string) {
     return this.model(type).findMany({
       where: status ? { status: status as CategoryStatus } : undefined,

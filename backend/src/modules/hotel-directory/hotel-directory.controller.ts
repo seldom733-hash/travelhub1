@@ -57,6 +57,12 @@ export class HotelDirectoryController {
     return this.directory.search(q ?? "", type, status);
   }
 
+  @Get("hotels")
+  @RequirePermissions("hotel_directory.read")
+  hotels(@Query("q") q?: string, @Query("country") country?: string, @Query("limit") limit?: string) {
+    return this.directory.listHotels({ q, country, limit: limit ? Number(limit) : undefined });
+  }
+
   @Get(":type")
   @RequirePermissions("hotel_directory.read")
   list(@Param("type") type: string, @Query("status") status?: string) {

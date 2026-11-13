@@ -394,10 +394,9 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
     if (query.length < 2 && !d.country) { setHotelResults([]); return; }
     const timer = window.setTimeout(() => {
       const params = new URLSearchParams({ limit: "20" });
-      if (d.country) params.set("geoCountry", d.country);
-      if (d.city) params.set("geoCity", d.city);
+      if (d.country) params.set("country", d.country);
       if (query) params.set("q", query);
-      api.get<Array<{ id: string; name: string; suppliers?: string[] }>>(`/geo/supplier-hotels?${params.toString()}`)
+      api.get<Array<{ id: string; name: string; suppliers?: string[] }>>(`/hotel-directory/hotels?${params.toString()}`)
         .then((rows) => setHotelResults(Array.isArray(rows) ? rows : [])).catch(() => setHotelResults([]));
     }, 250);
     return () => window.clearTimeout(timer);
