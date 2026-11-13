@@ -30,8 +30,16 @@ export class SummerGdsFlightAddonService {
   ) {}
 
   /** Add AZAL round-trip flight cost to Summertour GDS search offers. */
-  async applyToOffers(offers: SupplierOffer[]): Promise<SupplierOffer[]> {
+  async applyToOffers(
+    offers: SupplierOffer[],
+    passengers: { adults: number; children?: number; childAges?: number[] } = { adults: 1 },
+  ): Promise<SupplierOffer[]> {
     if (offers.length === 0) return offers;
+    const pax = {
+      adults: Math.max(1, Number(passengers.adults) || 1),
+      children: Math.max(0, Number(passengers.children) || 0),
+      childAges: passengers.childAges ?? [],
+    };
     const out: SupplierOffer[] = [];
     for (const offer of offers) {
       const airport = this.airportOfOffer(offer);
@@ -40,7 +48,7 @@ export class SummerGdsFlightAddonService {
         continue;
       }
       const returnDate = addDays(offer.departureDate, offer.nights);
-      const addon = await this.minRoundTrip(airport, offer.departureDate, returnDate);
+      const addon = await this.minRoundTrip(airport, offer.departureDate, returnDate, pax);
       if (addon == null) {
         out.push(offer);
         continue;
@@ -78,9 +86,14 @@ export class SummerGdsFlightAddonService {
     const dates = priced.map((e) => e.date).sort();
     const minDate = dates[0];
     const maxDate = addDays(dates[dates.length - 1], nights);
+    const pax = {
+      adults: Math.max(1, Number(query.adults) || 1),
+      children: Math.max(0, Number(query.children) || 0),
+      childAges: query.childAges ?? [],
+    };
     const [outbound, inbound] = await Promise.all([
-      this.calendarPrices("GYD", airport, minDate, maxDate),
-      this.calendarPrices(airport, "GYD", minDate, maxDate),
+      this.calendarPrices("GYD", airport, minDate, maxDate, pax),
+      this.calendarPrices(airport, "GYD", minDate, maxDate, pax),
     ]);
     if (outbound.size === 0 || inbound.size === 0) return entries;
 
@@ -145,11 +158,16 @@ export class SummerGdsFlightAddonService {
     return null;
   }
 
-  private minRoundTrip(airport: string, departureDate: string, returnDate: string): Promise<number | null> {
-    const key = `${airport}:${departureDate}:${returnDate}`;
+  private minRoundTrip(
+    airport: string,
+    departureDate: string,
+    returnDate: string,
+    passengers: { adults: number; children: number; childAges: number[] },
+  ): Promise<number | null> {
+    const key = `${airport}:${departureDate}:${returnDate}:${passengers.adults}:${passengers.children}:${passengers.childAges.join(",")}`;
     const cached = this.flightCache.get(key);
     if (cached) return cached;
-    const promise = this.loadMinRoundTrip(airport, departureDate, returnDate);
+    const promise = this.loadMinRoundTrip(airport, departureDate, returnDate, passengers);
     this.flightCache.set(key, promise);
     // Short-lived cache: AZAL prices move; keep the map bounded.
     if (this.flightCache.size > 500) {
@@ -163,6 +181,7 @@ export class SummerGdsFlightAddonService {
     airport: string,
     departureDate: string,
     returnDate: string,
+    passengers: { adults: number; children: number; childAges: number[] },
   ): Promise<number | null> {
     try {
       const result = await this.azal.search({
@@ -171,7 +190,12 @@ export class SummerGdsFlightAddonService {
         departureDate,
         returnDate,
         tripType: "RT",
-        passengers: { adults: 1, children: 0, infants: 0 },
+        passengers: {
+          adults: passengers.adults,
+          children: passengers.children,
+          infants: 0,
+          childAges: passengers.childAges,
+        },
       });
       const flights = result.flights;
       const rt = flights.filter((f) => f.optionId?.endsWith("_RT"));
@@ -192,12 +216,18 @@ export class SummerGdsFlightAddonService {
     to: string,
     dateFrom: string,
     dateTo: string,
+    passengers: { adults: number; children: number; childAges: number[] },
   ): Promise<Map<string, number>> {
     try {
       const result = await this.azal.calendar({
         from,
         to,
-        passengers: { adults: 1, children: 0, infants: 0 },
+        passengers: {
+          adults: passengers.adults,
+          children: passengers.children,
+          infants: 0,
+          childAges: passengers.childAges,
+        },
         dates: { from: dateFrom, to: dateTo },
       });
       const map = new Map<string, number>();

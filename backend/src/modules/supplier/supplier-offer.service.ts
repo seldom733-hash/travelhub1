@@ -144,7 +144,11 @@ export class SupplierOfferService {
     // Summertour GDS sells the hotel+transfer package without the flight:
     // append the cheapest AZAL round trip so the displayed amount is full.
     if (supplierCode === "SUMMERTOUR") {
-      return this.summerGdsFlight.applyToOffers(priced);
+      return this.summerGdsFlight.applyToOffers(priced, {
+        adults: query.adults,
+        children: query.children,
+        childAges: query.childAges,
+      });
     }
     return priced;
   }
