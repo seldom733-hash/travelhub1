@@ -9,6 +9,8 @@
  */
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { api, auth } from "@/lib/api";
 import { useCurrentUser } from "@/lib/use-user";
 import { useLocale, t } from "@/lib/i18n";
 
@@ -106,13 +108,24 @@ const CARDS = [
 export default function OverviewPage() {
   const user = useCurrentUser();
   const locale = useLocale();
+  const router = useRouter();
+  const logout = () => {
+    void api.post("/auth/logout").catch(() => undefined);
+    auth.clear();
+    router.replace("/login");
+  };
 
   const visible = user ? CARDS.filter((c) => user.permissions.includes(c.permission)) : CARDS;
   const hiddenCount = CARDS.length - visible.length;
 
   return (
     <div className="p-6 lg:p-10">
-      <h1 className="text-2xl font-bold text-slate-900">{t("nav.dashboard", locale)}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-slate-900">{t("nav.dashboard", locale)}</h1>
+        <button type="button" onClick={logout} className="rounded-lg border border-rose-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50">
+          {t("nav.logout", locale)}
+        </button>
+      </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map((c) => (
