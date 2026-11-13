@@ -26,6 +26,7 @@ import {
 import { t, useLocale, useSetLocale, LOCALES } from "@/lib/i18n";
 import { useCurrentUserStatus } from "@/lib/use-user";
 import { isInternalRole } from "@/lib/routes";
+import { api, auth } from "@/lib/api";
 import GlobalSearchAutocomplete from "./GlobalSearchAutocomplete";
 
 interface ServiceItem {
@@ -89,6 +90,11 @@ export default function MarketplaceHeader({ config }: { config?: MarketplaceHead
   const locale = useLocale();
   const setLocale = useSetLocale();
   const router = useRouter();
+  const logout = () => {
+    void api.post("/auth/logout").catch(() => undefined);
+    auth.clear();
+    router.replace("/login");
+  };
   const soonLabel = locale === "ru" ? "скоро" : locale === "az" ? "tezliklə" : "soon";
   const [mobileOpen, setMobileOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
@@ -283,9 +289,14 @@ export default function MarketplaceHeader({ config }: { config?: MarketplaceHead
                 <span>{t("nav.login", locale)}</span>
               </Link>
             ) : isInternalRole(user.role) ? (
-              <Link href="/app/dashboard" className="rounded-full border border-gold/40 px-4 py-2 text-sm font-semibold text-gold transition-colors hover:bg-gold/10">
-                {t("nav.workspace", locale)}
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link href="/app/dashboard" className="rounded-full border border-gold/40 px-4 py-2 text-sm font-semibold text-gold transition-colors hover:bg-gold/10">
+                  {t("nav.workspace", locale)}
+                </Link>
+                <button type="button" onClick={logout} className="rounded-full border border-neutral-600 px-4 py-2 text-sm font-semibold text-neutral-300 transition-colors hover:border-gold/60 hover:text-gold">
+                  {t("nav.logout", locale)}
+                </button>
+              </div>
             ) : user.role === "PARTNER" ? (
               <Link href="/partner" className="rounded-full border border-gold/40 px-4 py-2 text-sm font-semibold text-gold transition-colors hover:bg-gold/10">
                 {t("nav.cabinet", locale)}
