@@ -42,6 +42,16 @@ function auditDetails(value: unknown): Record<string, unknown> {
  * uses plain ID strings validated here. Every mutation is written to
  * security.AuditLog by the caller-facing methods below.
  */
+function localizedName(value: unknown): string | undefined {
+  if (!value) return undefined;
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    const names = value as Record<string, unknown>;
+    return String(names.ru ?? names.en ?? names.az ?? "") || undefined;
+  }
+  return undefined;
+}
+
 @Injectable()
 export class GeoService {
   constructor(
@@ -495,7 +505,7 @@ export class GeoService {
     service?: "tours" | "hotels";
     q?: string;
     limit?: number;
-  }): Promise<Array<{ id: string; name: string; suppliers: string[] }>> {
+  }): Promise<Array<{ id: string; name: string; suppliers: string[]; countryName?: string; cityName?: string; stars?: number | null }>> {
     const limit = Math.min(params.limit ?? 500, 2000);
     const categorySlug = params.service === "tours" ? "tours" : "accommodation";
     const conditions: Prisma.Sql[] = [
@@ -522,11 +532,14 @@ export class GeoService {
     if (params.q) {
       conditions.push(Prisma.sql`TRIM(p."attributes"->>'hotelName') ILIKE ${`%${params.q}%`}`);
     }
-    const rows = await this.prisma.$queryRaw<Array<{ name: string; supplierCode: string }>>(
+    const rows = await this.prisma.$queryRaw<Array<{ name: string; supplierCode: string; countryNames: unknown; cityNames: unknown; stars: string | null }>>(
       Prisma.sql`
         SELECT DISTINCT
           TRIM(p."attributes"->>'hotelName') AS "name",
-          p."attributes"->>'supplierCode' AS "supplierCode"
+          p."attributes"->>'supplierCode' AS "supplierCode",
+          gc."names" AS "countryNames",
+          COALESCE(gr."names", gcity."names") AS "cityNames",
+          p."attributes"->>'stars' AS "stars"
         FROM catalog."Product" p
         JOIN catalog."Category" c ON c."id" = p."categoryId"
         LEFT JOIN geo."GeoCountry" gc ON gc."id" = p."geoCountryId"
@@ -538,20 +551,27 @@ export class GeoService {
         LIMIT ${limit}
       `,
     );
-    const byName = new Map<string, Set<string>>();
+    const byName = new Map<string, { suppliers: Set<string>; countryNames?: unknown; cityNames?: unknown; stars?: number | null }>();
     for (const row of rows) {
       const name = row.name.replace(/\s+/g, " ").trim();
       if (!name) continue;
-      let suppliers = byName.get(name);
-      if (!suppliers) {
-        suppliers = new Set();
-        byName.set(name, suppliers);
+      let entry = byName.get(name);
+      if (!entry) {
+        entry = { suppliers: new Set(), countryNames: row.countryNames, cityNames: row.cityNames, stars: row.stars ? Number(row.stars) : null };
+        byName.set(name, entry);
       }
-      if (row.supplierCode) suppliers.add(row.supplierCode);
+      if (row.supplierCode) entry.suppliers.add(row.supplierCode);
     }
     return [...byName.entries()]
       .slice(0, limit)
-      .map(([name, suppliers]) => ({ id: name, name, suppliers: [...suppliers] }));
+      .map(([name, entry]) => ({
+        id: name,
+        name,
+        suppliers: [...entry.suppliers],
+        countryName: localizedName(entry.countryNames),
+        cityName: localizedName(entry.cityNames),
+        stars: entry.stars ?? null,
+      }));
   }
 
   // ── Unified search (admin directory) ──────────────────────────────
