@@ -3,6 +3,7 @@ import { SupplierAdapterRegistry } from "./adapter/supplier-adapter.registry";
 import { SupplierCacheService } from "./cache/supplier-cache.service";
 import { SupplierResilienceService } from "./resilience/supplier-resilience.service";
 import { SupplierOfferService } from "./supplier-offer.service";
+import { SummerGdsFlightAddonService } from "./summer-gds-flight-addon.service";
 import { SupplierAggregatorService } from "./supplier-aggregator.service";
 import { SupplierGeoIngestService } from "./supplier-geo-ingest.service";
 import { HotelMatchingService } from "../catalog/hotel/hotel-matching.service";
@@ -72,6 +73,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
     SupplierCacheService,
     SupplierResilienceService,
     SupplierOfferService,
+    SummerGdsFlightAddonService,
     SupplierAggregatorService,
     SupplierGeoIngestService,
     HotelMatchingService,
@@ -435,6 +437,6 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
       ],
     },
   ],
-  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SupplierGeoIngestService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, KompasHotelSyncService, KazunionHttpService, KazunionAdapter, KazunionHotelAdapter, KazunionSyncService, KazunionHotelSyncService, AnexAdapter, AnexProvider, AnexHotelAdapter, AnexSyncService, FstravelAdapter, FstravelSyncService, VoyagerHttpService, VoyagerAdapter, VoyagerHotelAdapter, VoyagerSyncService, VoyagerHotelSyncService, KompasHotelAdapter, AzalAdapter, AzalHttpService, AzalLocationsService, AviasalesAdapter, AviasalesHttpService, FlightSupplierRegistry],
+  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SummerGdsFlightAddonService, SupplierAggregatorService, SupplierGeoIngestService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, KompasHotelSyncService, KazunionHttpService, KazunionAdapter, KazunionHotelAdapter, KazunionSyncService, KazunionHotelSyncService, AnexAdapter, AnexProvider, AnexHotelAdapter, AnexSyncService, FstravelAdapter, FstravelSyncService, VoyagerHttpService, VoyagerAdapter, VoyagerHotelAdapter, VoyagerSyncService, VoyagerHotelSyncService, KompasHotelAdapter, AzalAdapter, AzalHttpService, AzalLocationsService, AviasalesAdapter, AviasalesHttpService, FlightSupplierRegistry],
 })
 export class SupplierModule {}

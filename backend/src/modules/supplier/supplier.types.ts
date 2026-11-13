@@ -109,6 +109,15 @@ export interface SupplierSearchQuery {
 
 export type SupplierAvailability = "AVAILABLE" | "NOT_AVAILABLE" | "UNKNOWN";
 
+/** Explicit price component added on top of the supplier package price. */
+export interface PriceAddon {
+  source: string;
+  amount: number;
+  currency: string;
+  departureDate: string;
+  returnDate: string;
+}
+
 export interface SupplierOffer {
   /** Supplier code (e.g., "SUMMERTOUR"). */
   supplierCode: string;
@@ -163,6 +172,8 @@ export interface SupplierOffer {
   expiresAt: Date;
   /** Raw supplier metadata (for diagnostics/re-check). */
   rawMetadata?: Record<string, unknown>;
+  /** Extra supplier-paid transport added to the displayed price (Summertour GDS + AZAL). */
+  flightAddon?: PriceAddon;
 }
 
 // ── Price Snapshot ───────────────────────────────────────────────────────
@@ -473,6 +484,8 @@ export interface PriceCalendarEntry {
   absenceText?: string;
   /** Markup breakdown (§20) for the entry-level price (set by the pricing boundary). */
   pricing?: MarkupPricingJson;
+  /** Extra transport added to the displayed price (Summertour GDS + AZAL). */
+  flightAddon?: PriceAddon;
 }
 
 export interface PriceCalendarResult {

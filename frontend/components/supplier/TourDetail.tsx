@@ -93,6 +93,12 @@ export default function TourDetail({
     adults,
     children: children || undefined,
     childAges: childAges.length > 0 ? childAges : undefined,
+    // Summertour GDS: the calendar must know the exact program, otherwise the
+    // backend cannot distinguish GDS (flight separate) from a regular package.
+    tourIncValue:
+      (attributes?.tourIncValue as string | undefined) ??
+      (attributes?.tourInc as string | undefined),
+    tourIncName: attributes?.tourIncName as string | undefined,
   };
 
   // Handle calendar date click — inline panel, no modal.

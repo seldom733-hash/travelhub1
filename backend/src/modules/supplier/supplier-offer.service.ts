@@ -3,6 +3,7 @@ import { SupplierAdapterRegistry } from "./adapter/supplier-adapter.registry";
 import { SupplierCacheService } from "./cache/supplier-cache.service";
 import { SupplierResilienceService } from "./resilience/supplier-resilience.service";
 import { SupplierPricingService } from "../pricing/supplier-pricing.service";
+import { SummerGdsFlightAddonService } from "./summer-gds-flight-addon.service";
 import type {
   SupplierSearchQuery,
   SupplierOffer,
@@ -39,6 +40,7 @@ export class SupplierOfferService {
     private readonly cache: SupplierCacheService,
     private readonly resilience: SupplierResilienceService,
     private readonly pricing: SupplierPricingService,
+    private readonly summerGdsFlight: SummerGdsFlightAddonService,
   ) {}
 
   // ── Search ──────────────────────────────────────────────────────────
@@ -138,7 +140,13 @@ export class SupplierOfferService {
     }
     // Pricing boundary: public amount + §20 pricing block (raw offers stay
     // in the cache — a rule change is reflected on the next call).
-    return this.pricing.applyToOffers(offers, supplierCode, query.service ?? "tours");
+    const priced = await this.pricing.applyToOffers(offers, supplierCode, query.service ?? "tours");
+    // Summertour GDS sells the hotel+transfer package without the flight:
+    // append the cheapest AZAL round trip so the displayed amount is full.
+    if (supplierCode === "SUMMERTOUR") {
+      return this.summerGdsFlight.applyToOffers(priced);
+    }
+    return priced;
   }
 
   // ── Get Detail ──────────────────────────────────────────────────────
@@ -348,11 +356,16 @@ export class SupplierOfferService {
     })) as PriceCalendarResult;
     // Pricing boundary: applied OUTSIDE the coalesce so raw cache entries
     // (fresh and cached alike) get the public price exactly once.
-    return this.pricing.applyToCalendar(
+    const priced = await this.pricing.applyToCalendar(
       result,
       query.supplierCode,
       this.calendarServiceType(query),
     );
+    if (query.supplierCode === "SUMMERTOUR") {
+      const entries = await this.summerGdsFlight.applyToCalendar(priced.entries, query);
+      return { ...priced, entries };
+    }
+    return priced;
   }
 
   /** Service category of a calendar query — mirrors the adapter actually serving it. */
