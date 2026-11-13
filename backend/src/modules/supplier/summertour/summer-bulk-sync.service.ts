@@ -3,6 +3,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
 import { SummertourNewAdapter } from "./summertour-new.adapter";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
+import { SummerGdsFlightAddonService } from "../summer-gds-flight-addon.service";
 import type { SupplierSearchQuery, SupplierOffer } from "../supplier.types";
 import { resolveGeoCountryId } from "../geo-country-resolver";
 
@@ -44,6 +45,7 @@ export class SummerBulkSyncService {
     private readonly prisma: PrismaService,
     private readonly summertour: SummertourNewAdapter,
     private readonly pricing: SupplierPricingService,
+    private readonly flightAddon: SummerGdsFlightAddonService,
     private readonly ids: IdsService,
   ) {}
 
@@ -230,21 +232,40 @@ export class SummerBulkSyncService {
   ): Promise<"created" | "updated" | "unchanged"> {
     const productCode = `SUMMERTOUR-${tourIncValue}-${hotelKey}`;
 
-    // Find minimum price
+    // Find minimum price. GDS cards need the AZAL round trip on top of the
+    // cheapest hotel+transfer package (price one offer only — see V3 sync).
     const validOffers = offers.filter((o) => o.price.amount > 0);
-    let minPrice = validOffers.length > 0
-      ? Math.min(...validOffers.map((o) => o.price.amount))
-      : 0;
-    const currency = validOffers[0]?.price.currency ?? "USD";
-    // Markup boundary (§9): Tariff/startingPrice are customer-facing —
-    // write the PUBLIC price (already-priced feeds pass through).
-    if (minPrice > 0 && !offers.some((o) => o.pricing)) {
-      minPrice = await this.pricing.publicAmountFor(
-        minPrice,
-        currency,
-        this.summertour.code,
-        "tours",
-      );
+    const isGds = tourIncValue === "256" || tourIncValue === "238";
+    const cheapest = validOffers.reduce<SupplierOffer | null>(
+      (best, offer) => (!best || offer.price.amount < best.price.amount ? offer : best),
+      null,
+    );
+    let minPrice = 0;
+    let currency = cheapest?.price.currency ?? "USD";
+    if (cheapest) {
+      if (isGds) {
+        const [priced] = await this.pricing.applyToOffers(
+          [cheapest],
+          this.summertour.code,
+          "tours",
+        );
+        const [withAir] = await this.flightAddon.applyToOffers(priced ? [priced] : [], {
+          adults: 2,
+          children: 0,
+        });
+        minPrice = withAir?.price.amount ?? priced?.price.amount ?? 0;
+        currency = withAir?.price.currency ?? priced?.price.currency ?? currency;
+      } else {
+        minPrice = cheapest.price.amount;
+        if (!offers.some((o) => o.pricing)) {
+          minPrice = await this.pricing.publicAmountFor(
+            minPrice,
+            currency,
+            this.summertour.code,
+            "tours",
+          );
+        }
+      }
     }
 
     // Extract hotel name from first offer
