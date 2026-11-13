@@ -8,6 +8,7 @@ import PanelFrame from "@/components/PanelFrame";
 import Pagination from "@/components/Pagination";
 import { useLocale, t } from "@/lib/i18n";
 import { useCan } from "@/lib/use-can";
+import HotelCatalogueTab from "@/components/HotelCatalogueTab";
 import {
   hotelDirectoryApi,
   hotelDirectoryDisplayName,
@@ -36,7 +37,10 @@ const EMPTY_FORM: FormState = {
 
 const PAGE_SIZE = 20;
 
-const TABS: { key: HotelDirectoryType; labelKey: string; fallback: string }[] = [
+type TabKey = HotelDirectoryType | "hotels";
+
+const TABS: { key: TabKey; labelKey: string; fallback: string }[] = [
+  { key: "hotels", labelKey: "nav.hotels", fallback: "Отели" },
   { key: "categories", labelKey: "hd.tabs.categories", fallback: "Категории отелей" },
   { key: "room-types", labelKey: "hd.tabs.room_types", fallback: "Типы номеров" },
   { key: "placement-types", labelKey: "hd.tabs.placement_types", fallback: "Типы размещения" },
@@ -49,7 +53,7 @@ function HotelDirectoryContent() {
   const canUpdate = useCan("hotel_directory.update");
   const canDelete = useCan("hotel_directory.delete");
 
-  const [tab, setTab] = useState<HotelDirectoryType>("categories");
+  const [tab, setTab] = useState<TabKey>("hotels");
   const [rows, setRows] = useState<HotelDirectoryEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -64,7 +68,13 @@ function HotelDirectoryContent() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(
-    async (forTab: HotelDirectoryType, q: string, status: string) => {
+    async (forTab: TabKey, q: string, status: string) => {
+      if (forTab === "hotels") {
+        setRows([]);
+        setTotal(0);
+        setBusy(false);
+        return;
+      }
       setBusy(true);
       setError("");
       try {
@@ -132,6 +142,7 @@ function HotelDirectoryContent() {
   };
 
   const handleSave = async () => {
+    if (tab === "hotels") return;
     if (!form.code.trim() || !form.ru.trim() || !form.en.trim() || !form.az.trim()) {
       setError(t("geo.form.required", locale) ?? "Заполните код и названия (ru/en/az)");
       return;
@@ -163,6 +174,7 @@ function HotelDirectoryContent() {
   };
 
   const handleDelete = async (row: HotelDirectoryEntry) => {
+    if (tab === "hotels") return;
     const name = hotelDirectoryDisplayName(row.names, row.code);
     if (!window.confirm(`${t("geo.delete.confirm", locale) ?? "Удалить"} ${name}?`)) return;
     setError("");
@@ -209,6 +221,9 @@ function HotelDirectoryContent() {
           ))}
         </div>
 
+        {tab === "hotels" && <HotelCatalogueTab />}
+
+        <div className={tab === "hotels" ? "hidden" : "space-y-4"}>
         <div className="flex flex-wrap items-center gap-2">
           <input
             defaultValue={search}
@@ -316,6 +331,7 @@ function HotelDirectoryContent() {
         </div>
 
         <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+        </div>
       </div>
 
       {showForm && (
