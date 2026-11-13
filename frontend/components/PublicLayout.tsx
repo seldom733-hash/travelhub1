@@ -211,6 +211,13 @@ function PublicHeader({ user, userReady }: { user: AuthUser | null; userReady: b
               >
                 {t("nav.workspace", locale)}
               </Link>
+              <button
+                type="button"
+                onClick={logout}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-700 transition-colors hover:bg-slate-100"
+              >
+                {t("nav.logout", locale)}
+              </button>
             </div>
           ) : user.role === "PARTNER" ? (
             <div className="flex items-center gap-2 text-sm">
