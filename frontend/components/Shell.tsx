@@ -45,6 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     headingKey: "nav.group.operations",
     items: [
+      { href: "/app/requests/create", icon: "➕", labelKey: "nav.request_create", permission: "order.edit_noncritical" },
       { href: "/app/documents", icon: "📄", labelKey: "nav.documents", permission: "documents.read" },
     ],
   },

@@ -56,6 +56,8 @@ type DealRow = {
   sequence: string;
   requestId: string;
   requestCode: string;
+  requestType: string | null;
+  primarySupplierCode: string | null;
   orderId: string | null;
   orderCode: string | null;
   bookingId: string | null;
@@ -357,6 +359,17 @@ export class DealsService {
   private async loadRows(): Promise<DealRow[]> {
     const requests = await this.prisma.request.findMany({ orderBy: { createdAt: "desc" }, take: 1000 });
     if (requests.length === 0) return [];
+    const requestServiceRows = await this.prisma.requestService.findMany({
+      where: { requestId: { in: requests.map((r) => r.id) } },
+      orderBy: { position: "asc" },
+      select: { id: true, requestId: true, serviceType: true, supplierCode: true, supplierName: true, title: true, data: true },
+    });
+    const requestServicesByRequest = new Map<string, typeof requestServiceRows>();
+    for (const service of requestServiceRows) {
+      const list = requestServicesByRequest.get(service.requestId) ?? [];
+      list.push(service);
+      requestServicesByRequest.set(service.requestId, list);
+    }
     const orderIds = requests.map((r) => r.convertedOrderId).filter((id): id is string => Boolean(id));
     const orders = await this.prisma.order.findMany({ where: { OR: [{ id: { in: orderIds } }, { commerceSequence: { in: requests.map((r) => r.commerceSequence) } }] }, select: { id: true, code: true, referenceNumber: true, commerceSequence: true, status: true, amount: true, currency: true, cancelledAt: true, returnedToRequestAt: true, cancellationReason: true, paidAmount: true, refundedAmount: true, customerId: true, createdBy: true, financialStatus: true, commercialSnapshot: true, items: { select: { id: true, title: true, type: true, serviceDate: true, amount: true, productId: true } } } });
     const orderBySequence = new Map(orders.map((order) => [order.commerceSequence, order]));
@@ -502,7 +515,19 @@ export class DealsService {
       const children = Number(attrs.children ?? 0) || null;
       const channel = request.sourceChannel ?? (commercial.priceSource === "PUBLIC" ? "Сайт (универсальный поиск)" : String(commercial.priceSource ?? "Ручное создание"));
       const itemRows = order?.items ?? [];
-      const services = itemRows.length > 0
+      const configuredServices = requestServicesByRequest.get(request.id) ?? [];
+      const services = configuredServices.length > 0
+        ? configuredServices.map((service) => ({
+            id: service.id,
+            title: service.title || service.supplierName || service.serviceType,
+            type: service.serviceType,
+            serviceDate: dateFrom,
+            clientPrice: fixed(0),
+            cost: fixed(0),
+            income: fixed(0),
+            mediaId: null,
+          }))
+        : itemRows.length > 0
         ? itemRows.map((item) => {
             const itemAmount = money(item.amount);
             const itemCost = sales > 0 ? cost * (itemAmount / sales) : 0;
@@ -513,6 +538,8 @@ export class DealsService {
         sequence: request.commerceSequence,
         requestId: request.id,
         requestCode: request.referenceNumber,
+        requestType: request.requestType ?? null,
+        primarySupplierCode: request.primarySupplierCode ?? null,
         orderId: order?.id ?? null,
         orderCode: order?.referenceNumber ?? null,
         bookingId: booking?.id ?? null,

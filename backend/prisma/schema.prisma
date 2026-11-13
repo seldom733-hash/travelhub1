@@ -2626,6 +2626,13 @@ model Request {
   customerId String? // ref crm.Customer (no FK)
   productId  String? // ref catalog.Product (no FK)
   partnerId  String? // ref crm.Partner/supplier (no FK)
+  /// Request type selected in the request creation workspace: TOUR_PACKAGE,
+  /// HOTEL, FLIGHT, TRANSFER, INSURANCE, VISA, FLIGHT_BOOKING, CRUISE,
+  /// CUSTOM_PACKAGE, OTHER. NULL for legacy requests.
+  requestType String?
+  /// Supplier selected as the primary one at creation; per-service suppliers
+  /// live in RequestService.supplierCode.
+  primarySupplierCode String?
 
   status RequestStatus @default(NEW)
 
@@ -2709,11 +2716,39 @@ model Request {
   /// (FIO + birthDate). Request 1 → N RequestTraveler. OrderTraveler на
   /// Request-стадии НЕ используется.
   travelers RequestTraveler[]
+  /// Structured multi-service request composition. Each service keeps its own
+  /// supplier and type-specific JSON parameters; it is not a single free-text
+  /// comment. Created only through the request creation flow.
+  services RequestService[]
 
   @@index([status])
   @@index([customerId])
   @@index([partnerId])
   @@index([commerceSequence])
+  @@schema("order")
+}
+
+/// Structured service line of a Request. The service type (TOUR_PACKAGE,
+/// HOTEL, FLIGHT, TRANSFER, INSURANCE, VISA, FLIGHT_BOOKING, CRUISE,
+/// CUSTOM_PACKAGE, OTHER) and its parameters are stored separately from the
+/// Request so one request can contain multiple services from different
+/// suppliers without losing data in a comment field.
+model RequestService {
+  id           String   @id @default(uuid())
+  requestId    String
+  request      Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  position     Int      @default(0)
+  serviceType  String
+  supplierCode String?
+  supplierName String?
+  title        String?
+  /// Type-specific fields (hotel dates, flight segments, transfer details…).
+  data         Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([requestId])
+  @@index([supplierCode])
   @@schema("order")
 }
 

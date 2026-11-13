@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from "@nestjs/common";
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from "@nestjs/common";
 import type { RequestStatus, ProductType } from "../../generated/prisma/client";
 
 /**
@@ -210,6 +210,34 @@ interface CreateRequestDto {
    * travelerCount — размер партии выводится из длины массива.
    */
   travelers?: RequestTravelerInput[];
+  /** New request workspace: request type and structured services. */
+  requestType?: RequestType;
+  primarySupplierCode?: string;
+  assignedManagerId?: string;
+  services?: RequestServiceInput[];
+}
+
+const REQUEST_TYPES = [
+  "TOUR_PACKAGE",
+  "HOTEL",
+  "FLIGHT",
+  "TRANSFER",
+  "INSURANCE",
+  "VISA",
+  "FLIGHT_BOOKING",
+  "CRUISE",
+  "CUSTOM_PACKAGE",
+  "OTHER",
+] as const;
+type RequestType = (typeof REQUEST_TYPES)[number];
+
+interface RequestServiceInput {
+  serviceType?: RequestType;
+  supplierCode?: string | null;
+  supplierName?: string | null;
+  title?: string | null;
+  /** Type-specific service fields, kept per service (hotel/flight/etc). */
+  data?: Record<string, unknown> | null;
 }
 
 interface ListRequestQuery {
@@ -300,6 +328,27 @@ export class RequestService {
     if (dto.quantity !== undefined && (!Number.isInteger(dto.quantity) || dto.quantity < 1)) {
       throw new BadRequestException("quantity must be a positive integer");
     }
+    const requestType = dto.requestType ?? null;
+    if (requestType && !REQUEST_TYPES.includes(requestType as RequestType)) {
+      throw new BadRequestException("Unknown requestType");
+    }
+    if (dto.services && dto.services.length > 20) {
+      throw new BadRequestException("A request can contain at most 20 services");
+    }
+    for (const [index, service] of (dto.services ?? []).entries()) {
+      if (service.serviceType && !REQUEST_TYPES.includes(service.serviceType as RequestType)) {
+        throw new BadRequestException(`services[${index}].serviceType is invalid`);
+      }
+      if (typeof service.supplierCode === "string" && service.supplierCode.length > 80) {
+        throw new BadRequestException(`services[${index}].supplierCode is too long`);
+      }
+    }
+    if (dto.assignedManagerId) {
+      const canAssign =
+        (await this.security.hasPermission(actor.id ?? "", "request.assignment.manage")) ||
+        (await this.security.hasPermission(actor.id ?? "", "request.assignment.reassign"));
+      if (!canAssign) throw new ForbiddenException("You cannot assign a manager for this request");
+    }
 
     // Two-stage §4/§6: состав Request-стадии валидируется целиком при создании
     // (FIO + birthDate REQUIRED; count-несоответствие → 422, а не «тихая» правка).
@@ -342,50 +391,71 @@ export class RequestService {
       }
     }
 
-    const request = await this.prisma.request.create({
-      data: {
-        code,
-        commerceSequence,
-        referenceNumber,
-        customerId: dto.customerId ?? null,
-        productId: dto.productId ?? null,
-        partnerId: dto.partnerId ?? null,
-        status: "NEW",
-        requestedServiceDate: dto.requestedServiceDate ? new Date(dto.requestedServiceDate) : null,
-        quantity: dto.quantity ?? 1,
-        travelerCount,
-        productSnapshot: productSnapshot ? (productSnapshot as Prisma.InputJsonValue) : Prisma.JsonNull,
-        displayedPrice: dto.displayedPrice != null ? dto.displayedPrice as any : null,
-        displayedCurrency: dto.displayedCurrency ?? null,
-        confirmedPrice: null,
-        confirmedCurrency: null,
-        pinnedRequirements: Prisma.JsonNull,
-        supplierResponseDeadline,
-        supplierRespondedAt: null,
-        supplierDecision: null,
-        supplierPriceProposal: null,
-        supplierNote: null,
-        customerActionDeadline: null,
-        customerAcceptedAt: null,
-        customerDecision: null,
-        convertedOrderId: null,
-        convertedAt: null,
-        rejectedAt: null,
-        rejectedBy: null,
-        rejectionReason: null,
-        version: 1,
-      },
-    });
+    const request = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.request.create({
+        data: {
+          code,
+          commerceSequence,
+          referenceNumber,
+          customerId: dto.customerId ?? null,
+          productId: dto.productId ?? null,
+          partnerId: dto.partnerId ?? null,
+          requestType,
+          primarySupplierCode: dto.primarySupplierCode ?? null,
+          status: "NEW",
+          requestedServiceDate: dto.requestedServiceDate ? new Date(dto.requestedServiceDate) : null,
+          quantity: dto.quantity ?? 1,
+          travelerCount,
+          productSnapshot: productSnapshot ? (productSnapshot as Prisma.InputJsonValue) : Prisma.JsonNull,
+          displayedPrice: dto.displayedPrice != null ? dto.displayedPrice as any : null,
+          displayedCurrency: dto.displayedCurrency ?? null,
+          confirmedPrice: null,
+          confirmedCurrency: null,
+          pinnedRequirements: Prisma.JsonNull,
+          supplierResponseDeadline,
+          supplierRespondedAt: null,
+          supplierDecision: null,
+          supplierPriceProposal: null,
+          supplierNote: null,
+          customerActionDeadline: null,
+          customerAcceptedAt: null,
+          customerDecision: null,
+          convertedOrderId: null,
+          convertedAt: null,
+          rejectedAt: null,
+          rejectedBy: null,
+          rejectionReason: null,
+          version: 1,
+        },
+      });
 
-    await this.prisma.requestHistory.create({
-      data: {
-        requestId: request.id,
-        action: "created",
-        to: "NEW",
-        actorId: actor.id,
-        actorName: actor.username,
-        comment: "Заявка создана (Shared Commerce Sequence)",
-      },
+      const serviceRows = (dto.services ?? []).filter((service) => Boolean(service?.serviceType));
+      if (serviceRows.length > 0) {
+        await tx.requestService.createMany({
+          data: serviceRows.map((service, index) => ({
+            requestId: created.id,
+            position: index + 1,
+            serviceType: service.serviceType ?? requestType ?? "OTHER",
+            supplierCode: service.supplierCode?.trim() || null,
+            supplierName: service.supplierName?.trim() || null,
+            title: service.title?.trim() || null,
+            data: service.data ? (service.data as Prisma.InputJsonValue) : Prisma.JsonNull,
+          })),
+        });
+      }
+
+      await tx.requestHistory.create({
+        data: {
+          requestId: created.id,
+          action: "created",
+          to: "NEW",
+          actorId: actor.id,
+          actorName: actor.username,
+          comment: "Заявка создана (Shared Commerce Sequence)",
+        },
+      });
+
+      return created;
     });
 
     await this.notifyDealCreated(request.id, request.referenceNumber, request.customerId);
@@ -393,7 +463,11 @@ export class RequestService {
     // Auto-distribution must never lose the request: a failure leaves it QUEUED
     // and visible to the supervisor; the request itself is already persisted.
     try {
-      await this.assignment.assign(request.id, undefined, { respectMode: true });
+      if (dto.assignedManagerId) {
+        await this.assignment.reassign(request.id, dto.assignedManagerId, "Assigned at request creation", { id: actor.id ?? "", username: actor.username ?? "" });
+      } else {
+        await this.assignment.assign(request.id, undefined, { respectMode: true });
+      }
     } catch {
       // Assignment telemetry is captured by the notification/queue path.
     }
@@ -1042,7 +1116,7 @@ export class RequestService {
         status: "PRICE_CHANGED",
         supplierRespondedAt: now,
         supplierDecision: "PRICE_CHANGED",
-        supplierPriceProposal: platformPrice as any,
+        supplierPriceProposal: platformPrice as any,
         confirmedPrice: platformPrice as any,
         confirmedCurrency: snapshot.customerCurrency ?? request.confirmedCurrency,
         supplierNote: note ?? null,

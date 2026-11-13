@@ -260,9 +260,19 @@ export class RequestController {
       displayedCurrency?: string;
       /** Two-stage §4: FIO + birthDate состав; задаёт travelerCount, если тот не указан. */
       travelers?: RequestTravelerBody[];
+      requestType?: string;
+      primarySupplierCode?: string;
+      assignedManagerId?: string;
+      services?: Array<{
+        serviceType?: string;
+        supplierCode?: string | null;
+        supplierName?: string | null;
+        title?: string | null;
+        data?: Record<string, unknown> | null;
+      }>;
     },
   ) {
-    return this.requestService.createRequest(body, { id: user.id, username: user.username });
+    return this.requestService.createRequest(body as any, { id: user.id, username: user.username });
   }
 
   @Patch(":id/details")
