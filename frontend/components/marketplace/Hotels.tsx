@@ -142,7 +142,7 @@ export default function Hotels() {
             </p>
           </div>
           <Link
-            href="/search?category=hotels"
+            href="/search?category=hotels&sort=price_asc"
             className="hidden items-center gap-1.5 text-sm text-gold transition-colors hover:text-gold-light sm:flex"
           >
             {t("marketplace.all_hotels", locale)}
@@ -172,7 +172,7 @@ export default function Hotels() {
         {!loading && hotels.length > 0 && (
           <div className="mt-8 text-center sm:hidden">
             <Link
-              href="/search?category=hotels"
+              href="/search?category=hotels&sort=price_asc"
               className="inline-flex items-center gap-1.5 text-sm text-gold transition-colors hover:text-gold-light"
             >
               {t("marketplace.all_hotels", locale)}

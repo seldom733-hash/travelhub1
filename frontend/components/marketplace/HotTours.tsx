@@ -148,7 +148,7 @@ export default function HotTours() {
             </p>
           </div>
           <Link
-            href="/search?category=tours&sort=newest"
+            href="/search?category=tours&sort=price_asc"
             className="hidden items-center gap-1.5 text-sm text-gold transition-colors hover:text-gold-light sm:flex"
           >
             {t("marketplace.all_hot_tours", locale)}
@@ -178,7 +178,7 @@ export default function HotTours() {
         {!loading && tours.length > 0 && (
           <div className="mt-8 text-center sm:hidden">
             <Link
-              href="/search?category=tours&sort=newest"
+              href="/search?category=tours&sort=price_asc"
               className="inline-flex items-center gap-1.5 text-sm text-gold transition-colors hover:text-gold-light"
             >
               {t("marketplace.all_hot_tours", locale)}

@@ -76,8 +76,8 @@ const DEFAULT_HEADER_CONFIG: MarketplaceHeaderConfig = {
 };
 
 const SERVICES: ServiceItem[] = [
-  { icon: <HouseSimple size={18} weight="light" />, labelKey: "marketplace.category_accommodation", href: "/search?category=hotels" },
-  { icon: <MapPin size={18} weight="light" />, labelKey: "marketplace.category_tours", href: "/search?category=tours" },
+  { icon: <HouseSimple size={18} weight="light" />, labelKey: "marketplace.category_accommodation", href: "/search?category=hotels&sort=price_asc" },
+  { icon: <MapPin size={18} weight="light" />, labelKey: "marketplace.category_tours", href: "/search?category=tours&sort=price_asc" },
   { icon: <Compass size={18} weight="light" />, labelKey: "marketplace.category_excursions", href: "/search?category=excursions", disabled: true },
   { icon: <Van size={18} weight="light" />, labelKey: "marketplace.category_transfers", href: "/search?category=transfers", disabled: true },
   { icon: <Star size={18} weight="light" />, labelKey: "marketplace.category_experiences", href: "/search?category=experiences", disabled: true },

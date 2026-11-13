@@ -153,7 +153,7 @@ export default function Tours() {
             </p>
           </div>
           <Link
-            href="/search?category=tours"
+            href="/search?category=tours&sort=price_asc"
             className="hidden items-center gap-1.5 text-sm text-gold transition-colors hover:text-gold-light sm:flex"
           >
             {t("marketplace.all_tours", locale)}
@@ -183,7 +183,7 @@ export default function Tours() {
         {!loading && tours.length > 0 && (
           <div className="mt-8 text-center sm:hidden">
             <Link
-              href="/search?category=tours"
+              href="/search?category=tours&sort=price_asc"
               className="inline-flex items-center gap-1.5 text-sm text-gold transition-colors hover:text-gold-light"
             >
               {t("marketplace.all_tours", locale)}

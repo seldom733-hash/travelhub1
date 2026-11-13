@@ -7,8 +7,8 @@ import type { MarketplaceHeaderConfig } from "./MarketplaceHeader";
 import { useCurrentUserStatus } from "@/lib/use-user";
 
 const FOOTER_SERVICES = [
-  { href: "/search?category=hotels", labelKey: "footer.service_accommodation" },
-  { href: "/search?category=tours", labelKey: "footer.service_tours" },
+  { href: "/search?category=hotels&sort=price_asc", labelKey: "footer.service_accommodation" },
+  { href: "/search?category=tours&sort=price_asc", labelKey: "footer.service_tours" },
   { href: "/search?category=excursions", labelKey: "footer.service_excursions" },
   { href: "/search?category=transfers", labelKey: "footer.service_transfers" },
 ] as const;
