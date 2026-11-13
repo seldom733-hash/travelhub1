@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
+import SortableHeader, { type SortDirection, type SortState } from "@/components/SortableHeader";
 
 interface HotelRow { id: string; name: string; suppliers: string[]; countryCode?: string; countryName?: string; cityName?: string; resortName?: string; stars?: number | null; categoryLabel?: string | null }
 
@@ -13,6 +14,7 @@ export default function HotelsReferencePage() {
   const [country, setCountry] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [sort, setSort] = useState<SortState | null>({ sortBy: "name", sortDirection: "asc" });
   const tr = (ru: string, az: string, en: string) => (locale === "az" ? az : locale === "en" ? en : ru);
 
   useEffect(() => {
@@ -23,10 +25,19 @@ export default function HotelsReferencePage() {
 
   const countries = useMemo(() => [...new Set(rows.map((r) => r.countryName).filter(Boolean))].sort() as string[], [rows]);
   const filtered = useMemo(() => rows.filter((r) => (!country || r.countryName === country) && (!search.trim() || r.name.toLowerCase().includes(search.trim().toLowerCase()))), [rows, country, search]);
+  const sorted = useMemo(() => {
+    if (!sort) return filtered;
+    const dir = sort.sortDirection === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const value = (row: HotelRow) => sort.sortBy === "id" ? row.id : sort.sortBy === "country" ? row.countryName ?? "" : sort.sortBy === "city" ? row.cityName ?? "" : sort.sortBy === "category" ? (row.categoryLabel ?? (row.stars != null ? String(row.stars) : "")) : row.name;
+      return String(value(a)).localeCompare(String(value(b)), undefined, { numeric: true, sensitivity: "base" }) * dir;
+    });
+  }, [filtered, sort]);
+  const onSort = (field: string, direction: SortDirection) => setSort({ sortBy: field, sortDirection: direction });
 
   function exportXls() {
     const head = ["ID", tr("Наименование", "Ad", "Name"), tr("Страна", "Ölkə", "Country"), tr("Город/курорт", "Şəhər/kurort", "City/resort"), tr("Категория", "Kateqoriya", "Category"), tr("Поставщики", "Təchizatçılar", "Suppliers")];
-    const body = filtered.map((r) => [r.id, r.name, r.countryName ?? "", r.cityName ?? "", r.categoryLabel ?? (r.stars ? String(r.stars) : ""), (r.suppliers ?? []).join(", ")]);
+    const body = sorted.map((r) => [r.id, r.name, r.countryName ?? "", r.cityName ?? "", r.categoryLabel ?? (r.stars ? String(r.stars) : ""), (r.suppliers ?? []).join(", ")]);
     const html = `<table><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr>${body.map((row) => `<tr>${row.map((c) => `<td>${String(c).replaceAll("&", "&amp;").replaceAll("<", "&lt;")}</td>`).join("")}</tr>`).join("")}</table>`;
     const url = URL.createObjectURL(new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel;charset=utf-8" }));
     const a = document.createElement("a"); a.href = url; a.download = "hotels.xls"; a.click(); URL.revokeObjectURL(url);
@@ -48,6 +59,13 @@ export default function HotelsReferencePage() {
       <select value={country} onChange={(e) => setCountry(e.target.value)} className="rounded-lg border px-3 py-2 text-sm"><option value="">{tr("Все страны", "Bütün ölkələr", "All countries")}</option>{countries.map((c) => <option key={c}>{c}</option>)}</select>
       <span className="self-center text-xs text-slate-500">{filtered.length}</span>
     </div>
-    <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[820px] text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr>{["ID", tr("Наименование", "Ad", "Name"), tr("Страна", "Ölkə", "Country"), tr("Город/курорт", "Şəhər/kurort", "City/resort"), tr("Категория", "Kateqoriya", "Category"), tr("Поставщики", "Təchizatçılar", "Suppliers")].map((h) => <th key={h} className="px-3 py-2 font-medium">{h}</th>)}</tr></thead><tbody>{filtered.map((r) => <tr key={r.id} className="border-t"><td className="px-3 py-2 font-mono text-slate-500">{r.id.slice(0, 18)}</td><td className="px-3 py-2 font-medium">{r.name}</td><td className="px-3 py-2">{r.countryName ?? "—"}</td><td className="px-3 py-2">{r.cityName ?? "—"}</td><td className="px-3 py-2">{r.stars ? `${r.stars}*` : "—"}</td><td className="px-3 py-2">{r.suppliers.join(", ")}</td></tr>)}</tbody></table></div>
+    <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[820px] text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr>
+      <SortableHeader field="id" currentSort={sort} onSort={onSort} padX="px-3">ID</SortableHeader>
+      <SortableHeader field="name" currentSort={sort} onSort={onSort} padX="px-3">{tr("Наименование", "Ad", "Name")}</SortableHeader>
+      <SortableHeader field="country" currentSort={sort} onSort={onSort} padX="px-3">{tr("Страна", "Ölkə", "Country")}</SortableHeader>
+      <SortableHeader field="city" currentSort={sort} onSort={onSort} padX="px-3">{tr("Город/курорт", "Şəhər/kurort", "City/resort")}</SortableHeader>
+      <SortableHeader field="category" currentSort={sort} onSort={onSort} padX="px-3">{tr("Категория", "Kateqoriya", "Category")}</SortableHeader>
+      <th className="px-3 py-2 font-medium">{tr("Поставщики", "Təchizatçılar", "Suppliers")}</th>
+    </tr></thead><tbody>{sorted.map((r) => <tr key={r.id} className="border-t"><td className="px-3 py-2 font-mono text-slate-500">{r.id}</td><td className="px-3 py-2 font-medium">{r.name}</td><td className="px-3 py-2">{r.countryName ?? "—"}</td><td className="px-3 py-2">{r.cityName ?? "—"}</td><td className="px-3 py-2">{r.categoryLabel ?? (r.stars != null ? `${r.stars}*` : "—")}</td><td className="px-3 py-2">{r.suppliers.join(", ") || "—"}</td></tr>)}</tbody></table></div>
   </div>;
 }
