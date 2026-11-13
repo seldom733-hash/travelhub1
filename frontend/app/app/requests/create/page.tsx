@@ -380,11 +380,33 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
   const input = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm";
   const label = "grid gap-1 text-[11px] font-medium text-slate-600";
   const d = service.data;
+  const [hotelSearch, setHotelSearch] = useState(d.hotelName ?? service.title ?? "");
+  const [hotelResults, setHotelResults] = useState<Array<{ id: string; name: string; suppliers?: string[] }>>([]);
+  useEffect(() => {
+    if (service.kind !== "HOTEL" && service.kind !== "TOUR_PACKAGE") return;
+    const query = hotelSearch.trim();
+    if (query.length < 2 && !d.country) { setHotelResults([]); return; }
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams({ limit: "20" });
+      if (d.country) params.set("geoCountry", d.country);
+      if (d.city) params.set("geoCity", d.city);
+      if (query) params.set("q", query);
+      api.get<Array<{ id: string; name: string; suppliers?: string[] }>>(`/geo/supplier-hotels?${params.toString()}`)
+        .then((rows) => setHotelResults(Array.isArray(rows) ? rows : [])).catch(() => setHotelResults([]));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [hotelSearch, d.country, d.city, service.kind]);
+  const chooseHotel = (hotel: { id: string; name: string; suppliers?: string[] }) => {
+    setHotelSearch(hotel.name);
+    onSelectHotel({ id: hotel.id, title: hotel.name });
+    onData("hotelName", hotel.name);
+    if (hotel.suppliers?.[0] && !service.supplierCode) onChange({ supplierCode: hotel.suppliers[0], supplierName: hotel.suppliers[0] });
+  };
   const supplier = <label className={label}>{tr("Поставщик услуги", "Xidmət təchizatçısı", "Service supplier")}<select className={input} value={service.supplierCode} onChange={(e) => { const code = e.target.value; const row = suppliers.find((s) => s.code === code); onChange({ supplierCode: code, supplierName: row?.name ?? "" }); }}><option value="">{tr("Выберите", "Seçin", "Select")}</option>{suppliers.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}</select></label>;
 
-  if (service.kind === "HOTEL") return <div className="grid gap-3 sm:grid-cols-2">
+  if (service.kind === "HOTEL" || service.kind === "TOUR_PACKAGE") return <div className="grid gap-3 sm:grid-cols-2">
     {supplier}
-    <label className={label}>{tr("Название отеля", "Otel adı", "Hotel name")}<input className={input} value={d.hotelName ?? service.title} onChange={(e) => { onSelectHotel({ id: "", title: e.target.value }); onData("hotelName", e.target.value); }} placeholder={tr("Поиск отеля", "Otel axtar", "Search hotel")} /></label>
+    <label className={label}>{tr("Название отеля", "Otel adı", "Hotel name")}<input className={input} value={hotelSearch} onChange={(e) => { setHotelSearch(e.target.value); onData("hotelName", e.target.value); }} placeholder={tr("Начните вводить название отеля", "Otel adını yazmağa başlayın", "Start typing a hotel name")} /></label>
     <label className={label}>{tr("Страна", "Ölkə", "Country")}<select className={input} value={selectedCountryId} onChange={(e) => { setSelectedCountryId(e.target.value); const row = countries.find((c) => c.id === e.target.value); onData("country", row?.code ?? ""); }}><option value="">{tr("Выберите страну", "Ölkə seçin", "Select country")}</option>{countries.map((c) => <option key={c.id} value={c.id}>{c.names[locale] ?? c.names.ru ?? c.code}</option>)}</select></label>
     <label className={label}>{tr("Город", "Şəhər", "City")}<select className={input} value={d.cityId ?? ""} onChange={(e) => { const row = cities.find((c) => c.id === e.target.value); onData("cityId", e.target.value); onData("city", row?.code ?? row?.names[locale] ?? ""); }}><option value="">{tr("Выберите город", "Şəhər seçin", "Select city")}</option>{cities.map((c) => <option key={c.id} value={c.id}>{c.names[locale] ?? c.names.ru ?? c.code}</option>)}</select></label>
     <label className={label}>{tr("Заезд", "Giriş", "Check-in")}<input type="date" className={input} value={d.checkIn ?? ""} onChange={(e) => onData("checkIn", e.target.value)} /></label>
@@ -396,7 +418,7 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
     <label className={label}>{tr("Взрослых", "Böyüklər", "Adults")}<input type="number" min="1" className={input} value={d.adults ?? "2"} onChange={(e) => onData("adults", e.target.value)} /></label>
     <label className={label}>{tr("Детей", "Uşaqlar", "Children")}<input type="number" min="0" className={input} value={d.children ?? "0"} onChange={(e) => onData("children", e.target.value)} /></label>
     <label className={label}>{tr("Возраст детей", "Uşaqların yaşı", "Children ages")}<input className={input} value={d.childrenAges ?? ""} onChange={(e) => onData("childrenAges", e.target.value)} /></label>
-    {hotelOptions.length > 0 && <div className="sm:col-span-2"><div className="mb-1 text-[10px] text-slate-500">{tr("Найденные отели", "Tapılan otellər", "Found hotels")}</div><div className="flex flex-wrap gap-1">{hotelOptions.map((p) => <button key={p.id} type="button" onClick={() => onSelectHotel(p)} className="rounded border px-2 py-1 text-[11px]">{p.title}</button>)}</div></div>}
+    {hotelResults.length > 0 && <div className="sm:col-span-2"><div className="mb-1 text-[10px] text-slate-500">{tr("Найденные отели поставщиков", "Təchizatçı otelləri", "Supplier hotels")}</div><div className="max-h-48 overflow-auto rounded-lg border">{hotelResults.map((p) => <button key={p.id} type="button" onClick={() => chooseHotel(p)} className="flex w-full items-center justify-between border-b px-2 py-1.5 text-left text-[11px] last:border-0 hover:bg-slate-50"><span>{p.name}</span><span className="text-slate-400">{p.suppliers?.join(", ")}</span></button>)}</div></div>}
   </div>;
 
   if (service.kind === "FLIGHT") {
