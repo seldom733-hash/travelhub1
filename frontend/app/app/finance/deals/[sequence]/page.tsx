@@ -256,7 +256,7 @@ export default function DealDetailPage() {
   const refundable = Number(deal.clientReceived) > 0 && !cancelled;
   const readOnly = user?.role === "SALES_MANAGER" && deal.managerId !== user.id;
   const effectiveRequestActions = readOnly ? {} : requestActions;
-  const effectiveBookingActions = readOnly ? [] : bookingActions;
+  const effectiveBookingActions = readOnly || deal.stage !== "BOOKING" ? [] : bookingActions;
   const clientRefundDue = deal.status === "CANCELLED"
     ? Math.max(0, Number(deal.clientReceived) - Number(deal.clientRefundTotal))
     : Math.max(0, Number(deal.clientReceived) - Number(deal.clientRefundTotal) - Number(deal.salesAmount));
