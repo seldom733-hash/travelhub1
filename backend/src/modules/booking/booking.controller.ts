@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query, Req, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
 import { ExportService } from '../shared/export/export.service';
 import { Type } from "class-transformer";
 import { IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from "class-validator";
@@ -219,6 +219,15 @@ export class BookingController {
   @RequirePermissions("booking.read")
   getBooking(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.bookings.getBooking(id, actor, actor.permissions ?? []);
+  }
+
+  @Post("bookings/:id/undo")
+  @RequirePermissions("booking.cancel")
+  undoLastCancellation(
+    @Param("id") id: string,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.bookings.undoLastCancellation(id, actor.username);
   }
 
   @Patch("bookings/:id")

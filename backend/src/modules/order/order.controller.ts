@@ -300,6 +300,12 @@ export class OrderController {
     return this.orders.addItem(id, body, { id: actor.id, username: actor.username });
   }
 
+  @Post("orders/:id/undo")
+  @RequirePermissions("order.cancel")
+  undoLastClose(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.orders.undoLastClose(id, actor.username);
+  }
+
   @Patch("orders/:id")
   @RequirePermissions((req) => [ACTION_PERMISSIONS[req.body?.action as OrderAction] ?? "order.edit_noncritical"])
   orderAction(

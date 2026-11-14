@@ -734,6 +734,129 @@ export class BookingService {
   }
 
   /**
+   * Undo the last accidental cancellation of a Booking.
+   *
+   * Deliberately narrow: only `cancel` as the latest action, only while the
+   * booking is still CANCELLED, and only when the parent Order is not terminal.
+   * No time window — availability is determined by business state.
+   */
+  async undoLastCancellation(bookingId: string, actor: string) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.findUnique({ where: { id: bookingId } });
+      if (!booking) throw new NotFoundError(`Booking ${bookingId} not found`);
+      if (booking.acquisitionSource === "PARTNER_STOREFRONT") {
+        throw new NotFoundError(`Booking ${bookingId} not found`);
+      }
+      if (booking.status !== "CANCELLED") {
+        throw new ConflictError(`Booking ${booking.code} is not cancelled`);
+      }
+      const latest = await tx.bookingHistory.findFirst({
+        where: { bookingId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!latest || latest.action !== "cancel") {
+        throw new ConflictError(`Booking ${booking.code}: last action is not a cancellation`);
+      }
+      if (latest.to !== booking.status) {
+        throw new ConflictError(`Booking ${booking.code}: status changed after cancellation`);
+      }
+      const target = latest.from as BookingStatus | null;
+      if (!target) throw new ConflictError(`Booking ${booking.code}: cancellation has no previous state`);
+      const order = await tx.order.findUnique({
+        where: { id: booking.orderId },
+        select: { code: true, status: true, version: true },
+      });
+      if (order && ["CANCELLED", "CLOSED"].includes(order.status)) {
+        throw new ConflictError(
+          `Cannot undo cancellation: order ${order.code} is ${order.status}`,
+        );
+      }
+      const activeSibling = await tx.booking.findFirst({
+        where: {
+          orderId: booking.orderId,
+          orderItemId: booking.orderItemId ?? undefined,
+          id: { not: bookingId },
+          status: { not: "CANCELLED" },
+          rejectedAt: null,
+        },
+        select: { code: true },
+      });
+      if (activeSibling) {
+        throw new ConflictError(
+          `Cannot undo cancellation: active booking ${activeSibling.code} already occupies this order item`,
+        );
+      }
+
+      const updatedRows = await tx.booking.updateMany({
+        where: { id: bookingId, status: booking.status, version: booking.version },
+        data: { status: target, version: { increment: 1 }, cancelledAt: null },
+      });
+      if (updatedRows.count !== 1) {
+        throw new ConflictError(`Booking ${booking.code} was concurrently modified`);
+      }
+
+      await tx.bookingHistory.create({
+        data: {
+          bookingId,
+          action: "undo",
+          from: booking.status,
+          to: target,
+          actorId: actor,
+          actorName: actor,
+          comment: "Отмена брони отменена вручную",
+        },
+      });
+
+      // Cancellation moved the Order back to READY_FOR_BOOKING; restoring an
+      // active Booking must move it forward again, otherwise the deal shows
+      // an active booking under a READY order.
+      if (order?.status === "READY_FOR_BOOKING") {
+        const orderRows = await tx.order.updateMany({
+          where: { id: booking.orderId, status: order.status, version: order.version },
+          data: { status: "SENT_TO_BOOKING", version: { increment: 1 } },
+        });
+        if (orderRows.count === 1) {
+          await tx.orderHistory.create({
+            data: {
+              orderId: booking.orderId,
+              action: "booking_restored",
+              from: order.status,
+              to: "SENT_TO_BOOKING",
+              actorId: actor,
+              actorName: actor,
+              comment: "Бронь восстановлена после ошибочной отмены",
+            },
+          });
+          await this.eventBus.emit(tx, {
+            aggregateType: "Order",
+            aggregateId: booking.orderId,
+            eventType: DomainEvents.OrderStatusChanged,
+            payload: { from: order.status, to: "SENT_TO_BOOKING", actor } as Prisma.InputJsonValue,
+          });
+        }
+      }
+
+      await this.eventBus.emit(tx, {
+        aggregateType: "Booking",
+        aggregateId: bookingId,
+        eventType: DomainEvents.BookingStatusChanged,
+        payload: {
+          from: booking.status,
+          to: target,
+          actor,
+          bookingId,
+          orderId: booking.orderId,
+          code: booking.code,
+        } as Prisma.InputJsonValue,
+      });
+
+      return { ...booking, status: target, version: booking.version + 1 };
+    });
+    await this.eventBus.publishPending();
+    return result;
+  }
+
+  /**
    * Stage 2 (Booking → Order, Q1–Q9) — round-trip «бронь возвращается в заказ».
    *
    * Оркестрация в booking.service (зеркало Stage 1, но «наоборот»): booking-домен

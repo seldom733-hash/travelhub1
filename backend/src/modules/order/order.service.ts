@@ -2054,6 +2054,74 @@ export class OrderService {
     return result;
   }
 
+  /**
+   * Undo an accidental close of an Order. Only the latest `close` transition is
+   * reversible, and only while no money movement exists. No time window.
+   */
+  async undoLastClose(orderId: string, actor: string) {
+    const result = await this.prisma.$transaction(async (tx: any) => {
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+      if (order.status !== "CLOSED") {
+        throw new ConflictError(`Order ${order.code} is not closed`);
+      }
+      const latest = await tx.orderHistory.findFirst({
+        where: { orderId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!latest || latest.action !== "close") {
+        throw new ConflictError(`Order ${order.code}: last action is not a close`);
+      }
+      if (latest.to !== order.status) {
+        throw new ConflictError(`Order ${order.code}: status changed after close`);
+      }
+      const target = latest.from as OrderStatus | null;
+      if (!target) throw new ConflictError(`Order ${order.code}: close has no previous state`);
+
+      const [payments, refunds, settlements] = await Promise.all([
+        tx.payment.count({ where: { orderId } }),
+        tx.refund.count({ where: { orderId } }),
+        tx.orderFinancialSettlement.count({ where: { orderId } }),
+      ]);
+      if (payments > 0 || refunds > 0 || settlements > 0) {
+        throw new ConflictError(
+          `Cannot undo close: order ${order.code} has financial operations`,
+        );
+      }
+
+      const updatedRows = await tx.order.updateMany({
+        where: { id: orderId, status: order.status, version: order.version },
+        data: { status: target, version: { increment: 1 }, closedAt: null },
+      });
+      if (updatedRows.count !== 1) {
+        throw new ConflictError(`Order ${order.code} was concurrently modified`);
+      }
+
+      await tx.orderHistory.create({
+        data: {
+          orderId,
+          action: "undo",
+          from: order.status,
+          to: target,
+          actorId: actor,
+          actorName: actor,
+          comment: "Закрытие заказа отменено вручную",
+        },
+      });
+
+      await this.eventBus.emit(tx, {
+        aggregateType: "Order",
+        aggregateId: orderId,
+        eventType: DomainEvents.OrderStatusChanged,
+        payload: { from: order.status, to: target, actor } as Prisma.InputJsonValue,
+      });
+
+      return { ...order, status: target, version: order.version + 1 };
+    });
+    await this.eventBus.publishPending();
+    return result;
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // D3 — Traveler Collection + Order/Booking Population
   // ══════════════════════════════════════════════════════════════════════════
