@@ -36,3 +36,14 @@ Request → Order → Booking → Payment/Refund
 ```
 
 Аналитика только читает эти таблицы. Запись в доменные таблицы отсутствует.
+
+## Проверка RBAC в БД
+
+```text
+ADMIN         → sales.kpi.read
+DIRECTOR      → sales.kpi.read
+SALES_MANAGER → sales.kpi.read
+SALES_HEAD    → sales.kpi.read
+FINANCE       → нет управленческого sales.kpi.read
+```
+
