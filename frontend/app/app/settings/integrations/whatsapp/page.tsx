@@ -224,6 +224,21 @@ export default function WhatsAppIntegrationPage() {
     }
   }
 
+  async function restoreSession(id: string) {
+    if (!window.confirm(t("wa_int.sessions.restore_confirm", locale))) return;
+    setSessionBusy(`${id}:restore`);
+    setError(null);
+    try {
+      await api.post(`/whatsapp/sessions/${id}/restore`, { confirm: true });
+      await loadSessions();
+      await loadStatus();
+    } catch (err) {
+      setError(errMessage(err, locale));
+    } finally {
+      setSessionBusy(null);
+    }
+  }
+
   async function createSession() {
     setCreateBusy(true);
     setError(null);
@@ -424,6 +439,17 @@ export default function WhatsAppIntegrationPage() {
                       <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-600">
                         {t("wa_int.sessions.archived", locale)}
                       </span>
+                    )}
+                    {archived && (
+                      <button
+                        type="button"
+                        onClick={() => void restoreSession(s.id)}
+                        disabled={busyKey}
+                        className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        data-testid={`btn-session-restore-${s.id}`}
+                      >
+                        {t("wa_int.sessions.restore", locale)}
+                      </button>
                     )}
                     {!archived && (
                       <div className="flex gap-2">

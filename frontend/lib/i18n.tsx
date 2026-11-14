@@ -3203,6 +3203,12 @@ export const DICT: Record<string, Record<Locale, string>> = {
     en: "Archive this number? It will be disconnected, but conversation history is kept.",
   },
   "wa_int.sessions.archived": { ru: "В архиве", az: "Arxivdə", en: "Archived" },
+  "wa_int.sessions.restore": { ru: "Восстановить", az: "Bərpa et", en: "Restore" },
+  "wa_int.sessions.restore_confirm": {
+    ru: "Восстановить номер? После этого его можно будет подключить заново.",
+    az: "Nömrə bərpa edilsin? Bundan sonra onu yenidən qoşmaq mümkün olacaq.",
+    en: "Restore this number? You will be able to connect it again.",
+  },
   "wa_int.sessions.created": { ru: "Номер добавлен", az: "Nömrə əlavə olundu", en: "Number added" },
   "wa_int.sessions.primary_hint": {
     ru: "Основной номер обслуживается и через legacy-эндпоинты страницы выше.",

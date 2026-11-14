@@ -129,4 +129,11 @@ export class WhatsAppSessionsController {
   archive(@Param("id") id: string, @Body() dto: ConfirmDto, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.runtime.archive(actor, dto.confirm, id);
   }
+
+  @Post(":id/restore")
+  @HttpCode(200)
+  @RequirePermissions("whatsapp.session.admin")
+  restore(@Param("id") id: string, @Body() dto: ConfirmDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.runtime.restore(actor, dto.confirm, id);
+  }
 }

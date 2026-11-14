@@ -1,4 +1,4 @@
-﻿import { Inject, Injectable, OnApplicationBootstrap, OnApplicationShutdown } from "@nestjs/common";
+import { Inject, Injectable, OnApplicationBootstrap, OnApplicationShutdown } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { SecurityService } from "../../../security/security.service";
 import { ConflictError, DomainError, NotFoundError, ValidationDomainError } from "../../../shared/errors";
@@ -257,6 +257,35 @@ export class WhatsAppSessionRuntimeService implements OnApplicationBootstrap, On
       resource: "WhatsAppAccount",
       resourceId: accountId,
       details: { wipedLocalSession: true },
+    });
+    return this.statusDto(updated, undefined);
+  }
+
+  /**
+   * Restore an archived number: clears archivedAt so the number can be
+   * connected again. The archived conversation history stays untouched.
+   */
+  async restore(
+    actor: ActorAuditRef,
+    confirm: boolean,
+    accountId: string,
+  ): Promise<WhatsAppStatusDto> {
+    this.assertConfirm(confirm, "restore");
+    this.assertEnabled();
+    const row = await this.registry.getAccount(accountId);
+    if (!row) throw new NotFoundError(`WhatsApp account ${accountId} not found`);
+    if (!row.archivedAt) return this.statusDto(row, undefined);
+    const updated = await this.prisma.whatsAppAccount.update({
+      where: { id: accountId },
+      data: { archivedAt: null, state: "DISCONNECTED", lastError: null },
+    });
+    await this.security.audit(undefined, {
+      userId: actor.id,
+      username: actor.username ?? null,
+      action: "whatsapp.restored",
+      resource: "WhatsAppAccount",
+      resourceId: accountId,
+      details: {},
     });
     return this.statusDto(updated, undefined);
   }
