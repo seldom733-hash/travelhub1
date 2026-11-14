@@ -53,6 +53,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
   const [managerId, setManagerId] = useState("");
   const [serviceType, setServiceType] = useState("");
   const [source, setSource] = useState("");
+  const [status, setStatus] = useState("");
   const [tab] = useState(initialTab);
   const [dealTab, setDealTab] = useState<"completed" | "closed">("completed");
   const [data, setData] = useState<any>(null);
@@ -72,6 +73,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
     if (q.get("managerId")) setManagerId(q.get("managerId")!);
     if (q.get("serviceType")) setServiceType(q.get("serviceType")!);
     if (q.get("source")) setSource(q.get("source")!);
+    if (q.get("status")) setStatus(q.get("status")!);
     if (q.get("dealTab") === "closed") setDealTab("closed");
   }, []);
 
@@ -99,8 +101,9 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
     if (managerId) qs.set("managerId", managerId);
     if (serviceType) qs.set("serviceType", serviceType);
     if (source) qs.set("source", source);
+    if (status) qs.set("status", status);
     return qs.toString();
-  }, [preset, startDate, endDate, managerId, serviceType, source]);
+  }, [preset, startDate, endDate, managerId, serviceType, source, status]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -163,7 +166,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
               <option value="">Все</option>{["TOUR_PACKAGE", "HOTEL", "FLIGHT", "TRANSFER", "INSURANCE", "VISA", "CRUISE", "OTHER"].map((x) => <option key={x}>{x}</option>)}
             </select>
           </label>
-          <label className="flex flex-col gap-1"><span className="text-slate-500">Источник</span><input value={source} onChange={(e) => setSource(e.target.value)} placeholder="Все" className="w-28 rounded-lg border bg-white px-2 py-1.5" /></label>
+          <label className="flex flex-col gap-1"><span className="text-slate-500">Источник</span><input value={source} onChange={(e) => setSource(e.target.value)} placeholder="Все" className="w-28 rounded-lg border bg-white px-2 py-1.5" /></label><label className="flex flex-col gap-1"><span className="text-slate-500">Статус</span><select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-lg border bg-white px-2 py-1.5"><option value="">Все</option><option value="NEW">Новая</option><option value="IN_PROGRESS">В работе</option><option value="CONFIRMED">Подтверждена</option><option value="CONVERTED">Сконвертирована</option><option value="REJECTED">Отклонена</option><option value="UNAVAILABLE">Недоступна</option></select></label>
         </div>
       </div>
 
