@@ -97,6 +97,21 @@ export function resolveSalesPeriod(q: SalesAnalyticsQuery, now = new Date()): Pe
 }
 
 function previousPeriod(p: Period): Period {
+  const t = tzParts(p.start, p.timezone);
+  if (p.preset === "CURRENT_MONTH") {
+    const m = addMonths(t.y, t.m, -1);
+    return { start: zonedMidnight(m.y, m.m, 1, p.timezone), end: p.start, preset: "PREVIOUS", timezone: p.timezone };
+  }
+  if (p.preset === "CURRENT_QUARTER") {
+    const m = addMonths(t.y, t.m, -3);
+    return { start: zonedMidnight(m.y, m.m, 1, p.timezone), end: p.start, preset: "PREVIOUS", timezone: p.timezone };
+  }
+  if (p.preset === "CURRENT_YEAR") {
+    return { start: zonedMidnight(t.y - 1, 1, 1, p.timezone), end: p.start, preset: "PREVIOUS", timezone: p.timezone };
+  }
+  if (p.preset === "CURRENT_WEEK") {
+    return { start: addDays(p.start, -7), end: p.start, preset: "PREVIOUS", timezone: p.timezone };
+  }
   const ms = p.end.getTime() - p.start.getTime();
   return { start: new Date(p.start.getTime() - ms), end: new Date(p.start.getTime()), preset: "PREVIOUS", timezone: p.timezone };
 }
@@ -139,6 +154,7 @@ export class SalesAnalyticsService {
       deals: current.deals,
       series: current.series,
       sources: current.sources,
+      distribution: current.distribution,
     };
   }
 
@@ -204,13 +220,20 @@ export class SalesAnalyticsService {
       : [];
     const proposals = new Set(requestHistory.filter((h) => ["supplier_confirmed", "PRICE_CHANGED"].includes(h.action)).map((h) => h.requestId));
 
-    const ordersCreated = orders.filter((o) => dateIn(o.createdAt, p));
-    const bookingsConfirmed = bookings.filter((b) => dateIn(b.confirmedAt, p));
-    const completedBookings = bookings.filter((b) => dateIn(b.completedAt, p));
-    const closedOrders = orders.filter((o) => dateIn(o.closedAt, p));
-    const cancelledOrders = orders.filter((o) => dateIn(o.cancelledAt, p));
-    const cancelledBookings = bookings.filter((b) => dateIn(b.cancelledAt, p));
-    const completedOrders = orders.filter((o) => dateIn(o.fulfilledAt, p) || bookings.some((b) => b.orderId === o.id && dateIn(b.completedAt, p)));
+    // A manager-scoped report must never include other managers' Orders merely
+    // because those Orders were created in the same period.
+    const linkedOrderIds = new Set(requests.map((r) => r.convertedOrderId).filter((x): x is string => !!x));
+    const scopedOrders = q.managerId ? orders.filter((o) => linkedOrderIds.has(o.id)) : orders;
+    const scopedOrderIdSet = new Set(scopedOrders.map((o) => o.id));
+    const inScopeBooking = (b: any) => scopedOrderIdSet.has(b.orderId);
+
+    const ordersCreated = scopedOrders.filter((o) => dateIn(o.createdAt, p));
+    const bookingsConfirmed = bookings.filter((b) => inScopeBooking(b) && dateIn(b.confirmedAt, p));
+    const completedBookings = bookings.filter((b) => inScopeBooking(b) && dateIn(b.completedAt, p));
+    const closedOrders = scopedOrders.filter((o) => dateIn(o.closedAt, p));
+    const cancelledOrders = scopedOrders.filter((o) => dateIn(o.cancelledAt, p));
+    const cancelledBookings = bookings.filter((b) => inScopeBooking(b) && dateIn(b.cancelledAt, p));
+    const completedOrders = scopedOrders.filter((o) => dateIn(o.fulfilledAt, p) || bookings.some((b) => b.orderId === o.id && dateIn(b.completedAt, p)));
     const lostRequests = requests.filter((r) => ["REJECTED", "UNAVAILABLE", "EXPIRED", "CUSTOMER_PAYMENT_TIMEOUT", "CANCELLED_BY_CUSTOMER"].includes(r.status));
     const overdue = requests.filter((r) => !!r.slaDueAt && r.slaDueAt < new Date() && !TERMINAL_REQUEST.includes(r.status));
     const noFirstResponse = requests.filter((r) => !r.firstContactAt && !TERMINAL_REQUEST.includes(r.status));
@@ -218,7 +241,7 @@ export class SalesAnalyticsService {
     const accepted = requests.filter((r) => !!r.processingStartedAt);
     const inWork = requests.filter((r) => !TERMINAL_REQUEST.includes(r.status));
 
-    const linkedOrders = new Set(requests.map((r) => r.convertedOrderId).filter((x): x is string => !!x));
+    const linkedOrders = linkedOrderIds;
     const linkedOrderList = [...linkedOrders].map((id) => orderById.get(id)).filter((x): x is NonNullable<typeof x> => !!x);
     const cohortOrders = linkedOrderList.length ? linkedOrderList : [];
     const cohortWithBooking = cohortOrders.filter((o) => (bookingByOrder.get(o.id) ?? []).some((b) => !!b.confirmedAt));
@@ -227,8 +250,8 @@ export class SalesAnalyticsService {
 
     const salesOrders = ordersCreated;
     const salesAmount = salesOrders.reduce((s, o) => s + num(o.amount), 0);
-    const captured = payments.reduce((s, x) => s + num(x.amount), 0);
-    const refunded = refunds.reduce((s, x) => s + num(x.amount), 0);
+    const captured = payments.filter((x) => scopedOrderIdSet.has(x.orderId)).reduce((s, x) => s + num(x.amount), 0);
+    const refunded = refunds.filter((x) => scopedOrderIdSet.has(x.orderId)).reduce((s, x) => s + num(x.amount), 0);
     const costFor = (o: any) => (bookingByOrder.get(o.id) ?? []).reduce((s, b) => s + num(b.amount), 0);
     const cost = salesOrders.reduce((s, o) => s + costFor(o), 0);
     const grossProfit = salesAmount - cost;
@@ -293,7 +316,8 @@ export class SalesAnalyticsService {
       if (proposals.has(r.id)) m.proposalsSent++;
       if (lostRequests.some((x) => x.id === r.id)) m.lost++;
       if (overdue.some((x) => x.id === r.id)) m.overdue++;
-      if (r.assignedAt && r.createdAt) { m.responseSum += Math.max(0, (r.assignedAt.getTime() - r.createdAt.getTime()) / 3600000); m.responseCount++; }
+      const firstContact = r.firstContactAt ?? r.processingStartedAt;
+      if (firstContact && r.createdAt) { m.responseSum += Math.max(0, (firstContact.getTime() - r.createdAt.getTime()) / 3600000); m.responseCount++; }
       const o = r.convertedOrderId ? orderById.get(r.convertedOrderId) : null;
       if (o) {
         m.orders++;
@@ -412,6 +436,22 @@ export class SalesAnalyticsService {
       };
     });
 
-    return { kpis, managers, funnel, services: [...serviceMap.values()], sources: [...sourceMap.values()], activity, deals: { completed: dealRows("completed"), closed: dealRows("closed") }, series };
+    const assignmentRows = requestHistory.filter((h) => h.action === "ASSIGNED");
+    const assignmentCounts = new Map<string, number>();
+    for (const h of assignmentRows) assignmentCounts.set(h.requestId, (assignmentCounts.get(h.requestId) ?? 0) + 1);
+    const distribution = {
+      received: requests.length,
+      autoAssigned: requests.filter((r) => r.assignmentType === "AUTO").length,
+      manualAssigned: requests.filter((r) => r.assignmentType === "MANUAL" || r.assignmentType === "SELF").length,
+      unassigned: requests.filter((r) => !r.assignedManagerId).length,
+      reassigned: [...assignmentCounts.values()].filter((n) => n > 1).length,
+      assignmentEvents: assignmentRows.length,
+      managers: managers.map((m) => ({
+        managerId: m.managerId, manager: m.manager, assigned: m.assigned,
+        currentLoad: m.inWork, unprocessed: m.noFirstResponse, overdue: m.overdue,
+      })),
+    };
+
+    return { kpis, managers, funnel, services: [...serviceMap.values()], sources: [...sourceMap.values()], activity, deals: { completed: dealRows("completed"), closed: dealRows("closed") }, series, distribution };
   }
 }

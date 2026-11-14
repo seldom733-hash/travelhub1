@@ -12,7 +12,7 @@ const PRESETS: Array<[string, string]> = [
 ];
 const TABS: Array<[string, string]> = [
   ["overview", "Общая аналитика"], ["managers", "Менеджеры"], ["activity", "Активность и контроль"],
-  ["funnel", "Воронка продаж"], ["deals", "Завершённые сделки"],
+  ["funnel", "Воронка продаж"], ["deals", "Завершённые сделки"], ["distribution", "Распределение"],
 ];
 const KPI_LABELS: Record<string, string> = {
   requestsTotal: "Всего новых заявок", assigned: "Назначено менеджерам", accepted: "Принято в работу",
@@ -143,6 +143,13 @@ export default function SalesAnalyticsPage() {
         {tab === "activity" && <div className="overflow-x-auto rounded-xl border border-[#e5e2da] bg-white"><table className="w-full min-w-[1000px] text-left text-[11px]"><thead className="bg-slate-50 text-slate-400"><tr>{["Заявка", "Создана", "Назначена", "Менеджер", "Клиент", "Телефон", "Услуга", "Направление", "Источник", "Статус", "Первый ответ, ч", "Просрочка"].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead><tbody>{(data.activity ?? []).map((r: any) => <tr key={r.requestId} className="border-t border-slate-100"><td className="px-2 py-2 font-mono">{r.requestCode}</td><td className="px-2 py-2">{dt(r.createdAt)}</td><td className="px-2 py-2">{dt(r.assignedAt)}</td><td className="px-2 py-2">{r.manager}</td><td className="px-2 py-2">{r.customer}</td><td className="px-2 py-2">{r.phone ?? "—"}</td><td className="px-2 py-2">{r.requestType ?? "—"}</td><td className="px-2 py-2">{r.destination ?? "—"}</td><td className="px-2 py-2">{r.source ?? "—"}</td><td className="px-2 py-2">{r.status}</td><td className="px-2 py-2">{r.responseHours ?? "—"}</td><td className={`px-2 py-2 ${r.overdue ? "font-semibold text-rose-600" : "text-slate-400"}`}>{r.overdue ? "Да" : "Нет"}</td></tr>)}</tbody></table></div>}
 
         {tab === "funnel" && <div className="space-y-2">{(data.funnel ?? []).map((s: any, i: number, arr: any[]) => <div key={s.stage} className="rounded-xl border border-[#e5e2da] bg-white p-3"><div className="mb-1 flex justify-between text-xs"><b>{s.label}</b><span>{s.count} · {pct(s.conversion)}</span></div><div className="h-2 overflow-hidden rounded bg-slate-100"><div className="h-full rounded bg-[#0f6b5f]" style={{ width: `${Math.min(100, s.conversion)}%` }} /></div>{i < arr.length - 1 && <div className="mt-1 text-[10px] text-slate-400">Потери к следующему этапу: {Math.max(0, s.count - arr[i + 1].count)}</div>}</div>)}</div>}
+
+        {tab === "distribution" && <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {[["Поступило", data.distribution?.received], ["Авто", data.distribution?.autoAssigned], ["Вручную", data.distribution?.manualAssigned], ["Без менеджера", data.distribution?.unassigned], ["Переназначения", data.distribution?.reassigned], ["События назначения", data.distribution?.assignmentEvents]].map(([label, value]) => <div key={String(label)} className="rounded-xl border bg-white p-3"><div className="text-[10px] uppercase text-slate-400">{label}</div><div className="mt-1 text-xl font-semibold">{value ?? 0}</div></div>)}
+          </div>
+          <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[620px] text-left text-xs"><thead className="bg-slate-50 text-slate-400"><tr>{["Менеджер", "Назначено за период", "Текущая нагрузка", "Без обработки", "Просрочено"].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead><tbody>{(data.distribution?.managers ?? []).map((m: any) => <tr key={m.managerId ?? "none"} className="border-t"><td className="px-2 py-2">{m.manager}</td><td className="px-2 py-2">{m.assigned}</td><td className="px-2 py-2">{m.currentLoad}</td><td className="px-2 py-2">{m.unprocessed}</td><td className="px-2 py-2">{m.overdue}</td></tr>)}</tbody></table></div>
+        </div>}
 
         {tab === "deals" && <>
           <div className="mb-2 flex gap-1 rounded-lg border bg-white p-1"><button onClick={() => setDealTab("completed")} className={`rounded px-3 py-1.5 text-xs ${dealTab === "completed" ? "bg-[#0f6b5f] text-white" : ""}`}>Завершённые</button><button onClick={() => setDealTab("closed")} className={`rounded px-3 py-1.5 text-xs ${dealTab === "closed" ? "bg-[#0f6b5f] text-white" : ""}`}>Закрытые</button></div>
