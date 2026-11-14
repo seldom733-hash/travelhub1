@@ -35,7 +35,7 @@
  *    (outbox, correlation/causation/actor server-authoritative);
  *  - milestones server-owned UTC, первый переход wins, атомарны с CAS.
  */
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import { Prisma } from "../../generated/prisma/client";
 import { PaymentStatus, RefundStatus } from "../../generated/prisma/enums";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -369,6 +369,21 @@ export class PaymentService {
       });
     }
     return result;
+  }
+
+  /** Manager confirms a payment only if they created it (own payment). */
+  async confirmOwnPayment(code: string, actor: Actor): Promise<Record<string, unknown>> {
+    const payment = await this.prisma.payment.findUnique({ where: { code }, select: { id: true } });
+    if (!payment) throw new NotFoundError(`Payment ${code} not found`);
+    const created = await this.prisma.paymentHistory.findFirst({
+      where: { paymentId: payment.id, action: "created" },
+      orderBy: { createdAt: "asc" },
+      select: { actorId: true },
+    });
+    if (!created || created.actorId !== actor.id) {
+      throw new ForbiddenException("Only the manager who created the payment can confirm it");
+    }
+    return this.confirmPayment(code, actor);
   }
 
   /** PENDING → FAILED (терминальное отклонение; повторная инициация легальна). */

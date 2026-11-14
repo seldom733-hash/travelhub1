@@ -770,6 +770,12 @@ export class FinanceController {
     );
   }
 
+  @Post("payments/:code/confirm-own")
+  @RequirePermissions("finance.payment.confirm_own")
+  async confirmOwnPayment(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.payments.confirmOwnPayment(code, { id: actor.id, username: actor.username });
+  }
+
   @Post("payments/:code/confirm")
   @RequirePermissions("finance.payment.manage")
   async confirmPayment(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
