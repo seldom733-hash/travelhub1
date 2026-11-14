@@ -262,8 +262,8 @@ export class SalesAnalyticsService {
     const inScopeBooking = (b: any) => scopedOrderIdSet.has(b.orderId);
 
     const ordersCreated = scopedOrders.filter((o) => dateIn(o.createdAt, p));
-    const bookingsConfirmed = bookings.filter((b) => inScopeBooking(b) && dateIn(b.confirmedAt, p));
-    const completedBookings = bookings.filter((b) => inScopeBooking(b) && dateIn(b.completedAt, p));
+    const bookingsConfirmed = bookings.filter((b) => inScopeBooking(b) && orderById.get(b.orderId)?.status !== "CANCELLED" && dateIn(b.confirmedAt, p));
+    const completedBookings = bookings.filter((b) => inScopeBooking(b) && orderById.get(b.orderId)?.status !== "CANCELLED" && dateIn(b.completedAt, p));
     const closedOrders = scopedOrders.filter((o) => o.status !== "CANCELLED" && dateIn(o.closedAt, p));
     const cancelledOrders = scopedOrders.filter((o) => dateIn(o.cancelledAt, p));
     const cancelledBookings = bookings.filter((b) => inScopeBooking(b) && dateIn(b.cancelledAt, p));
@@ -284,8 +284,8 @@ export class SalesAnalyticsService {
 
     const salesOrders = ordersCreated.filter((o) => o.status !== "CANCELLED");
     const salesAmount = salesOrders.reduce((s, o) => s + num(o.amount), 0);
-    const captured = payments.filter((x) => scopedOrderIdSet.has(x.orderId)).reduce((s, x) => s + num(x.amount), 0);
-    const refunded = refunds.filter((x) => scopedOrderIdSet.has(x.orderId)).reduce((s, x) => s + num(x.amount), 0);
+    const captured = payments.filter((x) => scopedOrderIdSet.has(x.orderId) && orderById.get(x.orderId)?.status !== "CANCELLED").reduce((s, x) => s + num(x.amount), 0);
+    const refunded = refunds.filter((x) => scopedOrderIdSet.has(x.orderId) && orderById.get(x.orderId)?.status !== "CANCELLED").reduce((s, x) => s + num(x.amount), 0);
     const costFor = (o: any) => {
       const linkedRequest = requestByOrder.get(o.id);
       const snapshot = linkedRequest?.commercialSnapshot as any;
@@ -445,10 +445,13 @@ export class SalesAnalyticsService {
         responseHours: r.firstContactAt ? Math.round(((r.firstContactAt.getTime() - r.createdAt.getTime()) / 3600000) * 10) / 10 : null,
         overdue: !!r.slaDueAt && r.slaDueAt < new Date() && !TERMINAL_REQUEST.includes(r.status),
         orderCode: o?.referenceNumber ?? null, bookingCode: first?.referenceNumber ?? null,
+        proposalSent: proposals.has(r.id),
+        waitingCustomer: !r.customerAcceptedAt && ["PRICE_CHANGED", "CONFIRMED"].includes(r.status),
+        waitingSupplier: !r.supplierRespondedAt && ["NEW", "CHECKING"].includes(r.status),
       };
     });
 
-    const dealRows = (tab: "completed" | "closed") => orders.filter((o) => tab === "completed" ? (dateIn(o.fulfilledAt, p) || (bookingByOrder.get(o.id) ?? []).some((b) => dateIn(b.completedAt, p))) : dateIn(o.closedAt, p)).map((o) => {
+    const dealRows = (tab: "completed" | "closed") => scopedOrders.filter((o) => o.status !== "CANCELLED" && (tab === "completed" ? (dateIn(o.fulfilledAt, p) || (bookingByOrder.get(o.id) ?? []).some((b) => dateIn(b.completedAt, p))) : dateIn(o.closedAt, p))).map((o) => {
       const r = requestByOrder.get(o.id);
       const bs = bookingByOrder.get(o.id) ?? [];
       const b = bs.find((x) => tab === "closed" ? !!x.completedAt : !!x.completedAt) ?? bs[0];
