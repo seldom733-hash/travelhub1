@@ -184,6 +184,7 @@ export class SalesAnalyticsService {
       distribution: current.distribution,
       lossReasons: current.lossReasons,
       financials: current.financials,
+      reconciliation: current.reconciliation,
     };
   }
 
@@ -383,6 +384,14 @@ export class SalesAnalyticsService {
     const completedResult = completedOrders.reduce((s, o) => s + num(o.amount) - costFor(o) - (refundsByOrder.get(o.id) ?? 0), 0);
     const closedResult = closedOrders.reduce((s, o) => s + num(o.amount) - costFor(o) - (refundsByOrder.get(o.id) ?? 0), 0);
     const avgCheck = salesOrders.length ? salesAmount / salesOrders.length : 0;
+    const reconciliation = {
+      salesAmount: Math.round(salesAmount * 100) / 100,
+      capturedRevenue: Math.round(captured * 100) / 100,
+      refunds: Math.round(refunded * 100) / 100,
+      outstanding: Math.round(Math.max(0, salesAmount - captured + refunded) * 100) / 100,
+      overpayment: Math.round(Math.max(0, captured - salesAmount) * 100) / 100,
+      orders: salesOrders.length,
+    };
 
     const kpis: Record<string, number> = {
       requestsTotal: requests.length,
@@ -592,6 +601,6 @@ export class SalesAnalyticsService {
       })),
     };
 
-    return { kpis, managers, funnel, services: [...serviceMap.values()], sources: [...sourceMap.values()], lossReasons: [...lossReasonMap.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count), activity, deals: { completed: dealRows("completed"), closed: dealRows("closed") }, series, distribution, financials };
+    return { kpis, managers, funnel, services: [...serviceMap.values()], sources: [...sourceMap.values()], reconciliation, lossReasons: [...lossReasonMap.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count), activity, deals: { completed: dealRows("completed"), closed: dealRows("closed") }, series, distribution, financials };
   }
 }
