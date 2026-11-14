@@ -270,7 +270,7 @@ export default function DealDetailPage() {
   const effectiveBookingActions = (() => {
     if (readOnly || deal.stage !== "BOOKING") return [];
     let list = bookingActions.filter(
-      (action) => !["prepare", "requestClarification"].includes(action),
+      (action) => !["prepare", "requestClarification", "problem"].includes(action),
     );
     if (list.includes("returnToOrder") || list.includes("requestCancellation")) {
       list = list.filter((action) => action !== "cancel");
