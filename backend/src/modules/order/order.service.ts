@@ -2055,43 +2055,71 @@ export class OrderService {
   }
 
   /**
-   * Undo an accidental close of an Order. Only the latest `close` transition is
-   * reversible, and only while no money movement exists. No time window.
+   * Undo the latest lifecycle action of an Order (one step back).
+   *
+   * History-driven: restores the `from` status of the latest transition.
+   * No time window. Blocked when money exists or an active Booking would be
+   * left under an earlier Order status.
    */
-  async undoLastClose(orderId: string, actor: string) {
+  async undoLastAction(orderId: string, actor: string) {
     const result = await this.prisma.$transaction(async (tx: any) => {
       const order = await tx.order.findUnique({ where: { id: orderId } });
       if (!order) throw new NotFoundError(`Order ${orderId} not found`);
-      if (order.status !== "CLOSED") {
-        throw new ConflictError(`Order ${order.code} is not closed`);
-      }
       const latest = await tx.orderHistory.findFirst({
         where: { orderId },
         orderBy: { createdAt: "desc" },
       });
-      if (!latest || latest.action !== "close") {
-        throw new ConflictError(`Order ${order.code}: last action is not a close`);
+      const undoable = new Set([
+        "process", "markWaitingData", "resumeProcessing", "confirm",
+        "waitFirstPayment", "send", "complete", "close", "requestCancellation",
+        "approveCancellation", "rejectCancellation", "cancel", "reopen",
+        "problem", "suspend",
+      ]);
+      if (!latest || !undoable.has(latest.action)) {
+        throw new ConflictError(`Order ${order.code}: last action cannot be undone`);
       }
       if (latest.to !== order.status) {
-        throw new ConflictError(`Order ${order.code}: status changed after close`);
+        throw new ConflictError(`Order ${order.code}: status changed after last action`);
       }
       const target = latest.from as OrderStatus | null;
-      if (!target) throw new ConflictError(`Order ${order.code}: close has no previous state`);
+      if (!target) throw new ConflictError(`Order ${order.code}: no previous state`);
 
       const [payments, refunds, settlements] = await Promise.all([
-        tx.payment.count({ where: { orderId } }),
+        tx.payment.count({
+          where: { orderId, status: { in: ["AUTHORIZED", "CAPTURED", "REFUNDED"] } },
+        }),
         tx.refund.count({ where: { orderId } }),
         tx.orderFinancialSettlement.count({ where: { orderId } }),
       ]);
       if (payments > 0 || refunds > 0 || settlements > 0) {
+        throw new ConflictError(`Cannot undo: order ${order.code} has financial operations`);
+      }
+
+      const activeBookings = await tx.booking.count({
+        where: { orderId, status: { not: "CANCELLED" }, rejectedAt: null },
+      });
+      if (activeBookings > 0 && [
+        "NEW", "IN_PROCESSING", "WAITING_FOR_DATA", "READY_FOR_BOOKING",
+        "WAITING_FOR_FIRST_PAYMENT",
+      ].includes(target)) {
         throw new ConflictError(
-          `Cannot undo close: order ${order.code} has financial operations`,
+          `Cannot undo: order ${order.code} has an active booking`,
         );
       }
 
+      const data: Record<string, unknown> = {
+        status: target,
+        version: { increment: 1 },
+      };
+      if (latest.action === "close") data.closedAt = null;
+      if (latest.action === "cancel") data.cancelledAt = null;
+      if (latest.action === "complete") data.fulfilledAt = null;
+      if (latest.action === "confirm") data.confirmedAt = null;
+      if (latest.action === "send") data.submittedAt = null;
+
       const updatedRows = await tx.order.updateMany({
         where: { id: orderId, status: order.status, version: order.version },
-        data: { status: target, version: { increment: 1 }, closedAt: null },
+        data,
       });
       if (updatedRows.count !== 1) {
         throw new ConflictError(`Order ${order.code} was concurrently modified`);
@@ -2105,7 +2133,7 @@ export class OrderService {
           to: target,
           actorId: actor,
           actorName: actor,
-          comment: "Закрытие заказа отменено вручную",
+          comment: `Откат действия: ${latest.action}`,
         },
       });
 

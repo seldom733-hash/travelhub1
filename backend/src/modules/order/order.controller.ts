@@ -302,8 +302,8 @@ export class OrderController {
 
   @Post("orders/:id/undo")
   @RequirePermissions("order.cancel")
-  undoLastClose(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
-    return this.orders.undoLastClose(id, actor.username);
+  undoLastAction(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.orders.undoLastAction(id, actor.username);
   }
 
   @Patch("orders/:id")
