@@ -2065,33 +2065,31 @@ export class OrderService {
     const result = await this.prisma.$transaction(async (tx: any) => {
       const order = await tx.order.findUnique({ where: { id: orderId } });
       if (!order) throw new NotFoundError(`Order ${orderId} not found`);
-      const history = await tx.orderHistory.findMany({
-        where: { orderId },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-      });
-      const undoable = new Set([
-        "process", "markWaitingData", "resumeProcessing", "confirm",
-        "waitFirstPayment", "send", "complete", "close", "requestCancellation",
-        "approveCancellation", "rejectCancellation", "cancel", "reopen",
-        "problem", "suspend",
-      ]);
-      // The latest row may already be an `undo`; walk back to the last real
-      // transition that produced the CURRENT status. This makes the back button
-      // repeatable: each click undoes one previous step.
-      const transition = history.find(
-        (h: any) => h.to === order.status && undoable.has(h.action),
-      );
-      if (!transition) {
+      // Deterministic one-step-back backbone. This deliberately ignores
+      // repeated PROBLEM/SUSPENDED/WAITING toggles: leaving an exception or a
+      // waiting branch must return to the previous stable step, not bounce.
+      const BACK: Record<string, OrderStatus> = {
+        IN_PROCESSING: "NEW",
+        WAITING_FOR_DATA: "IN_PROCESSING",
+        READY_FOR_BOOKING: "IN_PROCESSING",
+        WAITING_FOR_FIRST_PAYMENT: "READY_FOR_BOOKING",
+        SENT_TO_BOOKING: "READY_FOR_BOOKING",
+        PARTIALLY_FULFILLED: "SENT_TO_BOOKING",
+        FULFILLED: "SENT_TO_BOOKING",
+        READY_TO_CLOSE: "FULFILLED",
+        CLOSED: "FULFILLED",
+        PROBLEM: "IN_PROCESSING",
+        SUSPENDED: "IN_PROCESSING",
+        CANCELLATION_REQUESTED: "IN_PROCESSING",
+        CANCELLATION_APPROVED: "CANCELLATION_REQUESTED",
+        CANCELLED: "CANCELLATION_APPROVED",
+      };
+      const target = BACK[order.status] ?? null;
+      if (!target) {
         throw new ConflictError(
           `Order ${order.referenceNumber ?? order.code}: last action cannot be undone`,
         );
       }
-      const target = transition.from as OrderStatus | null;
-      if (!target) {
-        throw new ConflictError(`Order ${order.referenceNumber ?? order.code}: no previous state`);
-      }
-
       const [payments, refunds, settlements] = await Promise.all([
         tx.payment.count({
           where: { orderId, status: { in: ["AUTHORIZED", "CAPTURED", "REFUNDED"] } },
@@ -2119,12 +2117,9 @@ export class OrderService {
         status: target,
         version: { increment: 1 },
       };
-      if (transition.action === "close") data.closedAt = null;
-      if (transition.action === "cancel") data.cancelledAt = null;
-      if (transition.action === "complete") data.fulfilledAt = null;
-      if (transition.action === "confirm") data.confirmedAt = null;
-      if (transition.action === "send") data.submittedAt = null;
-
+      if (order.status === "CLOSED") data.closedAt = null;
+      if (order.status === "CANCELLED") data.cancelledAt = null;
+      if (order.status === "FULFILLED") data.fulfilledAt = null;
       const updatedRows = await tx.order.updateMany({
         where: { id: orderId, status: order.status, version: order.version },
         data,
@@ -2141,7 +2136,7 @@ export class OrderService {
           to: target,
           actorId: actor,
           actorName: actor,
-          comment: `Откат действия: ${transition.action}`,
+          comment: `Откат статуса ${order.status} → ${target}`,
         },
       });
 
