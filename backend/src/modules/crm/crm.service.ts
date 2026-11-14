@@ -300,6 +300,7 @@ export class CrmService {
         ? {
             OR: [
               { email: { contains: query.search, mode: "insensitive" } },
+              { phone: { contains: query.search } },
               { firstName: { contains: query.search, mode: "insensitive" } },
               { lastName: { contains: query.search, mode: "insensitive" } },
               { companyName: { contains: query.search, mode: "insensitive" } },
@@ -312,7 +313,7 @@ export class CrmService {
     const orderBy = buildSortClause(
       query.sortBy,
       query.sortDirection,
-      { code: 'code', name: 'companyName', type: 'type', email: 'email', status: 'status', createdAt: 'createdAt' },
+      { code: 'code', name: 'companyName', type: 'type', email: 'email', phone: 'phone', status: 'status', createdAt: 'createdAt' },
       { createdAt: 'desc' },
     );
 

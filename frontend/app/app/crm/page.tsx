@@ -502,6 +502,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                     <tr>
                       <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.code", locale)}</SortableHeader>
                       <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>{t("crm.col.name", locale)}</SortableHeader>
+                      <SortableHeader field="phone" currentSort={sortState} onSort={handleSort}>{t("crm.col.phone", locale)}</SortableHeader>
                       <SortableHeader field="email" currentSort={sortState} onSort={handleSort}>{t("crm.col.email", locale)}</SortableHeader>
                       <SortableHeader field="type" currentSort={sortState} onSort={handleSort}>{t("crm.col.type", locale)}</SortableHeader>
                       <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("crm.col.status", locale)}</SortableHeader>
@@ -512,13 +513,14 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                       <tr key={c.id} className="border-b border-slate-50 transition-colors hover:bg-blue-50/50">
                         <td className="px-4 py-2.5"><Link href={`/app/crm/customers/${c.id}`} className="font-mono text-xs text-blue-600 hover:underline">{c.code}</Link></td>
                         <td className="px-4 py-2.5"><Link href={`/app/crm/customers/${c.id}`} className="font-medium text-slate-800 hover:underline">{displayName(c)}</Link></td>
+                        <td className="px-4 py-2.5 text-slate-500">{c.phone ?? "—"}</td>
                         <td className="px-4 py-2.5 text-slate-500">{c.email}</td>
                         <td className="px-4 py-2.5 text-slate-500">{c.type === "COMPANY" ? t("crm.type.company", locale) : t("crm.type.person", locale)}</td>
                         <td className="px-4 py-2.5"><StatusBadge status={c.status} /></td>
                       </tr>
                     ))}
                     {(customerData?.items ?? []).length === 0 && (
-                      <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400">{t("crm.customers_empty", locale)}</td></tr>
+                      <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">{t("crm.customers_empty", locale)}</td></tr>
                     )}
                   </tbody>
                 </table>

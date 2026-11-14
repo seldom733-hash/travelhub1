@@ -1798,6 +1798,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "crm.col.code": { ru: "Код", az: "Kod", en: "Code" },
   "crm.col.name": { ru: "Имя", az: "Ad", en: "Name" },
   "crm.col.email": { ru: "Email", az: "E-poçt", en: "Email" },
+  "crm.col.phone": { ru: "Номер", az: "Nömrə", en: "Phone" },
   "crm.col.type": { ru: "Тип", az: "Növ", en: "Type" },
   "crm.col.status": { ru: "Статус", az: "Status", en: "Status" },
   "crm.col.number": { ru: "Номер", az: "Nömrə", en: "Number" },

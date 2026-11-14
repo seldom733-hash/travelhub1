@@ -711,7 +711,48 @@ export class WhatsAppConversationsService {
       orderBy: { createdAt: "desc" },
       take: 10,
     });
-    const ids = [...new Set([...phoneIds, ...textRows.map((row) => row.id)])].slice(0, 10);
+    // "Scan all deals": a phone may live on a linked CRM Contact, and a
+    // manager may search by deal/order/request number. Resolve all of these
+    // back to the owning Customer instead of limiting search to Customer.phone.
+    const dealRows = await this.prisma.order.findMany({
+      where: {
+        customerId: { not: null },
+        OR: [
+          { code: { contains: q, mode: "insensitive" } },
+          { referenceNumber: { contains: q, mode: "insensitive" } },
+          { number: { contains: q, mode: "insensitive" } },
+        ],
+      },
+      select: { customerId: true },
+      take: 10,
+    });
+    const requestRows = await this.prisma.request.findMany({
+      where: {
+        customerId: { not: null },
+        OR: [
+          { code: { contains: q, mode: "insensitive" } },
+          { referenceNumber: { contains: q, mode: "insensitive" } },
+        ],
+      },
+      select: { customerId: true },
+      take: 10,
+    });
+    const contactRows = await this.prisma.contact.findMany({
+      where: {
+        phone: {
+          contains: canonical ?? q,
+        },
+      },
+      select: { customerId: true },
+      take: 10,
+    });
+    const ids = [...new Set([
+      ...phoneIds,
+      ...textRows.map((row) => row.id),
+      ...dealRows.map((row) => row.customerId).filter((id): id is string => id !== null),
+      ...requestRows.map((row) => row.customerId).filter((id): id is string => id !== null),
+      ...contactRows.map((row) => row.customerId).filter((id): id is string => id !== null),
+    ])].slice(0, 10);
     const refs: CustomerRef[] = [];
     for (const id of ids) {
       const ref = await this.customerRef(id);
