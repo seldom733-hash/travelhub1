@@ -734,62 +734,78 @@ export class BookingService {
   }
 
   /**
-   * Undo the last accidental cancellation of a Booking.
+   * Undo the latest lifecycle action of a Booking (one step back).
    *
-   * Deliberately narrow: only `cancel` as the latest action, only while the
-   * booking is still CANCELLED, and only when the parent Order is not terminal.
+   * This is deliberately history-driven: it restores the `from` status of the
+   * latest transition. Active sibling bookings and terminal Orders are guarded.
    * No time window — availability is determined by business state.
    */
-  async undoLastCancellation(bookingId: string, actor: string) {
+  async undoLastAction(bookingId: string, actor: string) {
     const result = await this.prisma.$transaction(async (tx) => {
       const booking = await tx.booking.findUnique({ where: { id: bookingId } });
       if (!booking) throw new NotFoundError(`Booking ${bookingId} not found`);
       if (booking.acquisitionSource === "PARTNER_STOREFRONT") {
         throw new NotFoundError(`Booking ${bookingId} not found`);
       }
-      if (booking.status !== "CANCELLED") {
-        throw new ConflictError(`Booking ${booking.code} is not cancelled`);
-      }
       const latest = await tx.bookingHistory.findFirst({
         where: { bookingId },
         orderBy: { createdAt: "desc" },
       });
-      if (!latest || latest.action !== "cancel") {
-        throw new ConflictError(`Booking ${booking.code}: last action is not a cancellation`);
+      const undoable = new Set([
+        "prepare", "send", "requestClarification", "resume", "confirm",
+        "reject", "service", "requestChange", "resolveChange",
+        "requestCancellation", "complete", "cancel", "problem",
+      ]);
+      if (!latest || !undoable.has(latest.action)) {
+        throw new ConflictError(`Booking ${booking.code}: last action cannot be undone`);
       }
       if (latest.to !== booking.status) {
-        throw new ConflictError(`Booking ${booking.code}: status changed after cancellation`);
+        throw new ConflictError(`Booking ${booking.code}: status changed after last action`);
       }
       const target = latest.from as BookingStatus | null;
-      if (!target) throw new ConflictError(`Booking ${booking.code}: cancellation has no previous state`);
+      if (!target) throw new ConflictError(`Booking ${booking.code}: no previous state`);
+
       const order = await tx.order.findUnique({
         where: { id: booking.orderId },
         select: { code: true, status: true, version: true },
       });
       if (order && ["CANCELLED", "CLOSED"].includes(order.status)) {
         throw new ConflictError(
-          `Cannot undo cancellation: order ${order.code} is ${order.status}`,
-        );
-      }
-      const activeSibling = await tx.booking.findFirst({
-        where: {
-          orderId: booking.orderId,
-          orderItemId: booking.orderItemId ?? undefined,
-          id: { not: bookingId },
-          status: { not: "CANCELLED" },
-          rejectedAt: null,
-        },
-        select: { code: true },
-      });
-      if (activeSibling) {
-        throw new ConflictError(
-          `Cannot undo cancellation: active booking ${activeSibling.code} already occupies this order item`,
+          `Cannot undo: order ${order.code} is ${order.status}`,
         );
       }
 
+      if (target !== "CANCELLED" && target !== "SUPPLIER_REJECTED") {
+        const activeSibling = await tx.booking.findFirst({
+          where: {
+            orderId: booking.orderId,
+            orderItemId: booking.orderItemId ?? undefined,
+            id: { not: bookingId },
+            status: { not: "CANCELLED" },
+            rejectedAt: null,
+          },
+          select: { code: true },
+        });
+        if (activeSibling) {
+          throw new ConflictError(
+            `Cannot undo: active booking ${activeSibling.code} already occupies this order item`,
+          );
+        }
+      }
+
+      const data: Record<string, unknown> = {
+        status: target,
+        version: { increment: 1 },
+      };
+      if (latest.action === "cancel") data.cancelledAt = null;
+      if (latest.action === "complete") data.completedAt = null;
+      if (latest.action === "confirm") data.confirmedAt = null;
+      if (latest.action === "reject") data.rejectedAt = null;
+      if (latest.action === "send" || latest.action === "resume") data.requestedAt = null;
+
       const updatedRows = await tx.booking.updateMany({
         where: { id: bookingId, status: booking.status, version: booking.version },
-        data: { status: target, version: { increment: 1 }, cancelledAt: null },
+        data,
       });
       if (updatedRows.count !== 1) {
         throw new ConflictError(`Booking ${booking.code} was concurrently modified`);
@@ -803,14 +819,13 @@ export class BookingService {
           to: target,
           actorId: actor,
           actorName: actor,
-          comment: "Отмена брони отменена вручную",
+          comment: `Откат действия: ${latest.action}`,
         },
       });
 
       // Cancellation moved the Order back to READY_FOR_BOOKING; restoring an
-      // active Booking must move it forward again, otherwise the deal shows
-      // an active booking under a READY order.
-      if (order?.status === "READY_FOR_BOOKING") {
+      // active Booking must move it forward again.
+      if (order?.status === "READY_FOR_BOOKING" && target !== "CANCELLED" && target !== "SUPPLIER_REJECTED") {
         const orderRows = await tx.order.updateMany({
           where: { id: booking.orderId, status: order.status, version: order.version },
           data: { status: "SENT_TO_BOOKING", version: { increment: 1 } },
@@ -824,7 +839,7 @@ export class BookingService {
               to: "SENT_TO_BOOKING",
               actorId: actor,
               actorName: actor,
-              comment: "Бронь восстановлена после ошибочной отмены",
+              comment: "Бронь восстановлена после ошибочного действия",
             },
           });
           await this.eventBus.emit(tx, {

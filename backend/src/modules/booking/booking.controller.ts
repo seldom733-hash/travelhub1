@@ -223,11 +223,11 @@ export class BookingController {
 
   @Post("bookings/:id/undo")
   @RequirePermissions("booking.cancel")
-  undoLastCancellation(
+  undoLastAction(
     @Param("id") id: string,
     @CurrentUser() actor: AuthedRequest["user"],
   ) {
-    return this.bookings.undoLastCancellation(id, actor.username);
+    return this.bookings.undoLastAction(id, actor.username);
   }
 
   @Patch("bookings/:id")
