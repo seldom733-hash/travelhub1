@@ -747,22 +747,25 @@ export class BookingService {
       if (booking.acquisitionSource === "PARTNER_STOREFRONT") {
         throw new NotFoundError(`Booking ${bookingId} not found`);
       }
-      const latest = await tx.bookingHistory.findFirst({
+      const history = await tx.bookingHistory.findMany({
         where: { bookingId },
         orderBy: { createdAt: "desc" },
+        take: 50,
       });
       const undoable = new Set([
         "prepare", "send", "requestClarification", "resume", "confirm",
         "reject", "service", "requestChange", "resolveChange",
         "requestCancellation", "complete", "cancel", "problem",
       ]);
-      if (!latest || !undoable.has(latest.action)) {
+      // Skip previous undo rows: each click must find the transition that
+      // produced the CURRENT status, so the back button works repeatedly.
+      const transition = history.find(
+        (h: any) => h.to === booking.status && undoable.has(h.action),
+      );
+      if (!transition) {
         throw new ConflictError(`Booking ${booking.code}: last action cannot be undone`);
       }
-      if (latest.to !== booking.status) {
-        throw new ConflictError(`Booking ${booking.code}: status changed after last action`);
-      }
-      const target = latest.from as BookingStatus | null;
+      const target = transition.from as BookingStatus | null;
       if (!target) throw new ConflictError(`Booking ${booking.code}: no previous state`);
 
       const order = await tx.order.findUnique({
@@ -797,11 +800,11 @@ export class BookingService {
         status: target,
         version: { increment: 1 },
       };
-      if (latest.action === "cancel") data.cancelledAt = null;
-      if (latest.action === "complete") data.completedAt = null;
-      if (latest.action === "confirm") data.confirmedAt = null;
-      if (latest.action === "reject") data.rejectedAt = null;
-      if (latest.action === "send" || latest.action === "resume") data.requestedAt = null;
+      if (transition.action === "cancel") data.cancelledAt = null;
+      if (transition.action === "complete") data.completedAt = null;
+      if (transition.action === "confirm") data.confirmedAt = null;
+      if (transition.action === "reject") data.rejectedAt = null;
+      if (transition.action === "send" || transition.action === "resume") data.requestedAt = null;
 
       const updatedRows = await tx.booking.updateMany({
         where: { id: bookingId, status: booking.status, version: booking.version },
@@ -819,7 +822,7 @@ export class BookingService {
           to: target,
           actorId: actor,
           actorName: actor,
-          comment: `Откат действия: ${latest.action}`,
+          comment: `Откат действия: ${transition.action}`,
         },
       });
 

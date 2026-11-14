@@ -2065,9 +2065,10 @@ export class OrderService {
     const result = await this.prisma.$transaction(async (tx: any) => {
       const order = await tx.order.findUnique({ where: { id: orderId } });
       if (!order) throw new NotFoundError(`Order ${orderId} not found`);
-      const latest = await tx.orderHistory.findFirst({
+      const history = await tx.orderHistory.findMany({
         where: { orderId },
         orderBy: { createdAt: "desc" },
+        take: 50,
       });
       const undoable = new Set([
         "process", "markWaitingData", "resumeProcessing", "confirm",
@@ -2075,14 +2076,21 @@ export class OrderService {
         "approveCancellation", "rejectCancellation", "cancel", "reopen",
         "problem", "suspend",
       ]);
-      if (!latest || !undoable.has(latest.action)) {
-        throw new ConflictError(`Order ${order.code}: last action cannot be undone`);
+      // The latest row may already be an `undo`; walk back to the last real
+      // transition that produced the CURRENT status. This makes the back button
+      // repeatable: each click undoes one previous step.
+      const transition = history.find(
+        (h: any) => h.to === order.status && undoable.has(h.action),
+      );
+      if (!transition) {
+        throw new ConflictError(
+          `Order ${order.referenceNumber ?? order.code}: last action cannot be undone`,
+        );
       }
-      if (latest.to !== order.status) {
-        throw new ConflictError(`Order ${order.code}: status changed after last action`);
+      const target = transition.from as OrderStatus | null;
+      if (!target) {
+        throw new ConflictError(`Order ${order.referenceNumber ?? order.code}: no previous state`);
       }
-      const target = latest.from as OrderStatus | null;
-      if (!target) throw new ConflictError(`Order ${order.code}: no previous state`);
 
       const [payments, refunds, settlements] = await Promise.all([
         tx.payment.count({
@@ -2111,11 +2119,11 @@ export class OrderService {
         status: target,
         version: { increment: 1 },
       };
-      if (latest.action === "close") data.closedAt = null;
-      if (latest.action === "cancel") data.cancelledAt = null;
-      if (latest.action === "complete") data.fulfilledAt = null;
-      if (latest.action === "confirm") data.confirmedAt = null;
-      if (latest.action === "send") data.submittedAt = null;
+      if (transition.action === "close") data.closedAt = null;
+      if (transition.action === "cancel") data.cancelledAt = null;
+      if (transition.action === "complete") data.fulfilledAt = null;
+      if (transition.action === "confirm") data.confirmedAt = null;
+      if (transition.action === "send") data.submittedAt = null;
 
       const updatedRows = await tx.order.updateMany({
         where: { id: orderId, status: order.status, version: order.version },
@@ -2133,7 +2141,7 @@ export class OrderService {
           to: target,
           actorId: actor,
           actorName: actor,
-          comment: `Откат действия: ${latest.action}`,
+          comment: `Откат действия: ${transition.action}`,
         },
       });
 
