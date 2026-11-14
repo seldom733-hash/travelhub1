@@ -707,6 +707,12 @@ function HistoryTab({ deal }: { deal: DealRow }) {
   return <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-[10px]"><thead className="text-[#98a2b3]"><tr>{["Дата и время", "Кто", "Действие", "Объект", "Детали"].map((h) => <th key={h} className="px-2 py-1 font-medium">{dealText(locale, h)}</th>)}</tr></thead><tbody>{items.map((x, i) => <tr key={x.id ?? i} className="border-t border-[#f0eee8] align-top"><td className="px-2 py-1.5 whitespace-nowrap">{x.createdAt ? new Date(x.createdAt).toLocaleString(locale === "az" ? "az-AZ" : locale === "en" ? "en-GB" : "ru-RU") : "—"}</td><td className="px-2 py-1.5">{x.actor}</td><td className="px-2 py-1.5 font-medium">{dealText(locale, x.label)}</td><td className="px-2 py-1.5">{dealText(locale, resourceLabels[x.resource] ?? x.resource ?? "—")}</td><td className="px-2 py-1.5">{detailsText(x.details)}</td></tr>)}</tbody></table></div>;
 }
 
+function isAudioMessage(m: WhatsAppTimelineItem): boolean {
+  if (!m.hasMedia || !m.mediaFilename) return false;
+  if (m.mediaMime?.startsWith("audio/")) return true;
+  return /\.(ogg|opus|mp3|m4a|wav|webm)$/i.test(m.mediaFilename);
+}
+
 function ClientChats({ deal, canSend }: { deal: DealRow; canSend: boolean }) {
   const locale = useLocale();
   const [rows, setRows] = React.useState<WhatsAppConversationRow[]>([]);
@@ -817,7 +823,7 @@ function ClientChats({ deal, canSend }: { deal: DealRow; canSend: boolean }) {
         <div ref={scrollRef} className="h-64 space-y-2 overflow-y-auto rounded-lg border border-[#f0eee8] bg-[#fbfaf7] p-2">
           {threadLoading ? <div className="text-[10px] text-[#98a2b3]">Загрузка сообщений…</div> : timeline.length === 0 ? <div className="text-[10px] text-[#98a2b3]">Сообщений пока нет</div> : timeline.map((m) => <div key={m.id} className={`max-w-[90%] rounded-lg px-2 py-1.5 text-[11px] ${m.direction === "OUTBOUND" ? "ml-auto bg-[#0f6b5f] text-white" : "bg-white text-[#344054] border border-[#e5e2da]"}`}>
             {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
-            {m.hasMedia && m.mediaFilename && <a href={whatsappMediaUrl(m.origin, m.id)} target="_blank" rel="noreferrer" className={`mt-1 block truncate underline ${m.direction === "OUTBOUND" ? "text-emerald-100" : "text-[#0f6b5f]"}`}>📎 {m.mediaFilename}</a>}
+            {m.hasMedia && m.mediaFilename && (isAudioMessage(m) ? <audio controls preload="none" src={whatsappMediaUrl(m.origin, m.id)} className="mt-1 block w-full max-w-[240px]" /> : <a href={whatsappMediaUrl(m.origin, m.id)} target="_blank" rel="noreferrer" className={`mt-1 block truncate underline ${m.direction === "OUTBOUND" ? "text-emerald-100" : "text-[#0f6b5f]"}`}>📎 {m.mediaFilename}</a>)}
             <div className={`mt-0.5 text-[9px] ${m.direction === "OUTBOUND" ? "text-emerald-100/80" : "text-[#98a2b3]"}`}>{new Date(m.occurredAt).toLocaleString("ru-RU")}</div>
           </div>)}
         </div>

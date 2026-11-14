@@ -1,4 +1,4 @@
-﻿import {
+import {
   Body,
   Controller,
   Get,
@@ -263,9 +263,10 @@ export class WhatsAppController {
     const asciiName = row.filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
     res.setHeader("Content-Type", row.mimetype ?? "application/octet-stream");
     res.setHeader("Content-Length", String(bytes.length));
+    const inlineMedia = Boolean(row.mimetype?.startsWith("audio/") || row.mimetype?.startsWith("image/") || row.mimetype?.startsWith("video/"));
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(row.filename)}`,
+      `${inlineMedia ? "inline" : "attachment"}; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(row.filename)}`,
     );
     res.end(bytes);
   }
