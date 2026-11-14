@@ -183,6 +183,7 @@ export class SalesAnalyticsService {
       sources: current.sources,
       distribution: current.distribution,
       lossReasons: current.lossReasons,
+      financials: current.financials,
     };
   }
 
@@ -194,10 +195,12 @@ export class SalesAnalyticsService {
     ]);
     let rows: any[] = [];
     if (requestMetrics.has(metric)) rows = data.activity ?? [];
-    else if (metric === "ordersCreated" || metric === "cancelledOrders" || metric === "salesAmount" || metric === "capturedRevenue" || metric === "grossProfit") {
+    else if (metric === "ordersCreated" || metric === "cancelledOrders" || metric === "grossProfit") {
       rows = (data.activity ?? []).filter((r: any) => !!r.orderCode);
     } else if (metric === "bookingsConfirmed" || metric === "cancelledBookings") {
       rows = (data.activity ?? []).filter((r: any) => !!r.bookingCode);
+    } else if (metric === "capturedRevenue" || metric === "refunds" || metric === "salesAmount") {
+      rows = data.financials ?? [];
     } else if (metric === "completedDeals" || metric === "completedResult") {
       rows = data.deals?.completed ?? [];
     } else if (metric === "closedDeals" || metric === "closedResult") {
@@ -274,11 +277,11 @@ export class SalesAnalyticsService {
     const bookingOrderIds = new Map(bookings.map((b) => [b.id, b.orderId]));
     const payments = await this.prisma.payment.findMany({
       where: { status: "CAPTURED", paidAt: { gte: p.start, lt: p.end }, orderId: { in: orderIds } },
-      select: { orderId: true, amount: true },
+      select: { orderId: true, amount: true, code: true, paidAt: true },
     });
     const refunds = await this.prisma.refund.findMany({
       where: { status: "PROCESSED", processedAt: { gte: p.start, lt: p.end }, orderId: { in: orderIds } },
-      select: { orderId: true, amount: true },
+      select: { orderId: true, amount: true, code: true, processedAt: true },
     });
 
     const requestByOrder = new Map<string, any>();
@@ -299,6 +302,22 @@ export class SalesAnalyticsService {
     const customerById = new Map((await this.prisma.customer.findMany({ where: { id: { in: customerIds } }, select: { id: true, code: true, firstName: true, lastName: true, companyName: true, phone: true } })).map((c) => [c.id, c]));
     const managerIds = [...new Set(requests.map((r) => r.assignedManagerId).filter((x): x is string => !!x))];
     const managerById = new Map((await this.prisma.user.findMany({ where: { id: { in: managerIds } }, select: { id: true, fullName: true, username: true } })).map((u) => [u.id, u]));
+    const financials = [
+      ...payments.map((x) => ({
+        kind: "PAYMENT", code: x.code, orderId: x.orderId,
+        orderCode: orderById.get(x.orderId)?.referenceNumber ?? null,
+        manager: requestByOrder.get(x.orderId)?.assignedManagerId
+          ? managerById.get(requestByOrder.get(x.orderId).assignedManagerId)?.fullName ?? null : null,
+        amount: num(x.amount), date: x.paidAt, status: "CAPTURED",
+      })),
+      ...refunds.map((x) => ({
+        kind: "REFUND", code: x.code, orderId: x.orderId,
+        orderCode: orderById.get(x.orderId)?.referenceNumber ?? null,
+        manager: requestByOrder.get(x.orderId)?.assignedManagerId
+          ? managerById.get(requestByOrder.get(x.orderId).assignedManagerId)?.fullName ?? null : null,
+        amount: num(x.amount), date: x.processedAt, status: "PROCESSED",
+      })),
+    ];
 
     const requestHistory = requestIds.length
       ? await this.prisma.requestHistory.findMany({ where: { requestId: { in: requestIds } }, orderBy: { createdAt: "desc" } })
@@ -567,6 +586,6 @@ export class SalesAnalyticsService {
       })),
     };
 
-    return { kpis, managers, funnel, services: [...serviceMap.values()], sources: [...sourceMap.values()], lossReasons: [...lossReasonMap.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count), activity, deals: { completed: dealRows("completed"), closed: dealRows("closed") }, series, distribution };
+    return { kpis, managers, funnel, services: [...serviceMap.values()], sources: [...sourceMap.values()], lossReasons: [...lossReasonMap.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count), activity, deals: { completed: dealRows("completed"), closed: dealRows("closed") }, series, distribution, financials };
   }
 }
