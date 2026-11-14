@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 
 const PRESETS: Array<[string, string]> = [
@@ -43,29 +45,42 @@ function deltaText(x: any) {
   return `${x.pct > 0 ? "+" : ""}${x.pct.toFixed(1)}%`;
 }
 
-export default function SalesAnalyticsPage() {
+export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: string }) {
+  const router = useRouter();
   const [preset, setPreset] = useState("CURRENT_MONTH");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [managerId, setManagerId] = useState("");
   const [serviceType, setServiceType] = useState("");
   const [source, setSource] = useState("");
-  const [tab, setTab] = useState("overview");
+  const [tab] = useState(initialTab);
   const [dealTab, setDealTab] = useState<"completed" | "closed">("completed");
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedManager, setSelectedManager] = useState<any>(null);
   const [managerOptions, setManagerOptions] = useState<any[]>([]);
+  const [activityFilter, setActivityFilter] = useState("all");
+
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("preset")) setPreset(q.get("preset")!);
+    if (q.get("startDate")) setStartDate(q.get("startDate")!);
+    if (q.get("endDate")) setEndDate(q.get("endDate")!);
+    if (q.get("managerId")) setManagerId(q.get("managerId")!);
+    if (q.get("serviceType")) setServiceType(q.get("serviceType")!);
+    if (q.get("source")) setSource(q.get("source")!);
+    if (q.get("dealTab") === "closed") setDealTab("closed");
+  }, []);
 
   function focusKpi(k: string) {
     if (["completedDeals", "closedDeals", "salesAmount", "capturedRevenue", "grossProfit", "completedResult", "closedResult"].includes(k)) {
       setDealTab(k === "closedDeals" || k === "closedResult" ? "closed" : "completed");
-      setTab("deals");
+      router.push(`/app/analytics/sales/deals?${query}&dealTab=${k === "closedDeals" || k === "closedResult" ? "closed" : "completed"}`);
       return;
     }
-    if (k === "ordersCreated" || k === "bookingsConfirmed" || k.startsWith("conversion")) { setTab("funnel"); return; }
-    setTab("activity");
+    if (k === "ordersCreated" || k === "bookingsConfirmed" || k.startsWith("conversion")) { router.push(`/app/analytics/sales/funnel?${query}`); return; }
+    router.push(`/app/analytics/sales/activity?${query}`);
   }
 
   const query = useMemo(() => {
@@ -76,6 +91,14 @@ export default function SalesAnalyticsPage() {
     if (source) qs.set("source", source);
     return qs.toString();
   }, [preset, startDate, endDate, managerId, serviceType, source]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    url.search = query;
+    window.history.replaceState(null, "", url);
+  }, [query]);
+
 
   useEffect(() => {
     let alive = true;
@@ -89,6 +112,14 @@ export default function SalesAnalyticsPage() {
 
   const managers = data?.managers ?? [];
   const kpis = data?.kpis ?? {};
+  const filteredActivity = useMemo(() => {
+    const rows = data?.activity ?? [];
+    if (activityFilter === "no_manager") return rows.filter((r: any) => !r.managerId);
+    if (activityFilter === "no_response") return rows.filter((r: any) => !r.firstContactAt);
+    if (activityFilter === "overdue") return rows.filter((r: any) => r.overdue);
+    if (activityFilter === "unprocessed") return rows.filter((r: any) => !r.processingStartedAt);
+    return rows;
+  }, [data, activityFilter]);
   const periodLabel = data?.period ? `${new Date(data.period.start).toLocaleDateString("ru-RU")} — ${new Date(new Date(data.period.end).getTime() - 1).toLocaleDateString("ru-RU")}` : "";
 
   return (
@@ -124,7 +155,7 @@ export default function SalesAnalyticsPage() {
       </div>
 
       <div className="mb-3 flex flex-wrap gap-1 rounded-xl border border-[#e5e2da] bg-white p-1">
-        {TABS.map(([v, l]) => <button key={v} onClick={() => setTab(v)} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${tab === v ? "bg-[#0f6b5f] text-white" : "text-slate-600 hover:bg-slate-50"}`}>{l}</button>)}
+        {TABS.map(([v, l]) => { const href = `${v === "overview" ? "/app/analytics/sales" : `/app/analytics/sales/${v}`}?${query}`; return <Link key={v} href={href} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${tab === v ? "bg-[#0f6b5f] text-white" : "text-slate-600 hover:bg-slate-50"}`}>{l}</Link>; })}
       </div>
 
       {loading && <div className="rounded-xl bg-white p-6 text-sm text-slate-500">Загрузка аналитики…</div>}
@@ -150,7 +181,7 @@ export default function SalesAnalyticsPage() {
           {selectedManager && <div className="border-t bg-emerald-50/40 p-3 text-xs"><div className="mb-1 flex justify-between"><b>{selectedManager.manager}</b><button onClick={() => setSelectedManager(null)} className="text-slate-500">×</button></div><div className="grid gap-2 sm:grid-cols-4"><div>Заявки: {selectedManager.requests}</div><div>Заказы: {selectedManager.orders}</div><div>Завершено: {selectedManager.completed}</div><div>Закрыто: {selectedManager.closed}</div><div>Продажи: {money(selectedManager.salesAmount)}</div><div>Выручка: {money(selectedManager.capturedRevenue)}</div><div>Прибыль: {money(selectedManager.grossProfit)}</div><div>Ср. ответ: {selectedManager.avgResponseHours ?? "—"} ч</div></div></div>}
         </div>}
 
-        {tab === "activity" && <div className="overflow-x-auto rounded-xl border border-[#e5e2da] bg-white"><table className="w-full min-w-[1000px] text-left text-[11px]"><thead className="bg-slate-50 text-slate-400"><tr>{["Заявка", "Создана", "Назначена", "Менеджер", "Клиент", "Телефон", "Услуга", "Направление", "Источник", "Статус", "Первый ответ, ч", "Просрочка"].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead><tbody>{(data.activity ?? []).map((r: any) => <tr key={r.requestId} className="border-t border-slate-100"><td className="px-2 py-2 font-mono">{r.requestCode}</td><td className="px-2 py-2">{dt(r.createdAt)}</td><td className="px-2 py-2">{dt(r.assignedAt)}</td><td className="px-2 py-2">{r.manager}</td><td className="px-2 py-2">{r.customer}</td><td className="px-2 py-2">{r.phone ?? "—"}</td><td className="px-2 py-2">{r.requestType ?? "—"}</td><td className="px-2 py-2">{r.destination ?? "—"}</td><td className="px-2 py-2">{r.source ?? "—"}</td><td className="px-2 py-2">{r.status}</td><td className="px-2 py-2">{r.responseHours ?? "—"}</td><td className={`px-2 py-2 ${r.overdue ? "font-semibold text-rose-600" : "text-slate-400"}`}>{r.overdue ? "Да" : "Нет"}</td></tr>)}</tbody></table></div>}
+        {tab === "activity" && <div className="space-y-2"><div className="flex flex-wrap items-center gap-2 text-xs"><span className="text-slate-500">Контроль:</span><select value={activityFilter} onChange={(e) => setActivityFilter(e.target.value)} className="rounded-lg border bg-white px-2 py-1.5"><option value="all">Все заявки</option><option value="no_manager">Без менеджера</option><option value="unprocessed">Не приняты в работу</option><option value="no_response">Без первого ответа</option><option value="overdue">Просроченные</option></select><span className="text-slate-400">Показано: {filteredActivity.length}</span></div><div className="overflow-x-auto rounded-xl border border-[#e5e2da] bg-white"><table className="w-full min-w-[1000px] text-left text-[11px]"><thead className="bg-slate-50 text-slate-400"><tr>{["Заявка", "Создана", "Назначена", "Менеджер", "Клиент", "Телефон", "Услуга", "Направление", "Источник", "Статус", "Первый ответ, ч", "Просрочка"].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead><tbody>{filteredActivity.map((r: any) => <tr key={r.requestId} className="border-t border-slate-100"><td className="px-2 py-2 font-mono">{r.requestCode}</td><td className="px-2 py-2">{dt(r.createdAt)}</td><td className="px-2 py-2">{dt(r.assignedAt)}</td><td className="px-2 py-2">{r.manager}</td><td className="px-2 py-2">{r.customer}</td><td className="px-2 py-2">{r.phone ?? "—"}</td><td className="px-2 py-2">{r.requestType ?? "—"}</td><td className="px-2 py-2">{r.destination ?? "—"}</td><td className="px-2 py-2">{r.source ?? "—"}</td><td className="px-2 py-2">{r.status}</td><td className="px-2 py-2">{r.responseHours ?? "—"}</td><td className={`px-2 py-2 ${r.overdue ? "font-semibold text-rose-600" : "text-slate-400"}`}>{r.overdue ? "Да" : "Нет"}</td></tr>)}</tbody></table></div></div>}
 
         {tab === "funnel" && <div className="space-y-2">{(data.funnel ?? []).map((s: any, i: number, arr: any[]) => <div key={s.stage} className="rounded-xl border border-[#e5e2da] bg-white p-3"><div className="mb-1 flex justify-between text-xs"><b>{s.label}</b><span>{s.count} · {pct(s.conversion)}</span></div><div className="h-2 overflow-hidden rounded bg-slate-100"><div className="h-full rounded bg-[#0f6b5f]" style={{ width: `${Math.min(100, s.conversion)}%` }} /></div>{i < arr.length - 1 && <div className="mt-1 text-[10px] text-slate-400">Потери к следующему этапу: {Math.max(0, s.count - arr[i + 1].count)}</div>}</div>)}</div>}
 
@@ -168,4 +199,8 @@ export default function SalesAnalyticsPage() {
       </>}
     </div>
   );
+}
+
+export default function SalesAnalyticsPage() {
+  return <SalesAnalyticsView />;
 }
