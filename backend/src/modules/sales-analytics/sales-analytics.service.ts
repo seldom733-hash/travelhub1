@@ -325,6 +325,8 @@ export class SalesAnalyticsService {
     const assigned = requests.filter((r) => !!r.assignedAt);
     const accepted = requests.filter((r) => !!r.processingStartedAt);
     const inWork = requests.filter((r) => !TERMINAL_REQUEST.includes(r.status));
+    const slaEligible = requests.filter((r) => !!r.slaDueAt);
+    const slaCompliant = slaEligible.filter((r) => !!r.firstContactAt && r.firstContactAt <= r.slaDueAt!);
 
     const linkedOrders = linkedOrderIds;
     const linkedOrderList = [...linkedOrders].map((id) => orderById.get(id)).filter((x): x is NonNullable<typeof x> => !!x);
@@ -361,6 +363,7 @@ export class SalesAnalyticsService {
       proposalsSent: proposals.size,
       lostRequests: lostRequests.length,
       overdueRequests: overdue.length,
+      slaCompliance: slaEligible.length ? slaCompliant.length / slaEligible.length * 100 : 0,
       ordersCreated: ordersCreated.length,
       bookingsConfirmed: bookingsConfirmed.length,
       completedDeals: completedOrders.length,
@@ -392,7 +395,7 @@ export class SalesAnalyticsService {
           requests: 0, assigned: 0, accepted: 0, processed: 0, inWork: 0, noFirstResponse: 0,
           proposalsSent: 0, transferred: 0, receivedTransfers: 0, lost: 0, overdue: 0,
           orders: 0, bookings: 0, completed: 0, closed: 0, cancelledOrders: 0, cancelledBookings: 0,
-          salesAmount: 0, capturedRevenue: 0, grossProfit: 0, refunds: 0,
+          salesAmount: 0, capturedRevenue: 0, grossProfit: 0, refunds: 0, slaEligible: 0, slaCompliant: 0,
           responseSum: 0, responseCount: 0,
         });
       }
@@ -409,6 +412,7 @@ export class SalesAnalyticsService {
       if (proposals.has(r.id)) m.proposalsSent++;
       if (lostRequests.some((x) => x.id === r.id)) m.lost++;
       if (overdue.some((x) => x.id === r.id)) m.overdue++;
+      if (r.slaDueAt) { m.slaEligible++; if (r.firstContactAt && r.firstContactAt <= r.slaDueAt) m.slaCompliant++; }
       const firstContact = r.firstContactAt ?? r.processingStartedAt;
       if (firstContact && r.createdAt) { m.responseSum += Math.max(0, (firstContact.getTime() - r.createdAt.getTime()) / 3600000); m.responseCount++; }
       const o = r.convertedOrderId ? orderById.get(r.convertedOrderId) : null;
@@ -430,6 +434,7 @@ export class SalesAnalyticsService {
     const managers = [...managerRows.values()].map((m) => ({
       ...m,
       avgResponseHours: m.responseCount ? Math.round((m.responseSum / m.responseCount) * 100) / 100 : null,
+      slaCompliance: m.slaEligible ? Math.round((m.slaCompliant / m.slaEligible) * 10000) / 100 : 0,
       conversionRequestOrder: m.requests ? Math.round((m.orders / m.requests) * 10000) / 100 : 0,
       conversionRequestCompleted: m.requests ? Math.round((m.completed / m.requests) * 10000) / 100 : 0,
       conversionRequestClosed: m.requests ? Math.round((m.closed / m.requests) * 10000) / 100 : 0,
@@ -494,6 +499,7 @@ export class SalesAnalyticsService {
         firstContactAt: r.firstContactAt, processingStartedAt: r.processingStartedAt,
         ageHours: Math.round(((Date.now() - r.createdAt.getTime()) / 3600000) * 10) / 10,
         responseHours: r.firstContactAt ? Math.round(((r.firstContactAt.getTime() - r.createdAt.getTime()) / 3600000) * 10) / 10 : null,
+        slaCompliant: r.slaDueAt ? Boolean(r.firstContactAt && r.firstContactAt <= r.slaDueAt) : null,
         overdue: !!r.slaDueAt && r.slaDueAt < new Date() && !TERMINAL_REQUEST.includes(r.status),
         orderCode: o?.referenceNumber ?? null, bookingCode: first?.referenceNumber ?? null,
         proposalSent: proposals.has(r.id),
