@@ -49,9 +49,9 @@ Request → Booking     = заявки, чей заказ имеет confirmed B
 Request → завершено   = заявки, чей Order имеет fulfilledAt или Booking.completedAt / заявки
 Request → закрыто     = заявки, чей Order имеет closedAt / заявки
 
-Сумма продаж          = Σ Order.amount по заказам, созданным в периоде
+Сумма продаж          = Σ Order.amount по заказам периода, кроме CANCELLED
 Фактическая выручка   = Σ Payment.amount (CAPTURED, paidAt в периоде)
-Себестоимость         = Σ Booking.amount по заказу (предварительно)
+Себестоимость         = commercialSnapshot.netSupplierCost (fallback: Σ Booking.amount)
 Валовая прибыль       = сумма продаж − себестоимость
 Средний чек           = сумма продаж / количество заказов
 Возвраты              = Σ Refund.amount (PROCESSED, processedAt в периоде)
@@ -94,7 +94,7 @@ sales.kpi.read
 
 ## 6. Ограничения v1
 
-1. Себестоимость берётся из `Booking.amount`; нужна сверка с финансовой моделью.
+1. Себестоимость берётся из `Request.commercialSnapshot.netSupplierCost`; fallback — `Booking.amount`. Нужна сверка с финансовой моделью для мультисервисных заказов.
 2. Причины отказов и потерянных заявок ещё не сгруппированы.
 3. Нет отдельной таблицы распределения `RequestAssignmentHistory`; используются `RequestHistory.action=ASSIGNED` и текущие поля.
 4. Нет SLA-настроек: используется существующий `Request.slaDueAt`.

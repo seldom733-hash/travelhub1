@@ -161,7 +161,41 @@ export class SalesAnalyticsService {
   async managerDetail(id: string, q: SalesAnalyticsQuery, user: any) {
     if (user?.role === "SALES_MANAGER" && user.id !== id) throw new ForbiddenException("Manager scope");
     const data = await this.dashboard({ ...q, managerId: id }, user);
-    return { ...data, managerId: id };
+    const requestCodes = new Map((data.activity ?? []).map((r: any) => [r.requestId, r.requestCode]));
+    const requestIds = [...requestCodes.keys()];
+    const history = requestIds.length
+      ? await this.prisma.requestHistory.findMany({
+          where: { requestId: { in: requestIds } },
+          orderBy: { createdAt: "desc" },
+          take: 100,
+        })
+      : [];
+    const manager = (data.managers ?? []).find((m: any) => m.managerId === id) ?? null;
+    return {
+      ...data,
+      managerId: id,
+      manager,
+      assignments: history
+        .filter((h) => ["ASSIGNED", "returned_from_order"].includes(h.action))
+        .map((h) => ({
+          requestId: h.requestId,
+          requestCode: requestCodes.get(h.requestId) ?? null,
+          action: h.action,
+          to: h.to,
+          actorName: h.actorName,
+          comment: h.comment,
+          createdAt: h.createdAt,
+        })),
+      actions: history.slice(0, 100).map((h) => ({
+        requestId: h.requestId,
+        requestCode: requestCodes.get(h.requestId) ?? null,
+        action: h.action,
+        from: h.from,
+        to: h.to,
+        actorName: h.actorName,
+        createdAt: h.createdAt,
+      })),
+    };
   }
 
   private async compute(p: Period, q: SalesAnalyticsQuery) {
@@ -230,10 +264,10 @@ export class SalesAnalyticsService {
     const ordersCreated = scopedOrders.filter((o) => dateIn(o.createdAt, p));
     const bookingsConfirmed = bookings.filter((b) => inScopeBooking(b) && dateIn(b.confirmedAt, p));
     const completedBookings = bookings.filter((b) => inScopeBooking(b) && dateIn(b.completedAt, p));
-    const closedOrders = scopedOrders.filter((o) => dateIn(o.closedAt, p));
+    const closedOrders = scopedOrders.filter((o) => o.status !== "CANCELLED" && dateIn(o.closedAt, p));
     const cancelledOrders = scopedOrders.filter((o) => dateIn(o.cancelledAt, p));
     const cancelledBookings = bookings.filter((b) => inScopeBooking(b) && dateIn(b.cancelledAt, p));
-    const completedOrders = scopedOrders.filter((o) => dateIn(o.fulfilledAt, p) || bookings.some((b) => b.orderId === o.id && dateIn(b.completedAt, p)));
+    const completedOrders = scopedOrders.filter((o) => o.status !== "CANCELLED" && (dateIn(o.fulfilledAt, p) || bookings.some((b) => b.orderId === o.id && dateIn(b.completedAt, p))));
     const lostRequests = requests.filter((r) => ["REJECTED", "UNAVAILABLE", "EXPIRED", "CUSTOMER_PAYMENT_TIMEOUT", "CANCELLED_BY_CUSTOMER"].includes(r.status));
     const overdue = requests.filter((r) => !!r.slaDueAt && r.slaDueAt < new Date() && !TERMINAL_REQUEST.includes(r.status));
     const noFirstResponse = requests.filter((r) => !r.firstContactAt && !TERMINAL_REQUEST.includes(r.status));
@@ -248,11 +282,19 @@ export class SalesAnalyticsService {
     const cohortCompleted = cohortOrders.filter((o) => !!o.fulfilledAt || (bookingByOrder.get(o.id) ?? []).some((b) => !!b.completedAt));
     const cohortClosed = cohortOrders.filter((o) => !!o.closedAt);
 
-    const salesOrders = ordersCreated;
+    const salesOrders = ordersCreated.filter((o) => o.status !== "CANCELLED");
     const salesAmount = salesOrders.reduce((s, o) => s + num(o.amount), 0);
     const captured = payments.filter((x) => scopedOrderIdSet.has(x.orderId)).reduce((s, x) => s + num(x.amount), 0);
     const refunded = refunds.filter((x) => scopedOrderIdSet.has(x.orderId)).reduce((s, x) => s + num(x.amount), 0);
-    const costFor = (o: any) => (bookingByOrder.get(o.id) ?? []).reduce((s, b) => s + num(b.amount), 0);
+    const costFor = (o: any) => {
+      const linkedRequest = requestByOrder.get(o.id);
+      const snapshot = linkedRequest?.commercialSnapshot as any;
+      const snapshotCost = num(snapshot?.netSupplierCost);
+      if (snapshotCost > 0) return snapshotCost;
+      return (bookingByOrder.get(o.id) ?? [])
+        .filter((b) => b.status !== "CANCELLED" && b.status !== "SUPPLIER_REJECTED")
+        .reduce((s, b) => s + num(b.amount), 0);
+    };
     const cost = salesOrders.reduce((s, o) => s + costFor(o), 0);
     const grossProfit = salesAmount - cost;
     const completedResult = completedOrders.reduce((s, o) => s + num(o.amount) - costFor(o) - (refundsByOrder.get(o.id) ?? 0), 0);
@@ -325,10 +367,12 @@ export class SalesAnalyticsService {
         if (o.fulfilledAt || (bookingByOrder.get(o.id) ?? []).some((b) => !!b.completedAt)) m.completed++;
         if (o.closedAt) m.closed++;
         if (o.cancelledAt) m.cancelledOrders++;
-        m.salesAmount += num(o.amount);
-        m.capturedRevenue += paymentsByOrder.get(o.id) ?? 0;
-        m.refunds += refundsByOrder.get(o.id) ?? 0;
-        m.grossProfit += num(o.amount) - costFor(o);
+        if (o.status !== "CANCELLED") {
+          m.salesAmount += num(o.amount);
+          m.capturedRevenue += paymentsByOrder.get(o.id) ?? 0;
+          m.refunds += refundsByOrder.get(o.id) ?? 0;
+          m.grossProfit += num(o.amount) - costFor(o);
+        }
         m.cancelledBookings += (bookingByOrder.get(o.id) ?? []).filter((b) => !!b.cancelledAt).length;
       }
     }
