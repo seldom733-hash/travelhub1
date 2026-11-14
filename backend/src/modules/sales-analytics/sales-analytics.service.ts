@@ -160,6 +160,10 @@ export class SalesAnalyticsService {
         return { ...m, currentLoad: live.load, unprocessed: live.unprocessed, overdue: live.overdue };
       });
     }
+    current.managers = current.managers.map((m: any) => {
+      const live = liveByManager.get(m.managerId ?? "unassigned") ?? { load: 0, unprocessed: 0, overdue: 0 };
+      return { ...m, currentLoad: live.load, liveUnprocessed: live.unprocessed, liveOverdue: live.overdue };
+    });
     const kpis: Record<string, any> = {};
     for (const k of Object.keys(current.kpis)) {
       const cur = current.kpis[k];
@@ -263,6 +267,7 @@ export class SalesAnalyticsService {
         ],
       },
       orderBy: { createdAt: "desc" },
+      include: { items: { select: { id: true, title: true, type: true, amount: true } } },
     });
     const orderIds = orders.map((o) => o.id);
     const bookings = await this.prisma.booking.findMany({ where: { orderId: { in: orderIds } } });
@@ -522,6 +527,12 @@ export class SalesAnalyticsService {
         clientPrice: num(o.amount), cost: costFor(o), revenue: paymentsByOrder.get(o.id) ?? 0,
         grossProfit: num(o.amount) - costFor(o), financialStatus: o.financialStatus,
         status: o.status,
+        services: ((o as any).items ?? []).map((item: any) => ({
+          title: item.title,
+          type: item.type,
+          amount: num(item.amount),
+          cost: num(o.amount) > 0 ? costFor(o) * (num(item.amount) / num(o.amount)) : 0,
+        })),
       };
     });
 
