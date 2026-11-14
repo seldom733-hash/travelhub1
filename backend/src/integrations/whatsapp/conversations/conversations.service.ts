@@ -167,7 +167,7 @@ export class WhatsAppConversationsService {
     if (!row) throw new NotFoundError(`WhatsApp conversation ${conversationId} not found`);
     const listRow = await this.toListRow(row);
 
-    const customer = row.customerId ? await this.customerRef(row.customerId) : null;
+    const customer = listRow.customerId ? await this.customerRef(listRow.customerId) : null;
     const candidates: CustomerRef[] = [];
     if (row.matchingStatus === "AMBIGUOUS" && row.canonicalPhone) {
       const ids = await findCustomerIdsByCanonicalPhone(
@@ -180,7 +180,7 @@ export class WhatsAppConversationsService {
         if (ref) candidates.push(ref);
       }
     }
-    const context = row.customerId ? await this.resolveContext(row.customerId) : null;
+    const context = listRow.customerId ? await this.resolveContext(listRow.customerId) : null;
     const resolvedContext =
       context && context.type === "CUSTOMER" && context.code === "" && customer
         ? { ...context, code: customer.code }
@@ -796,13 +796,28 @@ export class WhatsAppConversationsService {
           select: { id: true },
         })) !== null
       : false;
+    // customerId has no FK (ADR-0001): a deleted customer must not leave the
+    // conversation "MATCHED". Without this guard the list says "linked" while
+    // detail/send fail with Customer ... not found.
+    let customerId = row.customerId;
+    let matchingStatus = row.matchingStatus;
+    if (customerId) {
+      const exists = await this.prisma.customer.findUnique({
+        where: { id: customerId },
+        select: { id: true },
+      });
+      if (!exists) {
+        customerId = null;
+        matchingStatus = "UNMATCHED";
+      }
+    }
     return {
       id: row.id,
       accountId: row.accountId,
       remoteJid: row.remoteJid,
       canonicalPhone: row.canonicalPhone,
-      matchingStatus: row.matchingStatus,
-      customerId: row.customerId,
+      matchingStatus,
+      customerId,
       lastMessageAt: row.lastMessageAt,
       lastMessagePreview: row.lastMessagePreview,
       lastReadAt: row.lastReadAt,
