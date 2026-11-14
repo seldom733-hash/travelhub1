@@ -407,7 +407,16 @@ export class DealsService {
       }
       return map;
     };
-    const bookingByOrder = new Map(bookings.map((b) => [b.orderId, b]));
+    const bookingByOrder = new Map<string, (typeof bookings)[number]>();
+    const terminalBooking = (status: string) => ["CANCELLED", "COMPLETED", "SUPPLIER_REJECTED"].includes(status);
+    for (const booking of bookings) {
+      const current = bookingByOrder.get(booking.orderId);
+      // One order can have several bookings: keep the active one so a newer
+      // cancelled booking cannot hide the current booking stage.
+      if (!current || (terminalBooking(current.status) && !terminalBooking(booking.status))) {
+        bookingByOrder.set(booking.orderId, booking);
+      }
+    }
     const paymentsByOrder = byOrder(payments);
     const paymentMethodById = new Map(payments.map((p) => [p.id, p.paymentMethod]));
     const refundsByOrder = byOrder(refunds);
