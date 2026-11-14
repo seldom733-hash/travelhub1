@@ -13,6 +13,7 @@ import { SalesModule } from "./modules/sales/sales.module";
 import { ReverseModule } from "./modules/reverse/reverse.module";
 import { FinanceModule } from "./modules/finance/finance.module";
 import { AnalyticsModule } from "./modules/analytics/analytics.module";
+import { SalesAnalyticsModule } from "./modules/sales-analytics/sales-analytics.module";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
 import { WorkspaceModule } from "./modules/workspace/workspace.module";
 import { IdempotencyModule } from "./shared/idempotency/idempotency.module";
@@ -41,7 +42,7 @@ import { PermissionsGuard } from "./security/auth/permissions.guard";
  * открывает эндпоинты), PermissionsGuard глобально (проверка @RequirePermissions).
  */
 @Module({
-  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, CrmActivityModule, OrderModule, RequestModule, CheckoutModule, BookingModule, CommunicationModule, SalesModule, ReverseModule, FinanceModule, AnalyticsModule, DashboardModule, WorkspaceModule, ConstructorModule, SupplierModule, PricingModule, GeoModule, HotelDirectoryModule, IdempotencyModule, OperationalNotesModule, MarketingModule, SupportModule, DocumentsModule, WhatsAppModule],
+  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, CrmActivityModule, OrderModule, RequestModule, CheckoutModule, BookingModule, CommunicationModule, SalesModule, ReverseModule, FinanceModule, AnalyticsModule, SalesAnalyticsModule, DashboardModule, WorkspaceModule, ConstructorModule, SupplierModule, PricingModule, GeoModule, HotelDirectoryModule, IdempotencyModule, OperationalNotesModule, MarketingModule, SupportModule, DocumentsModule, WhatsAppModule],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

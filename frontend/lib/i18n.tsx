@@ -1161,6 +1161,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "salesChannel.unknown": { ru: "Не определено", az: "Müəyyən edilməyib", en: "Not specified" },
   "nav.command_center": { ru: "Центр управления", az: "İdarəetmə Mərkəzi", en: "Command Center" },
   "nav.analytics": { ru: "Аналитика", az: "Analitika", en: "Analytics" },
+  "nav.sales_analytics": { ru: "Аналитика продаж", az: "Satış analitikası", en: "Sales analytics" },
   "nav.catalog": { ru: "Каталог", az: "Kataloq", en: "Catalog" },
   "nav.group.supplier_updates": { ru: "ОБНОВЛЕНИЕ УСЛУГ", az: "XİDMƏTLƏRİN YENİLƏNMƏSİ", en: "SERVICE UPDATES" },
   "nav.supplier_updates": { ru: "Поставщики", az: "Təchizatçılar", en: "Suppliers" },

@@ -1,0 +1,155 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { api } from "@/lib/api";
+import { useLocale } from "@/lib/i18n";
+
+const PRESETS: Array<[string, string]> = [
+  ["TODAY", "Сегодня"], ["YESTERDAY", "Вчера"], ["LAST_7_DAYS", "Последние 7 дней"],
+  ["LAST_30_DAYS", "Последние 30 дней"], ["CURRENT_WEEK", "Текущая неделя"], ["PREVIOUS_WEEK", "Прошлая неделя"],
+  ["CURRENT_MONTH", "Текущий месяц"], ["PREVIOUS_MONTH", "Прошлый месяц"], ["CURRENT_QUARTER", "Текущий квартал"],
+  ["PREVIOUS_QUARTER", "Прошлый квартал"], ["CURRENT_YEAR", "Текущий год"], ["PREVIOUS_YEAR", "Прошлый год"],
+  ["CUSTOM", "Произвольный период"],
+];
+const TABS: Array<[string, string]> = [
+  ["overview", "Общая аналитика"], ["managers", "Менеджеры"], ["activity", "Активность и контроль"],
+  ["funnel", "Воронка продаж"], ["deals", "Завершённые сделки"],
+];
+const KPI_LABELS: Record<string, string> = {
+  requestsTotal: "Всего новых заявок", assigned: "Назначено менеджерам", accepted: "Принято в работу",
+  inWork: "Заявки в работе", noFirstResponse: "Без первого ответа", proposalsSent: "Отправлено предложений",
+  lostRequests: "Потерянные заявки", overdueRequests: "Просроченные заявки",
+  ordersCreated: "Создано заказов", bookingsConfirmed: "Подтверждено бронирований",
+  completedDeals: "Завершено сделок", closedDeals: "Окончательно закрыто",
+  cancelledOrders: "Отменено заказов", cancelledBookings: "Отменено бронирований",
+  conversionRequestOrder: "Request → Order", conversionOrderBooking: "Order → Booking",
+  conversionRequestBooking: "Request → Booking", conversionRequestCompleted: "Request → завершено",
+  conversionRequestClosed: "Request → закрыто", salesAmount: "Сумма продаж", capturedRevenue: "Фактическая выручка",
+  costAmount: "Себестоимость", grossProfit: "Валовая прибыль", avgCheck: "Средний чек",
+  refunds: "Сумма возвратов", completedResult: "Фин. результат завершённых",
+  closedResult: "Фин. результат закрытых",
+};
+const GROUPS: Array<[string, string[]]> = [
+  ["Заявки", ["requestsTotal", "assigned", "accepted", "inWork", "noFirstResponse", "proposalsSent", "lostRequests", "overdueRequests"]],
+  ["Продажи", ["ordersCreated", "bookingsConfirmed", "completedDeals", "closedDeals", "cancelledOrders", "cancelledBookings"]],
+  ["Конверсия", ["conversionRequestOrder", "conversionOrderBooking", "conversionRequestBooking", "conversionRequestCompleted", "conversionRequestClosed"]],
+  ["Финансы", ["salesAmount", "capturedRevenue", "costAmount", "grossProfit", "avgCheck", "refunds", "completedResult", "closedResult"]],
+];
+
+function money(v: any) { return Number(v ?? 0).toLocaleString("ru-RU", { maximumFractionDigits: 2 }); }
+function dt(v: any) { return v ? new Date(v).toLocaleString("ru-RU") : "—"; }
+function pct(v: any) { return `${Number(v ?? 0).toFixed(1)}%`; }
+function deltaText(x: any) {
+  if (x?.pct == null) return x?.delta > 0 ? `+${money(x.delta)}` : x?.delta < 0 ? money(x.delta) : "—";
+  return `${x.pct > 0 ? "+" : ""}${x.pct.toFixed(1)}%`;
+}
+
+export default function SalesAnalyticsPage() {
+  const locale = useLocale();
+  const [preset, setPreset] = useState("CURRENT_MONTH");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [managerId, setManagerId] = useState("");
+  const [serviceType, setServiceType] = useState("");
+  const [source, setSource] = useState("");
+  const [tab, setTab] = useState("overview");
+  const [dealTab, setDealTab] = useState<"completed" | "closed">("completed");
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selectedManager, setSelectedManager] = useState<any>(null);
+
+  const query = useMemo(() => {
+    const qs = new URLSearchParams({ preset, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" });
+    if (preset === "CUSTOM") { qs.set("startDate", startDate); qs.set("endDate", endDate); }
+    if (managerId) qs.set("managerId", managerId);
+    if (serviceType) qs.set("serviceType", serviceType);
+    if (source) qs.set("source", source);
+    return qs.toString();
+  }, [preset, startDate, endDate, managerId, serviceType, source]);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true); setError("");
+    api.get<any>(`/sales-analytics/dashboard?${query}`)
+      .then((r) => { if (alive) setData(r); })
+      .catch((e) => { if (alive) setError((e as Error).message); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [query]);
+
+  const managers = data?.managers ?? [];
+  const kpis = data?.kpis ?? {};
+  const periodLabel = data?.period ? `${new Date(data.period.start).toLocaleDateString("ru-RU")} — ${new Date(new Date(data.period.end).getTime() - 1).toLocaleDateString("ru-RU")}` : "";
+
+  return (
+    <div className="min-h-screen bg-[#f6f4ef] p-4 text-slate-800 lg:p-6">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">Аналитика продаж</h1>
+          <p className="mt-1 text-xs text-slate-500">Заявки → заказы → бронирования → завершённые и закрытые сделки. Период: {periodLabel}</p>
+        </div>
+        <div className="flex flex-wrap items-end gap-2 text-xs">
+          <label className="flex flex-col gap-1"><span className="text-slate-500">Период</span>
+            <select value={preset} onChange={(e) => setPreset(e.target.value)} className="rounded-lg border bg-white px-2 py-1.5">
+              {PRESETS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </label>
+          {preset === "CUSTOM" && <>
+            <label className="flex flex-col gap-1"><span className="text-slate-500">С</span><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-lg border bg-white px-2 py-1.5" /></label>
+            <label className="flex flex-col gap-1"><span className="text-slate-500">По</span><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-lg border bg-white px-2 py-1.5" /></label>
+          </>}
+          <label className="flex flex-col gap-1"><span className="text-slate-500">Менеджер</span>
+            <select value={managerId} onChange={(e) => setManagerId(e.target.value)} className="min-w-40 rounded-lg border bg-white px-2 py-1.5">
+              <option value="">Все</option>
+              {managers.map((m: any) => <option key={m.managerId ?? "none"} value={m.managerId ?? ""}>{m.manager}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1"><span className="text-slate-500">Услуга</span>
+            <select value={serviceType} onChange={(e) => setServiceType(e.target.value)} className="rounded-lg border bg-white px-2 py-1.5">
+              <option value="">Все</option>{["TOUR_PACKAGE", "HOTEL", "FLIGHT", "TRANSFER", "INSURANCE", "VISA", "CRUISE", "OTHER"].map((x) => <option key={x}>{x}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1"><span className="text-slate-500">Источник</span><input value={source} onChange={(e) => setSource(e.target.value)} placeholder="Все" className="w-28 rounded-lg border bg-white px-2 py-1.5" /></label>
+        </div>
+      </div>
+
+      <div className="mb-3 flex flex-wrap gap-1 rounded-xl border border-[#e5e2da] bg-white p-1">
+        {TABS.map(([v, l]) => <button key={v} onClick={() => setTab(v)} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${tab === v ? "bg-[#0f6b5f] text-white" : "text-slate-600 hover:bg-slate-50"}`}>{l}</button>)}
+      </div>
+
+      {loading && <div className="rounded-xl bg-white p-6 text-sm text-slate-500">Загрузка аналитики…</div>}
+      {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>}
+      {!loading && !error && data && <>
+        {tab === "overview" && <>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {GROUPS.map(([title, keys]) => (
+              <div key={title} className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm">
+                <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{title}</div>
+                <div className="space-y-1.5">{keys.map((k) => <div key={k} className="flex items-center justify-between gap-2 text-xs"><span className="text-slate-500">{KPI_LABELS[k] ?? k}</span><span className="text-right font-semibold">{k.startsWith("conversion") ? pct(kpis[k]?.value) : k.toLowerCase().includes("amount") || k.toLowerCase().includes("revenue") || k.toLowerCase().includes("profit") || k.toLowerCase().includes("result") || k === "avgCheck" || k === "refunds" ? money(kpis[k]?.value) : kpis[k]?.value ?? 0}<span className={`ml-1 text-[9px] ${(kpis[k]?.delta ?? 0) < 0 ? "text-rose-500" : "text-emerald-600"}`}>{deltaText(kpis[k])}</span></span></div>)}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 rounded-xl border border-[#e5e2da] bg-white p-3">
+            <div className="mb-2 text-xs font-semibold">Динамика по дням</div>
+            <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-[11px]"><thead className="text-slate-400"><tr>{["Дата", "Заявки", "Заказы", "Брони", "Завершено", "Закрыто", "Продажи"].map((h) => <th key={h} className="px-2 py-1 font-medium">{h}</th>)}</tr></thead><tbody>{(data.series ?? []).slice(-30).map((r: any) => <tr key={r.date} className="border-t border-slate-100"><td className="px-2 py-1">{r.date}</td><td className="px-2 py-1">{r.requests}</td><td className="px-2 py-1">{r.orders}</td><td className="px-2 py-1">{r.bookings}</td><td className="px-2 py-1">{r.completed}</td><td className="px-2 py-1">{r.closed}</td><td className="px-2 py-1">{money(r.salesAmount)}</td></tr>)}</tbody></table></div>
+          </div>
+        </>}
+
+        {tab === "managers" && <div className="overflow-x-auto rounded-xl border border-[#e5e2da] bg-white">
+          <table className="w-full min-w-[1100px] text-left text-[11px]"><thead className="bg-slate-50 text-slate-400"><tr>{["Менеджер", "Заявки", "Обработано", "Без ответа", "Просрочено", "Заказы", "Брони", "Завершено", "Закрыто", "Конверсия", "Продажи", "Выручка", "Прибыль", "Ср. ответ, ч"].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead><tbody>{managers.map((m: any) => <tr key={m.managerId ?? "none"} onClick={() => setSelectedManager(m)} className="cursor-pointer border-t border-slate-100 hover:bg-emerald-50/40"><td className="px-2 py-2 font-medium">{m.manager}</td><td className="px-2 py-2">{m.requests}</td><td className="px-2 py-2">{m.processed}</td><td className="px-2 py-2">{m.noFirstResponse}</td><td className="px-2 py-2">{m.overdue}</td><td className="px-2 py-2">{m.orders}</td><td className="px-2 py-2">{m.bookings}</td><td className="px-2 py-2">{m.completed}</td><td className="px-2 py-2">{m.closed}</td><td className="px-2 py-2">{pct(m.conversionRequestOrder)}</td><td className="px-2 py-2">{money(m.salesAmount)}</td><td className="px-2 py-2">{money(m.capturedRevenue)}</td><td className="px-2 py-2">{money(m.grossProfit)}</td><td className="px-2 py-2">{m.avgResponseHours ?? "—"}</td></tr>)}</tbody></table>
+          {selectedManager && <div className="border-t bg-emerald-50/40 p-3 text-xs"><div className="mb-1 flex justify-between"><b>{selectedManager.manager}</b><button onClick={() => setSelectedManager(null)} className="text-slate-500">×</button></div><div className="grid gap-2 sm:grid-cols-4"><div>Заявки: {selectedManager.requests}</div><div>Заказы: {selectedManager.orders}</div><div>Завершено: {selectedManager.completed}</div><div>Закрыто: {selectedManager.closed}</div><div>Продажи: {money(selectedManager.salesAmount)}</div><div>Выручка: {money(selectedManager.capturedRevenue)}</div><div>Прибыль: {money(selectedManager.grossProfit)}</div><div>Ср. ответ: {selectedManager.avgResponseHours ?? "—"} ч</div></div></div>}
+        </div>}
+
+        {tab === "activity" && <div className="overflow-x-auto rounded-xl border border-[#e5e2da] bg-white"><table className="w-full min-w-[1000px] text-left text-[11px]"><thead className="bg-slate-50 text-slate-400"><tr>{["Заявка", "Создана", "Назначена", "Менеджер", "Клиент", "Телефон", "Услуга", "Направление", "Источник", "Статус", "Первый ответ, ч", "Просрочка"].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead><tbody>{(data.activity ?? []).map((r: any) => <tr key={r.requestId} className="border-t border-slate-100"><td className="px-2 py-2 font-mono">{r.requestCode}</td><td className="px-2 py-2">{dt(r.createdAt)}</td><td className="px-2 py-2">{dt(r.assignedAt)}</td><td className="px-2 py-2">{r.manager}</td><td className="px-2 py-2">{r.customer}</td><td className="px-2 py-2">{r.phone ?? "—"}</td><td className="px-2 py-2">{r.requestType ?? "—"}</td><td className="px-2 py-2">{r.destination ?? "—"}</td><td className="px-2 py-2">{r.source ?? "—"}</td><td className="px-2 py-2">{r.status}</td><td className="px-2 py-2">{r.responseHours ?? "—"}</td><td className={`px-2 py-2 ${r.overdue ? "font-semibold text-rose-600" : "text-slate-400"}`}>{r.overdue ? "Да" : "Нет"}</td></tr>)}</tbody></table></div>}
+
+        {tab === "funnel" && <div className="space-y-2">{(data.funnel ?? []).map((s: any, i: number, arr: any[]) => <div key={s.stage} className="rounded-xl border border-[#e5e2da] bg-white p-3"><div className="mb-1 flex justify-between text-xs"><b>{s.label}</b><span>{s.count} · {pct(s.conversion)}</span></div><div className="h-2 overflow-hidden rounded bg-slate-100"><div className="h-full rounded bg-[#0f6b5f]" style={{ width: `${Math.min(100, s.conversion)}%` }} /></div>{i < arr.length - 1 && <div className="mt-1 text-[10px] text-slate-400">Потери к следующему этапу: {Math.max(0, s.count - arr[i + 1].count)}</div>}</div>)}</div>}
+
+        {tab === "deals" && <>
+          <div className="mb-2 flex gap-1 rounded-lg border bg-white p-1"><button onClick={() => setDealTab("completed")} className={`rounded px-3 py-1.5 text-xs ${dealTab === "completed" ? "bg-[#0f6b5f] text-white" : ""}`}>Завершённые</button><button onClick={() => setDealTab("closed")} className={`rounded px-3 py-1.5 text-xs ${dealTab === "closed" ? "bg-[#0f6b5f] text-white" : ""}`}>Закрытые</button></div>
+          <div className="overflow-x-auto rounded-xl border border-[#e5e2da] bg-white"><table className="w-full min-w-[1200px] text-left text-[10px]"><thead className="bg-slate-50 text-slate-400"><tr>{["Request", "Order", "Booking", "Клиент", "Телефон", "Менеджер", "Услуга", "Направление", "Заявка", "Заказ", "Бронь", "Завершение", "Закрытие", "Цена", "Себестоимость", "Выручка", "Прибыль", "Фин. статус"].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead><tbody>{(data.deals?.[dealTab] ?? []).map((d: any) => <tr key={d.orderId} className="border-t border-slate-100"><td className="px-2 py-2">{d.requestCode ?? "—"}</td><td className="px-2 py-2">{d.orderCode}</td><td className="px-2 py-2">{d.bookingCode ?? "—"}</td><td className="px-2 py-2">{d.customer}</td><td className="px-2 py-2">{d.phone ?? "—"}</td><td className="px-2 py-2">{d.manager ?? "—"}</td><td className="px-2 py-2">{d.requestType ?? "—"}</td><td className="px-2 py-2">{d.destination ?? "—"}</td><td className="px-2 py-2">{dt(d.requestCreatedAt)}</td><td className="px-2 py-2">{dt(d.orderCreatedAt)}</td><td className="px-2 py-2">{dt(d.bookingConfirmedAt)}</td><td className="px-2 py-2">{dt(d.serviceCompletedAt)}</td><td className="px-2 py-2">{dt(d.closedAt)}</td><td className="px-2 py-2">{money(d.clientPrice)}</td><td className="px-2 py-2">{money(d.cost)}</td><td className="px-2 py-2">{money(d.revenue)}</td><td className="px-2 py-2">{money(d.grossProfit)}</td><td className="px-2 py-2">{d.financialStatus ?? "—"}</td></tr>)}</tbody></table>{(data.deals?.[dealTab] ?? []).length === 0 && <div className="p-6 text-center text-xs text-slate-400">Нет сделок за период</div>}</div>
+        </>}
+      </>}
+    </div>
+  );
+}
