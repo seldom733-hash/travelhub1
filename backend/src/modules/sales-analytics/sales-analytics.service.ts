@@ -137,6 +137,29 @@ export class SalesAnalyticsService {
     const managerId = user?.role === "SALES_MANAGER" ? user.id : (q.managerId || undefined);
     const current = await this.compute(period, { ...q, managerId });
     const prev = await this.compute(previous, { ...q, managerId });
+    // Period assignments and live load are different facts: live load includes
+    // older requests still active today.
+    const liveWhere: any = { status: { notIn: TERMINAL_REQUEST } };
+    if (managerId) liveWhere.assignedManagerId = managerId;
+    const liveRequests = await this.prisma.request.findMany({
+      where: liveWhere,
+      select: { assignedManagerId: true, processingStartedAt: true, slaDueAt: true },
+    });
+    const liveByManager = new Map<string, { load: number; unprocessed: number; overdue: number }>();
+    for (const r of liveRequests) {
+      const k = r.assignedManagerId ?? "unassigned";
+      const row = liveByManager.get(k) ?? { load: 0, unprocessed: 0, overdue: 0 };
+      row.load++;
+      if (!r.processingStartedAt) row.unprocessed++;
+      if (r.slaDueAt && r.slaDueAt < new Date()) row.overdue++;
+      liveByManager.set(k, row);
+    }
+    if (current.distribution?.managers) {
+      current.distribution.managers = current.distribution.managers.map((m: any) => {
+        const live = liveByManager.get(m.managerId ?? "unassigned") ?? { load: 0, unprocessed: 0, overdue: 0 };
+        return { ...m, currentLoad: live.load, unprocessed: live.unprocessed, overdue: live.overdue };
+      });
+    }
     const kpis: Record<string, any> = {};
     for (const k of Object.keys(current.kpis)) {
       const cur = current.kpis[k];
