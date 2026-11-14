@@ -171,7 +171,7 @@ export default function DealDetailPage() {
 
   async function undoLastAction() {
     if (!deal) return;
-    const bookingUndo = deal.stage === "BOOKING" && deal.status === "CANCELLED" && deal.bookingId;
+    const bookingUndo = deal.stage === "BOOKING" && deal.status !== "NEW" && deal.bookingId;
     const orderUndo = deal.stage === "ORDER" && deal.status !== "NEW" && deal.orderId;
     if (!bookingUndo && !orderUndo) return;
     if (!window.confirm("Вернуть последнее действие?")) return;
