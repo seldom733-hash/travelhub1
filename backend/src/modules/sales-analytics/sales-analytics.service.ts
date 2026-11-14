@@ -155,6 +155,7 @@ export class SalesAnalyticsService {
       series: current.series,
       sources: current.sources,
       distribution: current.distribution,
+      lossReasons: current.lossReasons,
     };
   }
 
@@ -291,6 +292,11 @@ export class SalesAnalyticsService {
     const cancelledBookings = bookings.filter((b) => inScopeBooking(b) && dateIn(b.cancelledAt, p));
     const completedOrders = scopedOrders.filter((o) => o.status !== "CANCELLED" && (dateIn(o.fulfilledAt, p) || bookings.some((b) => b.orderId === o.id && dateIn(b.completedAt, p))));
     const lostRequests = requests.filter((r) => ["REJECTED", "UNAVAILABLE", "EXPIRED", "CUSTOMER_PAYMENT_TIMEOUT", "CANCELLED_BY_CUSTOMER"].includes(r.status));
+    const lossReasonMap = new Map<string, number>();
+    for (const r of lostRequests) {
+      const reason = r.rejectionReason?.trim() || r.status;
+      lossReasonMap.set(reason, (lossReasonMap.get(reason) ?? 0) + 1);
+    }
     const overdue = requests.filter((r) => !!r.slaDueAt && r.slaDueAt < new Date() && !TERMINAL_REQUEST.includes(r.status));
     const noFirstResponse = requests.filter((r) => !r.firstContactAt && !TERMINAL_REQUEST.includes(r.status));
     const assigned = requests.filter((r) => !!r.assignedAt);
@@ -521,6 +527,6 @@ export class SalesAnalyticsService {
       })),
     };
 
-    return { kpis, managers, funnel, services: [...serviceMap.values()], sources: [...sourceMap.values()], activity, deals: { completed: dealRows("completed"), closed: dealRows("closed") }, series, distribution };
+    return { kpis, managers, funnel, services: [...serviceMap.values()], sources: [...sourceMap.values()], lossReasons: [...lossReasonMap.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count), activity, deals: { completed: dealRows("completed"), closed: dealRows("closed") }, series, distribution };
   }
 }
