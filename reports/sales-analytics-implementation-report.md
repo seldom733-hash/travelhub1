@@ -96,7 +96,8 @@ FINANCE — только в рамках финансовых прав
 
 ```text
 sales-analytics.period.spec.ts  5 passed
-sales-analytics.service.spec.ts 2 passed
+sales-analytics.service.spec.ts 3 passed
+reports/sales-analytics-smoke.ps1 — OK dashboard/manager/drilldown
 ```
 
 Проверено:
