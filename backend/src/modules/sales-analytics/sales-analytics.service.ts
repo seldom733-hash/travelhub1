@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 
 export const SALES_ANALYTICS_PRESETS = [
@@ -159,7 +159,7 @@ export class SalesAnalyticsService {
   }
 
   async managerDetail(id: string, q: SalesAnalyticsQuery, user: any) {
-    if (user?.role === "SALES_MANAGER" && user.id !== id) throw new Error("Forbidden");
+    if (user?.role === "SALES_MANAGER" && user.id !== id) throw new ForbiddenException("Manager scope");
     const data = await this.dashboard({ ...q, managerId: id }, user);
     return { ...data, managerId: id };
   }

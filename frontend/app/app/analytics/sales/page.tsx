@@ -58,6 +58,16 @@ export default function SalesAnalyticsPage() {
   const [selectedManager, setSelectedManager] = useState<any>(null);
   const [managerOptions, setManagerOptions] = useState<any[]>([]);
 
+  function focusKpi(k: string) {
+    if (["completedDeals", "closedDeals", "salesAmount", "capturedRevenue", "grossProfit", "completedResult", "closedResult"].includes(k)) {
+      setDealTab(k === "closedDeals" || k === "closedResult" ? "closed" : "completed");
+      setTab("deals");
+      return;
+    }
+    if (k === "ordersCreated" || k === "bookingsConfirmed" || k.startsWith("conversion")) { setTab("funnel"); return; }
+    setTab("activity");
+  }
+
   const query = useMemo(() => {
     const qs = new URLSearchParams({ preset, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" });
     if (preset === "CUSTOM") { qs.set("startDate", startDate); qs.set("endDate", endDate); }
@@ -125,7 +135,7 @@ export default function SalesAnalyticsPage() {
             {GROUPS.map(([title, keys]) => (
               <div key={title} className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm">
                 <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{title}</div>
-                <div className="space-y-1.5">{keys.map((k) => <div key={k} className="flex items-center justify-between gap-2 text-xs"><span className="text-slate-500">{KPI_LABELS[k] ?? k}</span><span className="text-right font-semibold">{k.startsWith("conversion") ? pct(kpis[k]?.value) : k.toLowerCase().includes("amount") || k.toLowerCase().includes("revenue") || k.toLowerCase().includes("profit") || k.toLowerCase().includes("result") || k === "avgCheck" || k === "refunds" ? money(kpis[k]?.value) : kpis[k]?.value ?? 0}<span className={`ml-1 text-[9px] ${(kpis[k]?.delta ?? 0) < 0 ? "text-rose-500" : "text-emerald-600"}`}>{deltaText(kpis[k])}</span></span></div>)}</div>
+                <div className="space-y-1.5">{keys.map((k) => <button type="button" key={k} onClick={() => focusKpi(k)} className="flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left text-xs hover:bg-emerald-50"><span className="text-slate-500">{KPI_LABELS[k] ?? k}</span><span className="text-right font-semibold">{k.startsWith("conversion") ? pct(kpis[k]?.value) : k.toLowerCase().includes("amount") || k.toLowerCase().includes("revenue") || k.toLowerCase().includes("profit") || k.toLowerCase().includes("result") || k === "avgCheck" || k === "refunds" ? money(kpis[k]?.value) : kpis[k]?.value ?? 0}<span className={`ml-1 text-[9px] ${(kpis[k]?.delta ?? 0) < 0 ? "text-rose-500" : "text-emerald-600"}`}>{deltaText(kpis[k])}</span></span></button>)}</div>
               </div>
             ))}
           </div>
