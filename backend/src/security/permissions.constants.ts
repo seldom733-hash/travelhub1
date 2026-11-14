@@ -134,7 +134,6 @@ export const PERMISSIONS = {
   // были недостижимы через API. Добавлены в каталог и выданы FINANCE.
   "finance.payment.create": "Создание платежа (инициация, Step 2.12H)",
   "finance.payment.manage": "Управление платежом (confirm/fail/cancel)",
-  "finance.payment.confirm_own": "Подтверждение платежа, созданного самим менеджером",
   "finance.payment.delete": "Удаление ошибочных платежей",
   "finance.refund.read": "Чтение возвратов",
   "finance.refund.delete": "Удаление ошибочных возвратов",
@@ -459,7 +458,6 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.payment.read",
     "finance.payment.write",
     "finance.payment.create",
-    "finance.payment.confirm_own",
     "finance.payment.manage",
     "finance.payment.delete",
     // Finance completion: отдельное право подтверждения исполнения выплаты
@@ -692,7 +690,6 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.overview.read",
     "finance.payment.read",
     "finance.payment.create",
-    "finance.payment.confirm_own",
     "finance.obligation.read",
     "finance.supplier_payout.read",
     "finance.supplier_payout.manage",
@@ -758,7 +755,6 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.overview.read",
     "finance.payment.read",
     "finance.payment.create",
-    "finance.payment.confirm_own",
     "finance.obligation.read",
     "finance.supplier_payout.read",
     "finance.supplier_payout.manage",

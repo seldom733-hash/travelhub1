@@ -174,7 +174,7 @@ export default function DealDetailPage() {
     if (!payment) return;
     setActionBusy("confirm-payment"); setActionError("");
     try {
-      await api.post(`/finance/payments/${payment.code}/${canManagePayments ? "confirm" : "confirm-own"}`, {});
+      await api.post(`/finance/payments/${payment.code}/confirm`, {});
       setReload((v) => v + 1);
     } catch (e) { setActionError((e as Error).message); } finally { setActionBusy(""); }
   }
@@ -287,9 +287,7 @@ export default function DealDetailPage() {
   const canReopenDeal = Boolean(user?.permissions.includes("order.cancel"));
   const canCancelDeal = Boolean(user?.permissions.includes("order.cancel"));
   const pendingPayment = deal.payments?.find((p) => p.status === "PENDING");
-  const canManagePayments = Boolean(user?.permissions.includes("finance.payment.manage"));
-  const canConfirmOwnPayment = Boolean(user?.permissions.includes("finance.payment.confirm_own"));
-  const canConfirmPayment = Boolean(pendingPayment) && (canManagePayments || canConfirmOwnPayment);
+  const canConfirmPayment = Boolean(user?.permissions.includes("finance.payment.manage")) && Boolean(pendingPayment);
   const closeBlockedByServiceDate = Boolean(serviceEndIso && !["CANCELLED", "CANCELLATION_APPROVED"].includes(deal.status) && serviceEndIso >= todayIso);
   const effectiveOrderActions = readOnly || deal.stage === "BOOKING" ? [] : availableActions.filter((a) => {
     if (isCancellationApproved && ["cancel", "close", "reopen"].includes(a)) return false;

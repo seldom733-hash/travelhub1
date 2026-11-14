@@ -71,7 +71,6 @@ export class SecurityService implements OnModuleInit {
     // finance.payment.manage / finance.refund.approve / finance.refund.execute
     // and supplier-payment confirmation, survives permissions added later.
     await this.ensureAdminPermissions();
-    await this.ensureOwnPaymentConfirmation();
 
     // Step 3.2: RolePermission rows = persisted effective state.
     // Startup seed НЕ выполняет toAdd/toRevoke для RolePermission.
@@ -89,24 +88,6 @@ export class SecurityService implements OnModuleInit {
     if (!admin) return;
     await this.prisma.rolePermission.createMany({
       data: permissions.map((p) => ({ roleId: admin.id, permissionId: p.id })),
-      skipDuplicates: true,
-    });
-  }
-
-  /** Managers may confirm only a payment they created (own payment). */
-  private async ensureOwnPaymentConfirmation(): Promise<void> {
-    const permission = await this.prisma.permission.findUnique({
-      where: { code: "finance.payment.confirm_own" },
-      select: { id: true },
-    });
-    if (!permission) return;
-    const roles = await this.prisma.role.findMany({
-      where: { code: { in: ["SALES_MANAGER", "SALES_HEAD"] } },
-      select: { id: true },
-    });
-    if (roles.length === 0) return;
-    await this.prisma.rolePermission.createMany({
-      data: roles.map((role) => ({ roleId: role.id, permissionId: permission.id })),
       skipDuplicates: true,
     });
   }
