@@ -752,22 +752,34 @@ export class BookingService {
         orderBy: { createdAt: "desc" },
         take: 50,
       });
-      const undoable = new Set([
-        "prepare", "send", "requestClarification", "resume", "confirm",
-        "reject", "service", "requestChange", "resolveChange",
-        "requestCancellation", "complete", "cancel", "problem",
-      ]);
-      // Skip previous undo rows: each click must find the transition that
-      // produced the CURRENT status, so the back button works repeatedly.
-      const transition = history.find(
-        (h: any) => h.to === booking.status && undoable.has(h.action),
-      );
-      if (!transition) {
+      // Deterministic backbone: PROBLEM/SUSPENDED/CHANGE are branches, not a
+      // cycle. CANCELLED is special: restore the status from which it was
+      // cancelled.
+      const BACK: Record<string, BookingStatus> = {
+        PREPARING_REQUEST: "NEW",
+        SENT_TO_SUPPLIER: "PREPARING_REQUEST",
+        AWAITING_CONFIRMATION: "SENT_TO_SUPPLIER",
+        NEEDS_CLARIFICATION: "SENT_TO_SUPPLIER",
+        CONFIRMED: "SENT_TO_SUPPLIER",
+        IN_SERVICE: "CONFIRMED",
+        COMPLETED: "IN_SERVICE",
+        CHANGE_REQUESTED: "CONFIRMED",
+        PROBLEM: "CONFIRMED",
+        CANCELLATION_REQUESTED: "CONFIRMED",
+        SUPPLIER_REJECTED: "SENT_TO_SUPPLIER",
+      };
+      let target: BookingStatus | null;
+      if (booking.status === "CANCELLED") {
+        const cancelledFrom = history.find(
+          (h: any) => h.action === "cancel" && h.to === "CANCELLED",
+        );
+        target = (cancelledFrom?.from as BookingStatus | undefined) ?? null;
+      } else {
+        target = BACK[booking.status] ?? null;
+      }
+      if (!target) {
         throw new ConflictError(`Booking ${booking.code}: last action cannot be undone`);
       }
-      const target = transition.from as BookingStatus | null;
-      if (!target) throw new ConflictError(`Booking ${booking.code}: no previous state`);
-
       const order = await tx.order.findUnique({
         where: { id: booking.orderId },
         select: { code: true, status: true, version: true },
@@ -800,12 +812,8 @@ export class BookingService {
         status: target,
         version: { increment: 1 },
       };
-      if (transition.action === "cancel") data.cancelledAt = null;
-      if (transition.action === "complete") data.completedAt = null;
-      if (transition.action === "confirm") data.confirmedAt = null;
-      if (transition.action === "reject") data.rejectedAt = null;
-      if (transition.action === "send" || transition.action === "resume") data.requestedAt = null;
-
+      if (booking.status === "CANCELLED") data.cancelledAt = null;
+      if (booking.status === "COMPLETED") data.completedAt = null;
       const updatedRows = await tx.booking.updateMany({
         where: { id: bookingId, status: booking.status, version: booking.version },
         data,
@@ -822,7 +830,7 @@ export class BookingService {
           to: target,
           actorId: actor,
           actorName: actor,
-          comment: `Откат действия: ${transition.action}`,
+          comment: `Откат статуса ${booking.status} → ${target}`,
         },
       });
 
