@@ -224,10 +224,16 @@ export class SalesAnalyticsService {
         })
       : [];
     const manager = (data.managers ?? []).find((m: any) => m.managerId === id) ?? null;
+    const managerUser = manager ? null : await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, fullName: true, username: true },
+    });
     return {
       ...data,
       managerId: id,
-      manager,
+      manager: manager ?? (managerUser
+        ? { managerId: id, manager: managerUser.fullName ?? managerUser.username, requests: 0, orders: 0, completed: 0, closed: 0 }
+        : null),
       assignments: history
         .filter((h) => ["ASSIGNED", "returned_from_order"].includes(h.action))
         .map((h) => ({
