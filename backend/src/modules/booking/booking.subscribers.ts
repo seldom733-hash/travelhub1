@@ -182,9 +182,24 @@ export class BookingSubscribers implements OnModuleInit {
           // Multi-item Order: same commerce root must not collide on Booking.referenceNumber
           // (unique) — ordinal suffix keeps MKT-BKG-{root}-{n} stable per OrderItem.
           const orderAttempt = /-(\d{1,2})$/.exec(order.referenceNumber ?? "")?.[1] ?? "";
-          const bookingRefNum = order.commerceSequence
+          let bookingRefNum = order.commerceSequence
             ? `${this.refNum.commerceBookingRef(order.commerceSequence)}${orderAttempt ? `-${orderAttempt}` : ""}${bookingOrdinal > 1 ? `-${bookingOrdinal - 1}` : ""}`
             : await this.generateBookingReferenceNumber(tx, order, item);
+          // A returned-to-request Order can be converted again with the same
+          // commerce sequence/attempt; old Booking references are still unique
+          // historical rows. Pick the next free root suffix instead of failing
+          // the whole BookingRequested event on a unique collision.
+          if (order.commerceSequence) {
+            const root = this.refNum.commerceBookingRef(order.commerceSequence);
+            let suffix = 0;
+            while (await tx.booking.findUnique({
+              where: { referenceNumber: bookingRefNum },
+              select: { id: true },
+            })) {
+              suffix += 1;
+              bookingRefNum = `${root}-${suffix}`;
+            }
+          }
           // Step 2.8: canonical cardinality 1 OrderItem → 1 Booking. orderItemId
           // (частичный unique — status <> CANCELLED AND rejectedAt IS NULL,
           // Stage 2) — надёжная защита от logically-duplicate BookingRequested
