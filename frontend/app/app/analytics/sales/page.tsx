@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import { useLocale } from "@/lib/i18n";
 
 const PRESETS: Array<[string, string]> = [
   ["TODAY", "Сегодня"], ["YESTERDAY", "Вчера"], ["LAST_7_DAYS", "Последние 7 дней"],
@@ -45,7 +44,6 @@ function deltaText(x: any) {
 }
 
 export default function SalesAnalyticsPage() {
-  const locale = useLocale();
   const [preset, setPreset] = useState("CURRENT_MONTH");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -58,6 +56,7 @@ export default function SalesAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedManager, setSelectedManager] = useState<any>(null);
+  const [managerOptions, setManagerOptions] = useState<any[]>([]);
 
   const query = useMemo(() => {
     const qs = new URLSearchParams({ preset, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" });
@@ -72,7 +71,7 @@ export default function SalesAnalyticsPage() {
     let alive = true;
     setLoading(true); setError("");
     api.get<any>(`/sales-analytics/dashboard?${query}`)
-      .then((r) => { if (alive) setData(r); })
+      .then((r) => { if (alive) { setData(r); if (!managerId) setManagerOptions(r.managers ?? []); } })
       .catch((e) => { if (alive) setError((e as Error).message); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
@@ -102,7 +101,7 @@ export default function SalesAnalyticsPage() {
           <label className="flex flex-col gap-1"><span className="text-slate-500">Менеджер</span>
             <select value={managerId} onChange={(e) => setManagerId(e.target.value)} className="min-w-40 rounded-lg border bg-white px-2 py-1.5">
               <option value="">Все</option>
-              {managers.map((m: any) => <option key={m.managerId ?? "none"} value={m.managerId ?? ""}>{m.manager}</option>)}
+              {managerOptions.map((m: any) => <option key={m.managerId ?? "none"} value={m.managerId ?? ""}>{m.manager}</option>)}
             </select>
           </label>
           <label className="flex flex-col gap-1"><span className="text-slate-500">Услуга</span>
