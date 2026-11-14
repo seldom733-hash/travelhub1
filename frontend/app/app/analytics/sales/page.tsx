@@ -61,6 +61,8 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
   const [selectedManager, setSelectedManager] = useState<any>(null);
   const [managerOptions, setManagerOptions] = useState<any[]>([]);
   const [activityFilter, setActivityFilter] = useState("all");
+  const [drill, setDrill] = useState<any>(null);
+  const [drillLoading, setDrillLoading] = useState("");
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -73,8 +75,16 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
     if (q.get("dealTab") === "closed") setDealTab("closed");
   }, []);
 
-  function focusKpi(k: string) {
-    if (["completedDeals", "closedDeals", "salesAmount", "capturedRevenue", "grossProfit", "completedResult", "closedResult"].includes(k)) {
+  async function openDrilldown(k: string) {
+    setDrillLoading(k); setError("");
+    try {
+      const r = await api.get<any>(`/sales-analytics/drilldown?metric=${encodeURIComponent(k)}&${query}`);
+      setDrill(r);
+    } catch (e) { setError((e as Error).message); }
+    finally { setDrillLoading(""); }
+  }
+
+  function focusKpi(k: string) {    if (["completedDeals", "closedDeals", "salesAmount", "capturedRevenue", "grossProfit", "completedResult", "closedResult"].includes(k)) {
       setDealTab(k === "closedDeals" || k === "closedResult" ? "closed" : "completed");
       router.push(`/app/analytics/sales/deals?${query}&dealTab=${k === "closedDeals" || k === "closedResult" ? "closed" : "completed"}`);
       return;
@@ -169,7 +179,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
             {GROUPS.map(([title, keys]) => (
               <div key={title} className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm">
                 <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{title}</div>
-                <div className="space-y-1.5">{keys.map((k) => <button type="button" key={k} onClick={() => focusKpi(k)} className="flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left text-xs hover:bg-emerald-50"><span className="text-slate-500">{KPI_LABELS[k] ?? k}</span><span className="text-right font-semibold">{k.startsWith("conversion") ? pct(kpis[k]?.value) : k.toLowerCase().includes("amount") || k.toLowerCase().includes("revenue") || k.toLowerCase().includes("profit") || k.toLowerCase().includes("result") || k === "avgCheck" || k === "refunds" ? money(kpis[k]?.value) : kpis[k]?.value ?? 0}<span className={`ml-1 text-[9px] ${(kpis[k]?.delta ?? 0) < 0 ? "text-rose-500" : "text-emerald-600"}`}>{deltaText(kpis[k])}</span></span></button>)}</div>
+                <div className="space-y-1.5">{keys.map((k) => <button type="button" key={k} onClick={() => void openDrilldown(k)} className="flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left text-xs hover:bg-emerald-50"><span className="text-slate-500">{KPI_LABELS[k] ?? k}</span><span className="text-right font-semibold">{k.startsWith("conversion") ? pct(kpis[k]?.value) : k.toLowerCase().includes("amount") || k.toLowerCase().includes("revenue") || k.toLowerCase().includes("profit") || k.toLowerCase().includes("result") || k === "avgCheck" || k === "refunds" ? money(kpis[k]?.value) : kpis[k]?.value ?? 0}<span className={`ml-1 text-[9px] ${(kpis[k]?.delta ?? 0) < 0 ? "text-rose-500" : "text-emerald-600"}`}>{deltaText(kpis[k])}</span></span></button>)}</div>
               </div>
             ))}
           </div>
@@ -200,6 +210,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
           <div className="overflow-x-auto rounded-xl border border-[#e5e2da] bg-white"><table className="w-full min-w-[1200px] text-left text-[10px]"><thead className="bg-slate-50 text-slate-400"><tr>{["Request", "Order", "Booking", "Клиент", "Телефон", "Менеджер", "Услуга", "Направление", "Заявка", "Заказ", "Бронь", "Завершение", "Закрытие", "Цена", "Себестоимость", "Выручка", "Прибыль", "Фин. статус"].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead><tbody>{(data.deals?.[dealTab] ?? []).map((d: any) => <tr key={d.orderId} className="border-t border-slate-100"><td className="px-2 py-2">{d.requestCode ?? "—"}</td><td className="px-2 py-2">{d.orderCode}</td><td className="px-2 py-2">{d.bookingCode ?? "—"}</td><td className="px-2 py-2">{d.customer}</td><td className="px-2 py-2">{d.phone ?? "—"}</td><td className="px-2 py-2">{d.manager ?? "—"}</td><td className="px-2 py-2">{d.requestType ?? "—"}</td><td className="px-2 py-2">{d.destination ?? "—"}</td><td className="px-2 py-2">{dt(d.requestCreatedAt)}</td><td className="px-2 py-2">{dt(d.orderCreatedAt)}</td><td className="px-2 py-2">{dt(d.bookingConfirmedAt)}</td><td className="px-2 py-2">{dt(d.serviceCompletedAt)}</td><td className="px-2 py-2">{dt(d.closedAt)}</td><td className="px-2 py-2">{money(d.clientPrice)}</td><td className="px-2 py-2">{money(d.cost)}</td><td className="px-2 py-2">{money(d.revenue)}</td><td className="px-2 py-2">{money(d.grossProfit)}</td><td className="px-2 py-2">{d.financialStatus ?? "—"}</td></tr>)}</tbody></table>{(data.deals?.[dealTab] ?? []).length === 0 && <div className="p-6 text-center text-xs text-slate-400">Нет сделок за период</div>}</div>
         </>}
       </>}
+      {drill && <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={() => setDrill(null)}><div className="max-h-[80vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}><div className="mb-3 flex items-center justify-between"><div><b className="text-sm">{KPI_LABELS[drill.metric] ?? drill.metric}</b><span className="ml-2 text-xs text-slate-400">записей: {drill.total}</span></div><button onClick={() => setDrill(null)} className="text-slate-500">×</button></div><table className="w-full text-left text-[11px]"><thead className="bg-slate-50 text-slate-400"><tr>{["Заявка", "Заказ", "Клиент", "Менеджер", "Статус", "Сумма"].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead><tbody>{(drill.rows ?? []).slice(0, 200).map((r: any, i: number) => <tr key={i} className="border-t"><td className="px-2 py-1.5 font-mono">{r.requestCode ?? "—"}</td><td className="px-2 py-1.5 font-mono">{r.orderCode ?? "—"}</td><td className="px-2 py-1.5">{r.customer ?? "—"}</td><td className="px-2 py-1.5">{r.manager ?? "—"}</td><td className="px-2 py-1.5">{r.status ?? "—"}</td><td className="px-2 py-1.5">{money(r.clientPrice ?? r.salesAmount ?? 0)}</td></tr>)}</tbody></table></div></div>}
     </div>
   );
 }

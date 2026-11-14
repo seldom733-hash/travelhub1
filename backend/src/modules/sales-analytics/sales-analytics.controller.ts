@@ -13,6 +13,12 @@ export class SalesAnalyticsController {
     return this.sales.dashboard(query, user);
   }
 
+  @Get("drilldown")
+  @RequirePermissions("sales.kpi.read")
+  drilldown(@Query("metric") metric: string, @Query() query: SalesAnalyticsQuery, @CurrentUser() user: AuthedRequest["user"]) {
+    return this.sales.drilldown(metric || "requestsTotal", query, user);
+  }
+
   @Get("managers/:id")
   @RequirePermissions("sales.kpi.read")
   manager(@Param("id") id: string, @Query() query: SalesAnalyticsQuery, @CurrentUser() user: AuthedRequest["user"]) {

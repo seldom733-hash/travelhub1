@@ -158,6 +158,28 @@ export class SalesAnalyticsService {
     };
   }
 
+  async drilldown(metric: string, q: SalesAnalyticsQuery, user: any) {
+    const data = await this.dashboard(q, user);
+    const requestMetrics = new Set([
+      "requestsTotal", "assigned", "accepted", "inWork", "noFirstResponse",
+      "proposalsSent", "lostRequests", "overdueRequests",
+    ]);
+    let rows: any[] = [];
+    if (requestMetrics.has(metric)) rows = data.activity ?? [];
+    else if (metric === "ordersCreated" || metric === "cancelledOrders" || metric === "salesAmount" || metric === "capturedRevenue" || metric === "grossProfit") {
+      rows = (data.activity ?? []).filter((r: any) => !!r.orderCode);
+    } else if (metric === "bookingsConfirmed" || metric === "cancelledBookings") {
+      rows = (data.activity ?? []).filter((r: any) => !!r.bookingCode);
+    } else if (metric === "completedDeals" || metric === "completedResult") {
+      rows = data.deals?.completed ?? [];
+    } else if (metric === "closedDeals" || metric === "closedResult") {
+      rows = data.deals?.closed ?? [];
+    } else {
+      rows = data.activity ?? [];
+    }
+    return { metric, total: rows.length, rows, period: data.period };
+  }
+
   async managerDetail(id: string, q: SalesAnalyticsQuery, user: any) {
     if (user?.role === "SALES_MANAGER" && user.id !== id) throw new ForbiddenException("Manager scope");
     const data = await this.dashboard({ ...q, managerId: id }, user);
