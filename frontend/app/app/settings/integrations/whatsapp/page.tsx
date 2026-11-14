@@ -224,6 +224,22 @@ export default function WhatsAppIntegrationPage() {
     }
   }
 
+  async function resetSession(id: string) {
+    if (!window.confirm(t("wa_int.sessions.reset_confirm", locale))) return;
+    setSessionBusy(`${id}:reset`);
+    setError(null);
+    try {
+      await api.post(`/whatsapp/sessions/${id}/session-reset`, { confirm: true });
+      if (qrSessionId === id) setQrSessionId(null);
+      await loadSessions();
+      await loadStatus();
+    } catch (err) {
+      setError(errMessage(err, locale));
+    } finally {
+      setSessionBusy(null);
+    }
+  }
+
   async function restoreSession(id: string) {
     if (!window.confirm(t("wa_int.sessions.restore_confirm", locale))) return;
     setSessionBusy(`${id}:restore`);
@@ -470,6 +486,15 @@ export default function WhatsAppIntegrationPage() {
                           data-testid={`btn-session-disconnect-${s.id}`}
                         >
                           {t("wa_int.disconnect", locale)}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void resetSession(s.id)}
+                          disabled={busyKey}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                          data-testid={`btn-session-reset-${s.id}`}
+                        >
+                          {t("wa_int.sessions.reset", locale)}
                         </button>
                         <button
                           type="button"

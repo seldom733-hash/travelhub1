@@ -136,4 +136,11 @@ export class WhatsAppSessionsController {
   restore(@Param("id") id: string, @Body() dto: ConfirmDto, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.runtime.restore(actor, dto.confirm, id);
   }
+
+  @Post(":id/session-reset")
+  @HttpCode(200)
+  @RequirePermissions("whatsapp.session.admin")
+  sessionReset(@Param("id") id: string, @Body() dto: ConfirmDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.runtime.sessionReset(actor, dto.confirm, id);
+  }
 }

@@ -3197,6 +3197,12 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "wa_int.sessions.label_placeholder": { ru: "Название номера (напр. Sales)", az: "Nömrə adı (məs. Sales)", en: "Number label (e.g. Sales)" },
   "wa_int.sessions.empty": { ru: "Номеров пока нет", az: "Hələ nömrə yoxdur", en: "No numbers yet" },
   "wa_int.sessions.archive": { ru: "Архивировать", az: "Arxivləşdir", en: "Archive" },
+  "wa_int.sessions.reset": { ru: "Сбросить сессию", az: "Sessiyanı sıfırla", en: "Reset session" },
+  "wa_int.sessions.reset_confirm": {
+    ru: "Сбросить сессию? Локальные данные входа будут удалены, при следующем подключении потребуется новый QR-код.",
+    az: "Sessiya sıfırlansın? Lokal giriş məlumatları silinəcək və növbəti qoşulmada yeni QR tələb olunacaq.",
+    en: "Reset the session? Local login data will be deleted and a new QR code will be required on the next connection.",
+  },
   "wa_int.sessions.archive_confirm": {
     ru: "Архивировать номер? Он отключится, но история диалогов и сообщений сохранится.",
     az: "Nömrə arxivləşdirilsin? O, qoparılacaq, amma söhbət tarixçəsi saxlanacaq.",
