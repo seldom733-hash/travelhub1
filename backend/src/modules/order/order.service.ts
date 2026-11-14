@@ -215,6 +215,7 @@ export function computeAvailableOrderActions(
    *  согласована с guard в orderAction — один и тот же терминальный список). */
   activeBlockingBookings = 0,
   freeOrderItems?: number,
+  hasCapturedClientPayment = true,
 ): OrderAction[] {
   const d3Scope = (order.travelerCount ?? 0) > 0 && order.termsAcceptedAt !== null;
   const actions: OrderAction[] = [];
@@ -228,6 +229,8 @@ export function computeAvailableOrderActions(
     // No free OrderItem → the backend send guard would reject. Do not render a
     // misleading forward button (e.g. one completed Booking on a single item).
     if (action === "send" && freeOrderItems !== undefined && freeOrderItems <= 0) continue;
+    // Send to Booking requires at least one captured client payment.
+    if (action === "send" && !hasCapturedClientPayment) continue;
     // D3 traveler gate (как в orderAction): confirm/send требуют finalConfirmedAt.
     if (d3Scope && !order.finalConfirmedAt && (action === "confirm" || action === "send")) continue;
     // Data is already confirmed: the next step is confirm order, not another
@@ -1254,11 +1257,15 @@ export class OrderService {
     const freeOrderItems = legacyOccupiesAll
       ? 0
       : order.items.filter((item) => !occupiedItemIds.has(item.id)).length;
+    const hasCapturedClientPayment = (await this.prisma.payment.count({
+      where: { orderId: order.id, status: "CAPTURED" },
+    })) > 0;
     const availableActions = computeAvailableOrderActions(
       order,
       grantedPermissions,
       activeBlockingBookings,
       freeOrderItems,
+      hasCapturedClientPayment,
     );
 
     // D5 §11: Request→Order canonical relation (Request.convertedOrderId).
@@ -1835,6 +1842,14 @@ export class OrderService {
               `Order ${order.code} has no free order item to book (active booking exists); return the booking to the order first`,
             );
           }
+        }
+        const captured = await tx.payment.count({
+          where: { orderId, status: "CAPTURED" },
+        });
+        if (captured === 0) {
+          throw new ConflictError(
+            `Order ${order.code} has no captured client payment; add a payment before sending to booking`,
+          );
         }
       }
 
