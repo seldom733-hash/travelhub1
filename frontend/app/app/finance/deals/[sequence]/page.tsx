@@ -44,7 +44,7 @@ const REQUEST_ACTION_LABELS: Record<string, string> = {
   convert: "Конвертировать в заказ",
 };
 const BOOKING_ACTION_LABELS: Record<string, string> = {
-  prepare: "Подготовить запрос", send: "Отправить поставщику", requestClarification: "Запросить уточнение",
+  prepare: "Подготовить запрос", send: "Отправить на бронь", requestClarification: "Запросить уточнение",
   resume: "Вернуть в работу", confirm: "Подтвердить бронь", reject: "Отклонить бронь",
   service: "Начать обслуживание", requestChange: "Запросить изменение", resolveChange: "Согласовать изменение",
   requestCancellation: "Запросить отмену", complete: "Завершить бронь", cancel: "Отменить бронь",
@@ -267,11 +267,16 @@ export default function DealDetailPage() {
   const refundable = Number(deal.clientReceived) > 0 && !cancelled;
   const readOnly = user?.role === "SALES_MANAGER" && deal.managerId !== user.id;
   const effectiveRequestActions = readOnly ? {} : requestActions;
-  const effectiveBookingActions = readOnly || deal.stage !== "BOOKING"
-    ? []
-    : bookingActions.includes("requestCancellation")
-      ? bookingActions.filter((action) => action !== "cancel")
-      : bookingActions;
+  const effectiveBookingActions = (() => {
+    if (readOnly || deal.stage !== "BOOKING") return [];
+    let list = bookingActions.filter(
+      (action) => !["prepare", "requestClarification"].includes(action),
+    );
+    if (list.includes("returnToOrder") || list.includes("requestCancellation")) {
+      list = list.filter((action) => action !== "cancel");
+    }
+    return list;
+  })();
   const clientRefundDue = deal.status === "CANCELLED"
     ? Math.max(0, Number(deal.clientReceived) - Number(deal.clientRefundTotal))
     : Math.max(0, Number(deal.clientReceived) - Number(deal.clientRefundTotal) - Number(deal.salesAmount));
