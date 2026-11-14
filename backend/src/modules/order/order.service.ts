@@ -214,6 +214,7 @@ export function computeAvailableOrderActions(
    *  возвращённые не считаются). > 0 → returnToRequest скрыт (проекция
    *  согласована с guard в orderAction — один и тот же терминальный список). */
   activeBlockingBookings = 0,
+  freeOrderItems?: number,
 ): OrderAction[] {
   const d3Scope = (order.travelerCount ?? 0) > 0 && order.termsAcceptedAt !== null;
   const actions: OrderAction[] = [];
@@ -224,6 +225,9 @@ export function computeAvailableOrderActions(
     // Stage 2 fix (Bug 2): блокирует только реально активный Booking;
     // исторический (returned/cancelled) не должен прятать кнопку.
     if ((action === "returnToRequest" || action === "cancel" || action === "complete" || action === "close") && activeBlockingBookings > 0) continue;
+    // No free OrderItem → the backend send guard would reject. Do not render a
+    // misleading forward button (e.g. one completed Booking on a single item).
+    if (action === "send" && freeOrderItems !== undefined && freeOrderItems <= 0) continue;
     // D3 traveler gate (как в orderAction): confirm/send требуют finalConfirmedAt.
     if (d3Scope && !order.finalConfirmedAt && (action === "confirm" || action === "send")) continue;
     // Data is already confirmed: the next step is confirm order, not another
@@ -1235,7 +1239,27 @@ export class OrderService {
     const activeBlockingBookings = await this.prisma.booking.count({
       where: { orderId: order.id, status: { notIn: BOOKING_TERMINAL } },
     });
-    const availableActions = computeAvailableOrderActions(order, grantedPermissions, activeBlockingBookings);
+    const occupiedRows = await this.prisma.booking.findMany({
+      where: {
+        orderId: order.id,
+        status: { notIn: ["CANCELLED", "SUPPLIER_REJECTED"] },
+        rejectedAt: null,
+      },
+      select: { orderItemId: true },
+    });
+    const occupiedItemIds = new Set(
+      occupiedRows.map((b) => b.orderItemId).filter((id): id is string => Boolean(id)),
+    );
+    const legacyOccupiesAll = occupiedRows.some((b) => !b.orderItemId);
+    const freeOrderItems = legacyOccupiesAll
+      ? 0
+      : order.items.filter((item) => !occupiedItemIds.has(item.id)).length;
+    const availableActions = computeAvailableOrderActions(
+      order,
+      grantedPermissions,
+      activeBlockingBookings,
+      freeOrderItems,
+    );
 
     // D5 §11: Request→Order canonical relation (Request.convertedOrderId).
     const linkedRequest = await this.prisma.request.findFirst({
