@@ -302,42 +302,30 @@ export default function MarkupAdminPage() {
   };
 
   const saveMarkupRule = async (supplierCode: string, serviceType: string, markupPercent: number) => {
-    const existing = markupRules.find((r) => r.supplierCode === supplierCode && r.serviceType === serviceType && r.status !== "ARCHIVED");
+    const existing = markupRules.filter((r) => r.supplierCode === supplierCode && r.serviceType === serviceType && r.status !== "ARCHIVED");
     const targetRate = decimalRate(String(markupPercent));
     if (markupPercent <= 0) {
-      if (existing) await api.post(`/pricing/markup-rules/${existing.code}/archive`, {});
+      for (const rule of existing) await api.post(`/pricing/markup-rules/${rule.code}/archive`, {});
       return;
     }
-    if (existing?.status === "DRAFT") {
-      await api.patch(`/pricing/markup-rules/${existing.code}`, { rate: targetRate, expectedVersion: existing.version });
-      await api.post(`/pricing/markup-rules/${existing.code}/activate`, {});
-      return;
-    }
-    if (existing?.status === "ACTIVE" && num(existing.rate) === Number(targetRate)) return;
-    if (existing) await api.post(`/pricing/markup-rules/${existing.code}/archive`, {});
+    // Archive every non-archived version first. Keeping a DRAFT beside an
+    // ACTIVE rule causes activate() to fail with an overlap conflict.
+    for (const rule of existing) await api.post(`/pricing/markup-rules/${rule.code}/archive`, {});
     const created = await api.post<MarkupRule>("/pricing/markup-rules", { supplierCode, serviceType, rate: targetRate });
     await api.post(`/pricing/markup-rules/${created.code}/activate`, {});
   };
 
   const saveCommissionRule = async (supplierCode: string, serviceType: string, commissionPercent: number) => {
-    const existing = commissionRules.find((r) => r.supplierCode === supplierCode && r.serviceType === serviceType && r.status !== "ARCHIVED");
+    const existing = commissionRules.filter((r) => r.supplierCode === supplierCode && r.serviceType === serviceType && r.status !== "ARCHIVED");
     const targetRate = decimalRate(String(commissionPercent));
     if (commissionPercent <= 0) {
-      if (existing) await api.post(`/pricing/commission-rules/${existing.code}/archive`, {});
+      for (const rule of existing) await api.post(`/pricing/commission-rules/${rule.code}/archive`, {});
       return;
     }
-    if (existing?.status === "DRAFT") {
-      await api.patch(`/pricing/commission-rules/${existing.code}`, {
-        rate: targetRate,
-        commissionType: "PERCENT",
-        calculationBase: "SUPPLIER_BASE",
-        expectedVersion: existing.version,
-      });
-      await api.post(`/pricing/commission-rules/${existing.code}/activate`, {});
-      return;
-    }
-    if (existing?.status === "ACTIVE" && num(existing.rate) === Number(targetRate)) return;
-    if (existing) await api.post(`/pricing/commission-rules/${existing.code}/archive`, {});
+    // A DRAFT plus an ACTIVE rule is a common legacy state. Archive all of
+    // them before creating the new active rule, otherwise activation returns
+    // 409 "Another active commission rule overlaps this period".
+    for (const rule of existing) await api.post(`/pricing/commission-rules/${rule.code}/archive`, {});
     const created = await api.post<CommissionRule>("/pricing/commission-rules", {
       supplierCode,
       serviceType,
