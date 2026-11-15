@@ -162,7 +162,7 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
   return (
     <section className="relative overflow-hidden bg-dark">
       <div className="th-container pt-8 sm:pt-10">
-        <div className="relative mt-2 aspect-[1956/804] min-h-[340px] overflow-hidden rounded-[26px] bg-dark-surface sm:min-h-0">
+        <div className="relative mt-2 aspect-[1956/804] min-h-[300px] w-full overflow-hidden rounded-[26px] bg-dark-surface sm:min-h-0">
           {images.map((image, i) => (
             <div
               key={`${image}-${i}`}
@@ -185,7 +185,7 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
           <div className="hero-overlay absolute inset-0 z-[1]" />
 
           <div className="absolute inset-0 z-10 flex items-center">
-            <div className="hero-overlay-copy max-w-2xl px-6 py-8 sm:px-12">
+            <div className="hero-overlay-copy w-full max-w-2xl px-6 py-8 sm:px-12">
               {heroTitle1 && (
                 <h1 className="font-serif text-[2rem] font-semibold leading-[1.04] text-white sm:text-5xl lg:text-[4.25rem]">
                   {heroTitle1}

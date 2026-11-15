@@ -24,16 +24,11 @@ import {
   PICKER_CHECKBOX,
   PICKER_CONTROL,
   PICKER_CONTROL_ICON,
-  PICKER_DATE_WIDTH_EXTRA,
   PICKER_LABEL,
   PICKER_ROW,
   PICKER_SUBMIT_RIGHT,
   PICKER_TRIGGER,
   PICKER_TRIGGER_TEXT,
-  PICKER_W_FROM,
-  PICKER_W_NIGHTS,
-  PICKER_W_NIGHTS_WIDE,
-  PICKER_W_TO,
 } from "./picker-styles";
 import {
   clearTourDraft,
@@ -66,6 +61,8 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [childAges, setChildAges] = useState<number[]>([]);
+  const [agesOpen, setAgesOpen] = useState(false);
+  const [hotelOpen, setHotelOpen] = useState(false);
   const [selectHotel, setSelectHotel] = useState(false);
   const [hotelId, setHotelId] = useState<string>("");
   const [hotelName, setHotelName] = useState<string>("");
@@ -77,9 +74,13 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [suppliersOpen, setSuppliersOpen] = useState(false);
   const suppliersRef = useRef<HTMLDivElement>(null);
+  const agesRef = useRef<HTMLDivElement>(null);
+  const hotelRef = useRef<HTMLDivElement>(null);
   // Multi-select: stays open while picking (like «Куда»), closes on the
   // trigger or when another search element is clicked.
   useClickOutside(suppliersRef, suppliersOpen, () => setSuppliersOpen(false));
+  useClickOutside(agesRef, agesOpen, () => setAgesOpen(false));
+  useClickOutside(hotelRef, hotelOpen, () => setHotelOpen(false));
   const suppliersPanelMaxHeight = usePanelMaxHeight(suppliersRef, suppliersOpen);
 
   // ── Draft: restore the pickers of the previous search ──────────────────
@@ -108,6 +109,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
       setAdults(draft.adults);
       setChildren(draft.children);
       setChildAges(draft.childAges);
+      setAgesOpen(draft.children > 0);
       setSelectHotel(draft.selectHotel);
       setHotelId(draft.hotelId);
       setHotelName(draft.hotelName);
@@ -171,7 +173,9 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
     setAdults(2);
     setChildren(0);
     setChildAges([]);
+    setAgesOpen(false);
     setSelectHotel(false);
+    setHotelOpen(false);
     setHotelId("");
     setHotelName("");
     setHotelStars([]);
@@ -342,9 +346,6 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
   // button is clicked while a required picker is still empty.
   const [submitError, setSubmitError] = useState("");
 
-  // Content-width: each date input fits «00.00.0000» (xx.xx.xxxx).
-  // useWidestText is SSR-safe (0 on server + hydration, measured after mount).
-  const datePx = useWidestText(["00.00.0000"]);
   // Single-digit selects (adults 1–6, children 0–5).
   const digitPx = useWidestText(["0"]);
 
@@ -394,7 +395,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
           stretched over equal grid columns. */}
       <div className={PICKER_ROW}>
         {/* From — Azerbaijan cities from the directory */}
-        <div className={PICKER_W_FROM}>
+        <div className="w-full sm:w-[278px] sm:min-w-[220px] sm:max-w-[278px] sm:flex-none">
         <DirectorySelect
           id="tour-from"
           label={t("search.from", locale)}
@@ -412,7 +413,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
 
         {/* To: single dropdown with nested Country → City → Resort
             lists, each with its own live search. */}
-        <div className={PICKER_W_TO}>
+        <div className="w-full sm:w-[278px] sm:min-w-[220px] sm:max-w-[278px] sm:flex-none">
         <DestinationPicker
           id="tour-to"
           label={t("search.to", locale)}
@@ -434,7 +435,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
         </div>
 
         {/* ONE check-in date (the supplier request gets it as both bounds). */}
-        <div style={{ minWidth: datePx + PICKER_DATE_WIDTH_EXTRA, maxWidth: datePx + PICKER_DATE_WIDTH_EXTRA }}>
+        <div className="w-full sm:w-[190px] sm:flex-none">
           <label htmlFor="tour-date" className={PICKER_LABEL}>
             {t("search.check_in", locale)}
           </label>
@@ -455,7 +456,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
         </div>
 
         {/* ONE night value - the supplier request gets it as both bounds. */}
-        <div className={PICKER_W_NIGHTS_WIDE}>
+        <div className="w-full sm:min-w-[320px] sm:flex-[1_1_320px]">
         <NightsSelect
           id="tour-nights"
           value={nightsFrom}
@@ -486,31 +487,53 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
           </select>
         </div>
 
-        {/* Children */}
-        <div style={{ maxWidth: digitPx + 56 }}>
+        {/* Children + compact age popover (no extra full-width row) */}
+        <div ref={agesRef} className="relative">
           <label htmlFor="tour-children" className={PICKER_LABEL}>
             {t("search.children", locale)}
           </label>
-          <select
-            id="tour-children"
-            value={children}
-            onChange={(e) => {
-              const val = Number(e.target.value);
-              setChildren(val);
-              setChildAges(Array(val).fill(0));
-            }}
-            className={PICKER_CONTROL}
-          >
-            {[0, 1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
+          <div className="flex items-end gap-2">
+            <select
+              id="tour-children"
+              value={children}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setChildren(val);
+                setChildAges(Array(val).fill(0));
+                setAgesOpen(val > 0);
+              }}
+              className={PICKER_CONTROL}
+              style={{ width: 76 }}
+            >
+              {[0, 1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+            {children > 0 && (
+              <button
+                type="button"
+                onClick={() => setAgesOpen((v) => !v)}
+                aria-expanded={agesOpen}
+                className="flex h-[42px] max-w-[130px] items-center gap-1 rounded-xl border border-dark-border bg-dark-card px-2.5 text-[12px] text-neutral-300 transition-colors hover:border-gold/40"
+                title={locale === "ru" ? "Возрасты детей" : locale === "az" ? "Uşaqların yaşları" : "Children ages"}
+              >
+                <span className="truncate">
+                  {childAges.slice(0, children).join(", ") || (locale === "ru" ? "возраст" : locale === "az" ? "yaş" : "age")}
+                </span>
+                <CaretDown size={12} className={`shrink-0 transition-transform ${agesOpen ? "rotate-180" : ""}`} />
+              </button>
+            )}
+          </div>
+          {children > 0 && agesOpen && (
+            <div className="absolute left-0 top-full z-[60] mt-1 w-[320px] rounded-xl border border-dark-border bg-dark-surface p-3 shadow-xl">
+              <ChildAges count={children} ages={childAges} onChange={setChildAges} />
+            </div>
+          )}
         </div>
 
-        {/* Suppliers («Поставщики») — all tour suppliers, multi-select;
-            empty = every supplier. */}
+        {/* Suppliers («Поставщики») — staff-only secondary filter. */}
         {showSuppliers && (
-        <div className="min-w-[150px] max-w-[260px] flex-[0_1_260px]">
+        <div className="min-w-[150px] max-w-[240px] flex-[0_1_240px]">
           <label htmlFor="tour-suppliers" className={PICKER_LABEL}>
             {locale === "ru" ? "Поставщики" : locale === "az" ? "Təchizatçılar" : "Suppliers"}
           </label>
@@ -578,8 +601,6 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
                                 ? prev.filter((c) => c !== s.code)
                                 : [...prev, s.code],
                             );
-                            // Collapse after picking an option (same contract
-                            // as «Откуда»); reopen to add/remove more.
                             setSuppliersOpen(false);
                           }}
                           className={`flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/5 ${active ? "bg-gold/10" : ""}`}
@@ -617,7 +638,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
         )}
 
         {/* Hotel star categories — per-country supplier dictionaries */}
-        <div className={PICKER_W_NIGHTS}>
+        <div className="w-[170px] flex-none">
           <HotelStarsSelect
             selected={hotelStars}
             onChange={setHotelStars}
@@ -625,14 +646,16 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
           />
         </div>
 
-        {/* Select hotel checkbox */}
-        <div className="flex items-end">
+        {/* Hotel toggle + popover attached to its own filter. */}
+        <div ref={hotelRef} className="relative">
+          <span className={PICKER_LABEL}>{locale === "ru" ? "Отель" : locale === "az" ? "Otel" : "Hotel"}</span>
           <label className={PICKER_CHECKBOX}>
             <input
               type="checkbox"
               checked={selectHotel}
               onChange={(e) => {
                 setSelectHotel(e.target.checked);
+                setHotelOpen(e.target.checked);
                 if (!e.target.checked) {
                   setHotelId("");
                   setHotelName("");
@@ -641,64 +664,46 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
               className="size-3.5 rounded border-dark-border accent-gold"
             />
             <Buildings size={14} weight="light" className="text-gold" />
-            {t("search.select_hotel", locale)}
+            <span className="max-w-[150px] truncate">
+              {hotelName || (locale === "ru" ? "Выбрать отель" : locale === "az" ? "Otel seç" : "Select hotel")}
+            </span>
+            {selectHotel && <CaretDown size={12} className={`transition-transform ${hotelOpen ? "rotate-180" : ""}`} />}
           </label>
+          {selectHotel && hotelOpen && (
+            <div className="absolute left-0 top-full z-[60] mt-1 w-[330px] rounded-xl border border-dark-border bg-dark-surface p-3 shadow-xl">
+              <HotelFilterSelect
+                region={{
+                  geoCountry: toCountry?.code,
+                  geoCity: toCity?.code,
+                  geoResort: toResort?.code,
+                }}
+                suppliers={selectedSuppliers}
+                serviceType="tours"
+                value={hotelName}
+                onSelect={(h) => {
+                  setHotelId(h.id);
+                  setHotelName(h.name);
+                }}
+                onClear={() => {
+                  setHotelId("");
+                  setHotelName("");
+                }}
+              />
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* Child ages */}
-      {children > 0 && (
-        <ChildAges count={children} ages={childAges} onChange={setChildAges} />
-      )}
+        {submitError && (
+          <p className="w-full text-sm text-red-400">{submitError}</p>
+        )}
 
-      {/* Hotel filter (conditional): the FULL supplier hotel directory of the
-          selected direction (hotels from ALL suppliers) as a dropdown filter
-          with live search over the list. */}
-      {selectHotel && (
-        <div className="w-full max-w-[280px]">
-          <HotelFilterSelect
-            region={{
-              geoCountry: toCountry?.code,
-              geoCity: toCity?.code,
-              geoResort: toResort?.code,
-            }}
-            suppliers={selectedSuppliers}
-            serviceType="tours"
-            value={hotelName}
-            onSelect={(h) => {
-              setHotelId(h.id);
-              setHotelName(h.name);
-            }}
-            onClear={() => {
-              setHotelId("");
-              setHotelName("");
-            }}
-          />
+        {/* Primary action stays at the right edge of the second row. */}
+        <div className="relative z-[70] ml-auto flex items-end">
+          <button type="submit" className={`btn-gold ${PICKER_SUBMIT_RIGHT}`}>
+            <span>{t("marketplace.search_submit", locale)}</span>
+            <ArrowRight size={16} weight="bold" />
+          </button>
         </div>
-      )}
-
-      {/* Submit — HelpFind скрыт (решение продукта: список пикера важнее);
-          кнопка в правом углу его строки. Любая панель закрывается выбором
-          или кликом мимо, после чего «Найти» снова впереди и кликабельна. */}
-      {submitError && (
-        <p className="text-sm text-red-400">{submitError}</p>
-      )}
-      {/* z-[70]: панель дропдауна (z-[60]) может накрывать кнопку «Найти»
-          (список большой, панель доходит до нижнего края формы). Без этого
-          после первого поиска панель остаётся открытой и перехватывает клик.
-          self-end (вместо растяжки во всю ширину): обёртка должна перекрывать
-          только саму кнопку справа — иначе её прозрачная часть ложится поверх
-          панели «Отель» слева, клик в поле поиска попадает в обёртку (вне
-          контейнера пикера), мousedown-обработчик считает его «клик мимо» и
-          сворачивает список. */}
-      <div className="relative z-[70] flex justify-end self-end">
-        <button
-          type="submit"
-          className={`btn-gold ${PICKER_SUBMIT_RIGHT}`}
-        >
-          <span>{t("marketplace.search_submit", locale)}</span>
-          <ArrowRight size={16} weight="bold" />
-        </button>
       </div>
     </form>
   );
