@@ -17,6 +17,7 @@ function buildPrisma() {
     refund: { findMany: jest.fn().mockResolvedValue([]) },
     orderFinancialSettlement: { findMany: jest.fn().mockResolvedValue([]) },
     orderFinancialAdjustment: { findMany: jest.fn().mockResolvedValue([]) },
+    supplierObligation: { findMany: jest.fn().mockResolvedValue([]) },
     customer: { findMany: jest.fn().mockResolvedValue([]) },
     user: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null) },
     requestHistory: { findMany: jest.fn().mockResolvedValue([]) },
@@ -88,5 +89,30 @@ describe("SalesAnalyticsService RBAC / scope", () => {
     const deal = result.deals.completed[0];
     expect(deal).toBeTruthy();
     expect(deal.services.map((s: any) => s.cost)).toEqual([300, 200]);
+  });
+
+  it("does not leak another manager's financial rows", async () => {
+    const prisma = buildPrisma();
+    const own = {
+      id: "ord-own", referenceNumber: "MKT-ORD-OWN", createdAt: new Date("2026-11-10T10:00:00Z"),
+      status: "SENT_TO_BOOKING", amount: 1000, fulfilledAt: null, closedAt: null,
+      cancelledAt: null, customerId: null, financialStatus: "OPEN", items: [],
+    };
+    const other = { ...own, id: "ord-other", referenceNumber: "MKT-ORD-OTHER" };
+    prisma.request.findMany.mockResolvedValue([{
+      id: "req-own", referenceNumber: "MKT-REQ-OWN", createdAt: new Date("2026-11-10T10:00:00Z"),
+      customerId: null, requestType: "TOUR_PACKAGE", sourceChannel: "WHATSAPP", status: "CONVERTED",
+      assignedManagerId: "m-1", assignedAt: new Date("2026-11-10T10:01:00Z"), assignmentType: "AUTO",
+      firstContactAt: null, processingStartedAt: null, slaDueAt: null, convertedOrderId: "ord-own",
+      customerAcceptedAt: null, supplierRespondedAt: null,
+    }]);
+    prisma.order.findMany.mockResolvedValue([own, other]);
+    prisma.payment.findMany.mockResolvedValue([
+      { orderId: "ord-own", amount: 100, code: "PAY-1", paidAt: new Date("2026-11-10T11:00:00Z") },
+      { orderId: "ord-other", amount: 900, code: "PAY-2", paidAt: new Date("2026-11-10T11:00:00Z") },
+    ]);
+    const service = new SalesAnalyticsService(prisma);
+    const result = await service.dashboard({ preset: "CURRENT_MONTH", timezone: "UTC" }, { id: "m-1", role: "SALES_MANAGER" });
+    expect(result.financials.map((x: any) => x.code)).toEqual(["PAY-1"]);
   });
 });
