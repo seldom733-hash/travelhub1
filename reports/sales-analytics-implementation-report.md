@@ -55,8 +55,9 @@ Request → закрыто     = заявки, чей Order имеет closedAt
 
 Сумма продаж          = Σ Order.amount по заказам периода, кроме CANCELLED
 Фактическая выручка   = Σ Payment.amount (CAPTURED, paidAt в периоде)
-Себестоимость         = SupplierObligation.aznAmount (one per OrderItem)
-                        fallback: Request.commercialSnapshot.netSupplierCost
+Себестоимость         = resolveDealCost (shared with Sales Register)
+                        obligationCost, если 0 < obligationCost < sales
+                        иначе commercialSnapshot / product cost
                         fallback: Σ Booking.amount (не CANCELLED/SUPPLIER_REJECTED)
 Валовая прибыль       = сумма продаж − себестоимость
 Средний чек           = сумма продаж / число заказов
@@ -108,6 +109,7 @@ frontend/lib/sales-analytics-i18n.ts
 ```text
 sales-analytics.period.spec.ts  5 passed
 sales-analytics.service.spec.ts 5 passed
+deal-cost.spec.ts               3 passed
 reports/sales-analytics-smoke.ps1 — OK dashboard/manager/drilldown
 reports/sales-analytics-e2e.ps1 — OK API + all frontend routes
 reports/sales-analytics-e2e-isolated.md — isolated travelhub1_test: 4 requests / 5 orders / 5 payments / 3 refunds / adjustment, OK

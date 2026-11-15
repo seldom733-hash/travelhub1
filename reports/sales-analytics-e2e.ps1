@@ -19,6 +19,18 @@ if ($null -eq $d.funnel) { throw "funnel missing" }
 if ($null -eq $d.activity) { throw "activity missing" }
 if ($null -eq $d.orders) { throw "orders missing" }
 
+$start = ([datetime]$d.period.start).ToString("yyyy-MM-dd")
+$end = ([datetime]$d.period.end).AddDays(-1).ToString("yyyy-MM-dd")
+$deals = Invoke-RestMethod -Uri "$Api/finance/deals?dateFrom=$start&dateTo=$end&pageSize=100" -Headers $h
+if ($null -ne $deals.kpi) {
+  $salesDiff = [math]::Abs([double]$d.kpis.salesAmount.value - [double]$deals.kpi.salesAmount)
+  $costDiff = [math]::Abs([double]$d.kpis.costAmount.value - [double]$deals.kpi.costAmount)
+  $profitDiff = [math]::Abs([double]$d.kpis.grossProfit.value - [double]$deals.kpi.grossMargin)
+  if ($salesDiff -gt 0.02 -or $costDiff -gt 0.02 -or $profitDiff -gt 0.02) {
+    throw "Sales Analytics vs Sales Register mismatch: sales=$salesDiff cost=$costDiff profit=$profitDiff"
+  }
+}
+
 $managerId = ($d.managers | Select-Object -First 1).managerId
 if ($managerId) {
   $card = Invoke-RestMethod -Uri "$Api/sales-analytics/managers/$managerId?$q" -Headers $h

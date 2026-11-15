@@ -51,11 +51,12 @@ Request → закрыто     = заявки, чей Order имеет closedAt 
 
 Сумма продаж          = Σ Order.amount по заказам периода, кроме CANCELLED
 Фактическая выручка   = Σ Payment.amount (CAPTURED, paidAt в периоде)
-Себестоимость         = commercialSnapshot.netSupplierCost (fallback: Σ Booking.amount)
+Себестоимость         = resolveDealCost: obligationCost, если 0 < obligation < sales,
+                        иначе commercialSnapshot.netSupplierCost / product cost
 Валовая прибыль       = сумма продаж − себестоимость
 Средний чек           = сумма продаж / количество заказов
 Возвраты              = Σ Refund.amount (PROCESSED, processedAt в периоде)
-Фин. результат        = Order.amount − Booking.amount − Refund.amount
+Фин. результат        = Order.amount − cost − Refund.amount
 ```
 
 ## 4. Периоды
@@ -94,8 +95,8 @@ sales.kpi.read
 
 ## 6. Ограничения v1
 
-1. Себестоимость берётся из `Request.commercialSnapshot.netSupplierCost`; fallback — `Booking.amount`. Нужна сверка с финансовой моделью для мультисервисных заказов.
-2. Причины отказов и потерянных заявок ещё не сгруппированы.
+1. Себестоимость использует общий `resolveDealCost` с Sales Register: obligation только если `0 < obligation < sales`, иначе snapshot/product. Для мультисервисных заказов нужна финальная сверка FINANCE.
+2. Причины отказов сгруппированы из `Request.rejectionReason`; legacy-заявки без причины используют статус.
 3. Нет отдельной таблицы распределения `RequestAssignmentHistory`; используются `RequestHistory.action=ASSIGNED` и текущие поля.
 4. Нет SLA-настроек: используется существующий `Request.slaDueAt`.
 5. Детализация KPI открывает вкладку, но не всегда фильтрует первичный список по конкретному KPI.

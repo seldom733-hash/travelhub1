@@ -19,6 +19,7 @@ function buildPrisma() {
     orderFinancialAdjustment: { findMany: jest.fn().mockResolvedValue([]) },
     supplierObligation: { findMany: jest.fn().mockResolvedValue([]) },
     customer: { findMany: jest.fn().mockResolvedValue([]) },
+    product: { findMany: jest.fn().mockResolvedValue([]) },
     user: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null) },
     requestHistory: { findMany: jest.fn().mockResolvedValue([]) },
   };

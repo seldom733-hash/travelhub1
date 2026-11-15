@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
+import { resolveDealCost, shouldUseObligationCost } from "../finance/deal-cost";
 
 export const SALES_ANALYTICS_PRESETS = [
   "TODAY", "YESTERDAY", "LAST_7_DAYS", "LAST_30_DAYS",
@@ -297,18 +298,14 @@ export class SalesAnalyticsService {
       select: { orderId: true, orderItemId: true, aznAmount: true, updatedAt: true },
       orderBy: { updatedAt: "desc" },
     });
+    // Use the same obligation aggregation as the Sales Register: legacy
+    // projections can contain several rows per item, and the shared rule
+    // decides whether the sum is a real cost or a demo projection.
     const obligationByOrder = new Map<string, number>();
     const obligationByItem = new Map<string, number>();
-    const seenObligationItems = new Set<string>();
     for (const o of obligations) {
-      // SupplierObligation can contain multiple versions for one OrderItem;
-      // the analytics fact is one obligation per item, not a sum of versions.
-      if (o.orderItemId) {
-        if (seenObligationItems.has(o.orderItemId)) continue;
-        seenObligationItems.add(o.orderItemId);
-      }
       obligationByOrder.set(o.orderId, (obligationByOrder.get(o.orderId) ?? 0) + num(o.aznAmount));
-      if (o.orderItemId) obligationByItem.set(o.orderItemId, num(o.aznAmount));
+      if (o.orderItemId) obligationByItem.set(o.orderItemId, (obligationByItem.get(o.orderItemId) ?? 0) + num(o.aznAmount));
     }
     const bookings = await this.prisma.booking.findMany({ where: { orderId: { in: orderIds } } });
     const bookingOrderIds = new Map(bookings.map((b) => [b.id, b.orderId]));
@@ -348,6 +345,11 @@ export class SalesAnalyticsService {
     const customerById = new Map((await this.prisma.customer.findMany({ where: { id: { in: customerIds } }, select: { id: true, code: true, firstName: true, lastName: true, companyName: true, phone: true } })).map((c) => [c.id, c]));
     const managerIds = [...new Set(requests.map((r) => r.assignedManagerId).filter((x): x is string => !!x))];
     const managerById = new Map((await this.prisma.user.findMany({ where: { id: { in: managerIds } }, select: { id: true, fullName: true, username: true } })).map((u) => [u.id, u]));
+    const productIds = [...new Set(requests.map((r) => r.productId).filter((x): x is string => !!x))];
+    const productById = new Map((await this.prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, attributes: true },
+    })).map((p) => [p.id, p]));
 
     const requestHistory = requestIds.length
       ? await this.prisma.requestHistory.findMany({ where: { requestId: { in: requestIds } }, orderBy: { createdAt: "desc" } })
@@ -395,14 +397,19 @@ export class SalesAnalyticsService {
     const refunded = refunds.filter((x) => scopedOrderIdSet.has(x.orderId) && orderById.get(x.orderId)?.status !== "CANCELLED").reduce((s, x) => s + num(x.amount), 0);
     const adjustmentAmount = adjustments.filter((x) => scopedOrderIdSet.has(x.orderId)).reduce((s, x) => s + num(x.amount), 0);
     const costFor = (o: any) => {
-      if (obligationByOrder.has(o.id)) return obligationByOrder.get(o.id)!;
       const linkedRequest = requestByOrder.get(o.id);
-      const snapshot = linkedRequest?.commercialSnapshot as any;
-      const snapshotCost = num(snapshot?.netSupplierCost);
-      if (snapshotCost > 0) return snapshotCost;
-      return (bookingByOrder.get(o.id) ?? [])
-        .filter((b) => b.status !== "CANCELLED" && b.status !== "SUPPLIER_REJECTED")
-        .reduce((s, b) => s + num(b.amount), 0);
+      const commercial = ((o as any).commercialSnapshot ?? linkedRequest?.commercialSnapshot ?? {}) as any;
+      const fx = commercial.fx as any;
+      const snapshotCost = num(commercial.netSupplierCost ?? fx?.aznAmount ?? commercial.supplierPrice);
+      const product = linkedRequest?.productId ? productById.get(linkedRequest.productId) : null;
+      const attrs = ((product as any)?.attributes ?? {}) as any;
+      const productCost = num(attrs.priceLocal ?? attrs.convertedPrice ?? attrs.startingPrice ?? 0);
+      return resolveDealCost({
+        sales: num(o.amount),
+        obligationCost: obligationByOrder.get(o.id) ?? 0,
+        snapshotCost,
+        productCost,
+      });
     };
 
     const financials = [
@@ -672,7 +679,7 @@ export class SalesAnalyticsService {
           title: item.title,
           type: item.type,
           amount: num(item.amount),
-          cost: obligationByItem.has(item.id)
+          cost: shouldUseObligationCost(num(o.amount), obligationByOrder.get(o.id) ?? 0) && obligationByItem.has(item.id)
             ? obligationByItem.get(item.id)!
             : (num(o.amount) > 0 ? costFor(o) * (num(item.amount) / num(o.amount)) : 0),
         })),

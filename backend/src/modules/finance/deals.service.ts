@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { resolveDealCost } from "./deal-cost";
 
 type DealQuery = {
   search?: string;
@@ -471,10 +472,12 @@ export class DealsService {
       // A supplier obligation equal to the customer sale is a legacy/demo
       // projection (auto-created from booking amount), not a cost. Use the
       // product's supplier price in that case.
-      const useObligationCost = obligationCost > 0 && obligationCost < sales;
-      const cost = useObligationCost
-        ? obligationCost
-        : costFromSnapshot || costFromProduct;
+      const cost = resolveDealCost({
+        sales,
+        obligationCost,
+        snapshotCost: costFromSnapshot,
+        productCost: costFromProduct,
+      });
       const returnedToRequest = order?.status === "CANCELLED" && request.status !== "CONVERTED" && !["CANCELLED_BY_CUSTOMER", "REJECTED", "UNAVAILABLE", "EXPIRED"].includes(request.status);
       const activeBooking = booking && !["CANCELLED", "COMPLETED", "SUPPLIER_REJECTED"].includes(booking.status) ? booking : null;
       const stage = returnedToRequest ? "REQUEST" : activeBooking ? "BOOKING" : order ? "ORDER" : "REQUEST";
