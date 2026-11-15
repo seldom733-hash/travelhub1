@@ -10,7 +10,7 @@
 | 6 | Воронка продаж | ✅ | `/app/analytics/sales/funnel` |
 | 7 | Завершённые и закрытые сделки | ✅ | `/app/analytics/sales/deals` |
 | 8 | Распределение заявок | ✅ | `/app/analytics/sales/distribution` |
-| 9 | Финансовые показатели | ⚠️ | продажи/выручка/прибыль есть; мультисервисная себестоимость не распределена |
+| 9 | Финансовые показатели | ✅ | `SupplierObligation` → snapshot → booking fallback, reconciliation |
 | 10 | Фильтрация по периодам | ✅ | 12 пресетов + CUSTOM, IANA timezone |
 | 11 | Сравнение периодов | ✅ | календарное сравнение месяца/квартала/года/недели |
 | 12 | Сохранение фильтров | ✅ | query string: период, менеджер, услуга, источник, статус |
@@ -19,7 +19,7 @@
 | 15 | Когортная конверсия | ⚠️ | связь Request→Order через `convertedOrderId`; пограничные legacy-случаи не закрыты |
 | 16 | Завершённая сделка ≠ подтверждённая бронь | ✅ | используются `fulfilledAt` / `completedAt`, не `confirmedAt` |
 | 17 | Закрытая сделка ≠ завершённая | ✅ | используются `closedAt` отдельно |
-| 18 | Финансы соответствуют модели | ⚠️ | `commercialSnapshot.netSupplierCost`, fallback `Booking.amount`; нужна сверка FINANCE |
+| 18 | Финансы соответствуют модели | ⚠️ | FINANCE sign-off ещё не оформлен; формула документирована |
 | 19 | DIRECTOR — полный доступ | ✅ | `sales.kpi.read` в RBAC DIRECTOR |
 | 20 | ADMIN — полный доступ | ✅ | ADMIN имеет все права |
 | 21 | SALES_MANAGER — только своё | ✅ | backend-фильтр + unit-тест |
