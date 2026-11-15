@@ -30,7 +30,7 @@ interface NavGroup {
 
 /**
  * UI-C1.2A: canonical sidebar ownership (UI-C1.2 contract §5/§7):
- * ОПЕРАЦИИ → Заявки/Заказы/Бронирования; ФИНАНСЫ → Платежи (Operations
+ * ОПЕРАЦИИ → Реестр продаж/Заявки/Документы; ФИНАНСЫ → Платежи (Operations
  * Center tab, domain ownership stays Finance). No invented "Центр операций"
  * sidebar item — the Operations Center is a workflow shell, not a domain.
  */
@@ -46,6 +46,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     headingKey: "nav.group.operations",
     items: [
+      { href: "/app/finance/deals", icon: "📊", labelKey: "nav.finance_deals", permission: "finance.overview.read" },
       { href: "/app/requests/create", icon: "➕", labelKey: "nav.request_create", permission: "order.edit_noncritical" },
       { href: "/app/documents", icon: "📄", labelKey: "nav.documents", permission: "documents.read" },
     ],
@@ -53,7 +54,6 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     headingKey: "nav.group.finance",
     items: [
-      { href: "/app/finance/deals", icon: "📊", labelKey: "nav.finance_deals", permission: "finance.overview.read" },
       { href: "/app/payments", icon: "💳", labelKey: "nav.payments", permission: "finance.payment.read" },
       { href: "/app/finance/reports/debt-as-of", icon: "📅", labelKey: "nav.supplier_debt_report", permission: "finance.obligation.read" },
       { href: "/app/finance/payment-terms", icon: "⏱️", labelKey: "nav.payment_terms", permission: "finance.obligation.read" },
@@ -243,7 +243,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
   // До монтирования рендерим одинаковый заглушечный DOM (SSR = client, без hydration mismatch).
   if (!mounted || !user || isExternalRole(user.role)) {
-    return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">{t("state.loading", locale)}</div>;
+    return <div className="flex min-h-screen items-center justify-center bg-ink text-ink/60">{t("state.loading", locale)}</div>;
   }
 
   const visibleNav = NAV.filter((item) => canAccess(user, item.permission));
@@ -261,20 +261,20 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen">
       {/* ── Sidebar ── */}
       <aside
-        className={`app-sidebar thin-scroll sticky top-0 flex h-screen shrink-0 flex-col overflow-y-auto bg-slate-900 text-slate-200 transition-all duration-200 ${sidebarWidth}`}
+        className={`app-sidebar thin-scroll sticky top-0 flex h-screen shrink-0 flex-col overflow-y-auto bg-ink text-white transition-all duration-200 ${sidebarWidth}`}
       >
         {/* Logo / Brand */}
         <Link
           href="/app/dashboard"
-          className={`flex items-center gap-2.5 border-b border-white/10 ${collapsed ? "justify-center px-2 py-4" : "px-5 py-4"}`}
+          className={`flex items-center gap-2.5 border-b border-line/40 ${collapsed ? "justify-center px-2 py-4" : "px-5 py-4"}`}
         >
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-base font-bold text-white">T</div>
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand text-base font-bold text-white">T</div>
           {!collapsed && (
             <div>
               <div className="text-base font-bold text-white">
                 {brandName}
               </div>
-              <div className="text-[10px] text-slate-400">Internal App</div>
+              <div className="text-[10px] text-white/60">Internal App</div>
             </div>
           )}
         </Link>
@@ -282,7 +282,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         {/* Toggle button */}
         <button
           onClick={toggleCollapse}
-          className="mx-2 mt-2 flex items-center justify-center rounded-lg py-1.5 text-xs text-slate-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+          className="mx-2 mt-2 flex items-center justify-center rounded-lg py-1.5 text-xs text-white/60 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           aria-expanded={!collapsed}
           aria-label={collapsed ? t("sidebar.expand", locale) : t("sidebar.collapse", locale)}
           title={collapsed ? t("sidebar.expand", locale) : t("sidebar.collapse", locale)}
@@ -298,7 +298,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             return (
               <div key={gi}>
                 {group.headingKey && !collapsed && (
-                  <div className="mt-4 mb-1 px-5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                  <div className="mt-4 mb-1 px-5 text-[10px] font-semibold uppercase tracking-wider text-white/50">
                     {t(group.headingKey, locale)}
                   </div>
                 )}
@@ -313,8 +313,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                         collapsed ? "justify-center px-2 py-2.5" : "px-5 py-2.5"
                       } ${
                         active
-                          ? "border-r-2 border-blue-400 bg-blue-500/15 font-medium text-white"
-                          : "text-slate-400 hover:bg-white/5 hover:text-white"
+                          ? "border-r-2 border-brand bg-brand/10 font-medium text-white"
+                          : "text-white/60 hover:bg-white/5 hover:text-white"
                       }`}
                       title={label}
                       aria-label={label}
@@ -348,7 +348,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                         <span className="absolute right-1 top-1 size-2 animate-pulse rounded-full bg-amber-400" />
                       )}
                       {collapsed && (
-                        <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                        <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                           {label}
                         </span>
                       )}
@@ -359,24 +359,24 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             );
           })}
           {!collapsed && hiddenCount > 0 && (
-            <div className="mt-3 px-5 text-[10px] leading-relaxed text-slate-600">
+            <div className="mt-3 px-5 text-[10px] leading-relaxed text-white/50">
               {t("workspace.hidden_count", locale).replace("{n}", String(hiddenCount))}
             </div>
           )}
         </nav>
 
         {/* User / Account area */}
-        <div className={`border-t border-white/10 ${collapsed ? "px-2 py-3" : "px-5 py-4"}`}>
+        <div className={`border-t border-line/40 ${collapsed ? "px-2 py-3" : "px-5 py-4"}`}>
           {user && (
             <div className={collapsed ? "text-center" : "mb-3"}>
               {collapsed ? (
-                <span className="inline-flex size-8 items-center justify-center rounded-full bg-blue-500/20 text-xs font-bold text-blue-300" title={user.fullName ?? user.username}>
+                <span className="inline-flex size-8 items-center justify-center rounded-full bg-brand/20 text-xs font-bold text-gold" title={user.fullName ?? user.username}>
                   {(user.fullName ?? user.username).charAt(0).toUpperCase()}
                 </span>
               ) : (
                 <>
                   <div className="truncate text-sm font-medium text-white">{user.fullName ?? user.username}</div>
-                  <div className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-300">
+                  <div className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold">
                     {user.role}
                   </div>
                 </>
@@ -387,13 +387,13 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             <>
               <Link
                 href="/"
-                className="mb-2 block w-full rounded-lg border border-white/10 px-3 py-1.5 text-center text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+                className="mb-2 block w-full rounded-lg border border-line/40 px-3 py-1.5 text-center text-xs text-white/60 transition-colors hover:bg-white/5 hover:text-white"
               >
                 {t("nav.to_marketplace", locale)} →
               </Link>
               <button
                 onClick={logout}
-                className="w-full rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+                className="w-full rounded-lg border border-line/40 px-3 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/5 hover:text-white"
               >
                 {t("nav.logout", locale)}
               </button>
@@ -402,7 +402,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           {collapsed && (
             <button
               onClick={logout}
-              className="mt-2 flex w-full items-center justify-center rounded-lg border border-white/10 py-1.5 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+              className="mt-2 flex w-full items-center justify-center rounded-lg border border-line/40 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/5 hover:text-white"
               title={t("nav.logout", locale)}
               aria-label={t("nav.logout", locale)}
             >
@@ -415,8 +415,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       {/* ── Content ── */}
       {/* Admin content is a LIGHT surface: глобальный body-color из marketplace
           (#e8e8e8) давал нечитаемые значения в таблицах/панелях. Явный
-          text-slate-900 — базовая типографика internal-контура. */}
-      <main className="thin-scroll flex-1 overflow-y-auto bg-slate-50 text-slate-900 [color-scheme:light]">{children}</main>
+          text-ink — базовая типографика internal-контура. */}
+      <main className="thin-scroll flex-1 overflow-y-auto bg-panel text-ink [color-scheme:light]">{children}</main>
     </div>
   );
 }
