@@ -76,8 +76,7 @@ export default function HeroSearch({ enabledServices, defaultService, onTabChang
   useEffect(() => {
     if (!tabPickedByUser.current) setActiveTab(initialTab);
   }, [initialTab]);
-  // «Сбросить все» → the form resets every picker (tours and hotels are the
-  // services whose forms keep a restorable draft).
+  // «Сбросить все» → each service form clears its pickers.
   const [resetSignal, setResetSignal] = useState(0);
 
   const handleSearch = (ctx: SearchContext) => {
@@ -142,7 +141,7 @@ export default function HeroSearch({ enabledServices, defaultService, onTabChang
     switch (activeTab) {
       case "tours": return <TourSearch onSearch={handleSearch} resetSignal={resetSignal} />;
       case "hotels": return <HotelSearch onSearch={handleSearch} resetSignal={resetSignal} />;
-      case "flights": return <FlightSearch onSearch={handleSearch} />;
+      case "flights": return <FlightSearch onSearch={handleSearch} resetSignal={resetSignal} />;
       case "sanatoriums": return <SanatoriumSearch onSearch={handleSearch} />;
       case "guides": return <GuideSearch onSearch={handleSearch} />;
       case "excursions": return <ExcursionSearch onSearch={handleSearch} />;

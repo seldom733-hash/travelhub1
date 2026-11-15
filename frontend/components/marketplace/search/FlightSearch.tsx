@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { MapPin, ArrowRight, Airplane, CaretDown } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
 import { todayISO } from "@/lib/dates";
@@ -26,9 +26,11 @@ import {
 
 interface FlightSearchProps {
   onSearch: (ctx: SearchContext) => void;
+  /** «Сбросить все» from the universal search toolbar. */
+  resetSignal?: number;
 }
 
-export default function FlightSearch({ onSearch }: FlightSearchProps) {
+export default function FlightSearch({ onSearch, resetSignal = 0 }: FlightSearchProps) {
   const locale = useLocale();
   const user = useCurrentUser();
   const showSuppliers = isPlatformStaff(user);
@@ -232,6 +234,27 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
 
   // Content-width: те же размеры, что в поиске туров.
   const digitPx = useWidestText(["0"]);
+
+  const resetAll = useCallback(() => {
+    setFrom(null);
+    setTo(null);
+    setDepartureDate(todayISO());
+    setRoundTrip(false);
+    setReturnDate(todayISO());
+    setAdults(1);
+    setChildren(0);
+    setChildAges([]);
+    setInfants(0);
+    setInfantAges([]);
+    setDirect(false);
+    setTariff("ALL");
+    setSupplier("ALL");
+    setAgesOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (resetSignal > 0) resetAll();
+  }, [resetSignal, resetAll]);
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
