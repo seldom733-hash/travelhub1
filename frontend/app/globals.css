@@ -421,3 +421,13 @@ h3,
 .app-sidebar .bg-blue-600 {
   color: #ffffff !important;
 }
+
+/* Native date fields: hide locale text, DateInputFormat paints dd.mm.yy. */
+input[type="date"]::-webkit-datetime-edit,
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="date"]::-webkit-datetime-edit-text,
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-year-field {
+  color: transparent;
+}
