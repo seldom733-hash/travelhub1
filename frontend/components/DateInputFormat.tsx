@@ -85,14 +85,10 @@ export default function DateInputFormat() {
     timer = window.setInterval(scan, 400);
     window.addEventListener("scroll", updateAll, true);
     window.addEventListener("resize", updateAll);
-    const observer = new MutationObserver(() => scan());
-    observer.observe(document.body, { childList: true, subtree: true });
-
     return () => {
       if (timer) window.clearInterval(timer);
       window.removeEventListener("scroll", updateAll, true);
       window.removeEventListener("resize", updateAll);
-      observer.disconnect();
       entries.forEach(({ input, overlay }) => {
         overlay.remove();
         input.style.removeProperty("-webkit-text-fill-color");
