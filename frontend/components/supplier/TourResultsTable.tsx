@@ -475,7 +475,9 @@ export default function TourResultsTable({
           </>
         )}
         {t("search.found", locale)}: {result.offers.length}
-        <span className="ml-2 font-mono text-neutral-700">searchId: {searchId}</span>
+        {showSupplier && (
+          <span className="ml-2 font-mono text-neutral-700">searchId: {searchId}</span>
+        )}
       </p>
 
       {/* Results table (§6) — sortable header with embedded per-column filters */}
