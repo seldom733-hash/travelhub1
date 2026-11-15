@@ -199,7 +199,7 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
           </div>
         </div>
 
-        <div className="relative mt-8 h-[260px] overflow-hidden rounded-[26px] bg-dark-surface sm:h-[390px]">
+        <div className="relative mt-8 aspect-[1956/804] overflow-hidden rounded-[26px] bg-dark-surface">
           {images.map((image, i) => (
             <div
               key={`${image}-${i}`}
