@@ -155,51 +155,14 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
     ? configured!.map((s) => s.image)
     : SLIDES.map((s) => s.image);
 
+  const heroTitle1 = configuredSlide ? configuredSlide.title1 : t(defaultSlide.titleKey1, locale);
+  const heroTitle2 = configuredSlide ? configuredSlide.title2 : t(defaultSlide.titleKey2, locale);
+  const heroDescription = configuredSlide ? configuredSlide.description : t(defaultSlide.descKey, locale);
+
   return (
     <section className="relative overflow-hidden bg-dark">
-      <div className="th-container pt-10 sm:pt-14">
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-          <div className="max-w-2xl">
-            {configuredSlide ? (
-              <>
-                {configuredSlide.title1 && (
-                  <h1 className="font-serif text-[2.35rem] font-semibold leading-[1.04] text-white sm:text-5xl lg:text-[4.25rem]">
-                    {configuredSlide.title1}
-                    {configuredSlide.title2 && (
-                      <>
-                        <br />
-                        <span className="text-gold-gradient">{configuredSlide.title2}</span>
-                      </>
-                    )}
-                  </h1>
-                )}
-                {configuredSlide.description && (
-                  <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-neutral-300 sm:text-base">
-                    {configuredSlide.description}
-                  </p>
-                )}
-              </>
-            ) : (
-              <>
-                <h1 className="font-serif text-[2.35rem] font-semibold leading-[1.04] text-white sm:text-5xl lg:text-[4.25rem]">
-                  {t(defaultSlide.titleKey1, locale)}
-                  <br />
-                  <span className="text-gold-gradient">{t(defaultSlide.titleKey2, locale)}</span>
-                </h1>
-                <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-neutral-300 sm:text-base">
-                  {t(defaultSlide.descKey, locale)}
-                </p>
-              </>
-            )}
-          </div>
-          <div className="flex items-center gap-2 pb-1 text-[11px] font-semibold text-neutral-500">
-            <span>{String(current + 1).padStart(2, "0")}</span>
-            <span className="h-px w-8 bg-dark-border" />
-            <span>{String(slideCount).padStart(2, "0")}</span>
-          </div>
-        </div>
-
-        <div className="relative mt-8 aspect-[1956/804] overflow-hidden rounded-[26px] bg-dark-surface">
+      <div className="th-container pt-8 sm:pt-10">
+        <div className="relative mt-2 aspect-[1956/804] min-h-[340px] overflow-hidden rounded-[26px] bg-dark-surface sm:min-h-0">
           {images.map((image, i) => (
             <div
               key={`${image}-${i}`}
@@ -218,7 +181,35 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
               />
             </div>
           ))}
+          <div className="absolute inset-0 z-[1] bg-gradient-to-r from-black/70 via-black/35 to-transparent" />
           <div className="hero-overlay absolute inset-0 z-[1]" />
+
+          <div className="absolute inset-0 z-10 flex items-center">
+            <div className="hero-overlay-copy max-w-2xl px-6 py-8 sm:px-12">
+              {heroTitle1 && (
+                <h1 className="font-serif text-[2rem] font-semibold leading-[1.04] text-white sm:text-5xl lg:text-[4.25rem]">
+                  {heroTitle1}
+                  {heroTitle2 && (
+                    <>
+                      <br />
+                      <span className="text-gold-gradient">{heroTitle2}</span>
+                    </>
+                  )}
+                </h1>
+              )}
+              {heroDescription && (
+                <p className="mt-4 max-w-xl text-[13px] leading-relaxed text-white/85 sm:mt-5 sm:text-base">
+                  {heroDescription}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="absolute bottom-5 right-6 z-20 flex items-center gap-2 text-[11px] font-semibold text-white/70">
+            <span>{String(current + 1).padStart(2, "0")}</span>
+            <span className="h-px w-8 bg-white/40" />
+            <span>{String(slideCount).padStart(2, "0")}</span>
+          </div>
 
           {showArrows && slideCount > 1 && (
             <>

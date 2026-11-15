@@ -431,3 +431,14 @@ input[type="date"]::-webkit-datetime-edit-day-field,
 input[type="date"]::-webkit-datetime-edit-year-field {
   color: transparent;
 }
+
+/* Hero copy is placed on the photo, not on the light page background. */
+.theme-grove .hero-overlay-copy h1,
+.theme-grove .hero-overlay-copy p,
+.hero-overlay-copy h1,
+.hero-overlay-copy p {
+  color: #ffffff !important;
+}
+.hero-overlay-copy .text-gold-gradient {
+  color: #d8efc9 !important;
+}
