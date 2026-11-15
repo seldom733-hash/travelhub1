@@ -18,6 +18,18 @@ $env:PORT='4001'
 node dist/main.js
 ```
 
+## Seed
+
+В `travelhub1_test` перенесены существующие записи:
+
+```text
+Request   = 4
+Order     = 5
+Customer  = 1
+```
+
+Финансовые Payment/Refund в seed не попали, поэтому выручка в этом прогоне равна `0`.
+
 ## Запуск
 
 ```powershell
@@ -29,7 +41,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 ## Результат
 
 ```text
-OK E2E requests=0 managers=0 sales=0 profit=0 issueCount=0
+OK E2E requests=4 managers=3 sales=3624,21 profit=296,7 issueCount=0
 ```
 
 Проверено на изолированной БД:
@@ -48,6 +60,7 @@ OK E2E requests=0 managers=0 sales=0 profit=0 issueCount=0
 
 ## Ограничение
 
-БД пустая. Это проверка контрактов, RBAC-входа, маршрутов и устойчивости нулевых данных, а не проверка бизнес-сумм на наборе данных.
+Seed содержит Request/Order/Booking-связи, но не содержит Payment/Refund. Поэтому проверены ненулевые заявки, заказы, менеджеры, продажи и прибыль, но не проверены ненулевые поступления и возвраты.
 
-Для проверки цифр нужен отдельный seed-набор Request → Order → Booking → Payment → Refund.
+Для полного финансового E2E нужен seed Payment/Refund.
+
