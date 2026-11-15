@@ -110,6 +110,7 @@ sales-analytics.period.spec.ts  5 passed
 sales-analytics.service.spec.ts 5 passed
 reports/sales-analytics-smoke.ps1 — OK dashboard/manager/drilldown
 reports/sales-analytics-e2e.ps1 — OK API + all frontend routes
+reports/sales-analytics-e2e-isolated.md — isolated travelhub1_test: OK (empty dataset)
 ```
 
 Проверено:
