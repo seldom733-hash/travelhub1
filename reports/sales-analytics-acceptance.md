@@ -27,7 +27,7 @@
 | 23 | Новые роли не создавались | ✅ | изменения только в существующих правах/запросах |
 | 24 | Sales Register не дублируется | ✅ | читаются существующие Request/Order/Booking/finance |
 | 25 | Жизненный цикл не нарушен | ✅ | analytics module read-only |
-| 26 | Все тесты | ⚠️ | 10 unit + smoke + dev E2E + isolated seeded E2E; Payment/Refund seed нет |
+| 26 | Все тесты | ⚠️ | 10 unit + smoke + dev E2E + isolated seeded E2E (Payment/Refund); не все финансовые сценарии |
 
 ## Единственный источник истины
 

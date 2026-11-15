@@ -23,12 +23,13 @@ node dist/main.js
 В `travelhub1_test` перенесены существующие записи:
 
 ```text
-Request   = 4
-Order     = 5
-Customer  = 1
+Request             = 4
+Order               = 5
+Customer            = 1
+Payment             = 3
+SupplierObligation  = 6
+Refund              = 1 (E2E seed)
 ```
-
-Финансовые Payment/Refund в seed не попали, поэтому выручка в этом прогоне равна `0`.
 
 ## Запуск
 
@@ -41,7 +42,17 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 ## Результат
 
 ```text
-OK E2E requests=4 managers=3 sales=3624,21 profit=296,7 issueCount=0
+OK E2E requests=4 managers=3 sales=3624,21 profit=145,8 issueCount=0
+```
+
+Финансовая проверка на изолированной БД:
+
+```text
+salesAmount     = 3 624.21
+capturedRevenue = 1 262.62
+refunds         = 19.00
+obligationCost  = 2 886.28
+financials      = 4
 ```
 
 Проверено на изолированной БД:
@@ -60,7 +71,8 @@ OK E2E requests=4 managers=3 sales=3624,21 profit=296,7 issueCount=0
 
 ## Ограничение
 
-Seed содержит Request/Order/Booking-связи, но не содержит Payment/Refund. Поэтому проверены ненулевые заявки, заказы, менеджеры, продажи и прибыль, но не проверены ненулевые поступления и возвраты.
+Seed содержит Request/Order/Booking/Payment/SupplierObligation/Refund, но не содержит полного набора всех финансовых сценариев (частичные оплаты, несколько возвратов, корректировки, закрытые расчёты).
 
-Для полного финансового E2E нужен seed Payment/Refund.
+Для полного финансового E2E нужен расширенный seed этих сценариев.
+
 
