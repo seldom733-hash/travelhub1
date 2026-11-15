@@ -84,6 +84,8 @@ TRUNCATE TABLE
   crm."OperationalNote"
 RESTART IDENTITY CASCADE;
 
+TRUNCATE TABLE security."UserNotification" RESTART IDENTITY;
+
 -- Reset transactional human-readable counters, keeping catalog/pricing config
 -- (CMR/MKR/PRD) intact.
 UPDATE events."BusinessSequence"
