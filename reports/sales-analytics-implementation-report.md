@@ -55,7 +55,8 @@ Request → закрыто     = заявки, чей Order имеет closedAt
 
 Сумма продаж          = Σ Order.amount по заказам периода, кроме CANCELLED
 Фактическая выручка   = Σ Payment.amount (CAPTURED, paidAt в периоде)
-Себестоимость         = Request.commercialSnapshot.netSupplierCost
+Себестоимость         = SupplierObligation.aznAmount (one per OrderItem)
+                        fallback: Request.commercialSnapshot.netSupplierCost
                         fallback: Σ Booking.amount (не CANCELLED/SUPPLIER_REJECTED)
 Валовая прибыль       = сумма продаж − себестоимость
 Средний чек           = сумма продаж / число заказов
