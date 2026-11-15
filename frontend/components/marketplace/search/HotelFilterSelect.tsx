@@ -18,6 +18,8 @@ interface HotelFilterSelectProps {
   region: { geoCountry?: string; geoCity?: string; geoResort?: string };
   /** Selected supplier codes; empty = all suppliers. */
   suppliers?: string[];
+  /** Internal supplier codes are visible to staff only. */
+  showSuppliers?: boolean;
   /** Never mix tour hotels into hotel search (and vice versa). */
   serviceType: "tours" | "hotels";
   /** Currently selected hotel name ("" = none). */
@@ -37,6 +39,7 @@ interface HotelFilterSelectProps {
 export default function HotelFilterSelect({
   region,
   suppliers = [],
+  showSuppliers = false,
   serviceType,
   value,
   onSelect,
@@ -222,7 +225,7 @@ export default function HotelFilterSelect({
                         <span className="block truncate text-[15px] font-medium text-white">
                           {h.name}
                         </span>
-                        {h.suppliers.length > 0 && (
+                        {showSuppliers && h.suppliers.length > 0 && (
                           <span className="block truncate text-[12px] text-neutral-500">
                             {h.suppliers.join(", ")}
                           </span>

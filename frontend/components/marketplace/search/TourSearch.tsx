@@ -679,6 +679,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
                 }}
                 suppliers={selectedSuppliers}
                 serviceType="tours"
+                showSuppliers={showSuppliers}
                 value={hotelName}
                 onSelect={(h) => {
                   setHotelId(h.id);

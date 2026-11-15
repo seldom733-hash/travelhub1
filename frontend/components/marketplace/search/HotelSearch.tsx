@@ -71,6 +71,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [childAges, setChildAges] = useState<number[]>([]);
+  const [agesOpen, setAgesOpen] = useState(false);
   // «Поставщики» picker: enabled hotel suppliers from the backend (имена и
   // признак активности — из CRM-партнёров); пустой выбор = все поставщики.
   const [supplierOptions, setSupplierOptions] = useState<Array<{ code: string; name: string; partnerCode?: string; countries?: string[] }>>([]);
@@ -78,7 +79,9 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
   const [hotelStars, setHotelStars] = useState<string[]>([]);
   const [suppliersOpen, setSuppliersOpen] = useState(false);
   const suppliersRef = useRef<HTMLDivElement>(null);
+  const agesRef = useRef<HTMLDivElement>(null);
   useClickOutside(suppliersRef, suppliersOpen, () => setSuppliersOpen(false));
+  useClickOutside(agesRef, agesOpen, () => setAgesOpen(false));
   const suppliersPanelMaxHeight = usePanelMaxHeight(suppliersRef, suppliersOpen);
 
   // ── Draft: restore the pickers of the previous search ──────────────────
@@ -108,6 +111,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
       setAdults(draft.adults);
       setChildren(draft.children);
       setChildAges(draft.childAges);
+      setAgesOpen(draft.children > 0);
       setSelectedSuppliers(draft.selectedSuppliers ?? []);
     }
     setHydrated(true);
@@ -202,6 +206,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
     setAdults(2);
     setChildren(0);
     setChildAges([]);
+    setAgesOpen(false);
     setSelectedSuppliers([]);
     clearHotelDraft();
   }, []);
@@ -368,7 +373,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
       {/* Направление + отель — те же размеры, что у «Куда» в поиске туров */}
       <div className={PICKER_ROW}>
         {/* Destination — Master Geography picker (country → city → resort) */}
-        <div className={PICKER_W_TO}>
+        <div className="w-full sm:w-[278px] sm:min-w-[220px] sm:max-w-[278px] sm:flex-none">
           <DestinationPicker
             id="hotel-to"
             label={t("search.to", locale)}
@@ -387,15 +392,14 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
           />
         </div>
 
-        {/* Hotel — supplier dictionary directory, scoped to the region;
-            тот же компонент, что в поиске туров: клик раскрывает список
-            отелей с полем поиска. */}
-        <div className={PICKER_W_TO}>
+        {/* Hotel — supplier dictionary directory, scoped to the region. */}
+        <div className="w-full sm:w-[278px] sm:min-w-[220px] sm:max-w-[278px] sm:flex-none">
           <HotelFilterSelect
             region={hotelRegion}
             suppliers={selectedSuppliers}
             serviceType="hotels"
             value={hotelName}
+            showSuppliers={showSuppliers}
             onSelect={(h) => {
               setHotelId(h.id);
               setHotelName(h.name);
@@ -407,8 +411,8 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
           />
         </div>
 
-        {/* Check-in — ровно ширина одиночного поля-даты (как в поиске туров) */}
-        <div style={{ minWidth: datePx + PICKER_DATE_WIDTH_EXTRA, maxWidth: datePx + PICKER_DATE_WIDTH_EXTRA }}>
+        {/* Check-in */}
+        <div className="w-full sm:w-[190px] sm:flex-none">
           <label htmlFor="hotel-checkin" className={PICKER_LABEL}>
             {t("search.check_in", locale)}
           </label>
@@ -425,7 +429,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
         </div>
 
         {/* ONE night value (the supplier request gets it as both bounds). */}
-        <div className={PICKER_W_NIGHTS_WIDE}>
+        <div className="w-full sm:min-w-[320px] sm:flex-[1_1_320px]">
           <NightsSelect
             id="hotel-nights"
             value={nightsFrom}
@@ -436,7 +440,9 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
             }}
           />
         </div>
+      </div>
 
+      <div className={PICKER_ROW}>
         {/* Adults */}
         <div style={{ maxWidth: digitPx + PICKER_DIGIT_WIDTH_EXTRA }}>
           <label htmlFor="hotel-adults" className={PICKER_LABEL}>
@@ -454,33 +460,57 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
           </select>
         </div>
 
-        {/* Children */}
-        <div style={{ maxWidth: digitPx + PICKER_DIGIT_WIDTH_EXTRA }}>
+        {/* Children + compact age popover (no extra full-width row). */}
+        <div ref={agesRef} className="relative">
           <label htmlFor="hotel-children" className={PICKER_LABEL}>
             {t("search.children", locale)}
           </label>
-          <select
-            id="hotel-children"
-            value={children}
-            onChange={(e) => {
-              const val = Number(e.target.value);
-              setChildren(val);
-              setChildAges(Array(val).fill(0));
-            }}
-            className={PICKER_CONTROL}
-          >
-            {[0, 1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
+          <div className="flex items-end gap-2">
+            <select
+              id="hotel-children"
+              value={children}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setChildren(val);
+                setChildAges(Array(val).fill(0));
+                setAgesOpen(val > 0);
+              }}
+              className={PICKER_CONTROL}
+              style={{ width: 76 }}
+            >
+              {[0, 1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+            {children > 0 && (
+              <button
+                type="button"
+                onClick={() => setAgesOpen((v) => !v)}
+                aria-expanded={agesOpen}
+                className="flex h-[42px] max-w-[130px] items-center gap-1 rounded-xl border border-dark-border bg-dark-card px-2.5 text-[12px] text-neutral-300 transition-colors hover:border-gold/40"
+                title={locale === "ru" ? "Возрасты детей" : locale === "az" ? "Uşaqların yaşları" : "Children ages"}
+              >
+                <span className="truncate">
+                  {childAges.slice(0, children).join(", ") || (locale === "ru" ? "возраст" : locale === "az" ? "yaş" : "age")}
+                </span>
+                <CaretDown size={12} className={`shrink-0 transition-transform ${agesOpen ? "rotate-180" : ""}`} />
+              </button>
+            )}
+          </div>
+          {children > 0 && agesOpen && (
+            <div className="absolute left-0 top-full z-[60] mt-1 w-[320px] rounded-xl border border-dark-border bg-dark-surface p-3 shadow-xl">
+              <ChildAges count={children} ages={childAges} onChange={setChildAges} />
+            </div>
+          )}
         </div>
 
-        <div className="min-w-[170px] max-w-[260px] flex-[0_1_260px]"><HotelStarsSelect selected={hotelStars} onChange={setHotelStars} countryCode={toCountry?.code} /></div>
+        <div className="w-[170px] flex-none">
+          <HotelStarsSelect selected={hotelStars} onChange={setHotelStars} countryCode={toCountry?.code} />
+        </div>
 
-        {/* Suppliers («Поставщики») — hotel suppliers from CRM partners,
-            multi-select; empty = every supplier. */}
+        {/* Suppliers — staff-only secondary filter. */}
         {showSuppliers && (
-        <div className="min-w-[150px] max-w-[260px] flex-[0_1_260px]">
+        <div className="min-w-[150px] max-w-[240px] flex-[0_1_240px]">
           <label htmlFor="hotel-suppliers" className={PICKER_LABEL}>
             {t("search.suppliers", locale)}
           </label>
@@ -544,8 +574,6 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
                                 ? prev.filter((c) => c !== s.code)
                                 : [...prev, s.code],
                             );
-                            // Collapse after picking an option (same contract
-                            // as «Откуда»); reopen to add/remove more.
                             setSuppliersOpen(false);
                           }}
                           className={`flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/5 ${active ? "bg-gold/10" : ""}`}
@@ -581,22 +609,15 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
           </div>
         </div>
         )}
+
+        {/* Primary action stays at the right edge of the second row. */}
+        <div className="relative z-[70] ml-auto flex items-end">
+          <button type="submit" className={`btn-gold ${PICKER_SUBMIT_RIGHT}`}>
+            <span>{t("marketplace.search_submit", locale)}</span>
+            <ArrowRight size={16} weight="bold" />
+          </button>
+        </div>
       </div>
-
-      {/* Child ages */}
-      {children > 0 && (
-        <ChildAges count={children} ages={childAges} onChange={setChildAges} />
-      )}
-
-      {/* Submit — right aligned at the same visual position as tours/flights. */}
-      <div className="relative z-[70] flex justify-end">
-        <button type="submit" className={`btn-gold ${PICKER_SUBMIT_RIGHT}`}>
-          <span>{t("marketplace.search_submit", locale)}</span>
-          <ArrowRight size={16} weight="bold" />
-        </button>
-      </div>
-
-      {/* HelpFind скрыт (как в поиске туров): кнопка «Найти» занимает его строку. */}
     </form>
   );
 }
