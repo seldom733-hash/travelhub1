@@ -276,6 +276,9 @@ export class SalesAnalyticsService {
 
     const requests = await this.prisma.request.findMany({ where: requestWhere, orderBy: { createdAt: "desc" } });
     const requestIds = requests.map((r) => r.id);
+    // CONVERTED without convertedOrderId is a historical data-integrity case.
+    // Keep it in the request count, but do not penalise conversion rates.
+    const conversionCohort = requests.filter((r) => r.status !== "CONVERTED" || !!r.convertedOrderId);
     const requestOrderIds = requests.map((r) => r.convertedOrderId).filter((x): x is string => !!x);
 
     const orders = await this.prisma.order.findMany({
@@ -497,11 +500,11 @@ export class SalesAnalyticsService {
       closedDeals: closedOrders.length,
       cancelledOrders: cancelledOrders.length,
       cancelledBookings: cancelledBookings.length,
-      conversionRequestOrder: requests.length ? cohortOrders.length / requests.length * 100 : 0,
+      conversionRequestOrder: conversionCohort.length ? cohortOrders.length / conversionCohort.length * 100 : 0,
       conversionOrderBooking: cohortOrders.length ? cohortWithBooking.length / cohortOrders.length * 100 : 0,
-      conversionRequestBooking: requests.length ? cohortWithBooking.length / requests.length * 100 : 0,
-      conversionRequestCompleted: requests.length ? cohortCompleted.length / requests.length * 100 : 0,
-      conversionRequestClosed: requests.length ? cohortClosed.length / requests.length * 100 : 0,
+      conversionRequestBooking: conversionCohort.length ? cohortWithBooking.length / conversionCohort.length * 100 : 0,
+      conversionRequestCompleted: conversionCohort.length ? cohortCompleted.length / conversionCohort.length * 100 : 0,
+      conversionRequestClosed: conversionCohort.length ? cohortClosed.length / conversionCohort.length * 100 : 0,
       salesAmount: Math.round(salesAmount * 100) / 100,
       capturedRevenue: Math.round(captured * 100) / 100,
       costAmount: Math.round(cost * 100) / 100,
@@ -520,7 +523,7 @@ export class SalesAnalyticsService {
         const u = id ? managerById.get(id) : null;
         managerRows.set(k, {
           managerId: id, manager: u?.fullName ?? u?.username ?? (id ? id : "Не назначен"),
-          requests: 0, assigned: 0, accepted: 0, processed: 0, inWork: 0, noFirstResponse: 0,
+          requests: 0, conversionCohort: 0, assigned: 0, accepted: 0, processed: 0, inWork: 0, noFirstResponse: 0,
           proposalsSent: 0, transferred: 0, receivedTransfers: 0, lost: 0, overdue: 0,
           orders: 0, bookings: 0, completed: 0, closed: 0, cancelledOrders: 0, cancelledBookings: 0,
           salesAmount: 0, capturedRevenue: 0, grossProfit: 0, refunds: 0, slaEligible: 0, slaCompliant: 0,
@@ -532,6 +535,7 @@ export class SalesAnalyticsService {
     for (const r of requests) {
       const m = ensureManager(r.assignedManagerId);
       m.requests++;
+      if (r.status !== "CONVERTED" || !!r.convertedOrderId) m.conversionCohort++;
       if (r.assignedAt) m.assigned++;
       if (r.processingStartedAt) m.accepted++;
       if (r.firstContactAt || r.processingStartedAt) m.processed++;
@@ -563,20 +567,20 @@ export class SalesAnalyticsService {
       ...m,
       avgResponseHours: m.responseCount ? Math.round((m.responseSum / m.responseCount) * 100) / 100 : null,
       slaCompliance: m.slaEligible ? Math.round((m.slaCompliant / m.slaEligible) * 10000) / 100 : 0,
-      conversionRequestOrder: m.requests ? Math.round((m.orders / m.requests) * 10000) / 100 : 0,
-      conversionRequestCompleted: m.requests ? Math.round((m.completed / m.requests) * 10000) / 100 : 0,
-      conversionRequestClosed: m.requests ? Math.round((m.closed / m.requests) * 10000) / 100 : 0,
+      conversionRequestOrder: m.conversionCohort ? Math.round((m.orders / m.conversionCohort) * 10000) / 100 : 0,
+      conversionRequestCompleted: m.conversionCohort ? Math.round((m.completed / m.conversionCohort) * 10000) / 100 : 0,
+      conversionRequestClosed: m.conversionCohort ? Math.round((m.closed / m.conversionCohort) * 10000) / 100 : 0,
       avgCheck: m.orders ? Math.round((m.salesAmount / m.orders) * 100) / 100 : 0,
     })).sort((a, b) => b.salesAmount - a.salesAmount);
 
     const funnel = [
-      { stage: "requests", label: "Заявки", count: requests.length, conversion: 100 },
-      { stage: "processing", label: "В обработке", count: accepted.length, conversion: requests.length ? accepted.length / requests.length * 100 : 0 },
-      { stage: "proposal", label: "Предложение", count: proposals.size, conversion: requests.length ? proposals.size / requests.length * 100 : 0 },
-      { stage: "orders", label: "Заказы", count: cohortOrders.length, conversion: requests.length ? cohortOrders.length / requests.length * 100 : 0 },
-      { stage: "bookings", label: "Бронирования", count: cohortWithBooking.length, conversion: requests.length ? cohortWithBooking.length / requests.length * 100 : 0 },
-      { stage: "completed", label: "Завершено", count: cohortCompleted.length, conversion: requests.length ? cohortCompleted.length / requests.length * 100 : 0 },
-      { stage: "closed", label: "Закрыто", count: cohortClosed.length, conversion: requests.length ? cohortClosed.length / requests.length * 100 : 0 },
+      { stage: "requests", label: "Заявки", count: requests.length, eligible: conversionCohort.length, conversion: 100 },
+      { stage: "processing", label: "В обработке", count: accepted.length, conversion: conversionCohort.length ? accepted.length / conversionCohort.length * 100 : 0 },
+      { stage: "proposal", label: "Предложение", count: proposals.size, conversion: conversionCohort.length ? proposals.size / conversionCohort.length * 100 : 0 },
+      { stage: "orders", label: "Заказы", count: cohortOrders.length, conversion: conversionCohort.length ? cohortOrders.length / conversionCohort.length * 100 : 0 },
+      { stage: "bookings", label: "Бронирования", count: cohortWithBooking.length, conversion: conversionCohort.length ? cohortWithBooking.length / conversionCohort.length * 100 : 0 },
+      { stage: "completed", label: "Завершено", count: cohortCompleted.length, conversion: conversionCohort.length ? cohortCompleted.length / conversionCohort.length * 100 : 0 },
+      { stage: "closed", label: "Закрыто", count: cohortClosed.length, conversion: conversionCohort.length ? cohortClosed.length / conversionCohort.length * 100 : 0 },
     ];
 
     const serviceMap = new Map<string, any>();
