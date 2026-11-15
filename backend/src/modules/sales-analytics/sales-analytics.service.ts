@@ -291,7 +291,8 @@ export class SalesAnalyticsService {
     const orderIds = orders.map((o) => o.id);
     const obligations = await this.prisma.supplierObligation.findMany({
       where: { orderId: { in: orderIds }, status: { not: "CANCELLED" } },
-      select: { orderId: true, orderItemId: true, aznAmount: true },
+      select: { orderId: true, orderItemId: true, aznAmount: true, updatedAt: true },
+      orderBy: { updatedAt: "desc" },
     });
     const obligationByOrder = new Map<string, number>();
     const obligationByItem = new Map<string, number>();
@@ -414,8 +415,7 @@ export class SalesAnalyticsService {
     const refunded = refunds.filter((x) => scopedOrderIdSet.has(x.orderId) && orderById.get(x.orderId)?.status !== "CANCELLED").reduce((s, x) => s + num(x.amount), 0);
     const adjustmentAmount = adjustments.filter((x) => scopedOrderIdSet.has(x.orderId)).reduce((s, x) => s + num(x.amount), 0);
     const costFor = (o: any) => {
-      const obligationCost = obligationByOrder.get(o.id) ?? 0;
-      if (obligationCost > 0) return obligationCost;
+      if (obligationByOrder.has(o.id)) return obligationByOrder.get(o.id)!;
       const linkedRequest = requestByOrder.get(o.id);
       const snapshot = linkedRequest?.commercialSnapshot as any;
       const snapshotCost = num(snapshot?.netSupplierCost);
@@ -662,7 +662,9 @@ export class SalesAnalyticsService {
           title: item.title,
           type: item.type,
           amount: num(item.amount),
-          cost: obligationByItem.get(item.id) ?? (num(o.amount) > 0 ? costFor(o) * (num(item.amount) / num(o.amount)) : 0),
+          cost: obligationByItem.has(item.id)
+            ? obligationByItem.get(item.id)!
+            : (num(o.amount) > 0 ? costFor(o) * (num(item.amount) / num(o.amount)) : 0),
         })),
       };
     });
