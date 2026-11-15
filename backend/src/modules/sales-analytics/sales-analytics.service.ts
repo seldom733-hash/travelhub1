@@ -290,6 +290,11 @@ export class SalesAnalyticsService {
       where: { status: "PROCESSED", processedAt: { gte: p.start, lt: p.end }, orderId: { in: orderIds } },
       select: { orderId: true, amount: true, code: true, processedAt: true },
     });
+    const settlements = await this.prisma.orderFinancialSettlement.findMany({
+      where: { orderId: { in: orderIds } },
+      select: { orderId: true, finalCustomerLiability: true, capturedAmount: true, refundedAmount: true, status: true },
+    });
+    const settlementByOrder = new Map(settlements.map((x) => [x.orderId, x]));
 
     const requestByOrder = new Map<string, any>();
     for (const r of requests) if (r.convertedOrderId) requestByOrder.set(r.convertedOrderId, r);
@@ -384,6 +389,11 @@ export class SalesAnalyticsService {
     const completedResult = completedOrders.reduce((s, o) => s + num(o.amount) - costFor(o) - (refundsByOrder.get(o.id) ?? 0), 0);
     const closedResult = closedOrders.reduce((s, o) => s + num(o.amount) - costFor(o) - (refundsByOrder.get(o.id) ?? 0), 0);
     const avgCheck = salesOrders.length ? salesAmount / salesOrders.length : 0;
+    const closedSettlements = closedOrders.map((o) => settlementByOrder.get(o.id)).filter(Boolean);
+    const settlementVariance = closedOrders.reduce((sum, o) => {
+      const s = settlementByOrder.get(o.id);
+      return s ? sum + (num(o.amount) - num(s.finalCustomerLiability)) : sum;
+    }, 0);
     const reconciliation = {
       salesAmount: Math.round(salesAmount * 100) / 100,
       capturedRevenue: Math.round(captured * 100) / 100,
@@ -391,6 +401,8 @@ export class SalesAnalyticsService {
       outstanding: Math.round(Math.max(0, salesAmount - captured + refunded) * 100) / 100,
       overpayment: Math.round(Math.max(0, captured - salesAmount) * 100) / 100,
       orders: salesOrders.length,
+      closedSettlements: closedSettlements.length,
+      settlementVariance: Math.round(settlementVariance * 100) / 100,
     };
 
     const kpis: Record<string, number> = {
