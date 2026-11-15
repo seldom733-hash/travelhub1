@@ -406,6 +406,15 @@ export class SalesAnalyticsService {
     const closedResult = closedOrders.reduce((s, o) => s + num(o.amount) - costFor(o) - (refundsByOrder.get(o.id) ?? 0), 0);
     const avgCheck = salesOrders.length ? salesAmount / salesOrders.length : 0;
     const closedSettlements = closedOrders.map((o) => settlementByOrder.get(o.id)).filter(Boolean);
+    const itemAmountVariance = salesOrders.reduce((sum, o) => {
+      const items = (o as any).items ?? [];
+      const itemsSum = items.reduce((x: number, item: any) => x + num(item.amount), 0);
+      return sum + (num(o.amount) - itemsSum);
+    }, 0);
+    const ordersWithItemMismatch = salesOrders.filter((o) => {
+      const items = (o as any).items ?? [];
+      return Math.abs(num(o.amount) - items.reduce((x: number, item: any) => x + num(item.amount), 0)) > 0.01;
+    }).length;
     const settlementVariance = closedOrders.reduce((sum, o) => {
       const s = settlementByOrder.get(o.id);
       return s ? sum + (num(o.amount) - num(s.finalCustomerLiability)) : sum;
@@ -418,6 +427,8 @@ export class SalesAnalyticsService {
       outstanding: Math.round(Math.max(0, salesAmount - captured + refunded) * 100) / 100,
       overpayment: Math.round(Math.max(0, captured - salesAmount) * 100) / 100,
       orders: salesOrders.length,
+      itemAmountVariance: Math.round(itemAmountVariance * 100) / 100,
+      ordersWithItemMismatch,
       closedSettlements: closedSettlements.length,
       settlementVariance: Math.round(settlementVariance * 100) / 100,
     };
