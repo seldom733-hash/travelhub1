@@ -345,29 +345,6 @@ export class SalesAnalyticsService {
     const customerById = new Map((await this.prisma.customer.findMany({ where: { id: { in: customerIds } }, select: { id: true, code: true, firstName: true, lastName: true, companyName: true, phone: true } })).map((c) => [c.id, c]));
     const managerIds = [...new Set(requests.map((r) => r.assignedManagerId).filter((x): x is string => !!x))];
     const managerById = new Map((await this.prisma.user.findMany({ where: { id: { in: managerIds } }, select: { id: true, fullName: true, username: true } })).map((u) => [u.id, u]));
-    const financials = [
-      ...payments.filter((x) => scopedOrderIdSet.has(x.orderId)).map((x) => ({
-        kind: "PAYMENT", code: x.code, orderId: x.orderId,
-        orderCode: orderById.get(x.orderId)?.referenceNumber ?? null,
-        manager: requestByOrder.get(x.orderId)?.assignedManagerId
-          ? managerById.get(requestByOrder.get(x.orderId).assignedManagerId)?.fullName ?? null : null,
-        amount: num(x.amount), date: x.paidAt, status: "CAPTURED",
-      })),
-      ...refunds.filter((x) => scopedOrderIdSet.has(x.orderId)).map((x) => ({
-        kind: "REFUND", code: x.code, orderId: x.orderId,
-        orderCode: orderById.get(x.orderId)?.referenceNumber ?? null,
-        manager: requestByOrder.get(x.orderId)?.assignedManagerId
-          ? managerById.get(requestByOrder.get(x.orderId).assignedManagerId)?.fullName ?? null : null,
-        amount: num(x.amount), date: x.processedAt, status: "PROCESSED",
-      })),
-      ...adjustments.filter((x) => scopedOrderIdSet.has(x.orderId)).map((x) => ({
-        kind: "ADJUSTMENT", code: x.code, orderId: x.orderId,
-        orderCode: orderById.get(x.orderId)?.referenceNumber ?? null,
-        manager: requestByOrder.get(x.orderId)?.assignedManagerId
-          ? managerById.get(requestByOrder.get(x.orderId).assignedManagerId)?.fullName ?? null : null,
-        amount: num(x.amount), date: x.occurredAt, status: x.type,
-      })),
-    ];
 
     const requestHistory = requestIds.length
       ? await this.prisma.requestHistory.findMany({ where: { requestId: { in: requestIds } }, orderBy: { createdAt: "desc" } })
@@ -424,6 +401,30 @@ export class SalesAnalyticsService {
         .filter((b) => b.status !== "CANCELLED" && b.status !== "SUPPLIER_REJECTED")
         .reduce((s, b) => s + num(b.amount), 0);
     };
+
+    const financials = [
+      ...payments.filter((x) => scopedOrderIdSet.has(x.orderId)).map((x) => ({
+        kind: "PAYMENT", code: x.code, orderId: x.orderId,
+        orderCode: orderById.get(x.orderId)?.referenceNumber ?? null,
+        manager: requestByOrder.get(x.orderId)?.assignedManagerId
+          ? managerById.get(requestByOrder.get(x.orderId).assignedManagerId)?.fullName ?? null : null,
+        amount: num(x.amount), date: x.paidAt, status: "CAPTURED",
+      })),
+      ...refunds.filter((x) => scopedOrderIdSet.has(x.orderId)).map((x) => ({
+        kind: "REFUND", code: x.code, orderId: x.orderId,
+        orderCode: orderById.get(x.orderId)?.referenceNumber ?? null,
+        manager: requestByOrder.get(x.orderId)?.assignedManagerId
+          ? managerById.get(requestByOrder.get(x.orderId).assignedManagerId)?.fullName ?? null : null,
+        amount: num(x.amount), date: x.processedAt, status: "PROCESSED",
+      })),
+      ...adjustments.filter((x) => scopedOrderIdSet.has(x.orderId)).map((x) => ({
+        kind: "ADJUSTMENT", code: x.code, orderId: x.orderId,
+        orderCode: orderById.get(x.orderId)?.referenceNumber ?? null,
+        manager: requestByOrder.get(x.orderId)?.assignedManagerId
+          ? managerById.get(requestByOrder.get(x.orderId).assignedManagerId)?.fullName ?? null : null,
+        amount: num(x.amount), date: x.occurredAt, status: x.type,
+      })),
+    ];
     const cost = salesOrders.reduce((s, o) => s + costFor(o), 0);
     const grossProfit = salesAmount - cost;
     const completedResult = completedOrders.reduce((s, o) => s + num(o.amount) - costFor(o) - (refundsByOrder.get(o.id) ?? 0), 0);
