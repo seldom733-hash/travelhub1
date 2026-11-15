@@ -178,7 +178,7 @@ export default function HeroSearch({ enabledServices, defaultService, onTabChang
             </button>
           ))}
         </div>
-        {(activeTab === "tours" || activeTab === "hotels") && (
+        {activeTab === "tours" || activeTab === "hotels" ? (
           <div className="flex items-center gap-2">
             <GdsFilter checked={withoutGds} onChange={setWithoutGds} />
             <button
@@ -189,7 +189,15 @@ export default function HeroSearch({ enabledServices, defaultService, onTabChang
               {t("search.reset_all", locale)}
             </button>
           </div>
-        )}
+        ) : activeTab === "flights" ? (
+          <button
+            type="button"
+            onClick={() => setResetSignal((n) => n + 1)}
+            className="rounded-full px-3 py-1.5 text-[13px] font-medium text-neutral-400 transition-colors hover:text-white"
+          >
+            {t("search.reset_all", locale)}
+          </button>
+        ) : null}
       </div>
 
       {/* Service-specific form */}
