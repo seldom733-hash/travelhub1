@@ -294,6 +294,10 @@ export class SalesAnalyticsService {
       where: { orderId: { in: orderIds } },
       select: { orderId: true, finalCustomerLiability: true, capturedAmount: true, refundedAmount: true, status: true },
     });
+    const adjustments = await this.prisma.orderFinancialAdjustment.findMany({
+      where: { orderId: { in: orderIds }, occurredAt: { gte: p.start, lt: p.end } },
+      select: { orderId: true, amount: true, occurredAt: true, code: true, type: true },
+    });
     const settlementByOrder = new Map(settlements.map((x) => [x.orderId, x]));
 
     const requestByOrder = new Map<string, any>();
@@ -328,6 +332,13 @@ export class SalesAnalyticsService {
         manager: requestByOrder.get(x.orderId)?.assignedManagerId
           ? managerById.get(requestByOrder.get(x.orderId).assignedManagerId)?.fullName ?? null : null,
         amount: num(x.amount), date: x.processedAt, status: "PROCESSED",
+      })),
+      ...adjustments.map((x) => ({
+        kind: "ADJUSTMENT", code: x.code, orderId: x.orderId,
+        orderCode: orderById.get(x.orderId)?.referenceNumber ?? null,
+        manager: requestByOrder.get(x.orderId)?.assignedManagerId
+          ? managerById.get(requestByOrder.get(x.orderId).assignedManagerId)?.fullName ?? null : null,
+        amount: num(x.amount), date: x.occurredAt, status: x.type,
       })),
     ];
 
@@ -375,6 +386,7 @@ export class SalesAnalyticsService {
     const salesAmount = salesOrders.reduce((s, o) => s + num(o.amount), 0);
     const captured = payments.filter((x) => scopedOrderIdSet.has(x.orderId) && orderById.get(x.orderId)?.status !== "CANCELLED").reduce((s, x) => s + num(x.amount), 0);
     const refunded = refunds.filter((x) => scopedOrderIdSet.has(x.orderId) && orderById.get(x.orderId)?.status !== "CANCELLED").reduce((s, x) => s + num(x.amount), 0);
+    const adjustmentAmount = adjustments.filter((x) => scopedOrderIdSet.has(x.orderId)).reduce((s, x) => s + num(x.amount), 0);
     const costFor = (o: any) => {
       const linkedRequest = requestByOrder.get(o.id);
       const snapshot = linkedRequest?.commercialSnapshot as any;
@@ -398,6 +410,7 @@ export class SalesAnalyticsService {
       salesAmount: Math.round(salesAmount * 100) / 100,
       capturedRevenue: Math.round(captured * 100) / 100,
       refunds: Math.round(refunded * 100) / 100,
+      adjustments: Math.round(adjustmentAmount * 100) / 100,
       outstanding: Math.round(Math.max(0, salesAmount - captured + refunded) * 100) / 100,
       overpayment: Math.round(Math.max(0, captured - salesAmount) * 100) / 100,
       orders: salesOrders.length,
@@ -432,6 +445,7 @@ export class SalesAnalyticsService {
       grossProfit: Math.round(grossProfit * 100) / 100,
       avgCheck: Math.round(avgCheck * 100) / 100,
       refunds: Math.round(refunded * 100) / 100,
+      adjustments: Math.round(adjustmentAmount * 100) / 100,
       completedResult: Math.round(completedResult * 100) / 100,
       closedResult: Math.round(closedResult * 100) / 100,
     };
