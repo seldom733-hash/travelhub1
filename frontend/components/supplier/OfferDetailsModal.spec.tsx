@@ -35,6 +35,8 @@ const mockUserState = vi.hoisted(() => ({ user: null as any }));
 vi.mock("@/lib/use-user", () => ({
   useCurrentUserStatus: () => ({ user: mockUserState.user, ready: true }),
   isAuthorizedCustomer: (u: any) => Boolean(u && u.role === "BUYER" && u.customerId),
+  isPlatformStaff: (u: any) =>
+    Boolean(u && ["ADMIN", "DIRECTOR", "FINANCE", "MARKETER", "ANALYST", "MODERATOR", "SALES_MANAGER", "SALES_HEAD", "OPERATOR"].includes(u.role)),
 }));
 
 const createTourRequestMock = createTourRequest as Mock;
@@ -150,6 +152,20 @@ describe("OfferDetailsModal — request hint + contract fields (Phase 4)", () =>
   it("blocks submission until required customer fields are valid", () => {
     renderModal();
     expect((screen.getByRole("button", { name: "Подать заявку" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("guest sees only the supplier code and no internal trace", () => {
+    renderModal();
+    expect(screen.getByText("KOMPAS")).toBeTruthy();
+    expect(screen.queryByText("Kompas")).toBeNull();
+    expect(screen.queryByText(/searchId:/)).toBeNull();
+  });
+
+  it("staff sees the supplier name and internal trace", () => {
+    mockUserState.user = { id: "s1", role: "ADMIN", fullName: "Admin" };
+    renderModal();
+    expect(screen.getByText("Kompas")).toBeTruthy();
+    expect(screen.getByText(/searchId:/)).toBeTruthy();
   });
 
   it("authorized client: traveler fields are prefilled, read-only and submit is active", async () => {

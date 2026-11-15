@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { t, useLocale } from "@/lib/i18n";
 import Price from "@/components/public/Price";
-import { isAuthorizedCustomer, useCurrentUserStatus } from "@/lib/use-user";
+import { isAuthorizedCustomer, isPlatformStaff, useCurrentUserStatus } from "@/lib/use-user";
 import {
   refreshSupplierPrice,
   refreshSupplierAvailability,
@@ -37,6 +37,7 @@ export default function OfferDetailsModal({
   const supplierLabels = useSupplierLabels("tours");
   const { user, ready } = useCurrentUserStatus();
   const isClient = ready && isAuthorizedCustomer(user);
+  const isStaff = ready && isPlatformStaff(user);
   const [customer, setCustomer] = useState({ firstName: "", lastName: "", phone: "", email: "" });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const prefilled = useRef(false);
@@ -237,7 +238,7 @@ export default function OfferDetailsModal({
             </p>
           </div>
           <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-neutral-300">
-            {supplierLabels[offer.supplierCode] ?? offer.supplierCode}
+            {isStaff ? supplierLabels[offer.supplierCode] ?? offer.supplierCode : offer.supplierCode}
           </span>
         </div>
 
@@ -376,9 +377,11 @@ export default function OfferDetailsModal({
           )}
         </div>
 
-        <p className="mt-3 text-right font-mono text-[10px] text-neutral-700">
-          searchId: {searchId} · offer: {offer.supplierCode}/{offer.externalOfferId}
-        </p>
+        {isStaff && (
+          <p className="mt-3 text-right font-mono text-[10px] text-neutral-700">
+            searchId: {searchId} · offer: {offer.supplierCode}/{offer.externalOfferId}
+          </p>
+        )}
       </div>
     </div>
   );
