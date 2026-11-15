@@ -20,6 +20,16 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async headers() {
+    // The marketplace shell points at content-hashed chunks that change on
+    // every production build. Never keep an old HTML shell in the browser.
+    return [
+      {
+        source: "/",
+        headers: [{ key: "Cache-Control", value: "no-store, max-age=0, must-revalidate" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
