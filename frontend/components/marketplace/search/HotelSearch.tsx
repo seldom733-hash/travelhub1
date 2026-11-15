@@ -400,6 +400,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
             serviceType="hotels"
             value={hotelName}
             showSuppliers={showSuppliers}
+            supplierNames={Object.fromEntries(supplierOptions.map((s) => [s.code, s.name]))}
             onSelect={(h) => {
               setHotelId(h.id);
               setHotelName(h.name);

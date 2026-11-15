@@ -20,6 +20,8 @@ interface HotelFilterSelectProps {
   suppliers?: string[];
   /** Internal supplier codes are visible to staff only. */
   showSuppliers?: boolean;
+  /** Staff-only display names for supplier codes (never rendered for guests). */
+  supplierNames?: Record<string, string>;
   /** Never mix tour hotels into hotel search (and vice versa). */
   serviceType: "tours" | "hotels";
   /** Currently selected hotel name ("" = none). */
@@ -40,6 +42,7 @@ export default function HotelFilterSelect({
   region,
   suppliers = [],
   showSuppliers = false,
+  supplierNames = {},
   serviceType,
   value,
   onSelect,
@@ -227,7 +230,7 @@ export default function HotelFilterSelect({
                         </span>
                         {showSuppliers && h.suppliers.length > 0 && (
                           <span className="block truncate text-[12px] text-neutral-500">
-                            {h.suppliers.join(", ")}
+                            {h.suppliers.map((code) => supplierNames[code] ?? code).join(", ")}
                           </span>
                         )}
                       </span>
