@@ -15,6 +15,9 @@ export function useConstructorPublished(slug: string) {
   useEffect(() => {
     mountedRef.current = true;
     let cancelled = false;
+    const fallbackTimer = window.setTimeout(() => {
+      if (!cancelled && mountedRef.current) setLoading(false);
+    }, 4000);
 
     async function load() {
       try {
@@ -26,6 +29,7 @@ export function useConstructorPublished(slug: string) {
         // Published config may not exist yet — that's fine
         // Fall back to default layout
       } finally {
+        window.clearTimeout(fallbackTimer);
         if (!cancelled && mountedRef.current) {
           setLoading(false);
         }
@@ -33,7 +37,7 @@ export function useConstructorPublished(slug: string) {
     }
 
     load();
-    return () => { cancelled = true; mountedRef.current = false; };
+    return () => { cancelled = true; mountedRef.current = false; window.clearTimeout(fallbackTimer); };
   }, [slug]);
 
   return { page, loading };
