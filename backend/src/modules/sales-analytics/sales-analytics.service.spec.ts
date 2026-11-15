@@ -15,8 +15,9 @@ function buildPrisma() {
     booking: { findMany: jest.fn().mockResolvedValue([]) },
     payment: { findMany: jest.fn().mockResolvedValue([]) },
     refund: { findMany: jest.fn().mockResolvedValue([]) },
+    orderFinancialSettlement: { findMany: jest.fn().mockResolvedValue([]) },
     customer: { findMany: jest.fn().mockResolvedValue([]) },
-    user: { findMany: jest.fn().mockResolvedValue([]) },
+    user: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null) },
     requestHistory: { findMany: jest.fn().mockResolvedValue([]) },
   };
   return prisma;
