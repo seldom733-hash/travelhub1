@@ -289,6 +289,23 @@ export class SalesAnalyticsService {
       include: { items: { select: { id: true, title: true, type: true, amount: true } } },
     });
     const orderIds = orders.map((o) => o.id);
+    const obligations = await this.prisma.supplierObligation.findMany({
+      where: { orderId: { in: orderIds }, status: { not: "CANCELLED" } },
+      select: { orderId: true, orderItemId: true, aznAmount: true },
+    });
+    const obligationByOrder = new Map<string, number>();
+    const obligationByItem = new Map<string, number>();
+    const seenObligationItems = new Set<string>();
+    for (const o of obligations) {
+      // SupplierObligation can contain multiple versions for one OrderItem;
+      // the analytics fact is one obligation per item, not a sum of versions.
+      if (o.orderItemId) {
+        if (seenObligationItems.has(o.orderItemId)) continue;
+        seenObligationItems.add(o.orderItemId);
+      }
+      obligationByOrder.set(o.orderId, (obligationByOrder.get(o.orderId) ?? 0) + num(o.aznAmount));
+      if (o.orderItemId) obligationByItem.set(o.orderItemId, num(o.aznAmount));
+    }
     const bookings = await this.prisma.booking.findMany({ where: { orderId: { in: orderIds } } });
     const bookingOrderIds = new Map(bookings.map((b) => [b.id, b.orderId]));
     const payments = await this.prisma.payment.findMany({
@@ -397,6 +414,8 @@ export class SalesAnalyticsService {
     const refunded = refunds.filter((x) => scopedOrderIdSet.has(x.orderId) && orderById.get(x.orderId)?.status !== "CANCELLED").reduce((s, x) => s + num(x.amount), 0);
     const adjustmentAmount = adjustments.filter((x) => scopedOrderIdSet.has(x.orderId)).reduce((s, x) => s + num(x.amount), 0);
     const costFor = (o: any) => {
+      const obligationCost = obligationByOrder.get(o.id) ?? 0;
+      if (obligationCost > 0) return obligationCost;
       const linkedRequest = requestByOrder.get(o.id);
       const snapshot = linkedRequest?.commercialSnapshot as any;
       const snapshotCost = num(snapshot?.netSupplierCost);
@@ -448,6 +467,7 @@ export class SalesAnalyticsService {
       outstanding: Math.round(Math.max(0, salesAmount - captured + refunded) * 100) / 100,
       overpayment: Math.round(Math.max(0, captured - salesAmount) * 100) / 100,
       orders: salesOrders.length,
+      obligationCost: Math.round(salesOrders.reduce((sum, o) => sum + (obligationByOrder.get(o.id) ?? 0), 0) * 100) / 100,
       itemAmountVariance: Math.round(itemAmountVariance * 100) / 100,
       ordersWithItemMismatch,
       closedSettlements: closedSettlements.length,
@@ -642,7 +662,7 @@ export class SalesAnalyticsService {
           title: item.title,
           type: item.type,
           amount: num(item.amount),
-          cost: num(o.amount) > 0 ? costFor(o) * (num(item.amount) / num(o.amount)) : 0,
+          cost: obligationByItem.get(item.id) ?? (num(o.amount) > 0 ? costFor(o) * (num(item.amount) / num(o.amount)) : 0),
         })),
       };
     });
