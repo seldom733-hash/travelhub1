@@ -20,7 +20,7 @@ function isValidEmailLocal(raw: string): boolean {
 /**
  * OfferModal — rich request modal (§4.8): tour/date/travelers header,
  * per-offer variant rows with a per-offer «Подать заявку», and the shared
- * «Данные путешественника» block (4.8.13, below variants).
+ * «Данные клиента (покупателя)» block (4.8.13, below variants).
  *
  * The variant rows and the create flow live in the shared `OfferRow` (the
  * inline day-tariffs panel uses the same component); this file owns only the

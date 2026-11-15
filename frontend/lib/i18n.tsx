@@ -323,7 +323,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "offer.details_hint": { ru: "Заполните данные путешественника и нажмите «Подать заявку»: мы перепроверим цену у поставщика и создадим заявку без заказа и бронирования.", az: "Səyahətçi məlumatlarını doldurun və «Müraciət göndər» düyməsini basın.", en: "Fill in the traveler details and click «Submit request»." },
   "offer.request_title": { ru: "Подать заявку", az: "Müraciət göndərmək", en: "Submit a request" },
   "offer.variants_title": { ru: "Варианты размещения и цены", az: "Yerləşmə variantları və qiymətlər", en: "Room options and prices" },
-  "offer.customer_title": { ru: "Данные путешественника", az: "Səyahətçi məlumatları", en: "Traveler details" },
+  "offer.customer_title": { ru: "Данные клиента (покупателя)", az: "Müştəri (alıcı) məlumatları", en: "Customer (buyer) details" },
   "offer.registered_hint": { ru: "Используем данные вашего аккаунта. Проверьте, всё ли корректно.", az: "Hesabınızın məlumatlarından istifadə edirik. Hər şeyin düzgün olduğunu yoxlayın.", en: "We use your account details. Please check that everything is correct." },
   "offer.submit_request": { ru: "Подать заявку", az: "Müraciət göndərmək", en: "Submit request" },
   "offer.phone_invalid": { ru: "Номер телефона указан неверно.", az: "Telefon nömrəsi yanlışdır.", en: "The phone number is invalid." },

@@ -276,7 +276,7 @@ export default function OfferDetailsModal({
         </dl>
 
         <div className="mt-5 border-t border-white/10 pt-4">
-          <h4 className="text-sm font-semibold text-white">Данные путешественника</h4>
+          <h4 className="text-sm font-semibold text-white">{t("offer.customer_title", locale)}</h4>
           {isClient ? (
             <p className="mt-1 text-xs text-neutral-400">
               Данные заполнены из профиля и не редактируются здесь.{" "}

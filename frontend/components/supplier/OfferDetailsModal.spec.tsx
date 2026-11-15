@@ -102,7 +102,7 @@ describe("OfferDetailsModal — request hint + contract fields (Phase 4)", () =>
     renderModal();
 
     expect(screen.getByText(/перепроверим цену у поставщика/)).toBeTruthy();
-    expect(screen.getByText("Данные путешественника")).toBeTruthy();
+    expect(screen.getByText("Данные клиента (покупателя)")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Подать заявку" })).toBeTruthy();
   });
 

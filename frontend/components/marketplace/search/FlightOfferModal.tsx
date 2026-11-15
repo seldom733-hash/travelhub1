@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFlightRequest, type FlightFare, type FlightOffer, type FlightSegment } from "@/lib/flight-api";
 import { useCurrentUser } from "@/lib/use-user";
+import { t, useLocale } from "@/lib/i18n";
 
 function fareAmount(fare: any): number {
   return Number(fare?.total?.amount ?? fare?.price?.total?.amount ?? fare?.price?.amount ?? 0);
@@ -34,6 +35,7 @@ export default function FlightOfferModal({
   onCreated?: (referenceNumber: string) => void;
 }) {
   const user = useCurrentUser();
+  const locale = useLocale();
   const fares = (flight.fares ?? []) as FlightFare[];
   const [selectedFare, setSelectedFare] = useState(0);
   const [firstName, setFirstName] = useState("");
@@ -153,7 +155,7 @@ export default function FlightOfferModal({
           </section>
 
           <section>
-            <h4 className="mb-1 text-sm font-semibold text-slate-800">Данные клиента</h4>
+            <h4 className="mb-1 text-sm font-semibold text-slate-800">{t("offer.customer_title", locale)}</h4>
             <p className="mb-2 text-xs text-slate-500">Клиент — тот, кто оформляет и оплачивает заявку. Турист может быть другим человеком.</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Имя *" value={firstName} onChange={setFirstName} autoComplete="given-name" />

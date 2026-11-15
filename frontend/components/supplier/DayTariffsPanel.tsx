@@ -27,7 +27,7 @@ function isValidEmailLocal(raw: string): boolean {
  *  - header: selected date + the day's summary (nights/travelers)
  *  - one `OfferRow` per tariff of that day (room/meal/price + «Оформить
  *    заявку» — §4.8.4 per-offer submit, unchanged)
- *  - the shared «Данные путешественника» block (§4.8.13) BELOW the variants:
+ *  - the shared «Данные клиента (покупателя)» block (§4.8.13) BELOW the variants:
  *    ONE form feeds every row of the day, so a user fills their phone once and
  *    can submit any variant.
  *
