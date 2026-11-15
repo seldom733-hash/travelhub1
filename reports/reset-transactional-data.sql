@@ -84,4 +84,13 @@ TRUNCATE TABLE
   crm."OperationalNote"
 RESTART IDENTITY CASCADE;
 
+-- Reset transactional human-readable counters, keeping catalog/pricing config
+-- (CMR/MKR/PRD) intact.
+UPDATE events."BusinessSequence"
+SET value = 0
+WHERE prefix IN (
+  'BKG', 'CML', 'CUS', 'LTX', 'ORD', 'PAY', 'REQ', 'SBO', 'TH-2026',
+  'REFSEQ:REFSEQ:COMMERCE:ROOT'
+);
+
 COMMIT;
