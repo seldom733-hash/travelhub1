@@ -268,7 +268,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           href="/app/dashboard"
           className={`flex items-center gap-2.5 border-b border-line/40 ${collapsed ? "justify-center px-2 py-4" : "px-5 py-4"}`}
         >
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand text-base font-bold text-white">T</div>
+          <div className="flex size-11 shrink-0 items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/navitravel-icon.png" alt={brandName} className="h-full w-auto object-contain" />
+          </div>
           {!collapsed && (
             <div>
               <div className="text-base font-bold text-white">

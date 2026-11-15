@@ -178,13 +178,14 @@ export default function MarketplaceHeader({ config }: { config?: MarketplaceHead
           {/* Logo */}
           <Link href="/" className="flex shrink-0 items-center gap-3" aria-label={companyName || "TravelHub"}>
             {cfg.logo ? (
-              <span className="flex size-14 items-center justify-center overflow-hidden rounded-2xl bg-[#f4f0e6] p-2 sm:size-20">
+              <span className="flex h-16 items-center justify-center sm:h-24">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={cfg.logo.url} alt={companyName || "TravelHub"} className="h-full w-full object-contain" />
+                <img src={cfg.logo.url} alt={companyName || "Navitravel"} className="h-full w-auto object-contain" />
               </span>
             ) : (
-              <span className="flex size-14 items-center justify-center rounded-2xl bg-gold text-xl font-bold text-dark sm:size-20">
-                T
+              <span className="flex h-16 items-center justify-center sm:h-24">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/navitravel-icon.png" alt={companyName || "Navitravel"} className="h-full w-auto object-contain" />
               </span>
             )}
             <span className="block">

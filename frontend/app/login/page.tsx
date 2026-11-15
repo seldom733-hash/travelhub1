@@ -58,7 +58,8 @@ function LoginPageInner() {
           <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, rgba(7,20,23,.88), rgba(7,20,23,.46), rgba(7,20,23,.18))" }} />
           <div className="relative flex h-full flex-col justify-between p-12">
             <Link href="/" className="flex items-center gap-3">
-              <span className="flex size-11 items-center justify-center rounded-2xl bg-gold text-base font-bold text-dark">N</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/navitravel-icon.png" alt="Navitravel" className="h-14 w-auto object-contain" />
               <span className="font-display text-lg font-semibold" style={{ color: "#fff" }}>Navitravel</span>
             </Link>
             <div className="max-w-md">
@@ -77,7 +78,8 @@ function LoginPageInner() {
           <div className="w-full max-w-[400px]">
             <div className="mb-8 flex items-center justify-between lg:hidden">
               <Link href="/" className="flex items-center gap-2.5">
-                <span className="flex size-10 items-center justify-center rounded-xl bg-gold text-base font-bold text-dark">N</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/navitravel-icon.png" alt="Navitravel" className="h-12 w-auto object-contain" />
                 <span className="font-display text-base font-semibold">Navitravel</span>
               </Link>
               <LocaleSelector />
