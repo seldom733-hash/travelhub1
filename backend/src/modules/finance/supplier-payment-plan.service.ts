@@ -258,9 +258,14 @@ export class SupplierPaymentPlanService implements OnModuleInit, OnModuleDestroy
       const label = isOverdue ? "Просрочена оплата поставщику" : "Напоминание об оплате поставщику";
       const obligation = installment.plan.obligation;
       const title = `${label}: ${obligation.bookingCode ?? obligation.orderCode ?? obligation.code}`;
+      const dueLabel = (() => {
+        const raw = isoDate(installment.dueDate) ?? "";
+        const [y, m, d] = raw.split("-");
+        return d && m && y ? `${d}.${m}.${y.slice(-2)}` : raw;
+      })();
       const body = [
         `${obligation.supplierCode ?? "Поставщик"}: ${num(installment.amount).toFixed(2)} AZN`,
-        `срок ${isoDate(installment.dueDate)}`,
+        `срок ${dueLabel}`,
         isOverdue ? `просрочка ${Math.abs(days)} дн.` : `до оплаты ${days} дн.`,
       ].join(" · ");
       for (const user of financeUsers) {
