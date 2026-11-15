@@ -444,7 +444,11 @@ export class SalesAnalyticsService {
       const s = settlementByOrder.get(o.id);
       return s ? sum + (num(o.amount) - num(s.finalCustomerLiability)) : sum;
     }, 0);
+    const missingConversionLinks = requests.filter((r) => r.status === "CONVERTED" && !r.convertedOrderId);
     const reconciliationIssues: Array<{ orderCode: string; kind: string; amount: number }> = [];
+    for (const r of missingConversionLinks) {
+      reconciliationIssues.push({ orderCode: r.referenceNumber, kind: "MISSING_ORDER_LINK", amount: 0 });
+    }
     for (const o of salesOrders) {
       const items = (o as any).items ?? [];
       const itemsSum = items.reduce((x: number, item: any) => x + num(item.amount), 0);
@@ -468,6 +472,7 @@ export class SalesAnalyticsService {
       outstanding: Math.round(Math.max(0, salesAmount - captured + refunded) * 100) / 100,
       overpayment: Math.round(Math.max(0, captured - salesAmount) * 100) / 100,
       orders: salesOrders.length,
+      missingConversionLinks: missingConversionLinks.length,
       obligationCost: Math.round(salesOrders.reduce((sum, o) => sum + (obligationByOrder.get(o.id) ?? 0), 0) * 100) / 100,
       itemAmountVariance: Math.round(itemAmountVariance * 100) / 100,
       ordersWithItemMismatch,
