@@ -184,6 +184,7 @@ export class SalesAnalyticsService {
       distribution: current.distribution,
       lossReasons: current.lossReasons,
       financials: current.financials,
+      orders: current.orders,
       reconciliation: current.reconciliation,
     };
   }
@@ -196,16 +197,20 @@ export class SalesAnalyticsService {
     ]);
     let rows: any[] = [];
     if (requestMetrics.has(metric)) rows = data.activity ?? [];
-    else if (metric === "ordersCreated" || metric === "cancelledOrders" || metric === "grossProfit") {
-      rows = (data.activity ?? []).filter((r: any) => !!r.orderCode);
+    else if (metric === "ordersCreated") {
+      rows = data.orders ?? [];
+    } else if (metric === "cancelledOrders") {
+      rows = (data.orders ?? []).filter((r: any) => r.status === "CANCELLED");
+    } else if (metric === "grossProfit") {
+      rows = (data.orders ?? []).filter((r: any) => r.status !== "CANCELLED");
     } else if (metric === "bookingsConfirmed" || metric === "cancelledBookings") {
       rows = (data.activity ?? []).filter((r: any) => !!r.bookingCode);
     } else if (metric === "capturedRevenue" || metric === "refunds" || metric === "salesAmount") {
       rows = data.financials ?? [];
     } else if (metric === "adjustments") {
       rows = (data.financials ?? []).filter((r: any) => r.kind === "ADJUSTMENT");
-    } else if (metric === "costAmount" || metric === "grossProfit" || metric === "avgCheck") {
-      rows = data.deals?.completed ?? [];
+    } else if (metric === "costAmount" || metric === "avgCheck") {
+      rows = (data.orders ?? []).filter((r: any) => r.status !== "CANCELLED");
     } else if (metric === "completedDeals" || metric === "completedResult") {
       rows = data.deals?.completed ?? [];
     } else if (metric === "closedDeals" || metric === "closedResult") {
@@ -585,6 +590,19 @@ export class SalesAnalyticsService {
       const c = id ? customerById.get(id) : null;
       return c?.companyName ?? [c?.firstName, c?.lastName].filter(Boolean).join(" ") ?? "—";
     };
+    const orderRows = ordersCreated.map((o) => {
+      const r = requestByOrder.get(o.id);
+      const bs = bookingByOrder.get(o.id) ?? [];
+      const b = bs.find((x) => !!x.confirmedAt) ?? bs[0];
+      return {
+        orderId: o.id, orderCode: o.referenceNumber, requestCode: r?.referenceNumber ?? null,
+        bookingCode: b?.referenceNumber ?? null, customer: cname(o.customerId),
+        manager: r?.assignedManagerId ? managerById.get(r.assignedManagerId)?.fullName ?? null : null,
+        status: o.status, createdAt: o.createdAt, fulfilledAt: o.fulfilledAt, closedAt: o.closedAt,
+        clientPrice: num(o.amount), cost: costFor(o), revenue: paymentsByOrder.get(o.id) ?? 0,
+        grossProfit: num(o.amount) - costFor(o),
+      };
+    });
     const activity = requests.map((r) => {
       const o = r.convertedOrderId ? orderById.get(r.convertedOrderId) : null;
       const bs = o ? bookingByOrder.get(o.id) ?? [] : [];
@@ -660,6 +678,6 @@ export class SalesAnalyticsService {
       })),
     };
 
-    return { kpis, managers, funnel, services: [...serviceMap.values()], sources: [...sourceMap.values()], reconciliation, lossReasons: [...lossReasonMap.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count), activity, deals: { completed: dealRows("completed"), closed: dealRows("closed") }, series, distribution, financials };
+    return { kpis, managers, funnel, services: [...serviceMap.values()], sources: [...sourceMap.values()], reconciliation, lossReasons: [...lossReasonMap.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count), activity, deals: { completed: dealRows("completed"), closed: dealRows("closed") }, orders: orderRows, series, distribution, financials };
   }
 }
