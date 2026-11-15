@@ -203,29 +203,8 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
     };
   }, []);
 
-  // Azerbaijan cities for From; all directory countries for To.
-  // Loaded lazily by the selects themselves; preselect Baku as origin.
-  useEffect(() => {
-    let alive = true;
-    fetchGeoDirectory("country")
-      .then((countries) => {
-        if (!alive) return;
-        const az = countries.find((c) => c.code === "AZ");
-        if (!az) return;
-        fetchGeoDirectory("city", az.id)
-          .then((cities) => {
-            if (!alive) return;
-            const baku =
-              cities.find((c) => c.code === "BAKU") ?? cities[0] ?? null;
-            if (baku) setFrom((prev) => prev ?? baku);
-          })
-          .catch(() => {});
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
+  // Origin is intentionally EMPTY by default. «Сбросить всё» must leave
+  // «Откуда» empty as well — no Baku autoselection.
 
   // Destination cascade: country → city → resort. Each level lists only
   // children of the selected parent, but a city/resort can also be picked
