@@ -419,6 +419,22 @@ export class SalesAnalyticsService {
       const s = settlementByOrder.get(o.id);
       return s ? sum + (num(o.amount) - num(s.finalCustomerLiability)) : sum;
     }, 0);
+    const reconciliationIssues: Array<{ orderCode: string; kind: string; amount: number }> = [];
+    for (const o of salesOrders) {
+      const items = (o as any).items ?? [];
+      const itemsSum = items.reduce((x: number, item: any) => x + num(item.amount), 0);
+      const variance = Math.round((num(o.amount) - itemsSum) * 100) / 100;
+      if (variance !== 0) reconciliationIssues.push({ orderCode: o.referenceNumber ?? o.code, kind: "ITEM_SUM", amount: variance });
+      if (costFor(o) <= 0) reconciliationIssues.push({ orderCode: o.referenceNumber ?? o.code, kind: "MISSING_COST", amount: num(o.amount) });
+    }
+    for (const o of closedOrders) {
+      const st = settlementByOrder.get(o.id);
+      if (!st) reconciliationIssues.push({ orderCode: o.referenceNumber ?? o.code, kind: "MISSING_SETTLEMENT", amount: num(o.amount) });
+      else {
+        const variance = Math.round((num(o.amount) - num(st.finalCustomerLiability)) * 100) / 100;
+        if (variance !== 0) reconciliationIssues.push({ orderCode: o.referenceNumber ?? o.code, kind: "SETTLEMENT", amount: variance });
+      }
+    }
     const reconciliation = {
       salesAmount: Math.round(salesAmount * 100) / 100,
       capturedRevenue: Math.round(captured * 100) / 100,
@@ -431,6 +447,7 @@ export class SalesAnalyticsService {
       ordersWithItemMismatch,
       closedSettlements: closedSettlements.length,
       settlementVariance: Math.round(settlementVariance * 100) / 100,
+      issues: reconciliationIssues.slice(0, 100),
     };
 
     const kpis: Record<string, number> = {
