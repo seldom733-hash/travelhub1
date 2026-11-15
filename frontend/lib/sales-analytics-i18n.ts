@@ -67,6 +67,7 @@ const AZ: Record<string, string> = {
   "Отклонена": "Rədd edilib", "Недоступна": "Mövcud deyil", "Истекла": "Vaxtı bitib",
   "Клиент не оплатил": "Müştəri ödəmədi", "Клиент отказался": "Müştəri imtina etdi",
   "Потери к следующему этапу:": "Növbəti mərhələyə itkilər:", "записей:": "qeydlər:",
+  "Без связи": "Əlaqəsiz",
 };
 const EN: Record<string, string> = {
   "Новая": "New", "Проверка": "Checking", "Поставщик не ответил": "Supplier timeout",
@@ -75,6 +76,7 @@ const EN: Record<string, string> = {
   "Отклонена": "Rejected", "Недоступна": "Unavailable", "Истекла": "Expired",
   "Клиент не оплатил": "Customer payment timeout", "Клиент отказался": "Cancelled by customer",
   "Потери к следующему этапу:": "Losses to next stage:", "записей:": "records:",
+  "Без связи": "Unlinked",
   "Аналитика продаж": "Sales analytics",
   "Заявки → заказы → бронирования → завершённые и закрытые сделки. Период:": "Requests → orders → bookings → completed and closed deals. Period:",
   "Период": "Period", "С": "From", "По": "To", "Менеджер": "Manager", "Все": "All", "Услуга": "Service",
