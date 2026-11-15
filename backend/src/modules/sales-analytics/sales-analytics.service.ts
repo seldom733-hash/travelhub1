@@ -202,6 +202,10 @@ export class SalesAnalyticsService {
       rows = (data.activity ?? []).filter((r: any) => !!r.bookingCode);
     } else if (metric === "capturedRevenue" || metric === "refunds" || metric === "salesAmount") {
       rows = data.financials ?? [];
+    } else if (metric === "adjustments") {
+      rows = (data.financials ?? []).filter((r: any) => r.kind === "ADJUSTMENT");
+    } else if (metric === "costAmount" || metric === "grossProfit" || metric === "avgCheck") {
+      rows = data.deals?.completed ?? [];
     } else if (metric === "completedDeals" || metric === "completedResult") {
       rows = data.deals?.completed ?? [];
     } else if (metric === "closedDeals" || metric === "closedResult") {
@@ -503,6 +507,7 @@ export class SalesAnalyticsService {
       conversionRequestOrder: m.requests ? Math.round((m.orders / m.requests) * 10000) / 100 : 0,
       conversionRequestCompleted: m.requests ? Math.round((m.completed / m.requests) * 10000) / 100 : 0,
       conversionRequestClosed: m.requests ? Math.round((m.closed / m.requests) * 10000) / 100 : 0,
+      avgCheck: m.orders ? Math.round((m.salesAmount / m.orders) * 100) / 100 : 0,
     })).sort((a, b) => b.salesAmount - a.salesAmount);
 
     const funnel = [
