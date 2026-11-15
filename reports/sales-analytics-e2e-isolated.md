@@ -20,15 +20,17 @@ node dist/main.js
 
 ## Seed
 
-В `travelhub1_test` перенесены существующие записи:
+В `travelhub1_test` перенесены существующие записи и добавлены E2E-сценарии:
 
 ```text
 Request             = 4
 Order               = 5
 Customer            = 1
-Payment             = 3
+Payment             = 5 (из них 1 PENDING)
 SupplierObligation  = 6
-Refund              = 1 (E2E seed)
+Refund              = 3 (2 PROCESSED, 1 REQUESTED)
+Adjustment          = 1
+Settlement          = 1
 ```
 
 ## Запуск
@@ -42,37 +44,40 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 ## Результат
 
 ```text
-OK E2E requests=4 managers=3 sales=3624,21 profit=145,8 issueCount=0
+OK E2E requests=4 managers=3 sales=3624,21 profit=145,8 issueCount=1
 ```
 
-Финансовая проверка на изолированной БД:
+Финансовая проверка:
 
 ```text
-salesAmount     = 3 624.21
-capturedRevenue = 1 262.62
-refunds         = 19.00
-obligationCost  = 2 886.28
-financials      = 4
+salesAmount          = 3 624.21
+capturedRevenue      = 1 362.62
+refunds              = 29.00
+adjustments          = 20.00
+obligationCost       = 2 886.28
+closedDeals          = 1
+closedSettlements    = 1
+financials           = 7
 ```
 
-Проверено на изолированной БД:
+`issueCount=1` — намеренная проверка видимости расхождения:
 
-- login/admin;
-- dashboard;
-- period;
-- KPI;
-- reconciliation;
-- distribution;
-- funnel;
-- activity;
-- orders;
-- drilldown;
-- frontend routes.
+```text
+MKT-ORD-00000002
+SETTLEMENT
+-356.38
+```
+
+Сценарий проверяет, что аналитика не скрывает расхождение между суммой заказа и `finalCustomerLiability`.
 
 ## Ограничение
 
-Seed содержит Request/Order/Booking/Payment/SupplierObligation/Refund, но не содержит полного набора всех финансовых сценариев (частичные оплаты, несколько возвратов, корректировки, закрытые расчёты).
+Seed покрывает частичную оплату, PENDING-оплату, несколько возвратов, PENDING-возврат, корректировку и settlement. Не покрыты:
 
-Для полного финансового E2E нужен расширенный seed этих сценариев.
+- несколько валют;
+- возврат без payment;
+- закрытие без settlement;
+- сложные мультисервисные обязательства.
+
 
 
