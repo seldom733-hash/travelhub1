@@ -63,4 +63,30 @@ describe("SalesAnalyticsService RBAC / scope", () => {
     expect(result.kpis.ordersCreated.value).toBe(1);
     expect(result.kpis.cancelledOrders.value).toBe(1);
   });
+
+  it("allocates a deal cost across its services", async () => {
+    const prisma = buildPrisma();
+    prisma.request.findMany.mockResolvedValue([{
+      id: "req-1", referenceNumber: "MKT-REQ-1", createdAt: new Date("2026-11-10T10:00:00Z"),
+      customerId: null, requestType: "TOUR_PACKAGE", sourceChannel: "WHATSAPP", status: "CONVERTED",
+      assignedManagerId: null, assignedAt: null, assignmentType: null, firstContactAt: null,
+      processingStartedAt: null, slaDueAt: null, convertedOrderId: "ord-1",
+      customerAcceptedAt: null, supplierRespondedAt: null,
+      commercialSnapshot: { netSupplierCost: 500 },
+    }]);
+    prisma.order.findMany.mockResolvedValue([{
+      id: "ord-1", referenceNumber: "MKT-ORD-1", createdAt: new Date("2026-11-10T10:00:00Z"),
+      status: "FULFILLED", amount: 1000, fulfilledAt: new Date("2026-11-12T10:00:00Z"),
+      closedAt: null, cancelledAt: null, customerId: null, financialStatus: "OPEN",
+      items: [
+        { id: "i1", title: "Hotel", type: "HOTEL", amount: 600 },
+        { id: "i2", title: "Transfer", type: "TRANSFER", amount: 400 },
+      ],
+    }]);
+    const service = new SalesAnalyticsService(prisma);
+    const result = await service.dashboard({ preset: "CURRENT_MONTH", timezone: "UTC" }, { role: "ADMIN" });
+    const deal = result.deals.completed[0];
+    expect(deal).toBeTruthy();
+    expect(deal.services.map((s: any) => s.cost)).toEqual([300, 200]);
+  });
 });
