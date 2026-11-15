@@ -9,7 +9,7 @@
  * Mass-assignment: server-owned поля (id/code/createdAt/updatedAt/version)
  * запрещены громко (422, project convention loud-forbidden-key) — не silent strip.
  */
-import { IsBoolean, IsEnum, IsIn, IsISO8601, IsInt, IsOptional, IsString, Length, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from "class-validator";
+import { IsArray, IsBoolean, IsEnum, IsIn, IsISO8601, IsInt, IsNumber, IsOptional, IsString, Length, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from "class-validator";
 import { Type, Transform } from "class-transformer";
 import { ValidationDomainError } from "../../shared/errors";
 import { Prisma } from "../../generated/prisma/client";
@@ -661,6 +661,32 @@ export class UpsertSupplierPaymentTermsDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+}
+
+/** Одна часть графика оплаты поставщику (суммы вводит финанс). */
+export class SupplierPaymentInstallmentDto {
+  @IsString()
+  @IsIn(["FIRST", "LAST", "FULL"])
+  kind!: string;
+
+  @IsISO8601()
+  dueDate!: string;
+
+  @IsNumber()
+  @Min(0.01)
+  amount!: number;
+}
+
+/** FULL — одна дата/сумма; PARTIAL — первая и последняя даты/суммы. */
+export class UpsertSupplierPaymentPlanDto {
+  @IsString()
+  @IsIn(["FULL", "PARTIAL"])
+  mode!: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SupplierPaymentInstallmentDto)
+  installments!: SupplierPaymentInstallmentDto[];
 }
 
 /** Отмена платежа поставщику (PENDING без сторно; CONFIRMED — со сторно). */

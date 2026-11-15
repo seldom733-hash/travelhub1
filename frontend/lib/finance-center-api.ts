@@ -209,6 +209,40 @@ export interface SupplierPaymentTerms {
   updatedAt: string;
 }
 
+export interface SupplierPaymentInstallment {
+  id: string;
+  kind: "FIRST" | "LAST" | "FULL";
+  dueDate: string;
+  amount: number;
+  status: "PLANNED" | "PAID" | "OVERDUE" | "CANCELLED";
+}
+
+export interface SupplierPaymentPlan {
+  id: string;
+  mode: "FULL" | "PARTIAL";
+  installments: SupplierPaymentInstallment[];
+}
+
+export interface SupplierPaymentPlanRow {
+  obligationId: string;
+  obligationCode: string;
+  orderId: string;
+  orderCode: string | null;
+  bookingId: string;
+  bookingCode: string | null;
+  bookingStatus: string | null;
+  serviceDate: string | null;
+  supplierCode: string | null;
+  sourceAmount: number;
+  sourceCurrency: string;
+  amount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  dueDate: string | null;
+  status: string;
+  plan: SupplierPaymentPlan | null;
+}
+
 export interface CreateSupplierPaymentInput {
   partnerId?: string;
   supplierCode?: string;
@@ -527,6 +561,17 @@ export const financeCenterApi = {
     active?: boolean;
   }): Promise<SupplierPaymentTerms> {
     return api.put(`${BASE}/supplier-payment-terms`, input);
+  },
+
+  listSupplierPaymentPlans(): Promise<SupplierPaymentPlanRow[]> {
+    return api.get(`${BASE}/supplier-payment-plans`);
+  },
+
+  upsertSupplierPaymentPlan(
+    obligationId: string,
+    input: { mode: "FULL" | "PARTIAL"; installments: { kind: "FIRST" | "LAST" | "FULL"; dueDate: string; amount: number }[] },
+  ): Promise<{ obligationId: string; mode: string; dueDate: string; installments: SupplierPaymentInstallment[] }> {
+    return api.put(`${BASE}/supplier-obligations/${encodeURIComponent(obligationId)}/payment-plan`, input);
   },
 
   // ── Historical reports ────────────────────────────────────────────────────

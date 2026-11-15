@@ -29,16 +29,20 @@ const META: Record<string, { icon: string; tone: string; label: string }> = {
   ORDER_CANCELLED: { icon: "✖", tone: "border-red-300 bg-red-50 text-red-800", label: "Отменена" },
   ORDER_FULFILLED: { icon: "✅", tone: "border-emerald-200 bg-emerald-50 text-emerald-800", label: "Выполнена" },
   ORDER_CLOSED: { icon: "🔒", tone: "border-slate-300 bg-slate-100 text-slate-700", label: "Закрыта" },
+  SUPPLIER_PAYMENT_DUE: { icon: "⏰", tone: "border-amber-300 bg-amber-50 text-amber-900", label: "Оплата поставщику" },
+  SUPPLIER_PAYMENT_OVERDUE: { icon: "⛔", tone: "border-red-300 bg-red-50 text-red-800", label: "Просрочена оплата" },
 };
 
-export default function NotificationStrip({ scope }: { scope: "sales" | "whatsapp" }) {
+export default function NotificationStrip({ scope }: { scope: "sales" | "whatsapp" | "finance" }) {
   const router = useRouter();
   const locale = useLocale();
   const [rows, setRows] = React.useState<Row[]>([]);
 
   const allowed = scope === "sales"
     ? ["DEAL_CREATED", "WHATSAPP_MESSAGE_LINKED"]
-    : ["WHATSAPP_MESSAGE_LINKED", "WHATSAPP_MESSAGE_UNLINKED"];
+    : scope === "finance"
+      ? ["SUPPLIER_PAYMENT_DUE", "SUPPLIER_PAYMENT_OVERDUE"]
+      : ["WHATSAPP_MESSAGE_LINKED", "WHATSAPP_MESSAGE_UNLINKED"];
 
   React.useEffect(() => {
     let alive = true;
@@ -55,7 +59,9 @@ export default function NotificationStrip({ scope }: { scope: "sales" | "whatsap
   async function open(row: Row) {
     await api.post("/sales/assignment/notifications/read-entity", { entityType: row.entityType, entityId: row.entityId }).catch(() => undefined);
     setRows((prev) => prev.filter((r) => r.id !== row.id));
-    if (row.type.startsWith("WHATSAPP") && row.entityId) {
+    if (row.type.startsWith("SUPPLIER_PAYMENT_")) {
+      router.push("/app/finance/payment-terms");
+    } else if (row.type.startsWith("WHATSAPP") && row.entityId) {
       router.push(`/app/whatsapp?conversation=${encodeURIComponent(row.entityId)}`);
     } else if (row.type.startsWith("ORDER_") && row.payload?.sequence) {
       router.push(`/app/finance/deals/${row.payload.sequence}`);

@@ -15,6 +15,8 @@ interface NavItem {
   labelKey: string;
   /** Гранулярное право, открывающее раздел (RBAC Matrix §4). */
   permission?: string;
+  /** Optional role allow-list for UI sections that are stricter than permissions. */
+  roles?: string[];
 }
 
 /**
@@ -56,7 +58,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/app/payments", icon: "💳", labelKey: "nav.payments", permission: "finance.payment.read" },
       { href: "/app/finance/reports/debt-as-of", icon: "📅", labelKey: "nav.supplier_debt_report", permission: "finance.obligation.read" },
-      { href: "/app/finance/payment-terms", icon: "⏱️", labelKey: "nav.payment_terms", permission: "finance.obligation.read" },
+      { href: "/app/finance/payment-terms", icon: "⏱️", labelKey: "nav.payment_terms", permission: "finance.obligation.read", roles: ["FINANCE", "ADMIN", "DIRECTOR"] },
       { href: "/app/pricing/markup", icon: "％", labelKey: "nav.markup_matrix", permission: "pricing.markup.read" },
       { href: "/app/finance/fx-rates", icon: "💱", labelKey: "nav.fx_rates", permission: "finance.fx_rate.read" },
     ],
@@ -115,8 +117,9 @@ const ROUTE_PERMISSION: Record<string, string> = Object.fromEntries(
   NAV.filter((n) => n.permission).map((n) => [n.href, n.permission as string]),
 );
 
-const canAccess = (user: { permissions: string[] } | null, permission?: string) =>
-  !permission || (user?.permissions.includes(permission) ?? false);
+const canAccess = (user: { permissions: string[]; role?: string } | null, permission?: string, roles?: string[]) =>
+  (!permission || (user?.permissions.includes(permission) ?? false)) &&
+  (!roles || (!!user?.role && roles.includes(user.role)));
 
 const isDashboardPath = (href: string, pathname: string) =>
   href === "/app/dashboard" ? pathname === "/app" || pathname === "/app/dashboard" : pathname.startsWith(href);
@@ -246,7 +249,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     return <div className="flex min-h-screen items-center justify-center bg-ink text-ink/60">{t("state.loading", locale)}</div>;
   }
 
-  const visibleNav = NAV.filter((item) => canAccess(user, item.permission));
+  const visibleNav = NAV.filter((item) => canAccess(user, item.permission, item.roles));
   const hiddenCount = NAV.length - visibleNav.length;
 
   const logout = () => {
@@ -296,7 +299,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         {/* Navigation */}
         <nav className="flex-1 py-3">
           {NAV_GROUPS.map((group, gi) => {
-            const visibleItems = group.items.filter((item) => canAccess(user, item.permission));
+            const visibleItems = group.items.filter((item) => canAccess(user, item.permission, item.roles));
             if (visibleItems.length === 0) return null;
             return (
               <div key={gi}>

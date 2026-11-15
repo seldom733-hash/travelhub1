@@ -1406,7 +1406,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "finance.client_debt.col.amount": { ru: "Сумма", az: "Məbləğ", en: "Amount" },
   "finance.client_debt.col.paid": { ru: "Оплачено", az: "Ödənilib", en: "Paid" },
   "finance.client_debt.col.debt": { ru: "Долг", az: "Borc", en: "Debt" },
-  "finance.payment_terms.title": { ru: "Условия оплаты поставщиков", az: "Təchizatçı ödəniş şərtləri", en: "Supplier payment terms" },
+  "finance.payment_terms.title": { ru: "Условия оплаты поставщикам", az: "Təchizatçılara ödəniş şərtləri", en: "Supplier payment terms" },
   "finance.payment_terms.hint": {
     ru: "Правило применяется только к новым обязательствам: срок и snapshot фиксируются при создании и не меняются задним числом.",
     az: "Qayda yalnız yeni öhdəliklərə tətbiq olunur: müddət və snapshot yaradılarkən qeyd olunur və geriyə dəyişmir.",
@@ -3457,5 +3457,4 @@ export function useLocale(): Locale {
 export function useSetLocale(): (l: Locale) => void {
   return useContext(LocaleContext).setLocale;
 }
-
 

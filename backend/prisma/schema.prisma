@@ -5632,6 +5632,7 @@ model SupplierObligation {
   payouts         SupplierPayout[]
   allocations     SupplierPayoutAllocation[]
   events          SupplierObligationEvent[]
+  paymentPlan     SupplierPaymentPlan?
 
   @@unique([commerceSequence, dealOrdinal])
   @@index([orderId])
@@ -5639,6 +5640,44 @@ model SupplierObligation {
   @@index([supplierCode])
   @@index([partnerId])
   @@index([dueDate])
+  @@schema("finance")
+}
+
+/// Per-booking supplier payment plan. Finance enters concrete dates and
+/// amounts manually. The plan is the single source of truth for due dates;
+/// SupplierObligation.dueDate is kept as the final date for compatibility.
+model SupplierPaymentPlan {
+  id           String   @id @default(uuid())
+  obligationId String   @unique
+  obligation   SupplierObligation @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+  /// FULL | PARTIAL
+  mode         String
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  installments SupplierPaymentInstallment[]
+
+  @@schema("finance")
+}
+
+/// One dated payment inside a supplier payment plan.
+/// kind: FULL | FIRST | LAST
+/// status: PLANNED | PAID | OVERDUE | CANCELLED
+model SupplierPaymentInstallment {
+  id        String   @id @default(uuid())
+  planId    String
+  plan      SupplierPaymentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  kind      String
+  dueDate   DateTime
+  amount    Decimal  @db.Decimal(12, 2)
+  status    String   @default("PLANNED")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([planId])
+  @@index([dueDate])
+  @@index([status])
   @@schema("finance")
 }
 

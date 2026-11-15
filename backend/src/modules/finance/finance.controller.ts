@@ -13,7 +13,7 @@
  * Payment/Refund/Invoice/Commission write-endpoints НЕ существуют в Step 2.10
  * (foundation, §15/§52) — агрегатные модели в схеме, создание — 2.12–2.14.
  */
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, Req, Res, UploadedFiles, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Param, Patch, Post, Put, Query, Req, Res, UploadedFiles, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FilesInterceptor } from "@nestjs/platform-express";
 import type { Request, Response } from 'express';
 import { ExportService } from '../shared/export/export.service';
@@ -31,6 +31,7 @@ import { SupplierPaymentService } from "./supplier-payment.service";
 import { SupplierPaymentEvidenceService } from "./supplier-payment-evidence.service";
 import { SupplierDebtReportService } from "./supplier-debt-report.service";
 import { SupplierPaymentTermsService } from "./supplier-payment-terms.service";
+import { SupplierPaymentPlanService } from "./supplier-payment-plan.service";
 import { FinanceOverviewService } from "./finance-overview.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
@@ -56,6 +57,7 @@ import {
   SupplierPaymentListQueryDto,
   UpdateObligationTermsDto,
   UpsertSupplierPaymentTermsDto,
+  UpsertSupplierPaymentPlanDto,
   CreateTaxDto,
   CreateTaxRuleDto,
   AdjustObligationDto,
@@ -101,6 +103,7 @@ export class FinanceController {
     private readonly supplierEvidence: SupplierPaymentEvidenceService,
     private readonly supplierDebtReport: SupplierDebtReportService,
     private readonly supplierPaymentTerms: SupplierPaymentTermsService,
+    private readonly supplierPaymentPlans: SupplierPaymentPlanService,
     private readonly overview: FinanceOverviewService,
   ) {}
 
@@ -259,9 +262,17 @@ export class FinanceController {
     return this.sendExport(res, "supplier_obligations", query.format, columns, rows);
   }
 
+  private assertPaymentTermsRole(actor: { role?: string }, write: boolean): void {
+    const allowed = write ? ["FINANCE", "ADMIN"] : ["FINANCE", "ADMIN", "DIRECTOR"];
+    if (!actor?.role || !allowed.includes(actor.role)) {
+      throw new ForbiddenException("Payment terms are available to FINANCE, ADMIN and DIRECTOR only");
+    }
+  }
+
   @Get("supplier-payment-terms")
   @RequirePermissions("finance.obligation.read")
-  async listSupplierPaymentTerms() {
+  async listSupplierPaymentTerms(@CurrentUser() actor: { role?: string }) {
+    this.assertPaymentTermsRole(actor, false);
     return this.supplierPaymentTerms.list();
   }
 
@@ -269,9 +280,33 @@ export class FinanceController {
   @RequirePermissions("finance.obligation.manage")
   async upsertSupplierPaymentTerms(
     @Body() dto: UpsertSupplierPaymentTermsDto,
-    @CurrentUser() actor: { id: string; username: string },
+    @CurrentUser() actor: { id: string; username: string; role?: string },
   ) {
-    return this.supplierPaymentTerms.upsert(dto, actor);
+    this.assertPaymentTermsRole(actor, true);
+    return this.supplierPaymentTerms.upsert(dto, actor as { id: string; username: string });
+  }
+
+  @Get("supplier-payment-plans")
+  @RequirePermissions("finance.obligation.read")
+  async listSupplierPaymentPlans(@CurrentUser() actor: { id: string; username: string; role?: string }) {
+    return this.supplierPaymentPlans.list(actor as { id: string; username: string; role: string });
+  }
+
+  @Put("supplier-obligations/:id/payment-plan")
+  @RequirePermissions("finance.obligation.manage")
+  async upsertSupplierPaymentPlan(
+    @Param("id") id: string,
+    @Body() dto: UpsertSupplierPaymentPlanDto,
+    @CurrentUser() actor: { id: string; username: string; role?: string },
+  ) {
+    return this.supplierPaymentPlans.upsert(id, dto, actor as { id: string; username: string; role: string });
+  }
+
+  @Post("supplier-payment-plans/reminders/run")
+  @RequirePermissions("finance.obligation.manage")
+  async runSupplierPaymentReminders(@CurrentUser() actor: { id: string; username: string; role?: string }) {
+    this.assertPaymentTermsRole(actor, true);
+    return this.supplierPaymentPlans.runReminders();
   }
 
   @Get("reports/client-debt")
