@@ -4,17 +4,19 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { useLocale } from "@/lib/i18n";
+import { useLocale, type Locale } from "@/lib/i18n";
 import { saStatus, saText } from "@/lib/sales-analytics-i18n";
 
-function money(v: any) { return Number(v ?? 0).toLocaleString("ru-RU", { maximumFractionDigits: 2 }); }
-function dt(v: any) { return v ? new Date(v).toLocaleString("ru-RU") : "—"; }
+function formatMoney(v: any, locale: Locale) { const tag = locale === "az" ? "az-AZ" : locale === "en" ? "en-GB" : "ru-RU"; return Number(v ?? 0).toLocaleString(tag, { maximumFractionDigits: 2 }); }
+function formatDate(v: any, locale: Locale) { const tag = locale === "az" ? "az-AZ" : locale === "en" ? "en-GB" : "ru-RU"; return v ? new Date(v).toLocaleString(tag) : "—"; }
 function pct(v: any) { return `${Number(v ?? 0).toFixed(1)}%`; }
 
 export default function SalesManagerDetailPage() {
   const params = useParams<{ id: string }>();
   const locale = useLocale();
   const L = (x: string) => saText(locale, x);
+  const money = (v: any) => formatMoney(v, locale);
+  const dt = (v: any) => formatDate(v, locale);
   const [data, setData] = useState<any>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");

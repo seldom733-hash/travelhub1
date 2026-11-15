@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { useLocale } from "@/lib/i18n";
+import { useLocale, type Locale } from "@/lib/i18n";
 import { saStatus, saText } from "@/lib/sales-analytics-i18n";
 
 const PRESETS: Array<[string, string]> = [
@@ -39,11 +39,11 @@ const GROUPS: Array<[string, string[]]> = [
   ["Финансы", ["salesAmount", "capturedRevenue", "costAmount", "grossProfit", "avgCheck", "refunds", "completedResult", "closedResult"]],
 ];
 
-function money(v: any) { return Number(v ?? 0).toLocaleString("ru-RU", { maximumFractionDigits: 2 }); }
-function dt(v: any) { return v ? new Date(v).toLocaleString("ru-RU") : "—"; }
+function formatMoney(v: any, locale: Locale) { const tag = locale === "az" ? "az-AZ" : locale === "en" ? "en-GB" : "ru-RU"; return Number(v ?? 0).toLocaleString(tag, { maximumFractionDigits: 2 }); }
+function formatDate(v: any, locale: Locale) { const tag = locale === "az" ? "az-AZ" : locale === "en" ? "en-GB" : "ru-RU"; return v ? new Date(v).toLocaleString(tag) : "—"; }
 function pct(v: any) { return `${Number(v ?? 0).toFixed(1)}%`; }
-function deltaText(x: any) {
-  if (x?.pct == null) return x?.delta > 0 ? `+${money(x.delta)}` : x?.delta < 0 ? money(x.delta) : "—";
+function deltaText(x: any, locale: Locale) {
+  if (x?.pct == null) return x?.delta > 0 ? `+${formatMoney(x.delta, locale)}` : x?.delta < 0 ? formatMoney(x.delta, locale) : "—";
   return `${x.pct > 0 ? "+" : ""}${x.pct.toFixed(1)}%`;
 }
 
@@ -51,6 +51,8 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
   const router = useRouter();
   const locale = useLocale();
   const L = (s: string) => saText(locale, s);
+  const money = (v: any) => formatMoney(v, locale);
+  const dt = (v: any) => formatDate(v, locale);
   const [preset, setPreset] = useState("CURRENT_MONTH");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -186,7 +188,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
             {GROUPS.map(([title, keys]) => (
               <div key={title} className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm">
                 <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{L(title)}</div>
-                <div className="space-y-1.5">{keys.map((k) => <button type="button" key={k} onClick={() => void openDrilldown(k)} className="flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left text-xs hover:bg-emerald-50"><span className="text-slate-500">{L(KPI_LABELS[k] ?? k)}</span><span className="text-right font-semibold">{k.startsWith("conversion") || k === "slaCompliance" ? pct(kpis[k]?.value) : k.toLowerCase().includes("amount") || k.toLowerCase().includes("revenue") || k.toLowerCase().includes("profit") || k.toLowerCase().includes("result") || k === "avgCheck" || k === "refunds" ? money(kpis[k]?.value) : kpis[k]?.value ?? 0}<span className={`ml-1 text-[9px] ${(kpis[k]?.delta ?? 0) < 0 ? "text-rose-500" : "text-emerald-600"}`}>{deltaText(kpis[k])}</span></span></button>)}</div>
+                <div className="space-y-1.5">{keys.map((k) => <button type="button" key={k} onClick={() => void openDrilldown(k)} className="flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left text-xs hover:bg-emerald-50"><span className="text-slate-500">{L(KPI_LABELS[k] ?? k)}</span><span className="text-right font-semibold">{k.startsWith("conversion") || k === "slaCompliance" ? pct(kpis[k]?.value) : k.toLowerCase().includes("amount") || k.toLowerCase().includes("revenue") || k.toLowerCase().includes("profit") || k.toLowerCase().includes("result") || k === "avgCheck" || k === "refunds" ? money(kpis[k]?.value) : kpis[k]?.value ?? 0}<span className={`ml-1 text-[9px] ${(kpis[k]?.delta ?? 0) < 0 ? "text-rose-500" : "text-emerald-600"}`}>{deltaText(kpis[k], locale)}</span></span></button>)}</div>
               </div>
             ))}
           </div>
