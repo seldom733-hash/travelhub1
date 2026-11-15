@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Manrope, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n";
+import DateInputFormat from "@/components/DateInputFormat";
 
 const bodyFont = Manrope({
   subsets: ["latin", "cyrillic"],
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="az" className={`${bodyFont.variable} ${displayFont.variable}`}>
       <body>
         <LocaleProvider>{children}</LocaleProvider>
+        <DateInputFormat />
       </body>
     </html>
   );
