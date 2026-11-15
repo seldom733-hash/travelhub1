@@ -1250,7 +1250,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "nav.supplier_obligations": { ru: "Обязательства поставщиков", az: "Təchizatçı öhdəlikləri", en: "Supplier obligations" },
   "nav.supplier_payments": { ru: "Платежи поставщикам", az: "Təchizatçılara ödənişlər", en: "Supplier payments" },
   "nav.supplier_debt_report": { ru: "Задолженность на дату", az: "Tarixə görə borc", en: "Debt as of date" },
-  "nav.payment_terms": { ru: "Условия оплаты", az: "Ödəniş şərtləri", en: "Payment terms" },
+  "nav.payment_terms": { ru: "Условия оплаты поставщикам", az: "Təchizatçılara ödəniş şərtləri", en: "Supplier payment terms" },
   "finance.overview.title": { ru: "Обзор финансов", az: "Maliyyə baxışı", en: "Finance overview" },
   "finance.overview.obligations": { ru: "Обязательства поставщиков", az: "Təchizatçı öhdəlikləri", en: "Supplier obligations" },
   "finance.overview.supplier_cash_paid": { ru: "Выплачено поставщикам", az: "Təchizatçılara ödənilib", en: "Paid to suppliers" },
