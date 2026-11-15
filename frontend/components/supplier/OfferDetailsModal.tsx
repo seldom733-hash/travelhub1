@@ -12,7 +12,7 @@ import {
   type SupplierPriceSnapshot,
 } from "@/lib/supplier-api";
 import type { AggregatedOffer } from "@/lib/supplier-api";
-import { useSupplierLabels } from "@/lib/supplier-registry";
+import { useSupplierLabels, useSupplierOptions } from "@/lib/supplier-registry";
 
 /**
  * OfferDetailsModal — card of the EXACTLY selected offer (§8).
@@ -35,6 +35,10 @@ export default function OfferDetailsModal({
 }) {
   const locale = useLocale();
   const supplierLabels = useSupplierLabels("tours");
+  const supplierOptions = useSupplierOptions("tours");
+  const supplierName = supplierLabels[offer.supplierCode] ?? offer.supplierCode;
+  const publicSupplierCode =
+    supplierOptions.find((option) => option.code === offer.supplierCode)?.partnerCode ?? offer.supplierCode;
   const { user, ready } = useCurrentUserStatus();
   const isClient = ready && isAuthorizedCustomer(user);
   const isStaff = ready && isPlatformStaff(user);
@@ -238,7 +242,7 @@ export default function OfferDetailsModal({
             </p>
           </div>
           <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-neutral-300">
-            {isStaff ? supplierLabels[offer.supplierCode] ?? offer.supplierCode : offer.supplierCode}
+            {isStaff ? supplierName : publicSupplierCode}
           </span>
         </div>
 

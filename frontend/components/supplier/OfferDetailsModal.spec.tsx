@@ -28,6 +28,7 @@ vi.mock("@/lib/supplier-api", async (importOriginal) => {
 
 vi.mock("@/lib/supplier-registry", () => ({
   useSupplierLabels: vi.fn(() => ({ KOMPAS: "Kompas" })),
+  useSupplierOptions: vi.fn(() => [{ code: "KOMPAS", name: "Kompas", partnerCode: "PRN-00000002" }]),
 }));
 
 const mockUserState = vi.hoisted(() => ({ user: null as any }));
@@ -154,10 +155,11 @@ describe("OfferDetailsModal — request hint + contract fields (Phase 4)", () =>
     expect((screen.getByRole("button", { name: "Подать заявку" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("guest sees only the supplier code and no internal trace", () => {
+  it("guest sees only the partner code and no internal trace", () => {
     renderModal();
-    expect(screen.getByText("KOMPAS")).toBeTruthy();
+    expect(screen.getByText("PRN-00000002")).toBeTruthy();
     expect(screen.queryByText("Kompas")).toBeNull();
+    expect(screen.queryByText("KOMPAS")).toBeNull();
     expect(screen.queryByText(/searchId:/)).toBeNull();
   });
 
