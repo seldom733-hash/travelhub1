@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { MapPin, ArrowRight, Airplane } from "@phosphor-icons/react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { MapPin, ArrowRight, Airplane, CaretDown } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
 import { todayISO } from "@/lib/dates";
 import type { SearchContext } from "@/lib/search-engine";
@@ -12,18 +12,16 @@ import { findFlightAirports, setRemoteAirports } from "@/lib/flight-locations";
 import { useSupplierOptions } from "@/lib/supplier-registry";
 import { isPlatformStaff, useCurrentUser } from "@/lib/use-user";
 import ChildAges from "./ChildAges";
+import { useClickOutside } from "./useClickOutside";
 
 import { useWidestText } from "@/lib/measure-text";
 import {
   PICKER_CHECKBOX,
   PICKER_CONTROL,
-  PICKER_DATE_WIDTH_EXTRA,
   PICKER_DIGIT_WIDTH_EXTRA,
   PICKER_LABEL,
   PICKER_ROW,
   PICKER_SUBMIT_RIGHT,
-  PICKER_W_FROM,
-  PICKER_W_TO,
 } from "./picker-styles";
 
 interface FlightSearchProps {
@@ -46,6 +44,9 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
   const [infants, setInfants] = useState(0);
   const [infantAges, setInfantAges] = useState<number[]>([]);
   const [direct, setDirect] = useState(false);
+  const [agesOpen, setAgesOpen] = useState(false);
+  const agesRef = useRef<HTMLDivElement>(null);
+  useClickOutside(agesRef, agesOpen, () => setAgesOpen(false));
 
   // Restore the form from the URL so a second search on the results page
   // starts with the previously selected airports/dates instead of an empty form.
@@ -230,14 +231,13 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
   };
 
   // Content-width: те же размеры, что в поиске туров.
-  const datePx = useWidestText(["00.00.0000"]);
   const digitPx = useWidestText(["0"]);
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <div className={PICKER_ROW}>
         {/* From */}
-        <div className={PICKER_W_FROM}>
+        <div className="w-full sm:w-[278px] sm:min-w-[220px] sm:max-w-[278px] sm:flex-none">
           <FlightAirportSelect
             id="flight-from"
             label={t("search.from", locale)}
@@ -248,7 +248,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
         </div>
 
         {/* To */}
-        <div className={PICKER_W_TO}>
+        <div className="w-full sm:w-[278px] sm:min-w-[220px] sm:max-w-[278px] sm:flex-none">
           <FlightAirportSelect
             id="flight-to"
             label={t("search.to", locale)}
@@ -259,7 +259,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
         </div>
 
         {/* Departure date */}
-        <div style={{ maxWidth: datePx + PICKER_DATE_WIDTH_EXTRA, flex: "1 1 0" }}>
+        <div className="w-full sm:w-[190px] sm:flex-none">
           <FlightDatePicker
             id="flight-departure"
             label={t("search.departure_date", locale)}
@@ -271,6 +271,24 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
           />
         </div>
 
+        {/* Return date (conditional) */}
+        {roundTrip && (
+          <div className="w-full sm:w-[190px] sm:flex-none">
+            <FlightDatePicker
+              id="flight-return"
+              label={t("search.return_date", locale)}
+              placeholder={t("search.select_date", locale)}
+              value={returnDate}
+              onChange={setReturnDate}
+              minDate={minReturnDate || undefined}
+              availability={returnAvailability}
+              disabled={!departureDate}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className={PICKER_ROW}>
         {/* Adults */}
         <div style={{ maxWidth: digitPx + PICKER_DIGIT_WIDTH_EXTRA }}>
           <label htmlFor="flight-adults" className={PICKER_LABEL}>
@@ -300,6 +318,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
               const val = Number(e.target.value);
               setChildren(val);
               setChildAges(Array(val).fill(2));
+              if (val > 0) setAgesOpen(true);
             }}
             className={PICKER_CONTROL}
           >
@@ -321,6 +340,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
               const val = Number(e.target.value);
               setInfants(val);
               setInfantAges(Array(val).fill(0));
+              if (val > 0) setAgesOpen(true);
             }}
             className={PICKER_CONTROL}
           >
@@ -330,52 +350,37 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
           </select>
         </div>
 
-        {/* Return date (conditional) */}
-        {roundTrip && (
-          <div style={{ maxWidth: datePx + PICKER_DATE_WIDTH_EXTRA, flex: "1 1 0" }}>
-            <FlightDatePicker
-              id="flight-return"
-              label={t("search.return_date", locale)}
-              placeholder={t("search.select_date", locale)}
-              value={returnDate}
-              onChange={setReturnDate}
-              minDate={minReturnDate || undefined}
-              availability={returnAvailability}
-              disabled={!departureDate}
-            />
+        {/* Combined child/infant ages popover. */}
+        {(children > 0 || infants > 0) && (
+          <div ref={agesRef} className="relative">
+            <span className={PICKER_LABEL}>&nbsp;</span>
+            <button
+              type="button"
+              onClick={() => setAgesOpen((v) => !v)}
+              aria-expanded={agesOpen}
+              className="flex h-[42px] items-center gap-1 rounded-xl border border-dark-border bg-dark-card px-3 text-[13px] text-neutral-300 transition-colors hover:border-gold/40"
+            >
+              <span>{locale === "ru" ? "Возрасты" : locale === "az" ? "Yaşlar" : "Ages"}</span>
+              <CaretDown size={12} className={`transition-transform ${agesOpen ? "rotate-180" : ""}`} />
+            </button>
+            {agesOpen && (
+              <div className="absolute left-0 top-full z-[60] mt-1 w-[340px] rounded-xl border border-dark-border bg-dark-surface p-3 shadow-xl">
+                {children > 0 && (
+                  <>
+                    <p className="text-xs text-neutral-400">{t("search.flight_ages_hint", locale)}</p>
+                    <ChildAges count={children} ages={childAges} onChange={setChildAges} minAge={2} maxAge={11} />
+                  </>
+                )}
+                {infants > 0 && (
+                  <ChildAges count={infants} ages={infantAges} onChange={setInfantAges} minAge={0} maxAge={1} labelKey="search.infant_n" ageAriaKey="search.infant_age_aria" />
+                )}
+              </div>
+            )}
           </div>
         )}
-      </div>
 
-      {(children > 0 || infants > 0) && (
-        <div className="flex flex-col gap-2">
-          <p className="text-xs text-neutral-500">{t("search.flight_ages_hint", locale)}</p>
-          {children > 0 && (
-            <ChildAges
-              count={children}
-              ages={childAges}
-              onChange={setChildAges}
-              minAge={2}
-              maxAge={11}
-            />
-          )}
-          {infants > 0 && (
-            <ChildAges
-              count={infants}
-              ages={infantAges}
-              onChange={setInfantAges}
-              minAge={0}
-              maxAge={1}
-              labelKey="search.infant_n"
-              ageAriaKey="search.infant_age_aria"
-            />
-          )}
-        </div>
-      )}
-
-      <div className={PICKER_ROW}>
         {/* Tariff (baggage) */}
-        <div className="w-[260px] max-w-full">
+        <div className="w-[190px] max-w-full">
           <label htmlFor="flight-tariff" className={PICKER_LABEL}>
             {t("search.tariff_baggage", locale)}
           </label>
@@ -420,7 +425,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
         </label>
 
         {showSuppliers && (
-        <div className="w-[260px] min-w-[260px] max-w-[260px] flex-none">
+        <div className="w-[190px] min-w-[190px] max-w-[190px] flex-none">
           <label htmlFor="flight-supplier" className={PICKER_LABEL}>
             {t("search.supplier", locale)}
           </label>
@@ -439,21 +444,19 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
           </select>
         </div>
         )}
-      </div>
 
-      {/* Submit — right aligned at the same visual position as tours. */}
-      <div className="relative z-[70] flex justify-end">
-        <button
-          type="submit"
-          disabled={!from || !to || !departureDate}
-          className={`${!from || !to || !departureDate ? "bg-neutral-700 text-neutral-400 cursor-not-allowed opacity-60" : "btn-gold"} ${PICKER_SUBMIT_RIGHT}`}
-        >
-          <span>{t("marketplace.search_submit", locale)}</span>
-          <ArrowRight size={16} weight="bold" />
-        </button>
+        {/* Primary action stays at the right edge of the second row. */}
+        <div className="relative z-[70] ml-auto flex items-end">
+          <button
+            type="submit"
+            disabled={!from || !to || !departureDate}
+            className={`${!from || !to || !departureDate ? "bg-neutral-700 text-neutral-400 cursor-not-allowed opacity-60" : "btn-gold"} ${PICKER_SUBMIT_RIGHT}`}
+          >
+            <span>{t("marketplace.search_submit", locale)}</span>
+            <ArrowRight size={16} weight="bold" />
+          </button>
+        </div>
       </div>
-
-      {/* HelpFind скрыт (как в поиске туров): кнопка «Найти» занимает его строку. */}
     </form>
   );
 }
