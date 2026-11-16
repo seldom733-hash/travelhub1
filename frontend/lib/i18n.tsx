@@ -283,16 +283,16 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "tour.room": { ru: "\u041d\u043e\u043c\u0435\u0440", az: "Otaq", en: "Room" },
   "tour.meal": { ru: "\u041f\u0438\u0442\u0430\u043d\u0438\u0435", az: "Yem\u0259k", en: "Meal" },
   "tour.passengers": { ru: "\u041f\u0430\u0441\u0441\u0430\u0436\u0438\u0440\u044b", az: "S\u0259rni\u015ftl\u0259r", en: "Passengers" },
-  "tour.nights_count": { ru: "\u041d\u043e\u0447\u0435\u0439", az: "Gec\u0259", en: "Nights" },
+  "tour.nights_count": { ru: "Ночей", az: "Gecə sayı", en: "Nights" },
   "tour.price": { ru: "\u0426\u0435\u043d\u0430", az: "Qiym\u0259t", en: "Price" },
   "tour.loading": { ru: "\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430...", az: "Y\u00fckl\u0259nir...", en: "Loading..." },
   "tour.error": { ru: "\u041e\u0448\u0438\u0431\u043a\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438", az: "Y\u00fckl\u0259m\u0259 x\u0259tas\u0131", en: "Loading error" },
   "tour.retry": { ru: "\u041f\u043e\u043f\u0440\u043e\u0431\u043e\u0432\u0430\u0442\u044c \u0441\u043d\u043e\u0432\u0430", az: "Yenid\u0259n c\u0259hd edin", en: "Try again" },
   "tour.selection_title": { ru: "\u041f\u043e\u0434\u0431\u043e\u0440 \u0442\u0443\u0440\u0430", az: "Tur se\u00e7imi", en: "Tour Selection" },
-  "tour.departure_city": { ru: "\u0413\u043e\u0440\u043e\u0434 \u0432\u044b\u043b\u0435\u0442\u0430", az: "\u0130nfis \u015f\u0259h\u0259ri", en: "Departure city" },
-  "tour.adults": { ru: "\u0412\u0437\u0440\u043e\u0441\u043b\u044b\u0435", az: "B\u00f6y\u00fckl\u0259r", en: "Adults" },
-  "tour.children": { ru: "\u0414\u0435\u0442\u0438", az: "\u00c7oc\u0131qlar", en: "Children" },
-  "tour.child_ages": { ru: "\u0412\u043e\u0437\u0440\u0430\u0441\u0442 \u0440\u0435\u0431\u0435\u043d\u043a\u0430", az: "\u00c7ocuq ya\u015f\u0131", en: "Child age" },
+  "tour.departure_city": { ru: "Город вылета", az: "Gediş şəhəri", en: "Departure city" },
+  "tour.adults": { ru: "Взрослые", az: "Yetkinlər", en: "Adults" },
+  "tour.children": { ru: "Дети", az: "Uşaqlar", en: "Children" },
+  "tour.child_ages": { ru: "Возраст ребёнка", az: "Uşağın yaşı", en: "Child age" },
   "tour.calendar_hint": { ru: "Нажмите на цену, чтобы посмотреть варианты размещения и подать заявку.", az: "Yerləşmə variantlarını görmək və müraciət göndərmək üçün qiymətə klikləyin.", en: "Click a price to view room options and submit a request." },
   "tour.howto_title": { ru: "Как подать заявку", az: "Müraciəti necə göndərmək olar", en: "How to submit a request" },
   "tour.howto_step1": { ru: "Выберите параметры тура в панели слева", az: "Solda tur parametrlərini seçin", en: "Choose your tour parameters on the left" },
@@ -3066,7 +3066,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
 
   // supplier / price configurator
   "supplier.no_offer": { ru: "Предложение не загружено", az: "Təklif yüklənməyib", en: "No offer loaded" },
-  "supplier.adults": { ru: "взр.", az: "böyük", en: "ad." },
+  "supplier.adults": { ru: "взр.", az: "yetkin", en: "ad." },
   "supplier.children": { ru: "детей", az: "uşaq", en: "ch." },
   "supplier.nights": { ru: "Ночей", az: "Gecə", en: "Nights" },
   "supplier.passengers": { ru: "Пассажиры", az: "Sərnişinlər", en: "Passengers" },
@@ -3457,4 +3457,3 @@ export function useLocale(): Locale {
 export function useSetLocale(): (l: Locale) => void {
   return useContext(LocaleContext).setLocale;
 }
-

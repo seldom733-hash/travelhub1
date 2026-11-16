@@ -9,6 +9,7 @@ import {
   type SupplierPriceCalendarEntry,
 } from "@/lib/supplier-api";
 import { useSupplierOptions } from "@/lib/supplier-registry";
+import { sx } from "@/lib/supplier-labels";
 
 /** Today as an ISO date string (local calendar day, not UTC). */
 function todayIso(): string {
@@ -57,9 +58,22 @@ export default function TourDetail({
   const [departureCity, setDepartureCity] = useState(
     (attributes?.departureCity as string) ?? "1411",
   );
-  const [destination, setDestination] = useState(
-    (attributes?.destination as string) ?? (attributes?.country as string) ?? "",
-  );
+  const [destination, setDestination] = useState(() => {
+    const direct = (attributes?.destination as string | undefined) || (attributes?.city as string | undefined);
+    if (direct) return direct;
+    // Product cards often carry only tourIncName ("Istanbul 2026-2027 GDS")
+    // or the destination in the title after an em dash; the country is not a
+    // valid supplier destination (it makes Summertour return zero calendar days).
+    const source = String(attributes?.tourIncName ?? "") || title;
+    const city = source
+      .split("—")
+      .pop()
+      ?.replace(/\s*\b20\d{2}.*$/, "")
+      .replace(/\s*\(.*$/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return city || (attributes?.country as string) || "";
+  });
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [childAges, setChildAges] = useState<number[]>([]);
@@ -77,10 +91,17 @@ export default function TourDetail({
   // and a stale id silently returns an empty calendar. «Любой» covers all
   // programs of the hotel (user decision, 2026-10-01).
   const hotelExternalId = (attributes?.hotelExternalId as string) ?? (attributes?.hotelKey as string) ?? undefined;
-  const hotelName = title;
+  const hotelName = (attributes?.hotelName as string | undefined) || title;
 
-  // Strip location suffix like "(Султанахмет)" from hotel name for KOMPAS queries
-  const cleanHotelName = hotelName?.replace(/\s*\(.*?\)\s*$/, "").replace(/\s*\r?\n\s*/g, " ").replace(/\s{2,}/g, " ").trim();
+  // Strip location/program suffix from the hotel name for supplier queries.
+  const cleanHotelName = hotelName
+    ?.split(" / — ")[0]
+    .split(" — ")[0]
+    .replace(/\s*\(\s*[^)]*\)\s*$/, "")
+    .replace(/\s*\/\s*\d+\s*\*?\s*$/, "")
+    .replace(/\s*\r?\n\s*/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 
   // Build calendar query — dates are derived per-month inside MonthlyCalendar; only context here.
   const calendarQuery = {
@@ -128,7 +149,7 @@ export default function TourDetail({
   // §4.8 context shared by every row of the day.
   const summary = useMemo(
     () => ({
-      departureCity: departureCity === "1411" ? "Баку (GYD)" : departureCity,
+      departureCity: departureCity === "1411" ? `${sx(locale, "Баку", "Bakı", "Baku")} (GYD)` : departureCity,
       destination,
       country: (attributes?.country as string) || undefined,
       adults,
@@ -136,7 +157,7 @@ export default function TourDetail({
       childAges,
       nights,
     }),
-    [departureCity, destination, attributes, adults, children, childAges, nights],
+    [departureCity, destination, attributes, adults, children, childAges, nights, locale],
   );
 
   return (
@@ -162,7 +183,7 @@ export default function TourDetail({
                 onChange={(e) => setDepartureCity(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
               >
-                <option value="1411">Баку (GYD)</option>
+                <option value="1411">{sx(locale, "Баку", "Bakı", "Baku")} (GYD)</option>
               </select>
             </div>
 
@@ -178,7 +199,7 @@ export default function TourDetail({
               >
                 {[1, 2, 3, 4].map((n) => (
                   <option key={n} value={n}>
-                    {n} {n === 1 ? "взрослый" : "взрослых"}
+                    {n} {sx(locale, "взрослых", "yetkin", "adults")}
                   </option>
                 ))}
               </select>
@@ -206,12 +227,8 @@ export default function TourDetail({
                 {[0, 1, 2, 3].map((n) => (
                   <option key={n} value={n}>
                     {n === 0
-                      ? "Нет детей"
-                      : n === 1
-                        ? "1 ребёнок"
-                        : n === 2
-                          ? "2 детей"
-                          : "3 детей"}
+                      ? sx(locale, "Нет детей", "Uşaq yoxdur", "No children")
+                      : `${n} ${sx(locale, "детей", "uşaq", "children")}`}
                   </option>
                 ))}
               </select>
@@ -236,7 +253,7 @@ export default function TourDetail({
                   >
                     {Array.from({ length: 15 }, (_, i) => i).map((a) => (
                       <option key={a} value={a}>
-                        {a} {a === 1 ? "год" : a < 5 ? "года" : "лет"}
+                        {a} {sx(locale, "лет", "yaş", "years")}
                       </option>
                     ))}
                   </select>
@@ -256,7 +273,7 @@ export default function TourDetail({
               >
                 {Array.from({ length: 27 }, (_, i) => i + 2).map((n) => (
                   <option key={n} value={n}>
-                    {n} {n === 1 ? "ночь" : n < 5 ? "ночи" : "ночей"}
+                    {n} {sx(locale, "ночей", "gecə", "nights")}
                   </option>
                 ))}
               </select>

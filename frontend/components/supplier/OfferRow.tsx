@@ -11,6 +11,7 @@ import {
 } from "@/lib/supplier-api";
 import { useKompasCaptcha } from "@/lib/useKompasCaptcha";
 import { KompasCaptchaModal } from "@/components/supplier/KompasCaptchaModal";
+import { humanMeal, humanRoom, humanTransport, sx } from "@/lib/supplier-labels";
 
 /** Calendar/tour context carried into the create-request payload (§4.8). */
 export type OfferSummary = {
@@ -30,6 +31,22 @@ export type OfferCustomer = {
   firstName?: string;
   lastName?: string;
 } | null;
+
+function fmtDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return y && m && d ? `${d}.${m}.${y.slice(-2)}` : iso;
+}
+
+function addDays(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  d.setUTCDate(d.getUTCDate() + Math.max(0, nightsSafe(days)));
+  return d.toISOString().slice(0, 10);
+}
+
+function nightsSafe(value: number): number {
+  return Number.isFinite(value) ? Math.round(value) : 0;
+}
 
 /**
  * OfferRow — one complete SupplierOffer as a requestable row: variant header
@@ -65,6 +82,7 @@ export default function OfferRow({
 }) {
   const locale = useLocale();
   const resolvedSupplier = offer.supplierCode || supplierCode;
+  const returnDate = addDays(offer.departureDate, offer.nights ?? 0);
   const [requestState, setRequestState] = useState<
     "idle" | "creating" | "done" | "error"
   >("idle");
@@ -175,11 +193,12 @@ export default function OfferRow({
           {index}
         </span>
         <span className="text-sm font-medium text-slate-500">
-          {offer.room ?? "Standard"} · {offer.meal ?? "RO"}
+          {humanRoom(offer.room, locale) || sx(locale, "Стандарт", "Standart", "Standard")} ·{" "}
+          {humanMeal(offer.meal, locale) || "RO"}
         </span>
         {offer.transport && (
           <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-700">
-            ✈️ {offer.transport}
+            ✈️ {humanTransport(offer.transport, locale)}
           </span>
         )}
       </div>
@@ -192,21 +211,22 @@ export default function OfferRow({
             {t("offer.outbound", locale) ?? "ПЕРЕЛЕТ ТУДА"}
           </div>
           <div className="text-sm font-medium text-slate-800">
-            {offer.departureDate}
+            {fmtDate(offer.departureDate)}
           </div>
           {offer.transport && (
-            <div className="mt-0.5 text-xs text-slate-500">{offer.transport}</div>
+            <div className="mt-0.5 text-xs text-slate-500">{humanTransport(offer.transport, locale)}</div>
           )}
         </div>
 
-        {/* Return flight — KOMPAS SAMO search does not provide return flight details */}
+        {/* Return flight — departure date + number of nights */}
         <div className="rounded-lg border border-slate-200 p-3">
           <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">
             {t("offer.return", locale) ?? "ПЕРЕЛЕТ ОБРАТНО"}
           </div>
-          <div className="text-xs text-slate-400">
-            {t("offer.return_not_available", locale) ?? "Информация не предоставлена поставщиком"}
-          </div>
+          <div className="text-sm font-medium text-slate-800">{fmtDate(returnDate)}</div>
+          {offer.transport && (
+            <div className="mt-0.5 text-xs text-slate-500">{humanTransport(offer.transport, locale)}</div>
+          )}
         </div>
 
         {/* Hotel / Room / Meal */}
@@ -218,7 +238,8 @@ export default function OfferRow({
             {offer.hotel?.split("\n")[0]?.trim()}
           </div>
           <div className="mt-0.5 text-xs text-slate-500">
-            {offer.room ?? "Standard"} · {offer.meal ?? "RO"}
+            {humanRoom(offer.room, locale) || sx(locale, "Стандарт", "Standart", "Standard")} ·{" "}
+            {humanMeal(offer.meal, locale) || "RO"}
           </div>
           <div className="mt-0.5 text-xs text-slate-400">{passengers}</div>
         </div>

@@ -164,7 +164,9 @@ export class SummerGdsFlightAddonService {
       const airport = SummerGdsFlightAddonService.GDS_AIRPORT[p];
       if (airport) return airport;
     }
-    return this.airportOfText(`${query.destination ?? ""} ${(query.tourIncNames ?? []).join(" ")}`);
+    return this.airportOfText(
+      `${query.destination ?? ""} ${query.tourIncName ?? ""} ${(query.tourIncNames ?? []).join(" ")}`,
+    );
   }
 
   private airportOfText(text: string): string | null {

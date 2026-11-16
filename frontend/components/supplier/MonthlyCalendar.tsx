@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { t, useLocale } from "@/lib/i18n";
+import { sx, MONTHS, WEEKDAYS } from "@/lib/supplier-labels";
 import Price from "@/components/public/Price";
 import {
   getPriceCalendar,
@@ -25,7 +26,7 @@ import { KompasCaptchaModal } from "@/components/supplier/KompasCaptchaModal";
 type MonthlyCalendarQuery = Omit<SupplierPriceCalendarQuery, "dateFrom" | "dateTo">;
 
 // Bump this to invalidate all cached calendar data (old keys become stale)
-const CAL_CACHE_V = 7;
+const CAL_CACHE_V = 8;
 const CAL_CACHE_TTL_MS = 30_000;
 
 function buildCacheKey(base: MonthlyCalendarQuery, year: number, month: number): string {
@@ -420,11 +421,8 @@ export default function MonthlyCalendar({
   };
   const nextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
 
-  const monthLabel = currentMonth.toLocaleDateString(locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US", {
-    year: "numeric",
-    month: "long",
-  });
-  const weekDays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+  const monthLabel = `${MONTHS[locale][currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
+  const weekDays = WEEKDAYS[locale];
 
   const isEmptyState = !loading && !error && !challenge && entries.length > 0 && entries.every((e) => e.price === null);
 
@@ -536,14 +534,17 @@ export default function MonthlyCalendar({
       {/* Last updated + refresh — only when we have successful data */}
       {lastUpdated && !loading && (
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-red-600">Последнее обновление цен: {formatLastUpdated(lastUpdated, locale)}</span>
+          <span className="text-red-600">
+            {sx(locale, "Последнее обновление цен:", "Qiymətlər son yeniləndi:", "Prices last updated:")}{" "}
+            {formatLastUpdated(lastUpdated, locale)}
+          </span>
           <button onClick={() => fetchMonth(true)} className="text-blue-600 underline hover:text-blue-800">
-            Обновить цены
+            {sx(locale, "Обновить цены", "Qiymətləri yenilə", "Refresh prices")}
           </button>
         </div>
       )}
       {loading && lastUpdated && (
-        <div className="text-xs text-slate-400">Обновление...</div>
+        <div className="text-xs text-slate-400">{sx(locale, "Обновление...", "Yenilənir...", "Updating...")}</div>
       )}
     </div>
   );

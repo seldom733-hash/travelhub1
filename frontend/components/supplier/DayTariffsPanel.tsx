@@ -9,6 +9,7 @@ import {
 import { isAuthorizedCustomer, useCurrentUser } from "@/lib/use-user";
 import OfferRow, { type OfferCustomer, type OfferSummary } from "@/components/supplier/OfferRow";
 import { TravelerFields } from "@/components/supplier/OfferModal";
+import { sx } from "@/lib/supplier-labels";
 
 /** Lightweight client checks — the backend (§4.8.8/4.8.9) is the authority. */
 function isValidPhoneLocal(raw: string): boolean {
@@ -86,7 +87,7 @@ export default function DayTariffsPanel({
       : null;
   const emailError =
     trimmedEmail === ""
-      ? "Введите email."
+      ? sx(locale, "Введите email.", "E-poçtu daxil edin.", "Enter email.")
       : !isValidEmailLocal(trimmedEmail)
         ? t("offer.email_invalid", locale)
         : null;
@@ -121,6 +122,8 @@ export default function DayTariffsPanel({
   }
 
   const offers = entry.offers ?? [];
+  const [entryYear, entryMonth, entryDay] = entry.date.split("-");
+  const entryDateLabel = entryDay && entryMonth && entryYear ? `${entryDay}.${entryMonth}.${entryYear.slice(-2)}` : entry.date;
 
   return (
     <section aria-labelledby="day-tariffs-title" className="rounded-2xl border border-slate-200 bg-white">
@@ -131,7 +134,7 @@ export default function DayTariffsPanel({
         </h3>
         <div className="mt-0.5 text-sm font-medium text-slate-700">{title}</div>
         <div className="mt-1 flex flex-wrap gap-1 text-xs text-slate-500">
-          <span>{entry.date}</span>
+          <span>{entryDateLabel}</span>
           <span>·</span>
           <span>
             {summary.nights}{" "}
@@ -180,8 +183,10 @@ export default function DayTariffsPanel({
           </h4>
           {isClient ? (
             <p className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-              Данные заполнены из профиля и не редактируются здесь.{" "}
-              <a href="/account/profile" className="font-semibold underline">Изменить в профиле</a>
+              {sx(locale, "Данные заполнены из профиля и не редактируются здесь.", "Məlumatlar profildən doldurulub və burada redaktə olunmur.", "Details are filled from your profile and cannot be edited here.")}{" "}
+              <a href="/account/profile" className="font-semibold underline">
+                {sx(locale, "Изменить в профиле", "Profildə dəyişdir", "Edit in profile")}
+              </a>
             </p>
           ) : user ? (
             <p className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">

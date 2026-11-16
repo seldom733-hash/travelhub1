@@ -1,47 +1,8 @@
 "use client";
 
 import type { SupplierPriceCalendarEntryOffer } from "@/lib/supplier-api";
-
-const MEAL_LABELS: Record<string, string> = {
-  RO: "Без питания",
-  BB: "Завтрак",
-  HB: "Полупансион",
-  FB: "Полный пансион",
-  AI: "Всё включено",
-  UAI: "Ультра всё включено",
-};
-
-const ROOM_LABELS: Array<[RegExp, string]> = [
-  [/^SGL\b/i, "Одноместный"],
-  [/^DBL\b/i, "Двухместный"],
-  [/^TWIN\b/i, "Двухместный с двумя кроватями"],
-  [/^TRPL\b/i, "Трёхместный"],
-  [/^QUAD\b/i, "Четырёхместный"],
-  [/^SUITE\b/i, "Люкс"],
-  [/^FAMILY\b/i, "Семейный"],
-  [/^DELUXE\b/i, "Делюкс"],
-  [/^STANDARD\b|^STANDART\b/i, "Стандартный"],
-  [/^ECONOMY\b|^ECO\b/i, "Эконом"],
-];
-
-function humanMeal(value?: string): string {
-  const raw = (value ?? "").replace(/\s+/g, " ").trim();
-  if (!raw) return "";
-  const code = raw.match(/^(RO|BB|HB|FB|AI|UAI)\b/i)?.[1]?.toUpperCase();
-  return (code && MEAL_LABELS[code]) || raw;
-}
-
-function humanRoom(value?: string): string {
-  const raw = (value ?? "").replace(/\s+/g, " ").trim();
-  if (!raw) return "";
-  for (const [re, label] of ROOM_LABELS) {
-    if (re.test(raw)) {
-      const suffix = raw.replace(re, "").replace(/^\s*[/,-]?\s*/, "").trim();
-      return suffix ? `${label} · ${suffix}` : label;
-    }
-  }
-  return raw;
-}
+import { useLocale } from "@/lib/i18n";
+import { humanMeal, humanRoom, sx } from "@/lib/supplier-labels";
 
 function unique(values: Array<string | undefined>): string[] {
   return [...new Set(values.map((v) => (v ?? "").trim()).filter(Boolean))];
@@ -59,9 +20,10 @@ function endDate(iso: string, nights: number): string {
   return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`;
 }
 
-function money(value: number | null | undefined, currency: string | null | undefined): string {
+function money(value: number | null | undefined, currency: string | null | undefined, locale: string): string {
   if (value == null || !Number.isFinite(value)) return "—";
-  const formatted = value.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const tag = locale === "az" ? "az-AZ" : locale === "en" ? "en-GB" : "ru-RU";
+  const formatted = value.toLocaleString(tag, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return `${formatted} ${currency ?? ""}`.trim();
 }
 
@@ -86,34 +48,49 @@ export default function ServiceFacts({
   price?: number | null;
   currency?: string | null;
 }) {
+  const locale = useLocale();
   if (!date) return null;
 
-  const meals = unique(offers.map((o) => humanMeal(o.meal)));
-  const rooms = unique(offers.map((o) => humanRoom(o.room)));
+  const meals = unique(offers.map((o) => humanMeal(o.meal, locale)));
+  const rooms = unique(offers.map((o) => humanRoom(o.room, locale)));
   const prices = offers.map((o) => o.price).filter((n) => Number.isFinite(n));
   const minPrice = prices.length ? Math.min(...prices) : price ?? null;
   const maxPrice = prices.length ? Math.max(...prices) : minPrice;
   const offerCurrency = offers[0]?.currency ?? currency ?? null;
   const travelerText = [
-    `${adults} ${adults === 1 ? "взрослый" : adults < 5 ? "взрослых" : "взрослых"}`,
-    children > 0 ? `${children} ${children === 1 ? "ребёнок" : "детей"}` : null,
+    `${adults} ${sx(locale, "взрослых", "yetkin", "adults")}`,
+    children > 0 ? `${children} ${sx(locale, "детей", "uşaq", "children")}` : null,
   ].filter(Boolean).join(", ");
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6">
-      <h4 className="text-sm font-semibold text-slate-800">Характеристики услуги</h4>
+      <h4 className="text-sm font-semibold text-slate-800">
+        {sx(locale, "Характеристики услуги", "Xidmətin xüsusiyyətləri", "Service details")}
+      </h4>
       <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-        <Fact label="Страна" value={country || "—"} />
-        <Fact label="Город" value={city || "—"} />
-        <Fact label="Дата начала" value={fmtDate(date)} />
-        <Fact label="Количество ночей" value={String(nights)} />
-        <Fact label="Дата окончания" value={endDate(date, nights)} />
-        <Fact label="Туристы" value={travelerText} />
-        <Fact label="Возможные типы питания" value={meals.length ? meals.join(", ") : "Уточняется"} />
-        <Fact label="Тип комнаты и размещения" value={rooms.length ? rooms.join(", ") : "Уточняется"} />
+        <Fact label={sx(locale, "Страна", "Ölkə", "Country")} value={country || "—"} />
+        <Fact label={sx(locale, "Город", "Şəhər", "City")} value={city || "—"} />
+        <Fact label={sx(locale, "Дата начала", "Başlama tarixi", "Start date")} value={fmtDate(date)} />
+        <Fact label={sx(locale, "Количество ночей", "Gecə sayı", "Nights")} value={String(nights)} />
+        <Fact label={sx(locale, "Дата окончания", "Bitmə tarixi", "End date")} value={endDate(date, nights)} />
+        <Fact label={sx(locale, "Туристы", "Sərnişinlər", "Travelers")} value={travelerText} />
         <Fact
-          label="Цена"
-          value={minPrice == null ? "—" : maxPrice != null && maxPrice > minPrice ? `от ${money(minPrice, offerCurrency)}` : money(minPrice, offerCurrency)}
+          label={sx(locale, "Возможные типы питания", "Mümkün yemək növləri", "Meal options")}
+          value={meals.length ? meals.join(", ") : sx(locale, "Уточняется", "Dəqiqləşdirilir", "To be confirmed")}
+        />
+        <Fact
+          label={sx(locale, "Тип комнаты и размещения", "Otaq və yerləşmə növü", "Room and accommodation")}
+          value={rooms.length ? rooms.join(", ") : sx(locale, "Уточняется", "Dəqiqləşdirilir", "To be confirmed")}
+        />
+        <Fact
+          label={sx(locale, "Цена", "Qiymət", "Price")}
+          value={
+            minPrice == null
+              ? "—"
+              : maxPrice != null && maxPrice > minPrice
+                ? `${sx(locale, "от", "başlayaraq", "from")} ${money(minPrice, offerCurrency, locale)}`
+                : money(minPrice, offerCurrency, locale)
+          }
         />
       </dl>
     </div>
