@@ -143,11 +143,15 @@ export class SummerGdsFlightAddonService {
   }
 
   private airportOfOffer(offer: SupplierOffer): string | null {
+    const meta = (offer.rawMetadata ?? {}) as Record<string, unknown>;
+    // Live Summertour offers keep the GDS program in tourIncValue (256/238);
+    // raw.tourKey is the supplier's internal tour key and must not shadow it.
     const program = String(
-      (offer.rawMetadata as Record<string, unknown> | undefined)?.tourKey ??
+      meta.tourIncValue ??
+        meta.tourKey ??
         offer.tour ??
         "",
-    );
+    ).trim();
     return SummerGdsFlightAddonService.GDS_AIRPORT[program] ?? null;
   }
 
