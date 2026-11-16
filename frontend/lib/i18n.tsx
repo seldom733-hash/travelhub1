@@ -209,7 +209,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "marketplace.special_offers_subtitle": { ru: "Лучшие цены на популярные услуги", az: "Populyar xidmətlərdə ən yaxşı qiymətlər", en: "Best prices on popular services" },
   "marketplace.all_offers": { ru: "Все предложения", az: "Bütün təkliflər", en: "All offers" },
   "marketplace.tours_title": { ru: "Туры", az: "Turlar", en: "Tours" },
-  "marketplace.tours_subtitle": { ru: "Актуальные предложения от партнёров", az: "Tərəfdaşlardan aktual təkliflər", en: "Current offers from partners" },
+  "marketplace.tours_subtitle": { ru: "Актуальные предложения от Navitravel", az: "Navitravel-dən aktual təkliflər", en: "Current offers from Navitravel" },
   "marketplace.all_tours": { ru: "Все туры", az: "Bütün turlar", en: "All tours" },
   "marketplace.hotels_title": { ru: "Отели", az: "Otellər", en: "Hotels" },
   "marketplace.hotels_subtitle": { ru: "Лучшие отели для вашего отдыха", az: "Dincəlmək üçün ən yaxşı otellər", en: "Best hotels for your stay" },
