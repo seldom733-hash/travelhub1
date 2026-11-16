@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import { useCan } from "@/lib/use-can";
+import { useLocale } from "@/lib/i18n";
+import { sx } from "@/lib/supplier-labels";
 import {
   supplierCatalogApi,
   type SupplierCatalogCapability,
@@ -24,13 +26,14 @@ const ACTION_LABEL: Record<string, string> = {
   ERROR: "Ошибки",
 };
 
-function formatDate(value: string | null): string {
+function formatDate(value: string | null, locale: string): string {
   if (!value) return "—";
-  return new Date(value).toLocaleString("ru-RU");
+  const tag = locale === "az" ? "az-AZ" : locale === "en" ? "en-GB" : "ru-RU";
+  return new Date(value).toLocaleString(tag);
 }
 
-function runCountryLabel(run: SupplierCatalogRun): string {
-  if (run.countryCode === "ALL") return "Все страны";
+function runCountryLabel(run: SupplierCatalogRun, allLabel: string): string {
+  if (run.countryCode === "ALL") return allLabel;
   // Country code is the canonical display value in the update report.
   if (run.countryCode) return run.countryCode;
   const scope = run.scope as { sourceScopes?: Array<{ countryLabel?: string }> } | null;
@@ -64,6 +67,23 @@ type DiscoveryReport = {
 };
 
 export default function SupplierUpdatesPage() {
+  const locale = useLocale();
+  const tr = (ru: string, az: string, en: string) => sx(locale, ru, az, en);
+  const serviceLabel = (service: string) =>
+    service === "tours" ? tr("Туры", "Turlar", "Tours")
+      : service === "hotels" ? tr("Отели", "Otellər", "Hotels")
+        : service === "all" ? tr("Все услуги", "Bütün xidmətlər", "All services")
+          : service;
+  const actionLabel = (action: string) =>
+    action === "CREATE" ? tr("Новые", "Yeni", "New")
+      : action === "UPDATE" ? tr("Обновления", "Yeniləmələr", "Updates")
+        : action === "RESTORE" ? tr("Восстановления", "Bərpalar", "Restores")
+          : action === "ARCHIVE" ? tr("Архивация", "Arxivləmə", "Archive")
+            : action === "AMBIGUOUS" ? tr("Неоднозначные", "Qeyri-müəyyən", "Ambiguous")
+              : action === "LEGACY_ARCHIVED" ? tr("Старый архив", "Köhnə arxiv", "Legacy archive")
+                : action === "UNCHANGED" ? tr("Без изменений", "Dəyişiklik yoxdur", "Unchanged")
+                  : action === "ERROR" ? tr("Ошибки", "Xətalar", "Errors")
+                    : action;
   const canManage = useCan("supplier.search.manage");  const [capabilities, setCapabilities] = useState<SupplierCatalogCapability[]>([]);
   const [loadingCaps, setLoadingCaps] = useState(true);
   const [supplierCode, setSupplierCode] = useState("");
@@ -313,11 +333,11 @@ export default function SupplierUpdatesPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <PageHeader title="Обновление услуг — Поставщики" breadcrumbs={["TravelHub", "Обновление услуг", "Поставщики"]} />
+      <PageHeader title={tr("Обновление услуг — Поставщики", "Xidmətlərin yenilənməsi — Təchizatçılar", "Service updates — Suppliers")} breadcrumbs={["TravelHub", tr("Обновление услуг", "Xidmətlərin yenilənməsi", "Service updates"), tr("Поставщики", "Təchizatçılar", "Suppliers")]} />
       <main className="mx-auto max-w-6xl space-y-5 p-6">
         {!canManage && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Раздел доступен только сотрудникам с правом запуска синхронизации поставщиков.
+            {tr("Раздел доступен только сотрудникам с правом запуска синхронизации поставщиков.", "Bölmə yalnız təchizatçı sinxronizasiyasını işə salmaq hüququ olan əməkdaşlar üçün əlçatandır.", "Available only to staff allowed to run supplier synchronization.")}
           </div>
         )}
         {error && <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
@@ -338,9 +358,9 @@ export default function SupplierUpdatesPage() {
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 id="discovery-report-title" className="text-lg font-semibold text-slate-900">Отчёт об обновлении списка стран</h2>
+                  <h2 id="discovery-report-title" className="text-lg font-semibold text-slate-900">{tr("Отчёт об обновлении списка стран", "Ölkə siyahısının yenilənmə hesabatı", "Country list update report")}</h2>
                   <p className="mt-1 text-xs text-slate-500">
-                    {discoveryReport.supplierCode} · {SERVICE_LABEL[discoveryReport.serviceType] ?? discoveryReport.serviceType} · {formatDate(discoveryReport.at)}
+                    {discoveryReport.supplierCode} · {serviceLabel(discoveryReport.serviceType)} · {formatDate(discoveryReport.at, locale)}
                   </p>
                 </div>
                 <button
@@ -349,32 +369,32 @@ export default function SupplierUpdatesPage() {
                   onClick={() => setDiscoveryReport(null)}
                   className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
                 >
-                  Закрыть
+                  {tr("Закрыть", "Bağla", "Close")}
                 </button>
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-emerald-700">Новых</div>
+                  <div className="text-[10px] uppercase tracking-wide text-emerald-700">{tr("Новых", "Yeni", "New")}</div>
                   <div className="text-xl font-semibold text-emerald-800">{discoveryReport.discovered}</div>
                 </div>
                 <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-slate-500">Распознано</div>
+                  <div className="text-[10px] uppercase tracking-wide text-slate-500">{tr("Распознано", "Tanınan", "Recognized")}</div>
                   <div className="text-xl font-semibold text-slate-900">{discoveryReport.countries.length}</div>
                 </div>
                 <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-amber-700">Пропущено</div>
+                  <div className="text-[10px] uppercase tracking-wide text-amber-700">{tr("Пропущено", "Buraxılan", "Skipped")}</div>
                   <div className="text-xl font-semibold text-amber-800">{discoveryReport.skipped}</div>
                 </div>
                 <div className="rounded-lg border border-rose-100 bg-rose-50 px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-rose-700">Удалено</div>
+                  <div className="text-[10px] uppercase tracking-wide text-rose-700">{tr("Удалено", "Silinən", "Removed")}</div>
                   <div className="text-xl font-semibold text-rose-800">{discoveryReport.removed.length}</div>
                 </div>
               </div>
 
               {discoveryReport.removed.length > 0 && (
                 <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
-                  <div className="font-semibold">Убраны из списка — больше нет в справочнике поставщика:</div>
+                  <div className="font-semibold">{tr("Убраны из списка — больше нет в справочнике поставщика:", "Siyahıdan çıxarıldı — təchizatçı məlumat kitabında artıq yoxdur:", "Removed from the list — no longer in the supplier directory:")}</div>
                   <div className="mt-1">
                     {discoveryReport.removed.map((country) => `${country.key} ${country.label}`).join(" · ")}
                   </div>
@@ -383,16 +403,16 @@ export default function SupplierUpdatesPage() {
 
               {discoveryReport.countries.length === 0 ? (
                 <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
-                  Поставщик не вернул ни одной страны. Список не изменён.
+                  {tr("Поставщик не вернул ни одной страны. Список не изменён.", "Təchizatçı heç bir ölkə qaytarmadı. Siyahı dəyişdirilmədi.", "The supplier returned no countries. The list was not changed.")}
                 </div>
               ) : (
                 <div className="mt-4 max-h-72 overflow-auto rounded-lg border border-slate-100">
                   <table className="w-full text-left text-xs">
                     <thead className="sticky top-0 bg-slate-50 text-slate-500">
                       <tr>
-                        <th className="px-3 py-2">Код</th>
-                        <th className="px-3 py-2">Страна</th>
-                        <th className="px-3 py-2">Статус</th>
+                        <th className="px-3 py-2">{tr("Код", "Kod", "Code")}</th>
+                        <th className="px-3 py-2">{tr("Страна", "Ölkə", "Country")}</th>
+                        <th className="px-3 py-2">{tr("Статус", "Status", "Status")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -404,7 +424,7 @@ export default function SupplierUpdatesPage() {
                             <td className="px-3 py-2 text-slate-700">{country.label || "—"}</td>
                             <td className="px-3 py-2">
                               <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${isNew ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                                {isNew ? "добавлена" : "уже была"}
+                                {isNew ? tr("добавлена", "əlavə edilib", "added") : tr("уже была", "artıq var idi", "already existed")}
                               </span>
                             </td>
                           </tr>
@@ -416,7 +436,7 @@ export default function SupplierUpdatesPage() {
               )}
 
               <p className="mt-3 text-[11px] text-slate-500">
-                Отчёт только по справочнику стран. Цены и карточки услуг он не меняет — для этого нужен preview и подтверждение.
+                {tr("Отчёт только по справочнику стран. Цены и карточки услуг он не меняет — для этого нужен preview и подтверждение.", "Hesabat yalnız ölkə məlumat kitabı haqqındadır. Qiymətləri və xidmət kartlarını dəyişmir — bunun üçün preview və təsdiq lazımdır.", "This report covers the country directory only. It does not change prices or service cards — use preview and confirmation for that.")}
               </p>
             </div>
           </div>
@@ -424,17 +444,17 @@ export default function SupplierUpdatesPage() {
 
         <section className="rounded-xl border border-slate-200 bg-white p-5">
           <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <span className="rounded-full bg-slate-100 px-2 py-1">1. Поставщик</span>
+            <span className="rounded-full bg-slate-100 px-2 py-1">{tr("1. Поставщик", "1. Təchizatçı", "1. Supplier")}</span>
             <span>→</span>
-            <span className="rounded-full bg-slate-100 px-2 py-1">2. Страна</span>
+            <span className="rounded-full bg-slate-100 px-2 py-1">{tr("2. Страна", "2. Ölkə", "2. Country")}</span>
             <span>→</span>
-            <span className="rounded-full bg-slate-100 px-2 py-1">3. Категория</span>
+            <span className="rounded-full bg-slate-100 px-2 py-1">{tr("3. Категория", "3. Kateqoriya", "3. Category")}</span>
             <span>→</span>
-            <span className="rounded-full bg-slate-100 px-2 py-1">4. Проверить</span>
+            <span className="rounded-full bg-slate-100 px-2 py-1">{tr("4. Проверить", "4. Yoxla", "4. Check")}</span>
             <span>→</span>
-            <span className="rounded-full bg-slate-100 px-2 py-1">5. Отчёт</span>
+            <span className="rounded-full bg-slate-100 px-2 py-1">{tr("5. Отчёт", "5. Hesabat", "5. Report")}</span>
             <span>→</span>
-            <span className="rounded-full bg-slate-100 px-2 py-1">6. Подтвердить</span>
+            <span className="rounded-full bg-slate-100 px-2 py-1">{tr("6. Подтвердить", "6. Təsdiqlə", "6. Confirm")}</span>
           </div>
 
           {loadingCaps ? (
@@ -442,7 +462,7 @@ export default function SupplierUpdatesPage() {
           ) : (
             <div className="grid gap-3 md:grid-cols-3">
               <label className="text-xs font-medium text-slate-600">
-                Поставщик
+                {tr("Поставщик", "Təchizatçı", "Supplier")}
                 <select
                   value={supplierCode}
                   onChange={(e) => setSupplierCode(e.target.value)}
@@ -452,23 +472,23 @@ export default function SupplierUpdatesPage() {
                 </select>
               </label>
               <label className="text-xs font-medium text-slate-600">
-                Категория услуги
+                {tr("Категория услуги", "Xidmət kateqoriyası", "Service category")}
                 <select
                   value={serviceType}
                   onChange={(e) => setServiceType(e.target.value as SupplierCatalogRunServiceType)}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 >
-                  {services.map((service) => <option key={service} value={service}>{SERVICE_LABEL[service] ?? service}</option>)}
+                  {services.map((service) => <option key={service} value={service}>{serviceLabel(service)}</option>)}
                 </select>
               </label>
               <label className="text-xs font-medium text-slate-600">
-                Страна
+                {tr("Страна", "Ölkə", "Country")}
                 <select
                   value={countryKey}
                   onChange={(e) => setCountryKey(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 >
-                  {countries.map((country) => <option key={country.key} value={country.key}>{country.key === "ALL" ? country.label : country.key}</option>)}
+                  {countries.map((country) => <option key={country.key} value={country.key}>{country.key === "ALL" ? tr("Все страны", "Bütün ölkələr", "All countries") : country.key}</option>)}
                 </select>
               </label>
             </div>
@@ -477,7 +497,7 @@ export default function SupplierUpdatesPage() {
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {countryKey === "ALL" && (
               <div className="w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Выбрано полное обновление всех стран выбранной категории. Preview может выполняться долго; применяйте только после проверки отчёта.
+                {tr("Выбрано полное обновление всех стран выбранной категории. Preview может выполняться долго; применяйте только после проверки отчёта.", "Seçilmiş kateqoriyanın bütün ölkələri üzrə tam yenilənmə seçilib. Preview uzun çəkə bilər; yalnız hesabatı yoxladıqdan sonra tətbiq edin.", "Full update of all countries in the selected category is selected. Preview may take a while; apply only after checking the report.")}
               </div>
             )}
             <button
@@ -486,16 +506,16 @@ export default function SupplierUpdatesPage() {
               disabled={!canManage || busy || !supplierCode || !countryKey}
               className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              Проверить услуги
+              {tr("Проверить услуги", "Xidmətləri yoxla", "Check services")}
             </button>
             <button
               type="button"
               onClick={() => void discoverCountries()}
               disabled={!canManage || busy || !supplierCode || serviceType === "all"}
               className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50"
-              title="Найти новые страны в справочнике поставщика и добавить их в список"
+              title={tr("Найти новые страны в справочнике поставщика и добавить их в список", "Təchizatçı məlumat kitabında yeni ölkələri tap və siyahıya əlavə et", "Find new countries in the supplier directory and add them to the list")}
             >
-              Обновить список стран
+              {tr("Обновить список стран", "Ölkə siyahısını yenilə", "Update country list")}
             </button>
             <button
               type="button"
@@ -503,7 +523,7 @@ export default function SupplierUpdatesPage() {
               disabled={!canConfirm || busy}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              Подтвердить обновление
+              {tr("Подтвердить обновление", "Yenilənməni təsdiqlə", "Confirm update")}
             </button>
             {run && ["PREVIEWING", "PREVIEW_READY"].includes(run.status) && (
               <button
@@ -511,11 +531,11 @@ export default function SupplierUpdatesPage() {
                 onClick={() => void supplierCatalogApi.cancel(run.id).then(setRun).catch((e) => setError((e as Error).message))}
                 className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600"
               >
-                Отменить
+                {tr("Отменить", "Ləğv et", "Cancel")}
               </button>
             )}
             <span className="text-xs text-slate-400">
-              Preview не меняет каталог. Изменения применяются только после подтверждения.
+              {tr("Preview не меняет каталог. Изменения применяются только после подтверждения.", "Preview kataloqu dəyişmir. Dəyişikliklər yalnız təsdiqdən sonra tətbiq olunur.", "Preview does not change the catalog. Changes apply only after confirmation.")}
             </span>
           </div>
 
@@ -530,9 +550,9 @@ export default function SupplierUpdatesPage() {
           <section className="rounded-xl border border-slate-200 bg-white p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h2 className="text-base font-semibold text-slate-900">Предварительный отчёт</h2>
+                <h2 className="text-base font-semibold text-slate-900">{tr("Предварительный отчёт", "İlkin hesabat", "Preview report")}</h2>
                 <div className="mt-1 text-xs text-slate-400">
-                  {run.supplierCode} · {SERVICE_LABEL[run.serviceType] ?? run.serviceType} · {runCountryLabel(run)} · {formatDate(run.createdAt)}
+                  {run.supplierCode} · {serviceLabel(run.serviceType)} · {runCountryLabel(run, tr("Все страны", "Bütün ölkələr", "All countries"))} · {formatDate(run.createdAt, locale)}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -543,27 +563,27 @@ export default function SupplierUpdatesPage() {
 
             {archiveBlocked && (
               <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Архивация заблокирована: полнота каталога не подтверждена. Обновления/восстановления можно применить, архив — только после complete preview.
+                {tr("Архивация заблокирована: полнота каталога не подтверждена. Обновления/восстановления можно применить, архив — только после complete preview.", "Arxivləmə bloklanıb: kataloqun tamlığı təsdiqlənməyib. Yeniləmələr/bərpalar tətbiq oluna bilər, arxiv yalnız tam preview-dən sonra.", "Archiving is blocked: catalog completeness is not confirmed. Updates/restores can be applied; archive only after a complete preview.")}
               </div>
             )}
             {run.coverage === "COMPLETE" && (counts.ARCHIVE ?? 0) > 0 && (
               <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                В отчёте {counts.ARCHIVE} карточек к архивации. Проверьте список перед подтверждением.
+                {tr("В отчёте", "Hesabatda", "The report contains")} {counts.ARCHIVE} {tr("карточек к архивации. Проверьте список перед подтверждением.", "arxivlənməli kart var. Təsdiqdən əvvəl siyahını yoxlayın.", "cards to archive. Review the list before confirming.")}
               </div>
             )}
             {emptySource && (
               <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Поставщик вернул <strong>0 предложений</strong> за проверяемый период
+                {tr("Поставщик вернул", "Təchizatçı qaytardı", "The supplier returned")} <strong>0 {tr("предложений", "təklif", "offers")}</strong> {tr("за проверяемый период", "yoxlanılan dövr üçün", "for the checked period")}
                 {sourceScope?.dateFrom && sourceScope?.dateTo ? ` ${sourceScope.dateFrom} — ${sourceScope.dateTo}` : ""}.
-                Цены и карточки не изменены. Обычно это означает, что у поставщика нет доступных тарифов на эти даты,
-                либо изменился сезон/окно продаж. Повторите проверку на другой период или проверьте наличие на сайте поставщика.
+                {tr("Цены и карточки не изменены. Обычно это означает, что у поставщика нет доступных тарифов на эти даты,", "Qiymətlər və kartlar dəyişdirilmədi. Adətən bu, təchizatçının bu tarixlər üçün tarifinin olmaması deməkdir,", "Prices and cards were not changed. Usually this means the supplier has no available rates for these dates,")}
+                {tr("либо изменился сезон/окно продаж. Повторите проверку на другой период или проверьте наличие на сайте поставщика.", "və ya mövsüm/satış pəncərəsi dəyişib. Yoxlamanı başqa dövr üçün təkrarlayın və ya təchizatçının saytında mövcudluğu yoxlayın.", "or the season/sales window changed. Retry the check for another period or verify availability on the supplier site.")}
               </div>
             )}
 
             <div className="mt-4 grid gap-2 sm:grid-cols-4 lg:grid-cols-7">
               {["CREATE", "UPDATE", "RESTORE", "ARCHIVE", "AMBIGUOUS", "LEGACY_ARCHIVED", "ERROR"].map((action) => (
                 <div key={action} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-slate-400">{ACTION_LABEL[action]}</div>
+                  <div className="text-[10px] uppercase tracking-wide text-slate-400">{actionLabel(action)}</div>
                   <div className="text-lg font-semibold text-slate-900">{counts[action] ?? 0}</div>
                 </div>
               ))}
@@ -580,28 +600,28 @@ export default function SupplierUpdatesPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="sticky top-0 bg-slate-50 text-slate-500">
                     <tr>
-                      <th className="px-3 py-2">Действие</th>
-                      <th className="px-3 py-2">Название услуги</th>
-                      <th className="px-3 py-2">Фото</th>
-                      <th className="px-3 py-2">Внешний ключ</th>
-                      <th className="px-3 py-2">Причина</th>
-                      <th className="px-3 py-2">Применено</th>
-                      <th className="px-3 py-2">Ручное действие</th>
+                      <th className="px-3 py-2">{tr("Действие", "Əməliyyat", "Action")}</th>
+                      <th className="px-3 py-2">{tr("Название услуги", "Xidmətin adı", "Service name")}</th>
+                      <th className="px-3 py-2">{tr("Фото", "Foto", "Photo")}</th>
+                      <th className="px-3 py-2">{tr("Внешний ключ", "Xarici açar", "External key")}</th>
+                      <th className="px-3 py-2">{tr("Причина", "Səbəb", "Reason")}</th>
+                      <th className="px-3 py-2">{tr("Применено", "Tətbiq edilib", "Applied")}</th>
+                      <th className="px-3 py-2">{tr("Ручное действие", "Əl əməliyyatı", "Manual action")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {run.items.map((item) => (
                       <tr key={item.id} className="border-t border-slate-100">
-                        <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-700">{ACTION_LABEL[item.action] ?? item.action}</td>
+                        <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-700">{actionLabel(item.action)}</td>
                         <td className="px-3 py-2 text-slate-700">{itemServiceName(item)}</td>
                         <td className="px-3 py-2">
                           <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${item.photo === "YES" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                            {item.photo === "YES" ? "Да" : "Нет"}
+                            {item.photo === "YES" ? tr("Да", "Bəli", "Yes") : tr("Нет", "Xeyr", "No")}
                           </span>
                         </td>
                         <td className="px-3 py-2 font-mono text-[11px] text-slate-500">{item.supplierRef ?? item.externalKey}</td>
                         <td className="px-3 py-2 text-slate-500">{item.error ?? item.reason ?? "—"}</td>
-                        <td className="px-3 py-2">{item.applied ? "да" : "нет"}</td>
+                        <td className="px-3 py-2">{item.applied ? tr("да", "bəli", "yes") : tr("нет", "xeyr", "no")}</td>
                         <td className="px-3 py-2">
                           {item.action === "LEGACY_ARCHIVED" && !item.applied && (
                             <button
@@ -610,7 +630,7 @@ export default function SupplierUpdatesPage() {
                               onClick={() => void restoreLegacy(item.id)}
                               className="rounded border border-amber-200 px-2 py-1 text-[11px] font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
                             >
-                              Восстановить вручную
+                              {tr("Восстановить вручную", "Əl ilə bərpa et", "Restore manually")}
                             </button>
                           )}
                         </td>
@@ -626,15 +646,15 @@ export default function SupplierUpdatesPage() {
         <section className="rounded-xl border border-slate-200 bg-white p-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="text-base font-semibold text-slate-900">Фото на проверку имени</h2>
+              <h2 className="text-base font-semibold text-slate-900">{tr("Фото на проверку имени", "Ad yoxlaması üçün foto", "Photos for name review")}</h2>
               <p className="mt-1 text-xs text-slate-500">
-                Найдено частичное совпадение с отелем — подтвердите, что фото относится к нужной услуге.
+                {tr("Найдено частичное совпадение с отелем — подтвердите, что фото относится к нужной услуге.", "Otel ilə qismən uyğunluq tapıldı — fotonun lazımi xidmətə aid olduğunu təsdiqləyin.", "A partial hotel match was found — confirm that the photo belongs to the right service.")}
               </p>
             </div>
-            <button type="button" onClick={() => void loadPhotoReviews()} className="text-xs text-slate-500 hover:text-slate-900">Обновить</button>
+            <button type="button" onClick={() => void loadPhotoReviews()} className="text-xs text-slate-500 hover:text-slate-900">{tr("Обновить", "Yenilə", "Refresh")}</button>
           </div>
           {photoReviews.length === 0 ? (
-            <div className="py-4 text-sm text-slate-400">Нет фото-кандидатов, требующих проверки.</div>
+            <div className="py-4 text-sm text-slate-400">{tr("Нет фото-кандидатов, требующих проверки.", "Yoxlama tələb edən foto namizədi yoxdur.", "No photo candidates need review.")}</div>
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {photoReviews.map((review) => (
@@ -652,8 +672,8 @@ export default function SupplierUpdatesPage() {
                     <div className="text-xs font-semibold text-slate-900">{review.name}</div>
                     <div className="text-[11px] text-slate-500">{review.cityName} · {review.countryName}</div>
                     <div className="mt-2 text-[11px] text-slate-600">
-                      Найдено: <span className="font-medium">{review.candidateTitle || "без названия"}</span>
-                      {review.score > 0 ? ` · совпадение ${review.score}` : ""}
+                      {tr("Найдено:", "Tapıldı:", "Found:")} <span className="font-medium">{review.candidateTitle || tr("без названия", "adsız", "untitled")}</span>
+                      {review.score > 0 ? ` · ${tr("совпадение", "uyğunluq", "match")} ${review.score}` : ""}
                     </div>
                     <div className="mt-2 flex gap-2">
                       <button
@@ -662,7 +682,7 @@ export default function SupplierUpdatesPage() {
                         onClick={() => void resolvePhotoReview(review.id, "approve")}
                         className="rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-800 disabled:opacity-50"
                       >
-                        Подтвердить
+                        {tr("Подтвердить", "Təsdiqlə", "Confirm")}
                       </button>
                       <button
                         type="button"
@@ -670,7 +690,7 @@ export default function SupplierUpdatesPage() {
                         onClick={() => void resolvePhotoReview(review.id, "reject")}
                         className="rounded border border-slate-200 px-2 py-1 text-[11px] text-slate-600 disabled:opacity-50"
                       >
-                        Отклонить
+                        {tr("Отклонить", "Rədd et", "Reject")}
                       </button>
                     </div>
                   </div>
@@ -682,37 +702,37 @@ export default function SupplierUpdatesPage() {
 
         <section className="rounded-xl border border-slate-200 bg-white p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-900">Последние запуски</h2>
-            <button type="button" onClick={() => void loadRuns()} className="text-xs text-slate-500 hover:text-slate-900">Обновить</button>
+            <h2 className="text-base font-semibold text-slate-900">{tr("Последние запуски", "Son işə salmalar", "Recent runs")}</h2>
+            <button type="button" onClick={() => void loadRuns()} className="text-xs text-slate-500 hover:text-slate-900">{tr("Обновить", "Yenilə", "Refresh")}</button>
           </div>
           {runs.length === 0 ? (
-            <div className="py-6 text-center text-sm text-slate-400">Запусков пока нет.</div>
+            <div className="py-6 text-center text-sm text-slate-400">{tr("Запусков пока нет.", "Hələ işə salma yoxdur.", "No runs yet.")}</div>
           ) : (
             <div className="overflow-auto">
               <table className="w-full text-left text-xs">
                 <thead className="text-slate-500">
                   <tr>
-                    <th className="px-2 py-2">Дата</th>
-                    <th className="px-2 py-2">Поставщик</th>
-                    <th className="px-2 py-2">Категория</th>
-                    <th className="px-2 py-2">Страна</th>
-                    <th className="px-2 py-2">Статус</th>
-                    <th className="px-2 py-2">Coverage</th>
-                    <th className="px-2 py-2">Автор</th>
+                    <th className="px-2 py-2">{tr("Дата", "Tarix", "Date")}</th>
+                    <th className="px-2 py-2">{tr("Поставщик", "Təchizatçı", "Supplier")}</th>
+                    <th className="px-2 py-2">{tr("Категория", "Kateqoriya", "Category")}</th>
+                    <th className="px-2 py-2">{tr("Страна", "Ölkə", "Country")}</th>
+                    <th className="px-2 py-2">{tr("Статус", "Status", "Status")}</th>
+                    <th className="px-2 py-2">{tr("Coverage", "Əhatə", "Coverage")}</th>
+                    <th className="px-2 py-2">{tr("Автор", "Müəllif", "Author")}</th>
                     <th className="px-2 py-2"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {runs.map((item) => (
                     <tr key={item.id} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => openRun(item.id)}>
-                      <td className="px-2 py-2 text-slate-500">{formatDate(item.createdAt)}</td>
+                      <td className="px-2 py-2 text-slate-500">{formatDate(item.createdAt, locale)}</td>
                       <td className="px-2 py-2 font-medium">{item.supplierCode}</td>
-                      <td className="px-2 py-2">{SERVICE_LABEL[item.serviceType] ?? item.serviceType}</td>
-                      <td className="px-2 py-2">{runCountryLabel(item)}</td>
+                      <td className="px-2 py-2">{serviceLabel(item.serviceType)}</td>
+                      <td className="px-2 py-2">{runCountryLabel(item, tr("Все страны", "Bütün ölkələr", "All countries"))}</td>
                       <td className="px-2 py-2"><span className={`rounded-full border px-2 py-0.5 font-semibold ${item.status === "COMPLETED" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : item.status === "FAILED" || item.status === "PARTIAL" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>{item.status}</span></td>
                       <td className="px-2 py-2">{item.coverage}</td>
                       <td className="px-2 py-2 text-slate-500">{item.createdByName ?? "—"}</td>
-                      <td className="px-2 py-2">{["PREVIEWING", "APPLYING"].includes(item.status) && <button type="button" onClick={(e) => { e.stopPropagation(); void supplierCatalogApi.cancel(item.id).then(() => loadRuns()).catch((err) => setError((err as Error).message)); }} className="rounded border border-rose-200 px-2 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50">Остановить</button>}</td>
+                      <td className="px-2 py-2">{["PREVIEWING", "APPLYING"].includes(item.status) && <button type="button" onClick={(e) => { e.stopPropagation(); void supplierCatalogApi.cancel(item.id).then(() => loadRuns()).catch((err) => setError((err as Error).message)); }} className="rounded border border-rose-200 px-2 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50">{tr("Остановить", "Dayandır", "Stop")}</button>}</td>
                     </tr>
                   ))}
                 </tbody>

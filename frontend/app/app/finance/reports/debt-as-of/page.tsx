@@ -169,8 +169,8 @@ export default function SupplierDebtAsOfPage() {
 
         <section className="overflow-hidden rounded-xl border border-line bg-white">
           <div className="border-b border-line px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">Задолженность поставщикам</h2>
-            <p className="mt-0.5 text-xs text-slate-500">Обязательства перед поставщиками, возникшие после подтверждения брони.</p>
+            <h2 className="text-sm font-semibold text-slate-900">{t("finance.debt_as_of.section_title", locale)}</h2>
+            <p className="mt-0.5 text-xs text-slate-500">{t("finance.debt_as_of.section_hint", locale)}</p>
           </div>
           {busy && !report ? (
             <div className="h-40 animate-pulse bg-slate-100" />
@@ -238,7 +238,7 @@ export default function SupplierDebtAsOfPage() {
         <section className="overflow-hidden rounded-xl border border-line bg-white">
           <div className="border-b border-line px-4 py-3">
             <h2 className="text-sm font-semibold text-slate-900">{t("finance.client_debt.title", locale)}</h2>
-            <p className="mt-0.5 text-xs text-slate-500">Сумма заказа минус подтверждённые оплаты и возвраты на выбранную дату.</p>
+            <p className="mt-0.5 text-xs text-slate-500">{t("finance.client_debt.hint", locale)}</p>
           </div>
           {clientReport && clientReport.totalsByCurrency.length > 0 && (
             <div className="grid gap-2 border-b border-line p-3 sm:grid-cols-3">
@@ -246,7 +246,7 @@ export default function SupplierDebtAsOfPage() {
                 <div key={total.currency} className="rounded-lg bg-slate-50 p-3">
                   <div className="text-[10px] uppercase tracking-wide text-slate-500">{total.currency} · {total.count}</div>
                   <div className="mt-1 font-mono text-lg font-semibold text-slate-900">{formatPrice(total.debt, total.currency, locale)}</div>
-                  <div className="text-[10px] text-slate-500">Из {formatPrice(total.amount, total.currency, locale)} оплачено {formatPrice(total.paid, total.currency, locale)}</div>
+                  <div className="text-[10px] text-slate-500">{t("finance.client_debt.paid_of", locale)} {formatPrice(total.amount, total.currency, locale)} {t("finance.debt_as_of.paid", locale).toLowerCase()} {formatPrice(total.paid, total.currency, locale)}</div>
                 </div>
               ))}
             </div>
