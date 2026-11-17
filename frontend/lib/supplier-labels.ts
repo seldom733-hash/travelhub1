@@ -81,9 +81,14 @@ export function displayTourName(raw: string | null | undefined): string {
   const value = (raw ?? "").replace(/\s+/g, " ").trim();
   if (!value) return "";
   const cut = value.search(/[.(]|\s[-–—]\s|[-–—]/);
-  if (cut > 0) {
-    const short = value.slice(0, cut).replace(/[\s/,;:]+$/, "").trim();
-    if (short.length >= 3) return short;
-  }
+  let short = cut > 0 ? value.slice(0, cut).replace(/[\s/,;:]+$/, "").trim() : value;
+  // Tour directions often carry the origin/destination after the hotel name
+  // («ManFiyo Baku Mahe»); strip those suffixes when no dash was present.
+  short = short.replace(/\bBaku\s+(?:Mahe|Sharjah|Smarkand|Samarkand)\b/gi, "").trim();
+  // «пробел тире пробел» and trailing separators.
+  short = short.replace(/\s+[-–—]\s+.*$/, "").replace(/[\s/,;:]+$/, "").trim();
+  // Category suffix is not part of the hotel/tour name.
+  short = short.replace(/\s+(?:S|Special)\s+class\b.*$/i, "").trim();
+  if (short.length >= 3) return short;
   return value;
 }

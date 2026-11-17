@@ -581,8 +581,12 @@ async function main(): Promise<void> {
       const ref = h.refs.find((r) => /[a-zA-Z]/.test(r.name)) ?? h.refs[0];
       const name = nameBeforeDelimiters(ref?.name || h.name)
         .replace(/[,\s]+$/, "")
+        // «Baku Mahe», «Baku Sharjah», «Baku Samarkand» — tour direction
+        // suffixes, not part of the hotel name.
+        .replace(/\bBaku\s+(?:Mahe|Sharjah|Smarkand|Samarkand)\b/gi, "")
         // «… 4*+», «… 5 *» — хвост звёздности мешает поиску.
         .replace(/\s*\d*\s*\*+\s*\+?\s*$/, "")
+        .replace(/\s+/g, " ")
         .trim();
       // Имя для поиска: убираем скобочные пометки («(ex. …)», «(Город)»),
       // хвостовую звёздность с суффиксом («5*lux») и пунктуацию — они уводят
