@@ -567,9 +567,17 @@ export class SupplierAggregatorService {
     return null;
   }
 
-  /** Normalized hotel identity: lowercase, ё→е, alphanumerics only. */
+  /** Normalized hotel identity: lowercase, ё→е, alphanumerics only.
+   * Parenthetical location and star suffix are not part of the hotel name:
+   * the user types "A11 Hotel Obakoy", the supplier returns
+   * "A11 HOTEL OBAKOY 4* (Обагёль)" — both must normalize to the same key. */
   private normHotel(s: string): string {
-    return s.toLowerCase().replace(/ё/g, "е").replace(/[^a-zа-я0-9]/gi, "");
+    return s
+      .replace(/\([^)]*\)/g, " ")
+      .replace(/\b\d+\s*\*+\s*\+?/g, " ")
+      .toLowerCase()
+      .replace(/ё/g, "е")
+      .replace(/[^a-zа-я0-9]/gi, "");
   }
 
   /**
