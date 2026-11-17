@@ -306,6 +306,48 @@ interface PhotoMatch {
   confident: boolean;
 }
 
+function isGoogleTravelImage(src: string): boolean {
+  return /^https:\/\/lh3\.googleusercontent\.com\/(?:grass-proxy|grass-cs)\//i.test(src);
+}
+
+/**
+ * Last-resort source: Google Travel hotel page. Useful when Tripadvisor HTML
+ * is blocked (DataDome) and Bing/DDG return no Tripadvisor CDN candidate.
+ * The page embeds hotel gallery images on lh3.googleusercontent.com.
+ */
+async function googleTravelPhoto(
+  query: string,
+  hotelName: string,
+): Promise<PhotoMatch | null> {
+  const tokens = nameTokens(hotelName);
+  if (tokens.length === 0) return null;
+  const url = `https://www.google.com/travel/search?q=${encodeURIComponent(query)}`;
+  let response: { status: number; body: string };
+  try {
+    response = await httpGet(url, 30_000, { "Accept-Language": "en-US,en;q=0.9" });
+  } catch {
+    return null;
+  }
+  if (response.status !== 200 || !response.body) return null;
+
+  const rawTitle = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(response.body)?.[1] ?? "";
+  const title = rawTitle
+    .replace(/&#(\d+);/g, (_m, n) => String.fromCharCode(Number(n)))
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .trim();
+  const hay = normalizeForMatch(title);
+  const score = tokens.filter((token) => hay.includes(token)).length;
+  if (score < Math.max(1, Math.ceil(tokens.length / 2))) return null;
+
+  const images = [...response.body.matchAll(/https:\/\/lh3\.googleusercontent\.com\/[^"'\\\s]+/g)]
+    .map((match) => match[0].replace(/&amp;/g, "&"))
+    .filter((image) => isGoogleTravelImage(image));
+  const image = images[0];
+  if (!image) return null;
+  return { url: image, title: title || hotelName, score: tokens.length, confident: true };
+}
+
 /**
  * Поиск CDN-фото отеля. Источник — Tripadvisor CDN; сами ссылки ищутся через
  * Bing Images (async), при отказе — через DuckDuckGo Images. Результат
@@ -402,6 +444,10 @@ async function searchHotelPhoto(
       }
     }
   }
+  // Google Travel fallback: Tripadvisor page is often 403 to the server,
+  // while Google Travel still exposes the hotel gallery images.
+  const google = await googleTravelPhoto(query, hotelName);
+  if (google) return google;
   return fallback;
 }
 
@@ -662,7 +708,7 @@ async function main(): Promise<void> {
       const query = [searchName || name, city, country || countryCode].filter(Boolean).join(" ");
       let sourceUrl: string | null = null;
       let review: PhotoMatch | null = null;
-      let photoSource: "tripadvisor" | "anextour" | "booking" = "tripadvisor";
+      let photoSource: "tripadvisor" | "anextour" | "booking" | "google" = "tripadvisor";
       const anexRef = h.refs.find((r) => r.supplierCode === "ANEX");
       if (anexRef) {
         // ANEX policy: take the exact hotel gallery from Anextour first.
@@ -676,6 +722,7 @@ async function main(): Promise<void> {
         if (match?.confident) {
           sourceUrl = match.url;
           if (isBookingCdn(sourceUrl)) photoSource = "booking";
+          else if (isGoogleTravelImage(sourceUrl)) photoSource = "google";
         } else if (match) {
           review = match;
         }
@@ -711,7 +758,11 @@ async function main(): Promise<void> {
         const match = await searchHotelPhoto(query, searchName || name, opts.relaxed);
         if (match?.confident) {
           sourceUrl = match.url;
-          photoSource = isBookingCdn(sourceUrl) ? "booking" : "tripadvisor";
+          photoSource = isBookingCdn(sourceUrl)
+            ? "booking"
+            : isGoogleTravelImage(sourceUrl)
+              ? "google"
+              : "tripadvisor";
         } else if (match) {
           review = match;
         }
