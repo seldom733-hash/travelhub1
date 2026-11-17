@@ -130,6 +130,10 @@ function isBookingCdn(src: string): boolean {
 /** Валидация CDN-URL: фото Tripadvisor или Booking.com, не аватары/иконки. */
 function pickPhotoUrl(src: string): string | null {
   if (!src || !/^https?:\/\//.test(src)) return null;
+  // Reject explicitly tiny CDN variants (Google/ TripAdvisor thumbnails).
+  const width = Number(src.match(/[?&=](?:w|width)=(\d+)/i)?.[1] ?? 0);
+  const height = Number(src.match(/[?&=](?:h|height)=(\d+)/i)?.[1] ?? 0);
+  if ((width > 0 && width < 400) || (height > 0 && height > 0 && height < 300)) return null;
   if (/default-avatar|user_photo|logo/i.test(src)) return null;
   if (isBookingCdn(src)) {
     return /\/xdata\/images\/hotel\//i.test(src) ? src.replace(/&amp;/g, "&") : null;
@@ -342,7 +346,9 @@ async function googleTravelPhoto(
 
   const images = [...response.body.matchAll(/https:\/\/lh3\.googleusercontent\.com\/[^"'\\\s]+/g)]
     .map((match) => match[0].replace(/&amp;/g, "&"))
-    .filter((image) => isGoogleTravelImage(image));
+    .filter((image) => isGoogleTravelImage(image))
+    // Google embeds thumbnails (=s287-w287-h192); request a full-size variant.
+    .map((image) => image.replace(/=[^/]*$/, "=w1200-h900-n-k-rw-no-v1"));
   const image = images[0];
   if (!image) return null;
   return { url: image, title: title || hotelName, score: tokens.length, confident: true };
