@@ -176,12 +176,16 @@ const STOP_WORDS = new Set([
  */
 export function nameBeforeDelimiters(raw: string): string {
   const value = (raw ?? "").replace(/\s+/g, " ").trim();
-  const cut = value.search(/[.(]|\s[-–—]\s|[-–—]/);
+  const cut = value.search(/[.(]|\s*\/\s*|\s[-–—]\s|[-–—]/);
   if (cut < 3) {
     const fallback = cut > 0 ? value.slice(0, cut).trim() : value;
     return fallback.length >= 3 ? fallback : value;
   }
-  return value.slice(0, cut).trim();
+  return value
+    .slice(0, cut)
+    // «S class / 4*», «Special Class» — category suffix, not the hotel name.
+    .replace(/\s+S\s+class\b.*$/i, "")
+    .trim();
 }
 
 function normalizeForMatch(raw: string): string {
@@ -654,6 +658,17 @@ async function main(): Promise<void> {
           });
           console.log(`DUPE   ${h.id}  ${sourceUrl.slice(0, 90)}  (${h.name})`);
           sourceUrl = null;
+        }
+      }
+      // A rejected Anextour gallery (shared by another hotel) must not abort
+      // the whole lookup: fall back to Tripadvisor/Booking discovery.
+      if (!sourceUrl && !review) {
+        const match = await searchHotelPhoto(query, searchName || name, opts.relaxed);
+        if (match?.confident) {
+          sourceUrl = match.url;
+          photoSource = isBookingCdn(sourceUrl) ? "booking" : "tripadvisor";
+        } else if (match) {
+          review = match;
         }
       }
       if (!sourceUrl && review) {
