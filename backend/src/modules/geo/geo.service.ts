@@ -508,10 +508,11 @@ export class GeoService {
   }): Promise<Array<{ id: string; name: string; suppliers: string[]; countryName?: string; cityName?: string; stars?: number | null }>> {
     const limit = Math.min(params.limit ?? 500, 2000);
     const categorySlug = params.service === "tours" ? "tours" : "accommodation";
+    const hotelNameSql = Prisma.sql`COALESCE(NULLIF(TRIM(p."attributes"->>'hotelName'), ''), REGEXP_REPLACE(p."title", '\\s*[\\(—].*$', ''))`;
     const conditions: Prisma.Sql[] = [
       Prisma.sql`p."status"::text = 'PUBLISHED'`,
       Prisma.sql`c."slug" = ${categorySlug}`,
-      Prisma.sql`COALESCE(TRIM(p."attributes"->>'hotelName'), '') <> ''`,
+      Prisma.sql`${hotelNameSql} <> ''`,
     ];
     if (params.geoCountry) {
       conditions.push(Prisma.sql`gc."code" = ${params.geoCountry}`);
@@ -530,12 +531,12 @@ export class GeoService {
       );
     }
     if (params.q) {
-      conditions.push(Prisma.sql`TRIM(p."attributes"->>'hotelName') ILIKE ${`%${params.q}%`}`);
+      conditions.push(Prisma.sql`${hotelNameSql} ILIKE ${`%${params.q}%`}`);
     }
     const rows = await this.prisma.$queryRaw<Array<{ name: string; supplierCode: string; countryNames: unknown; cityNames: unknown; stars: string | null }>>(
       Prisma.sql`
         SELECT DISTINCT
-          TRIM(p."attributes"->>'hotelName') AS "name",
+          ${hotelNameSql} AS "name",
           p."attributes"->>'supplierCode' AS "supplierCode",
           gc."names" AS "countryNames",
           COALESCE(gr."names", gcity."names") AS "cityNames",
