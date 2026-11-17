@@ -312,6 +312,7 @@ export default function TourDetail({
                 onSelect={handleCalendarSelect}
                 selectedDate={selectedEntry?.date ?? null}
                 onEntriesLoaded={handleEntriesLoaded}
+                initialMonth={(attributes?.priceDate as string | undefined) ?? null}
               />
             ) : null}
             <p className="mt-3 text-xs text-ink/60">

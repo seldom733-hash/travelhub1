@@ -138,6 +138,7 @@ export default function MonthlyCalendar({
   onSelect,
   selectedDate,
   onEntriesLoaded,
+  initialMonth,
 }: {
   query: MonthlyCalendarQuery;
   onSelect?: (entry: SupplierPriceCalendarEntry) => void;
@@ -151,12 +152,27 @@ export default function MonthlyCalendar({
    * page auto-select the NEAREST priced day without duplicating the cache.
    */
   onEntriesLoaded?: (entries: SupplierPriceCalendarEntry[]) => void;
+  /** ISO date of the nearest known price; opens the calendar on its month. */
+  initialMonth?: string | null;
 }) {
   const locale = useLocale();
+  const initialMonthStart = (() => {
+    const m = /^(\d{4})-(\d{2})/.exec(initialMonth ?? "");
+    if (!m) return null;
+    return new Date(Number(m[1]), Number(m[2]) - 1, 1);
+  })();
   const [currentMonth, setCurrentMonth] = useState(() => {
+    if (initialMonthStart) return initialMonthStart;
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+  // Months before the month containing the nearest price are not browsable.
+  const [floorMonth, setFloorMonth] = useState(() => {
+    if (initialMonthStart) return initialMonthStart;
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const autoScanRef = useRef(0);
 
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -363,6 +379,34 @@ export default function MonthlyCalendar({
     fetchMonth(false);
   }, [fetchMonth]);
 
+  // Open on the month that carries the nearest price. If the product has no
+  // stored priceDate, probe forward until the first month with a price.
+  useEffect(() => {
+    if (!initialMonthStart) return;
+    setCurrentMonth(initialMonthStart);
+    setFloorMonth(initialMonthStart);
+  }, [initialMonth]);
+
+  useEffect(() => {
+    if (loading || errorKind === "ERROR" || !entries.length) return;
+    const hasPrice = entries.some(
+      (e) => e.price !== null && e.availability !== "NOT_AVAILABLE",
+    );
+    if (hasPrice) {
+      setFloorMonth(currentMonth);
+      autoScanRef.current = 0;
+      return;
+    }
+    if (autoScanRef.current >= 18) return;
+    const timer = window.setTimeout(() => {
+      autoScanRef.current += 1;
+      setCurrentMonth(
+        new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1),
+      );
+    }, 750);
+    return () => window.clearTimeout(timer);
+  }, [entries, loading, errorKind, currentMonth]);
+
   // Report entries to the page (nearest-day default). A ref guard keeps the
   // callback from firing on every render — only when the array identity changes.
   const lastReportedRef = useRef<SupplierPriceCalendarEntry[] | null>(null);
@@ -413,7 +457,7 @@ export default function MonthlyCalendar({
 
   const nowForNav = new Date();
   const startOfCurrentMonth = new Date(nowForNav.getFullYear(), nowForNav.getMonth(), 1);
-  const isPrevDisabled = currentMonth <= startOfCurrentMonth;
+  const isPrevDisabled = currentMonth <= startOfCurrentMonth || currentMonth <= floorMonth;
 
   const prevMonth = () => {
     if (isPrevDisabled) return;
@@ -456,13 +500,13 @@ export default function MonthlyCalendar({
         <button
           onClick={prevMonth}
           disabled={isPrevDisabled}
-          className={`rounded-lg border px-3 py-1.5 text-sm ${isPrevDisabled ? "border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+          className={`rounded-lg border px-3 py-1.5 text-sm ${isPrevDisabled ? "border-line bg-panel text-ink/60 cursor-not-allowed" : "border-line text-ink/60 hover:bg-panel"}`}
           aria-label="Previous month"
         >
           ‹
         </button>
-        <h4 className="text-sm font-semibold text-slate-800">{monthLabel}</h4>
-        <button onClick={nextMonth} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50" aria-label="Next month">›</button>
+        <h4 className="text-sm font-semibold text-ink">{monthLabel}</h4>
+        <button onClick={nextMonth} className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink/60 hover:bg-panel" aria-label="Next month">›</button>
       </div>
 
       {loading && (
@@ -471,12 +515,12 @@ export default function MonthlyCalendar({
               недели; без неё календарь после загрузки «съезжал» на строку вниз. */}
           <div className="grid grid-cols-7 gap-1">
             {weekDays.map((day) => (
-              <div key={day} className="py-1 text-center text-xs font-medium text-slate-500">{day}</div>
+              <div key={day} className="py-1 text-center text-xs font-medium text-ink/60">{day}</div>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
             {Array.from({ length: 42 }).map((_, i) => (
-              <div key={i} className="h-16 rounded-lg bg-slate-100 animate-pulse" />
+              <div key={i} className="h-16 rounded-lg bg-panel animate-pulse" />
             ))}
           </div>
         </>
@@ -492,8 +536,8 @@ export default function MonthlyCalendar({
       )}
 
       {!loading && isEmptyState && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-          <p className="text-sm text-slate-500">{t("supplier.calendar.empty", locale) ?? "Нет предложений на этот месяц"}</p>
+        <div className="rounded-xl border border-dashed border-line bg-panel p-6 text-center">
+          <p className="text-sm text-ink/60">{t("supplier.calendar.empty", locale) ?? "Нет предложений на этот месяц"}</p>
         </div>
       )}
 
@@ -501,7 +545,7 @@ export default function MonthlyCalendar({
         <>
           <div className="grid grid-cols-7 gap-1">
             {weekDays.map((day) => (
-              <div key={day} className="py-1 text-center text-xs font-medium text-slate-500">{day}</div>
+              <div key={day} className="py-1 text-center text-xs font-medium text-ink/60">{day}</div>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
@@ -514,9 +558,9 @@ export default function MonthlyCalendar({
                   aria-label={day.dateStr}
                   onClick={() => isAvailable && onSelect?.(day.entry!)}
                   disabled={!isAvailable}
-                  className={`relative h-16 rounded-lg border p-1.5 text-left transition-colors ${!day.isCurrentMonth ? "border-transparent bg-transparent" : isAvailable ? "border-green-200 bg-green-50 hover:bg-green-100 cursor-pointer" : day.entry?.absenceCode ? "border-amber-200 bg-amber-50 cursor-not-allowed" : "border-slate-100 bg-slate-50/50 cursor-not-allowed"} ${day.dateStr === selectedDate ? "ring-2 ring-blue-500" : isToday ? "ring-2 ring-blue-400" : ""}`}
+                  className={`relative h-16 rounded-lg border p-1.5 text-left transition-colors ${!day.isCurrentMonth ? "border-transparent bg-transparent" : isAvailable ? "border-green-200 bg-green-50 hover:bg-green-100 cursor-pointer" : day.entry?.absenceCode ? "border-amber-200 bg-amber-50 cursor-not-allowed" : "border-line bg-panel/50 cursor-not-allowed"} ${day.dateStr === selectedDate ? "ring-2 ring-brand" : isToday ? "ring-2 ring-brand" : ""}`}
                 >
-                  <div className={`text-xs font-medium ${day.isCurrentMonth ? "text-slate-700" : "text-slate-300"}`}>{day.date.getDate()}</div>
+                  <div className={`text-xs font-medium ${day.isCurrentMonth ? "text-ink" : "text-ink/60"}`}>{day.date.getDate()}</div>
                   {isAvailable && day.entry!.price !== null ? (
                     <div className="mt-0.5 text-[9px] font-bold leading-tight text-green-700">
                       <Price amount={day.entry!.price} currency={day.entry!.currency} size="xs" withPrefix={false} />
@@ -538,13 +582,13 @@ export default function MonthlyCalendar({
             {sx(locale, "Последнее обновление цен:", "Qiymətlər son yeniləndi:", "Prices last updated:")}{" "}
             {formatLastUpdated(lastUpdated, locale)}
           </span>
-          <button onClick={() => fetchMonth(true)} className="text-blue-600 underline hover:text-blue-800">
+          <button onClick={() => fetchMonth(true)} className="text-brand underline hover:text-ink">
             {sx(locale, "Обновить цены", "Qiymətləri yenilə", "Refresh prices")}
           </button>
         </div>
       )}
       {loading && lastUpdated && (
-        <div className="text-xs text-slate-400">{sx(locale, "Обновление...", "Yenilənir...", "Updating...")}</div>
+        <div className="text-xs text-ink/60">{sx(locale, "Обновление...", "Yenilənir...", "Updating...")}</div>
       )}
     </div>
   );

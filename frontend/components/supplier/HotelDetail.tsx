@@ -128,21 +128,21 @@ export default function HotelDetail({
         <div className="space-y-4">
           <h2
             id="hotel-detail-section"
-            className="font-serif text-lg font-bold text-slate-900"
+            className="font-serif text-lg font-bold text-ink"
           >
             {t("hotel.selection_title", locale) ?? "Подбор номера"}
           </h2>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+          <div className="rounded-2xl border border-line bg-white p-5 space-y-4">
             {/* Adults */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-slate-500">
+              <label className="block text-xs font-medium text-ink/60">
                 {t("tour.adults", locale) ?? "Взрослые"}
               </label>
               <select
                 value={adults}
                 onChange={(e) => setAdults(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
               >
                 {[1, 2, 3, 4].map((n) => (
                   <option key={n} value={n}>
@@ -154,7 +154,7 @@ export default function HotelDetail({
 
             {/* Children */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-slate-500">
+              <label className="block text-xs font-medium text-ink/60">
                 {t("tour.children", locale) ?? "Дети"}
               </label>
               <select
@@ -169,7 +169,7 @@ export default function HotelDetail({
                     setChildAges(childAges.slice(0, v));
                   }
                 }}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
               >
                 {[0, 1, 2, 3].map((n) => (
                   <option key={n} value={n}>
@@ -188,7 +188,7 @@ export default function HotelDetail({
             {/* Child ages */}
             {children > 0 && (
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-slate-500">
+                <label className="block text-xs font-medium text-ink/60">
                   {t("tour.child_ages", locale) ?? "Возраст ребенка"}
                 </label>
                 {childAges.map((age, idx) => (
@@ -200,7 +200,7 @@ export default function HotelDetail({
                       newAges[idx] = Number(e.target.value);
                       setChildAges(newAges);
                     }}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                    className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
                   >
                     {Array.from({ length: 15 }, (_, i) => i).map((a) => (
                       <option key={a} value={a}>
@@ -214,13 +214,13 @@ export default function HotelDetail({
 
             {/* Nights */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-slate-500">
+              <label className="block text-xs font-medium text-ink/60">
                 {t("tour.nights_count", locale) ?? "Количество ночей"}
               </label>
               <select
                 value={nights}
                 onChange={(e) => setNights(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
               >
                 {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
                   <option key={n} value={n}>
@@ -232,11 +232,11 @@ export default function HotelDetail({
           </div>
 
           {/* Explicit guidance — same block as the tour card */}
-          <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-5">
-            <h3 className="text-sm font-semibold text-slate-800">
+          <div className="rounded-2xl border border-brand/15 bg-brand/70 p-5">
+            <h3 className="text-sm font-semibold text-ink">
               {t("tour.howto_title", locale)}
             </h3>
-            <ol className="mt-2 list-decimal list-inside space-y-1 text-xs leading-relaxed text-slate-600">
+            <ol className="mt-2 list-decimal list-inside space-y-1 text-xs leading-relaxed text-ink/60">
               <li>{t("tour.howto_step1", locale)}</li>
               <li>{t("tour.howto_step2", locale)}</li>
               <li>{t("tour.howto_step3", locale)}</li>
@@ -244,8 +244,8 @@ export default function HotelDetail({
           </div>
 
           {/* Monthly Calendar — same component/caching as the tour PDP */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <h3 className="mb-3 text-sm font-semibold text-slate-800">
+          <div className="rounded-2xl border border-line bg-white p-5">
+            <h3 className="mb-3 text-sm font-semibold text-ink">
               {t("tour.calendar_title", locale) ?? "Календарь цен"}
             </h3>
             <MonthlyCalendar
@@ -253,8 +253,9 @@ export default function HotelDetail({
               onSelect={handleCalendarSelect}
               selectedDate={selectedEntry?.date ?? null}
               onEntriesLoaded={handleEntriesLoaded}
+              initialMonth={(attributes?.priceDate as string | undefined) ?? null}
             />
-            <p className="mt-3 text-xs text-slate-500">
+            <p className="mt-3 text-xs text-ink/60">
               {t("tour.calendar_hint", locale)}
             </p>
           </div>
@@ -276,10 +277,10 @@ export default function HotelDetail({
           />
 
           {/* Hotel info */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <h3 className="font-serif text-xl font-bold text-slate-900">{title}</h3>
+          <div className="rounded-2xl border border-line bg-white p-6">
+            <h3 className="font-serif text-xl font-bold text-ink">{title}</h3>
             {(city || country) && (
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-ink/60">
                 📍 {[city, country].filter(Boolean).join(", ")}
               </p>
             )}
@@ -287,11 +288,11 @@ export default function HotelDetail({
 
           {/* Description */}
           {description && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <h4 className="text-sm font-semibold text-slate-800">
+            <div className="rounded-2xl border border-line bg-white p-6">
+              <h4 className="text-sm font-semibold text-ink">
                 {t("pdp.description_title", locale)}
               </h4>
-              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">
+              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink/60">
                 {description}
               </p>
             </div>
