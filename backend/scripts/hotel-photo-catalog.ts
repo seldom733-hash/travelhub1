@@ -184,8 +184,22 @@ export function nameBeforeDelimiters(raw: string): string {
   return value
     .slice(0, cut)
     // «S class / 4*», «Special Class» — category suffix, not the hotel name.
-    .replace(/\s+S\s+class\b.*$/i, "")
+    .replace(/\s+(?:S|Special)\s+class\b.*$/i, "")
     .trim();
+}
+
+/**
+ * Base identity for duplicate registry cards of the SAME physical hotel:
+ * strips category suffixes («S class», «Special Class»), punctuation and
+ * country/city annotations. Unlike DB normalizedName it intentionally makes
+ * «BLUE ISTANBUL HOTEL S class /» and «Blue Istanbul Hotel.» equal.
+ */
+export function photoBaseKey(raw: string): string {
+  return (raw ?? "")
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/\b(s\s*class|special\s*class)\b/gi, " ")
+    .replace(/[^a-zа-я0-9]/g, "");
 }
 
 function normalizeForMatch(raw: string): string {
@@ -532,6 +546,32 @@ async function main(): Promise<void> {
 
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
+    // Same physical hotel may be represented by several registry cards with
+    // different suffixes (S class / Special Class / trailing dot). Reuse an
+    // already downloaded sibling photo instead of searching again.
+    const existingPhotos = await prisma.hotel.findMany({
+      where: { NOT: { photoFile: null } },
+      orderBy: { photoUpdatedAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        countryCode: true,
+        photoFile: true,
+        photoSource: true,
+        photoSourceUrl: true,
+        photoWidth: true,
+        photoHeight: true,
+        photoBytes: true,
+      },
+    });
+    const siblingByBaseKey = new Map<string, (typeof existingPhotos)[number]>();
+    for (const existing of existingPhotos) {
+      if (!existing.photoFile) continue;
+      if (!fs.existsSync(path.join(OUTPUT_DIR, existing.photoFile))) continue;
+      const key = `${existing.countryCode}|${photoBaseKey(existing.name)}`;
+      if (!siblingByBaseKey.has(key)) siblingByBaseKey.set(key, existing);
+    }
+
     let saved = 0;
     let missed = 0;
 
@@ -571,7 +611,8 @@ async function main(): Promise<void> {
       // город по-разному («Северный Мале Атолл» / «North Male' Atoll»), из-за
       // чего в реестре появляется вторая запись той же гостиницы. Переиспользуем
       // готовый файл — не качаем заново и не плодим копии.
-      const sibling = await prisma.hotel.findFirst({
+      const baseSibling = siblingByBaseKey.get(`${h.countryCode}|${photoBaseKey(name)}`);
+      const sibling = baseSibling ?? await prisma.hotel.findFirst({
         where: {
           id: { not: h.id },
           normalizedName: h.normalizedName,
