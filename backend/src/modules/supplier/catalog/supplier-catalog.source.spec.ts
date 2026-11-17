@@ -97,7 +97,7 @@ describe("SupplierCatalogSource", () => {
     expect(kompasHotels?.serviceTypes).toEqual(["hotels"]);
   });
 
-  it("sweeps eleven ANEX weeks date-by-date with six night lengths", async () => {
+  it("sweeps seven ANEX tour weeks date-by-date with six night lengths", async () => {
     const anexSearchCatalog = jest.fn().mockResolvedValue({
       offers: [offer({ supplierCode: "ANEX", service: "tours", hotel: "Hotel", hotelExternalId: "H1" })],
       coverage: {
@@ -123,7 +123,7 @@ describe("SupplierCatalogSource", () => {
 
     const result = await source.fetch({ supplierCode: "ANEX", serviceType: "tours", countryKey: "AT" });
 
-    expect(anexSearchCatalog).toHaveBeenCalledTimes(77);
+    expect(anexSearchCatalog).toHaveBeenCalledTimes(49);
     for (const [query] of anexSearchCatalog.mock.calls) {
       expect(query.nightOptions).toEqual([2, 3, 4, 5, 6, 7]);
     }

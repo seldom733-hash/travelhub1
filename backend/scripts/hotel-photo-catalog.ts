@@ -168,6 +168,22 @@ const STOP_WORDS = new Set([
   "club", "beach", "by", "the", "and", "of", "at", "in", "city", "center", "centre",
 ]);
 
+/**
+ * Photo search must use the hotel name only, not the full product title with
+ * season/program/location suffixes. Cut at the first delimiter users asked for:
+ * «.», «(», «-» (including en/em dash). Keep the original name when the cut
+ * would leave fewer than three characters.
+ */
+export function nameBeforeDelimiters(raw: string): string {
+  const value = (raw ?? "").replace(/\s+/g, " ").trim();
+  const cut = value.search(/[.(]|\s[-–—]\s|[-–—]/);
+  if (cut < 3) {
+    const fallback = cut > 0 ? value.slice(0, cut).trim() : value;
+    return fallback.length >= 3 ? fallback : value;
+  }
+  return value.slice(0, cut).trim();
+}
+
 function normalizeForMatch(raw: string): string {
   return (raw ?? "")
     .toLowerCase()
@@ -519,7 +535,7 @@ async function main(): Promise<void> {
       // Для поиска берём самое «латинское» имя рефа: у KOMPAS в справочнике
       // поставщика label может быть на русском, а в продукте — на английском.
       const ref = h.refs.find((r) => /[a-zA-Z]/.test(r.name)) ?? h.refs[0];
-      const name = (ref?.name || h.name)
+      const name = nameBeforeDelimiters(ref?.name || h.name)
         .replace(/[,\s]+$/, "")
         // «… 4*+», «… 5 *» — хвост звёздности мешает поиску.
         .replace(/\s*\d*\s*\*+\s*\+?\s*$/, "")

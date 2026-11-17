@@ -52,6 +52,37 @@ function day(offset = 0): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Tour catalog sampling: 7 one-week probes spread over the next 365 days.
+ * The supplier sites price by weekly check-in windows; probing one week every
+ * ~7 calendar weeks keeps the full-year horizon covered without 365 requests
+ * per country/program.
+ */
+const TOUR_SYNC_WEEKS = 7;
+const TOUR_SYNC_STEP_DAYS = Math.ceil(365 / TOUR_SYNC_WEEKS);
+
+function sampledTourWeeks(): Array<{ from: string; to: string }> {
+  const out: Array<{ from: string; to: string }> = [];
+  for (let index = 0; index < TOUR_SYNC_WEEKS; index += 1) {
+    const start = index * TOUR_SYNC_STEP_DAYS;
+    out.push({ from: day(start), to: day(Math.min(start + 6, 364)) });
+  }
+  return out;
+}
+
+function sampledTourDates(): string[] {
+  const dates: string[] = [];
+  for (const week of sampledTourWeeks()) {
+    let cursor = new Date(`${week.from}T00:00:00Z`);
+    const end = new Date(`${week.to}T00:00:00Z`);
+    while (cursor <= end) {
+      dates.push(cursor.toISOString().slice(0, 10));
+      cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
+    }
+  }
+  return dates;
+}
+
 function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
   const map = new Map<string, T[]>();
   for (const item of items) {
@@ -147,14 +178,9 @@ export class SupplierCatalogSource {
     let offers: SupplierOffer[] = [];
     let coverage: SupplierCatalogCoverage | null = null;
     const errors: string[] = [];
-    const sampledDates: string[] = [];
-    // One 7-day week every 5 weeks. Query each date separately: a multi-day
-    // ANEX window is answered sparsely, so it would silently miss weekdays.
-    for (let offset = 0; offset < 365; offset += 35) {
-      for (let dayOffset = 0; dayOffset < 7 && offset + dayOffset < 365; dayOffset++) {
-        sampledDates.push(day(offset + dayOffset));
-      }
-    }
+    // Seven one-week probes over the full year, seven days each: ANEX answers
+    // multi-day ranges sparsely, so every sampled day is requested separately.
+    const sampledDates = sampledTourDates();
     for (const date of sampledDates) {
       try {
         const result = this.anex.searchCatalog
@@ -344,28 +370,33 @@ export class SupplierCatalogSource {
 
     let offers: SupplierOffer[] = [];
     let coverage: SupplierCatalogCoverage | null = null;
+    const weeks = sampledTourWeeks();
     for (const program of programs) {
-      try {
-        const result = await adapter.searchCatalog?.({
-          ...query,
-          tourIncValue: program.value,
-          tourIncName: program.name,
-          skipTownDiscovery: true,
-        } as SupplierSearchQuery & { skipTownDiscovery: boolean });
-        if (!result) continue;
-        offers = offers.concat(result.offers);
-        coverage = this.mergeCoverage(coverage, result.coverage);
-      } catch (error) {
-        errors.push(`SUMMERTOUR ${program.value}: ${(error as Error).message}`);
-        coverage = this.mergeCoverage(coverage, {
-          pagesFetched: 0,
-          pageCount: null,
-          hasMore: null,
-          truncated: true,
-          programsComplete: false,
-          windowsComplete: false,
-          errors: [(error as Error).message],
-        });
+      for (const week of weeks) {
+        try {
+          const result = await adapter.searchCatalog?.({
+            ...query,
+            departureDateFrom: week.from,
+            departureDateTo: week.to,
+            tourIncValue: program.value,
+            tourIncName: program.name,
+            skipTownDiscovery: true,
+          } as SupplierSearchQuery & { skipTownDiscovery: boolean });
+          if (!result) continue;
+          offers = offers.concat(result.offers);
+          coverage = this.mergeCoverage(coverage, result.coverage);
+        } catch (error) {
+          errors.push(`SUMMERTOUR ${program.value} ${week.from}–${week.to}: ${(error as Error).message}`);
+          coverage = this.mergeCoverage(coverage, {
+            pagesFetched: 0,
+            pageCount: null,
+            hasMore: null,
+            truncated: true,
+            programsComplete: false,
+            windowsComplete: false,
+            errors: [(error as Error).message],
+          });
+        }
       }
     }
 
@@ -422,7 +453,7 @@ export class SupplierCatalogSource {
     let offers: SupplierOffer[] = [];
     let coverage: SupplierCatalogCoverage | null = null;
     const errors: string[] = [];
-    const query = {
+    const baseQuery = {
       service: input.serviceType,
       country: input.countryKey,
       destination: countryLabel,
@@ -441,16 +472,21 @@ export class SupplierCatalogSource {
       adapter &&
       typeof (adapter as unknown as { discoverPrograms?: () => Promise<Array<{ value: string; name: string }>> }).discoverPrograms === "function"
     ) {
-      return this.fetchSummerPrograms(input, query, countryLabel);
+      return this.fetchSummerPrograms(input, baseQuery, countryLabel);
     }
     try {
-      if (adapter?.searchCatalog) {
-        const result = await adapter.searchCatalog(query);
-        offers = result.offers;
-        coverage = result.coverage;
-      } else {
-        offers = await this.offers.search(input.supplierCode, query);
-        coverage = null;
+      // Hotel catalogs stay on the near-term 30-day window; tour catalogs
+      // probe the full-year Anex-style horizon (7 weeks, one per sampled week).
+      const windows = isHotel ? [{ from: baseQuery.departureDateFrom, to: baseQuery.departureDateTo }] : sampledTourWeeks();
+      for (const window of windows) {
+        const query = { ...baseQuery, departureDateFrom: window.from, departureDateTo: window.to };
+        if (adapter?.searchCatalog) {
+          const result = await adapter.searchCatalog(query);
+          offers = offers.concat(result.offers);
+          coverage = this.mergeCoverage(coverage, result.coverage);
+        } else {
+          offers = offers.concat(await this.offers.search(input.supplierCode, query));
+        }
       }
     } catch (error) {
       errors.push((error as Error).message);

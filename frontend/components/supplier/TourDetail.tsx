@@ -103,6 +103,16 @@ export default function TourDetail({
     .replace(/\s{2,}/g, " ")
     .trim();
 
+  // GDS programs need the exact program for the AZAL add-on; regular Summer
+  // products must NOT pin a program — otherwise a stale/second program hides
+  // the hotel's earlier season dates (e.g. May while the program starts June).
+  const storedTourInc = String(
+    (attributes?.tourIncValue as string | undefined) ??
+      (attributes?.tourInc as string | undefined) ??
+      "",
+  ).trim();
+  const isGdsProgram = storedTourInc === "256" || storedTourInc === "238";
+
   // Build calendar query — dates are derived per-month inside MonthlyCalendar; only context here.
   const calendarQuery = {
     supplierCode,
@@ -114,12 +124,8 @@ export default function TourDetail({
     adults,
     children: children || undefined,
     childAges: childAges.length > 0 ? childAges : undefined,
-    // Summertour GDS: the calendar must know the exact program, otherwise the
-    // backend cannot distinguish GDS (flight separate) from a regular package.
-    tourIncValue:
-      (attributes?.tourIncValue as string | undefined) ??
-      (attributes?.tourInc as string | undefined),
-    tourIncName: attributes?.tourIncName as string | undefined,
+    tourIncValue: isGdsProgram ? storedTourInc : undefined,
+    tourIncName: isGdsProgram ? (attributes?.tourIncName as string | undefined) : undefined,
   };
 
   // Handle calendar date click — inline panel, no modal.
@@ -167,21 +173,21 @@ export default function TourDetail({
         <div className="space-y-4">
           <h2
             id="tour-detail-section"
-            className="font-serif text-lg font-bold text-slate-900"
+            className="font-serif text-lg font-bold text-ink"
           >
             {t("tour.selection_title", locale) ?? "Подбор тура"}
           </h2>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+          <div className="rounded-2xl border border-line bg-white p-5 space-y-4">
             {/* Departure city */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-slate-500">
+              <label className="block text-xs font-medium text-ink/60">
                 {t("tour.departure_city", locale) ?? "Город вылета"}
               </label>
               <select
                 value={departureCity}
                 onChange={(e) => setDepartureCity(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
               >
                 <option value="1411">{sx(locale, "Баку", "Bakı", "Baku")} (GYD)</option>
               </select>
@@ -189,13 +195,13 @@ export default function TourDetail({
 
             {/* Adults */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-slate-500">
+              <label className="block text-xs font-medium text-ink/60">
                 {t("tour.adults", locale) ?? "Взрослые"}
               </label>
               <select
                 value={adults}
                 onChange={(e) => setAdults(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
               >
                 {[1, 2, 3, 4].map((n) => (
                   <option key={n} value={n}>
@@ -207,7 +213,7 @@ export default function TourDetail({
 
             {/* Children */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-slate-500">
+              <label className="block text-xs font-medium text-ink/60">
                 {t("tour.children", locale) ?? "Дети"}
               </label>
               <select
@@ -222,7 +228,7 @@ export default function TourDetail({
                     setChildAges(childAges.slice(0, v));
                   }
                 }}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
               >
                 {[0, 1, 2, 3].map((n) => (
                   <option key={n} value={n}>
@@ -237,7 +243,7 @@ export default function TourDetail({
             {/* Child ages */}
             {children > 0 && (
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-slate-500">
+                <label className="block text-xs font-medium text-ink/60">
                   {t("tour.child_ages", locale) ?? "Возраст ребенка"}
                 </label>
                 {childAges.map((age, idx) => (
@@ -249,7 +255,7 @@ export default function TourDetail({
                       newAges[idx] = Number(e.target.value);
                       setChildAges(newAges);
                     }}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                    className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
                   >
                     {Array.from({ length: 15 }, (_, i) => i).map((a) => (
                       <option key={a} value={a}>
@@ -263,13 +269,13 @@ export default function TourDetail({
 
             {/* Nights */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-slate-500">
+              <label className="block text-xs font-medium text-ink/60">
                 {t("tour.nights_count", locale) ?? "Количество ночей"}
               </label>
               <select
                 value={nights}
                 onChange={(e) => setNights(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
               >
                 {Array.from({ length: 27 }, (_, i) => i + 2).map((n) => (
                   <option key={n} value={n}>
@@ -282,11 +288,11 @@ export default function TourDetail({
           </div>
 
           {/* Phase 4: explicit guidance — how to submit a request from this card */}
-          <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-5">
-            <h3 className="text-sm font-semibold text-slate-800">
+          <div className="rounded-2xl border border-brand/15 bg-brand/70 p-5">
+            <h3 className="text-sm font-semibold text-ink">
               {t("tour.howto_title", locale)}
             </h3>
-            <ol className="mt-2 list-decimal list-inside space-y-1 text-xs leading-relaxed text-slate-600">
+            <ol className="mt-2 list-decimal list-inside space-y-1 text-xs leading-relaxed text-ink/60">
               <li>{t("tour.howto_step1", locale)}</li>
               <li>{t("tour.howto_step2", locale)}</li>
               <li>{t("tour.howto_step3", locale)}</li>
@@ -294,8 +300,8 @@ export default function TourDetail({
           </div>
 
           {/* Monthly Calendar — monthly cache, lastUpdated + Обновить цены */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <h3 className="mb-3 text-sm font-semibold text-slate-800">
+          <div className="rounded-2xl border border-line bg-white p-5">
+            <h3 className="mb-3 text-sm font-semibold text-ink">
               {t("tour.calendar_title", locale) ?? "Календарь цен"}
             </h3>
             {supplierCode ? (
@@ -306,7 +312,7 @@ export default function TourDetail({
                 onEntriesLoaded={handleEntriesLoaded}
               />
             ) : null}
-            <p className="mt-3 text-xs text-slate-500">
+            <p className="mt-3 text-xs text-ink/60">
               {t("tour.calendar_hint", locale)}
             </p>
           </div>
@@ -328,22 +334,22 @@ export default function TourDetail({
           />
 
           {/* Hotel info */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <h3 className="font-serif text-xl font-bold text-slate-900">
+          <div className="rounded-2xl border border-line bg-white p-6">
+            <h3 className="font-serif text-xl font-bold text-ink">
               {hotelName}
             </h3>
             {destination && (
-              <p className="mt-1 text-sm text-slate-500">📍 {destination}</p>
+              <p className="mt-1 text-sm text-ink/60">📍 {destination}</p>
             )}
           </div>
 
           {/* Description */}
           {description && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <h4 className="text-sm font-semibold text-slate-800">
+            <div className="rounded-2xl border border-line bg-white p-6">
+              <h4 className="text-sm font-semibold text-ink">
                 {t("pdp.description_title", locale)}
               </h4>
-              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">
+              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink/60">
                 {description}
               </p>
             </div>
