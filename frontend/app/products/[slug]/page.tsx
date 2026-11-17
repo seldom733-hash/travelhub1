@@ -18,6 +18,7 @@ import { formatLocation } from "@/lib/locations";
 import { useCurrentUser } from "@/lib/use-user";
 import TourDetail from "@/components/supplier/TourDetail";
 import HotelDetail from "@/components/supplier/HotelDetail";
+import { displayTourName } from "@/lib/supplier-labels";
 
 /**
  * PHASE 1 STEP 1.7 §12 — Product Detail Page `/products/:slug`.
@@ -71,6 +72,7 @@ function PdpInner() {
 function PdpContent({ detail }: { detail: PublicProductDetail }) {
   const locale = useLocale();
   const p = detail.product;
+  const displayTitle = displayTourName(p.title);
   const isTour = p.type === "TOUR";
   const isHotel = p.type === "HOTEL";
   // §HOTEL-PARITY (2026-10-15, «страница карточек отелей не одинакова с
@@ -90,31 +92,31 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
     return (
       <div>
         {/* Breadcrumbs */}
-        <nav className="mb-3 text-xs text-slate-400" aria-label="breadcrumb">
-          <Link href="/" className="hover:text-blue-600 hover:underline">
+        <nav className="mb-3 text-xs text-ink/60" aria-label="breadcrumb">
+          <Link href="/" className="hover:text-brand hover:underline">
             {t("pdp.breadcrumb_home", locale)}
           </Link>
           {p.category && (
             <>
               <span className="mx-1.5">/</span>
-              <Link href={`/categories/${p.category.slug}`} className="hover:text-blue-600 hover:underline">
+              <Link href={`/categories/${p.category.slug}`} className="hover:text-brand hover:underline">
                 {categoryLabel(p.category, locale)}
               </Link>
             </>
           )}
           <span className="mx-1.5">/</span>
-          <span className="text-slate-600" aria-current="page">
-            {p.title}
+          <span className="text-ink/60" aria-current="page">
+            {displayTitle}
           </span>
         </nav>
 
         {/* Hotel header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">{p.title}</h1>
-          <SupplierCodeBadge code={p.partnerCode} className="mt-2 text-xs text-slate-500" />
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+          <h1 className="text-2xl font-bold text-ink sm:text-3xl">{displayTitle}</h1>
+          <SupplierCodeBadge code={p.partnerCode} className="mt-2 text-xs text-ink/60" />
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-ink/60">
             {p.category && (
-              <Link href={`/categories/${p.category.slug}`} className="rounded-full bg-blue-50 px-2.5 py-0.5 font-medium text-blue-700 hover:bg-blue-100">
+              <Link href={`/categories/${p.category.slug}`} className="rounded-full bg-brand/10 px-2.5 py-0.5 font-medium text-brand-dark hover:bg-brand/15">
                 {categoryLabel(p.category, locale)}
               </Link>
             )}
@@ -125,7 +127,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           /* TourDetail — primary tour experience: filters + calendar + offers */
           <TourDetail
             attributes={p.attributes}
-            title={p.title}
+            title={displayTitle}
             media={<MediaGallery media={detail.media} hotelImage={p.hotelImage} />}
             description={p.description}
             attributeSections={sectionsFor(p.attributes, locale)}
@@ -134,7 +136,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           /* HotelDetail — the very same layout, service = hotels */
           <HotelDetail
             attributes={p.attributes}
-            title={p.title}
+            title={displayTitle}
             media={<MediaGallery media={detail.media} hotelImage={p.hotelImage} />}
             description={p.description}
             attributeSections={sectionsFor(p.attributes, locale)}
@@ -150,28 +152,28 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
   return (
     <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
       <div>
-        <nav className="mb-3 text-xs text-slate-400" aria-label="breadcrumb">
-          <Link href="/" className="hover:text-blue-600 hover:underline">
+        <nav className="mb-3 text-xs text-ink/60" aria-label="breadcrumb">
+          <Link href="/" className="hover:text-brand hover:underline">
             {t("pdp.breadcrumb_home", locale)}
           </Link>
           {p.category && (
             <>
               <span className="mx-1.5">/</span>
-              <Link href={`/categories/${p.category.slug}`} className="hover:text-blue-600 hover:underline">
+              <Link href={`/categories/${p.category.slug}`} className="hover:text-brand hover:underline">
                 {categoryLabel(p.category, locale)}
               </Link>
             </>
           )}
           <span className="mx-1.5">/</span>
-          <span className="text-slate-600" aria-current="page">
-            {p.title}
+          <span className="text-ink/60" aria-current="page">
+            {displayTitle}
           </span>
         </nav>
 
-        <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">{p.title}</h1>
-        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+        <h1 className="text-2xl font-bold text-ink sm:text-3xl">{displayTitle}</h1>
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-ink/60">
           {p.category && (
-            <Link href={`/categories/${p.category.slug}`} className="rounded-full bg-blue-50 px-2.5 py-0.5 font-medium text-blue-700 hover:bg-blue-100">
+            <Link href={`/categories/${p.category.slug}`} className="rounded-full bg-brand/10 px-2.5 py-0.5 font-medium text-brand-dark hover:bg-brand/15">
               {categoryLabel(p.category, locale)}
             </Link>
           )}
@@ -179,17 +181,17 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
             {t("pdp.published_on", locale)}: {formatDate(p.publishedAt, locale)}
           </span>
         </div>
-        <SupplierCodeBadge code={p.partnerCode} className="mt-2 text-xs text-slate-500" />
+        <SupplierCodeBadge code={p.partnerCode} className="mt-2 text-xs text-ink/60" />
 
         <div className="mt-5">
           <MediaGallery media={detail.media} hotelImage={p.hotelImage} />
         </div>
 
         <section className="mt-8" aria-labelledby="pdp-description">
-          <h2 id="pdp-description" className="text-lg font-bold text-slate-900">
+          <h2 id="pdp-description" className="text-lg font-bold text-ink">
             {t("pdp.description_title", locale)}
           </h2>
-          <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">
+          <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink/60">
             {p.description ?? t("pdp.description_missing", locale)}
           </p>
         </section>
@@ -198,18 +200,18 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           const attrSections = sectionsFor(p.attributes, locale);
           return attrSections.length > 0 ? (
             <section className="mt-8" aria-labelledby="pdp-attrs">
-              <h2 id="pdp-attrs" className="text-lg font-bold text-slate-900">
+              <h2 id="pdp-attrs" className="text-lg font-bold text-ink">
                 {t("pdp.attributes_title", locale)}
               </h2>
               <div className="mt-3 space-y-4">
                 {attrSections.map((s) => (
-                  <div key={s.section} className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <h3 className="text-sm font-semibold text-slate-800">{sectionLabel(s.section, locale)}</h3>
+                  <div key={s.section} className="rounded-2xl border border-line bg-white p-4">
+                    <h3 className="text-sm font-semibold text-ink">{sectionLabel(s.section, locale)}</h3>
                     <dl className="mt-2 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
                       {s.items.map((i) => (
                         <div key={i.key} className="flex flex-col">
-                          <dt className="text-[11px] uppercase tracking-wide text-slate-400">{i.label}</dt>
-                          <dd className="whitespace-pre-line text-slate-700">{i.value}</dd>
+                          <dt className="text-[11px] uppercase tracking-wide text-ink/60">{i.label}</dt>
+                          <dd className="whitespace-pre-line text-ink">{i.value}</dd>
                         </div>
                       ))}
                     </dl>
@@ -226,10 +228,10 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
             answers no date. */}
         {p.tariffs.length > 0 && (
           <section className="mt-8" aria-labelledby="pdp-tariffs">
-            <h2 id="pdp-tariffs" className="text-lg font-bold text-slate-900">
+            <h2 id="pdp-tariffs" className="text-lg font-bold text-ink">
               {t("pdp.tariffs_title", locale)}
             </h2>
-            <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200">
+            <div className="mt-3 overflow-hidden rounded-2xl border border-line">
               {p.tariffs.map((tariff, i) => (
                 <TariffRow key={tariff.id} tariff={tariff} last={i === p.tariffs.length - 1} />
               ))}
@@ -238,7 +240,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
         )}
 
         <section className="mt-8" aria-labelledby="pdp-availability">
-          <h2 id="pdp-availability" className="text-lg font-bold text-slate-900">
+          <h2 id="pdp-availability" className="text-lg font-bold text-ink">
             {t("pdp.availability_title", locale)}
           </h2>
           <div
@@ -247,7 +249,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
                 ? "border-emerald-100 bg-emerald-50 text-emerald-800"
                 : availability.tone === "limited"
                   ? "border-amber-100 bg-amber-50 text-amber-800"
-                  : "border-slate-100 bg-slate-50 text-slate-500"
+                  : "border-line bg-panel text-ink/60"
             }`}
           >
             <div className="font-medium">{availability.title}</div>
@@ -258,8 +260,8 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
       </div>
 
       <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="text-xs uppercase tracking-wide text-slate-400">{t("pdp.price_from", locale)}</div>
+        <div className="rounded-2xl border border-line bg-white p-5">
+          <div className="text-xs uppercase tracking-wide text-ink/60">{t("pdp.price_from", locale)}</div>
           <div className="mt-1">
             <Price amount={p.priceFrom} currency={p.currency} size="lg" withPrefix={false} />
           </div>
@@ -268,7 +270,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
             <Link
               href={`/login?next=${encodeURIComponent(`/products/${p.code}`)}`}
               onClick={() => fireMarketplaceCta(p.slug)}
-              className="mt-4 block w-full rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-blue-500"
+              className="mt-4 block w-full rounded-xl bg-brand px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-brand"
             >
               {t("pdp.primary_cta", locale)}
             </Link>
@@ -276,25 +278,25 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
             <button
               type="button"
               onClick={() => fireMarketplaceCta(p.slug)}
-              className="mt-4 w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-blue-500"
+              className="mt-4 w-full rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-brand"
             >
               {t("pdp.primary_cta", locale)}
             </button>
           )}
-          <p className="mt-2 text-[11px] leading-relaxed text-slate-400">{t("pdp.cta_placeholder", locale)}</p>
+          <p className="mt-2 text-[11px] leading-relaxed text-ink/60">{t("pdp.cta_placeholder", locale)}</p>
         </div>
 
         {/* M4.5 §23: anonymous guest checkout (onboarding → Request). */}
         <GuestCheckoutForm productId={p.id} />
 
         {p.tariffs.length > 0 && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm">
-            <div className="text-xs uppercase tracking-wide text-slate-400">{t("pdp.tariffs_title", locale)}</div>
+          <div className="rounded-2xl border border-line bg-white p-5 text-sm">
+            <div className="text-xs uppercase tracking-wide text-ink/60">{t("pdp.tariffs_title", locale)}</div>
             <ul className="mt-2 space-y-1.5">
               {p.tariffs.map((trf) => (
                 <li key={trf.id} className="flex items-center justify-between gap-2">
-                  <span className="truncate text-slate-600">{trf.name}</span>
-                  <span className="shrink-0 font-medium text-slate-800">
+                  <span className="truncate text-ink/60">{trf.name}</span>
+                  <span className="shrink-0 font-medium text-ink">
                     {formatPriceLocal(trf, locale)}
                   </span>
                 </li>
@@ -317,9 +319,9 @@ function SellerBlock({ seller, locale }: { seller: NonNullable<PublicProductDeta
   const name = isAnonymous ? t("seller.anonymous_label", locale) : (seller.displayName ?? t("seller.anonymous_label", locale));
   const since = seller.memberSince ? formatDate(seller.memberSince, locale) : "";
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm">
-      <div className="text-xs uppercase tracking-wide text-slate-400">{t("seller.title", locale)}</div>
-      <div className="mt-1 flex items-center gap-1.5 font-semibold text-slate-800">
+    <div className="rounded-2xl border border-line bg-white p-5 text-sm">
+      <div className="text-xs uppercase tracking-wide text-ink/60">{t("seller.title", locale)}</div>
+      <div className="mt-1 flex items-center gap-1.5 font-semibold text-ink">
         <span className="truncate">{name}</span>
         {seller.verified && (
           <span className="inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
@@ -331,10 +333,10 @@ function SellerBlock({ seller, locale }: { seller: NonNullable<PublicProductDeta
           RU: «Баку, Азербайджан» / AZ: «Bakı, Azərbaycan» / EN: «Baku, Azerbaijan». */}
       {(() => {
         const loc = formatLocation(seller.countryCode, seller.cityCode, locale);
-        return loc ? <div className="mt-0.5 text-xs text-slate-500">📍 {loc}</div> : null;
+        return loc ? <div className="mt-0.5 text-xs text-ink/60">📍 {loc}</div> : null;
       })()}
-      {since && <div className="mt-1 text-[11px] text-slate-400">{t("seller.member_since", locale)}: {since}</div>}
-      <p className="mt-2 text-[11px] text-slate-400">{t("seller.moderated_notice", locale)}</p>
+      {since && <div className="mt-1 text-[11px] text-ink/60">{t("seller.member_since", locale)}: {since}</div>}
+      <p className="mt-2 text-[11px] text-ink/60">{t("seller.moderated_notice", locale)}</p>
     </div>
   );
 }
@@ -342,17 +344,17 @@ function SellerBlock({ seller, locale }: { seller: NonNullable<PublicProductDeta
 function TariffRow({ tariff, last }: { tariff: PublicTariff; last: boolean }) {
   const locale = useLocale();
   return (
-    <div className={`flex items-center justify-between gap-3 bg-white px-4 py-3 ${last ? "" : "border-b border-slate-100"}`}>
+    <div className={`flex items-center justify-between gap-3 bg-white px-4 py-3 ${last ? "" : "border-b border-line"}`}>
       <div>
-        <div className="text-sm font-medium text-slate-800">{tariff.name}</div>
+        <div className="text-sm font-medium text-ink">{tariff.name}</div>
         {tariff.validFrom && (
-          <div className="text-[11px] text-slate-400">
+          <div className="text-[11px] text-ink/60">
             {formatDate(tariff.validFrom, locale)}
             {tariff.validTo ? ` – ${formatDate(tariff.validTo, locale)}` : ""}
           </div>
         )}
       </div>
-      <div className="shrink-0 text-sm font-semibold text-slate-900">{formatPriceLocal(tariff, locale)}</div>
+      <div className="shrink-0 text-sm font-semibold text-ink">{formatPriceLocal(tariff, locale)}</div>
     </div>
   );
 }

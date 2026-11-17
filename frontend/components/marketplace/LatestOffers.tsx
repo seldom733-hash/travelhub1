@@ -1,5 +1,7 @@
 "use client";
 
+import { displayTourName } from "@/lib/supplier-labels";
+
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { ArrowRight } from "@phosphor-icons/react";
@@ -72,7 +74,7 @@ function LatestOfferCard({ card }: { card: PublicProductCard }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={img.thumbUrl}
-            alt={card.title}
+            alt={displayTourName(card.title)}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
           />
@@ -97,7 +99,7 @@ function LatestOfferCard({ card }: { card: PublicProductCard }) {
           </p>
         )}
         <h3 className="line-clamp-2 font-serif text-sm font-semibold text-white transition-colors group-hover:text-gold">
-          {card.title}
+          {displayTourName(card.title)}
         </h3>
         <SupplierCodeBadge code={card.partnerCode} className="mt-1 text-[10px] text-neutral-500" />
         <div className="mt-3 flex items-center justify-between">

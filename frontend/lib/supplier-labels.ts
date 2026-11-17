@@ -71,3 +71,19 @@ export function humanTransport(value: string | undefined, locale: Locale): strin
   if (!raw) return "";
   return TRANSPORT[locale][raw.toLowerCase()] ?? raw;
 }
+
+/**
+ * Display-only short tour/hotel title: everything before the first name
+ * delimiter — «.», «(» or a dash. The full value stays in the data for
+ * matching/queries; this is only for what the user sees on cards and pages.
+ */
+export function displayTourName(raw: string | null | undefined): string {
+  const value = (raw ?? "").replace(/\s+/g, " ").trim();
+  if (!value) return "";
+  const cut = value.search(/[.(]|\s[-–—]\s|[-–—]/);
+  if (cut > 0) {
+    const short = value.slice(0, cut).replace(/[\s/,;:]+$/, "").trim();
+    if (short.length >= 3) return short;
+  }
+  return value;
+}

@@ -10,6 +10,7 @@ import {
 } from "@/lib/supplier-api";
 import { useSupplierOptions } from "@/lib/supplier-registry";
 import { sx } from "@/lib/supplier-labels";
+import { displayTourName } from "@/lib/supplier-labels";
 
 /** Today as an ISO date string (local calendar day, not UTC). */
 function todayIso(): string {
@@ -43,6 +44,7 @@ export default function TourDetail({
   attributeSections?: Array<{ section: string; items: Array<{ key: string; label: string; value: string }> }>;
 }) {
   const locale = useLocale();
+  const displayTitle = displayTourName(title);
   const [selectedEntry, setSelectedEntry] = useState<SupplierPriceCalendarEntry | null>(null);
   // Auto-select must only apply ONCE (the first month that yields data) — a
   // later user click or month change must never be overridden.
@@ -327,7 +329,7 @@ export default function TourDetail({
           {/* Inline day tariffs — the §4.8 modal replaced by an on-page panel */}
           <DayTariffsPanel
             entry={selectedEntry}
-            title={title}
+            title={displayTitle}
             supplierCode={supplierCode}
             summary={summary}
             onRequestCreated={handleRequestCreated}
@@ -336,7 +338,7 @@ export default function TourDetail({
           {/* Hotel info */}
           <div className="rounded-2xl border border-line bg-white p-6">
             <h3 className="font-serif text-xl font-bold text-ink">
-              {hotelName}
+              {displayTourName(hotelName)}
             </h3>
             {destination && (
               <p className="mt-1 text-sm text-ink/60">📍 {destination}</p>

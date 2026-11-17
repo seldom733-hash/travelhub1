@@ -11,7 +11,7 @@ import {
 } from "@/lib/supplier-api";
 import { useKompasCaptcha } from "@/lib/useKompasCaptcha";
 import { KompasCaptchaModal } from "@/components/supplier/KompasCaptchaModal";
-import { humanMeal, humanRoom, humanTransport, sx } from "@/lib/supplier-labels";
+import { humanMeal, humanRoom, humanTransport, sx, displayTourName } from "@/lib/supplier-labels";
 
 /** Calendar/tour context carried into the create-request payload (§4.8). */
 export type OfferSummary = {
@@ -189,10 +189,10 @@ export default function OfferRow({
       )}
       {/* Row header */}
       <div className="mb-3 flex items-center gap-2">
-        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-medium text-slate-600">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-panel text-xs font-medium text-ink/60">
           {index}
         </span>
-        <span className="text-sm font-medium text-slate-500">
+        <span className="text-sm font-medium text-ink/60">
           {humanRoom(offer.room, locale) || sx(locale, "Стандарт", "Standart", "Standard")} ·{" "}
           {humanMeal(offer.meal, locale) || "RO"}
         </span>
@@ -206,51 +206,51 @@ export default function OfferRow({
       {/* Content grid */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         {/* Outbound flight */}
-        <div className="rounded-lg border border-slate-200 p-3">
-          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+        <div className="rounded-lg border border-line p-3">
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-ink/60">
             {t("offer.outbound", locale) ?? "ПЕРЕЛЕТ ТУДА"}
           </div>
-          <div className="text-sm font-medium text-slate-800">
+          <div className="text-sm font-medium text-ink">
             {fmtDate(offer.departureDate)}
           </div>
           {offer.transport && (
-            <div className="mt-0.5 text-xs text-slate-500">{humanTransport(offer.transport, locale)}</div>
+            <div className="mt-0.5 text-xs text-ink/60">{humanTransport(offer.transport, locale)}</div>
           )}
         </div>
 
         {/* Return flight — departure date + number of nights */}
-        <div className="rounded-lg border border-slate-200 p-3">
-          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+        <div className="rounded-lg border border-line p-3">
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-ink/60">
             {t("offer.return", locale) ?? "ПЕРЕЛЕТ ОБРАТНО"}
           </div>
-          <div className="text-sm font-medium text-slate-800">{fmtDate(returnDate)}</div>
+          <div className="text-sm font-medium text-ink">{fmtDate(returnDate)}</div>
           {offer.transport && (
-            <div className="mt-0.5 text-xs text-slate-500">{humanTransport(offer.transport, locale)}</div>
+            <div className="mt-0.5 text-xs text-ink/60">{humanTransport(offer.transport, locale)}</div>
           )}
         </div>
 
         {/* Hotel / Room / Meal */}
-        <div className="rounded-lg border border-slate-200 p-3">
-          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+        <div className="rounded-lg border border-line p-3">
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-ink/60">
             {t("offer.accommodation", locale) ?? "НОМЕР / ПИТАНИЕ"}
           </div>
-          <div className="text-sm font-medium text-slate-800">
-            {offer.hotel?.split("\n")[0]?.trim()}
+          <div className="text-sm font-medium text-ink">
+            {displayTourName(offer.hotel?.split("\n")[0]?.trim())}
           </div>
-          <div className="mt-0.5 text-xs text-slate-500">
+          <div className="mt-0.5 text-xs text-ink/60">
             {humanRoom(offer.room, locale) || sx(locale, "Стандарт", "Standart", "Standard")} ·{" "}
             {humanMeal(offer.meal, locale) || "RO"}
           </div>
-          <div className="mt-0.5 text-xs text-slate-400">{passengers}</div>
+          <div className="mt-0.5 text-xs text-ink/60">{passengers}</div>
         </div>
 
         {/* Price + Action */}
-        <div className="flex flex-col justify-between rounded-lg border border-slate-200 p-3">
+        <div className="flex flex-col justify-between rounded-lg border border-line p-3">
           <div>
-            <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+            <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-ink/60">
               {t("tour.price", locale)}
             </div>
-            <div className="text-lg font-bold text-slate-900">
+            <div className="text-lg font-bold text-ink">
               <Price
                 amount={created?.displayedPrice ?? offer.price}
                 currency={offer.currency}
@@ -258,7 +258,7 @@ export default function OfferRow({
                 withPrefix={false}
               />
             </div>
-            <div className="text-[10px] text-slate-400">
+            <div className="text-[10px] text-ink/60">
               {t("offer.for_all", locale) ?? "за всех"}
             </div>
           </div>
@@ -301,8 +301,8 @@ export default function OfferRow({
                 )}
               </div>
             ) : requestState === "creating" ? (
-              <div className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                <div className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+              <div className="flex items-center justify-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-xs text-ink/60">
+                <div className="h-3 w-3 animate-spin rounded-full border-2 border-line border-t-blue-600" />
                 {t("offer.creating", locale) ?? "Создание..."}
               </div>
             ) : (

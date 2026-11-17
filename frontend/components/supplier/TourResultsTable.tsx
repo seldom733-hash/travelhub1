@@ -9,6 +9,7 @@ import GdsBadge from "@/components/public/GdsBadge";
 import BlockBadge from "@/components/public/BlockBadge";
 import { isPlatformStaff, useCurrentUser } from "@/lib/use-user";
 import type { AggregatedOffer, AggregatedSearchResult } from "@/lib/supplier-api";
+import { displayTourName } from "@/lib/supplier-labels";
 
 /**
  * TourResultsTable — universal live tour search results (Summer + KOMPAS).
@@ -657,7 +658,7 @@ export default function TourResultsTable({
                 <td className="px-4 py-3 text-right text-neutral-200">{o.nights}</td>
                 <td className="max-w-[260px] px-4 py-3 text-neutral-100">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="truncate">{clean(o.hotel)}</span>
+                    <span className="truncate">{displayTourName(clean(o.hotel))}</span>
                     {offerIsGds(o) && <GdsBadge className="shrink-0" />}
                     {offerIsBlock(o) && <BlockBadge className="shrink-0" />}
                   </div>

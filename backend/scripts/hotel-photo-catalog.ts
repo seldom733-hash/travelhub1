@@ -792,7 +792,7 @@ async function main(): Promise<void> {
           journal({ hotelId: task.id, name: task.name, result: "error", error: (err as Error).message });
           console.log(`ERR    ${task.id}  ${(err as Error).message}`);
         }
-        await new Promise((r) => setTimeout(r, 2_000));
+        await new Promise((r) => setTimeout(r, 500));
       }
     };
     await Promise.all(Array.from({ length: opts.concurrency }, () => worker()));

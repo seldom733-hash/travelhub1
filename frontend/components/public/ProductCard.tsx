@@ -10,6 +10,7 @@ import { categoryLabel } from "@/lib/category-label";
 import { useHotelPhoto } from "@/lib/hotel-photo";
 import BlockBadge from "@/components/public/BlockBadge";
 import Price from "./Price";
+import { displayTourName } from "@/lib/supplier-labels";
 
 /** Дефолтная иконка по типу категории/услуги (нейтральный fallback без image). */
 const TYPE_ICON: Record<string, string> = {
@@ -40,6 +41,7 @@ export default function ProductCard({ card, position = 0 }: { card: PublicProduc
   const locale = useLocale();
   const availability = availabilityText(card.availabilitySummary, locale);
   const icon = TYPE_ICON[card.type] ?? "🏝";
+  const displayTitle = displayTourName(card.title);
 
   // Фото отеля: единый файл физической гостиницы из реестра — бэкенд отдаёт
   // `hotelImage` (`/hotels/hotel_<hotelId>.webp`) один и тот же для тура, услуги
@@ -65,7 +67,7 @@ export default function ProductCard({ card, position = 0 }: { card: PublicProduc
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={img.thumbUrl}
-            alt={card.title}
+            alt={displayTitle}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
           />
@@ -93,8 +95,8 @@ export default function ProductCard({ card, position = 0 }: { card: PublicProduc
             </span>
           )}
         </div>
-        <h3 className="mt-2 line-clamp-2 text-[15px] font-semibold leading-snug tracking-[0.012em] text-white transition-colors group-hover:text-gold" title={card.title}>
-          {card.title}
+        <h3 className="mt-2 line-clamp-2 text-[15px] font-semibold leading-snug tracking-[0.012em] text-white transition-colors group-hover:text-gold" title={displayTitle}>
+          {displayTitle}
         </h3>
         {card.shortDescription && (
           <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-neutral-400">{card.shortDescription}</p>

@@ -1,5 +1,7 @@
 "use client";
 
+import { displayTourName } from "@/lib/supplier-labels";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Compass } from "@phosphor-icons/react";
@@ -48,7 +50,7 @@ function TourCard({ card }: { card: PublicProductCard }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={img.thumbUrl}
-            alt={card.title}
+            alt={displayTourName(card.title)}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
           />
@@ -71,7 +73,7 @@ function TourCard({ card }: { card: PublicProductCard }) {
           </p>
         )}
         <h3 className="line-clamp-2 font-serif text-sm font-semibold tracking-[0.012em] text-white transition-colors group-hover:text-gold">
-          {card.title}
+          {displayTourName(card.title)}
         </h3>
         {card.shortDescription && (
           <p className="mt-1 line-clamp-1 text-[10px] text-neutral-500">

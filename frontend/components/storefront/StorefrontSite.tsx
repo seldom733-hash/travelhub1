@@ -1,5 +1,6 @@
 "use client";
 
+import { displayTourName } from "@/lib/supplier-labels";
 import Link from "next/link";
 import { t, useLocale, type Locale } from "@/lib/i18n";
 import type { PublicProductCard, PublicListResult } from "@/lib/public-api";
@@ -63,10 +64,10 @@ export default function StorefrontSite({
             </Link>
           </div>
           <nav className="ml-auto flex items-center gap-1 text-sm" aria-label="Storefront">
-            <a href="#products" className={`rounded-lg px-3 py-1.5 text-slate-600 ${theme.accentHover}`}>
+            <a href="#products" className={`rounded-lg px-3 py-1.5 text-ink/60 ${theme.accentHover}`}>
               {t("storefront.products", locale)}
             </a>
-            <a href="#contacts" className={`rounded-lg px-3 py-1.5 text-slate-600 ${theme.accentHover}`}>
+            <a href="#contacts" className={`rounded-lg px-3 py-1.5 text-ink/60 ${theme.accentHover}`}>
               {t("storefront.contacts", locale)}
             </a>
           </nav>
@@ -108,17 +109,17 @@ export default function StorefrontSite({
       {/* ── About / description ── */}
       {sf.description && (
         <section className="mx-auto max-w-6xl px-4 py-10">
-          <h2 className="text-xl font-bold text-slate-900">{t("storefront.about", locale)}</h2>
-          <p className="mt-3 max-w-3xl whitespace-pre-line text-sm leading-relaxed text-slate-600">{sf.description}</p>
-          {location && <div className="mt-4 text-sm text-slate-500">📍 {location}</div>}
+          <h2 className="text-xl font-bold text-ink">{t("storefront.about", locale)}</h2>
+          <p className="mt-3 max-w-3xl whitespace-pre-line text-sm leading-relaxed text-ink/60">{sf.description}</p>
+          {location && <div className="mt-4 text-sm text-ink/60">📍 {location}</div>}
         </section>
       )}
 
       {/* ── Products ── */}
       <section id="products" className="mx-auto w-full max-w-6xl px-4 pb-12">
-        <h2 className="text-xl font-bold text-slate-900">{t("storefront.products", locale)}</h2>
+        <h2 className="text-xl font-bold text-ink">{t("storefront.products", locale)}</h2>
         {!products || products.items.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-400">{t("storefront.no_products", locale)}</p>
+          <p className="mt-4 text-sm text-ink/60">{t("storefront.no_products", locale)}</p>
         ) : (
           <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {products.items.map((p) => (
@@ -129,10 +130,10 @@ export default function StorefrontSite({
       </section>
 
       {/* ── Contacts (Storefront-контекст, §4) ── */}
-      <section id="contacts" className="border-t border-slate-100 bg-slate-50">
+      <section id="contacts" className="border-t border-line bg-panel">
         <div className="mx-auto max-w-6xl px-4 py-10">
-          <h2 className="text-xl font-bold text-slate-900">{t("storefront.contacts", locale)}</h2>
-          <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-sm text-slate-600">
+          <h2 className="text-xl font-bold text-ink">{t("storefront.contacts", locale)}</h2>
+          <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-sm text-ink/60">
             {sf.publicPhone && (
               <a href={`tel:${sf.publicPhone.replace(/[^+\d]/g, "")}`} onClick={() => fireContactClick(sf.slug, "PHONE")} className={theme.accentHover}>
                 📞 {sf.publicPhone}
@@ -169,12 +170,12 @@ export default function StorefrontSite({
       </section>
 
       {/* ── Footer ── */}
-      <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-400">
+      <footer className="border-t border-line bg-white py-6 text-center text-xs text-ink/60">
         {name}
         {!brandingLoading && (
           <>
             {" "}— {t("storefront.powered_by", locale)}{" "}
-            <Link href="/" className="text-slate-500 hover:underline">
+            <Link href="/" className="text-ink/60 hover:underline">
               {brandName}
             </Link>
           </>
@@ -201,25 +202,25 @@ export function StorefrontProductCard({ sf, card, locale, preview }: { sf: Publi
   return (
     <Link
       href={`/store/${sf.slug}/products/${card.slug}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg"
     >
-      <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-100">
+      <div className="relative aspect-[16/9] w-full overflow-hidden bg-panel">
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageUrl} alt={card.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+          <img src={imageUrl} alt={displayTourName(card.title)} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-4xl text-slate-300">🏝</div>
+          <div className="flex h-full w-full items-center justify-center text-4xl text-ink/60">🏝</div>
         )}
       </div>
       <div className="flex flex-1 flex-col gap-1 p-4">
-        <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{card.category?.title ?? card.type}</div>
-        <div className="line-clamp-2 font-bold text-slate-900" title={card.title}>
-          {card.title}
+        <div className="text-[11px] font-medium uppercase tracking-wide text-ink/60">{card.category?.title ?? card.type}</div>
+        <div className="line-clamp-2 font-bold text-ink" title={displayTourName(card.title)}>
+          {displayTourName(card.title)}
         </div>
-        {card.shortDescription && <p className="line-clamp-2 text-xs leading-relaxed text-slate-500">{card.shortDescription}</p>}
+        {card.shortDescription && <p className="line-clamp-2 text-xs leading-relaxed text-ink/60">{card.shortDescription}</p>}
         <div className="mt-auto flex items-end justify-between gap-2 pt-3">
           <Price amount={card.priceFrom} currency={card.currency} size="sm" />
-          <span className="shrink-0 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors group-hover:bg-slate-900 group-hover:text-white">
+          <span className="shrink-0 rounded-lg bg-panel px-2.5 py-1 text-xs font-medium text-ink/60 transition-colors group-hover:bg-ink group-hover:text-white">
             {t("card.details", locale)}
           </span>
         </div>
