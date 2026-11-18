@@ -1,21 +1,11 @@
 import type { Metadata } from "next";
-import { Manrope, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n";
 import DateInputFormat from "@/components/DateInputFormat";
 
-const bodyFont = Manrope({
-  subsets: ["latin", "cyrillic"],
-  variable: "--font-body",
-  display: "swap",
-});
-
-const displayFont = Playfair_Display({
-  subsets: ["latin", "cyrillic"],
-  variable: "--font-display",
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-});
+// Build environments without access to fonts.gstatic.com must not fail.
+// The display/body stacks are declared in globals.css and fall back to the
+// system fonts when Manrope/Playfair are not installed.
 
 export const metadata: Metadata = {
   title: "Navitravel — Marketplace",
@@ -30,7 +20,7 @@ export const metadata: Metadata = {
  */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="az" className={`${bodyFont.variable} ${displayFont.variable}`}>
+    <html lang="az">
       <body>
         <LocaleProvider>{children}</LocaleProvider>
         <DateInputFormat />
