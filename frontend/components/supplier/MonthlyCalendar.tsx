@@ -25,9 +25,12 @@ import { KompasCaptchaModal } from "@/components/supplier/KompasCaptchaModal";
  */
 type MonthlyCalendarQuery = Omit<SupplierPriceCalendarQuery, "dateFrom" | "dateTo">;
 
-// Bump this to invalidate all cached calendar data (old keys become stale)
-const CAL_CACHE_V = 8;
-const CAL_CACHE_TTL_MS = 30_000;
+const CAL_CACHE_VERSION = 8;
+const CAL_CACHE_V = CAL_CACHE_VERSION;
+// Prices stay valid for the user's browsing session. The old 30s window caused
+// a background re-fetch whenever the page was reactivated; explicit refresh is
+// still available via «Обновить цены».
+const CAL_CACHE_TTL_MS = 10 * 60_000;
 
 function buildCacheKey(base: MonthlyCalendarQuery, year: number, month: number): string {
   // month 0-based — includes all KOMPAS filters that affect price

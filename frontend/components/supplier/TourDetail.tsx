@@ -122,20 +122,38 @@ export default function TourDetail({
   ).trim();
   const isGdsProgram = storedTourInc === "256" || storedTourInc === "238";
 
-  // Build calendar query — dates are derived per-month inside MonthlyCalendar; only context here.
-  const calendarQuery = {
-    supplierCode,
-    hotelExternalId,
-    hotel: cleanHotelName,
-    destination,
-    departureCity,
-    nights,
-    adults,
-    children: children || undefined,
-    childAges: childAges.length > 0 ? childAges : undefined,
-    tourIncValue: isGdsProgram ? storedTourInc : undefined,
-    tourIncName: isGdsProgram ? (attributes?.tourIncName as string | undefined) : undefined,
-  };
+  // Build calendar query — dates are derived per-month inside MonthlyCalendar;
+  // keep the object stable across parent re-renders, otherwise every render
+  // changes fetchMonth()/baseQuery and re-downloads the same month.
+  const calendarQuery = useMemo(
+    () => ({
+      supplierCode,
+      hotelExternalId,
+      hotel: cleanHotelName,
+      destination,
+      departureCity,
+      nights,
+      adults,
+      children: children || undefined,
+      childAges: childAges.length > 0 ? childAges : undefined,
+      tourIncValue: isGdsProgram ? storedTourInc : undefined,
+      tourIncName: isGdsProgram ? (attributes?.tourIncName as string | undefined) : undefined,
+    }),
+    [
+      supplierCode,
+      hotelExternalId,
+      cleanHotelName,
+      destination,
+      departureCity,
+      nights,
+      adults,
+      children,
+      childAges,
+      isGdsProgram,
+      storedTourInc,
+      attributes?.tourIncName,
+    ],
+  );
 
   // Handle calendar date click — inline panel, no modal.
   const handleCalendarSelect = useCallback((entry: SupplierPriceCalendarEntry) => {
