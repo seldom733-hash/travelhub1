@@ -18,6 +18,8 @@
 
 :root {
   color-scheme: light;
+  --font-body: "Manrope", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
   --th-bg: #f1f4ec;
   --th-surface: #fbfcf8;
   --th-card: #fbfcf8;
@@ -109,13 +111,7 @@ h3,
 }
 
 .hero-overlay {
-  background: linear-gradient(
-    90deg,
-    rgba(7, 20, 23, 0.88) 0%,
-    rgba(7, 20, 23, 0.62) 42%,
-    rgba(7, 20, 23, 0.16) 78%,
-    rgba(7, 20, 23, 0.32) 100%
-  );
+  background: none;
 }
 
 .search-glass {
@@ -181,12 +177,7 @@ h3,
 }
 
 .destination-overlay {
-  background: linear-gradient(
-    180deg,
-    rgba(7, 20, 23, 0.04) 0%,
-    rgba(7, 20, 23, 0.35) 48%,
-    rgba(7, 20, 23, 0.92) 100%
-  );
+  background: none;
 }
 
 /* Design token utilities */
@@ -302,7 +293,7 @@ h3,
   box-shadow: none;
 }
 .theme-grove .hero-overlay {
-  background: linear-gradient(180deg, transparent 45%, rgba(29, 42, 32, 0.28) 100%);
+  background: none;
 }
 
 /* Legacy public pages (PDP, partner onboarding) still use slate utility

@@ -77,7 +77,6 @@ export default function ProductCard({ card, position = 0 }: { card: PublicProduc
         {card.isGds && <GdsBadge className="absolute left-3 top-3 z-10" />}
         {card.isGdsHotel && <GdsBadge className="absolute left-3 top-3 z-10" />}
         {card.isBlock && <BlockBadge className="absolute left-3 top-9 z-10" />}
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-dark-card/80 to-transparent" />
         {availability.tone === "limited" && (
           <span className="absolute right-3 top-3 rounded-full bg-gold px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-dark">
             {t("card.availability_limited", locale)}

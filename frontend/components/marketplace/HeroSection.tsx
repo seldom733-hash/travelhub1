@@ -181,7 +181,6 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
               />
             </div>
           ))}
-          <div className="absolute inset-0 z-[1] bg-gradient-to-r from-black/70 via-black/35 to-transparent" />
           <div className="hero-overlay absolute inset-0 z-[1]" />
 
           <div className="absolute inset-0 z-10 flex items-center">
