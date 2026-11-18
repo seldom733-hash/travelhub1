@@ -299,6 +299,8 @@ export class SummerBulkSyncService {
       supplier: "Summertour",
       supplierCode: "SUMMERTOUR",
       startingPrice: minPrice,
+      priceDate: uniqueDates[0],
+      priceNights: offers.find((o) => o.departureDate === uniqueDates[0])?.nights ?? nights,
       currency,
       offerCount: offers.length,
       rooms: uniqueRooms,

@@ -316,6 +316,8 @@ export class PublicCatalogService {
     const { ids, total } = await this.matchPublishedProductIds({
       categorySlug: query.category,
       q: query.q?.trim() || undefined,
+      supplierCode: query.supplierCode?.trim().toUpperCase() || undefined,
+      program: query.program?.trim() || undefined,
       availableFrom,
       attrFilters,
       geoCountry: query.geoCountry?.trim().toUpperCase() || undefined,
@@ -741,6 +743,8 @@ export class PublicCatalogService {
   private async matchPublishedProductIds(input: {
     categorySlug?: string;
     q?: string;
+    supplierCode?: string;
+    program?: string;
     availableFrom?: Date;
     attrFilters: Array<{ key: string; value: unknown; type: string }>;
     geoCountry?: string;
@@ -766,6 +770,17 @@ export class PublicCatalogService {
     if (input.q) {
       const like = `%${input.q}%`;
       conds.push(Prisma.sql`(p."title" ILIKE ${like} OR p."description" ILIKE ${like} OR p."code" ILIKE ${like})`);
+    }
+    // Public supplier scope (supplierCode) — filter by the supplier label stored
+    // in product attributes (SUPPLIER_* / SUMMERTOUR / KOMPAS / ...). Optional so
+    // existing pages without the filter keep their behavior.
+    if (input.supplierCode) {
+      conds.push(Prisma.sql`(p."attributes" ->> 'supplierCode') = ${input.supplierCode}`);
+    }
+    // Public tour program filter (program) — attributes.tourIncName (GDS-style
+    // program name from the supplier sync, e.g. "Antalya 2027"). Optional.
+    if (input.program) {
+      conds.push(Prisma.sql`(p."attributes" ->> 'tourIncName') = ${input.program}`);
     }
     if (input.availableFrom) {
       conds.push(
@@ -1201,9 +1216,17 @@ export class PublicCatalogService {
     // Extract headline departure date and nights from the selected
     // nearest-date/min-nights tariff, with attributes as a fallback.
     const attrs = (row.attributes ?? {}) as Record<string, unknown>;
+    const availableDates = Array.isArray(attrs.availableDates)
+      ? (attrs.availableDates as unknown[]).filter((d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}/.test(d)).sort()
+      : [];
+    const availableNights = Array.isArray(attrs.availableNights)
+      ? (attrs.availableNights as unknown[]).map(Number).filter((n) => Number.isFinite(n) && n > 0).sort((a, b) => a - b)
+      : [];
     const headlineDepartureDate = price?.validFrom
       ? price.validFrom.toISOString().slice(0, 10)
-      : typeof attrs.priceDate === "string" ? attrs.priceDate : null;
+      : typeof attrs.priceDate === "string"
+        ? attrs.priceDate
+        : availableDates[0] ?? null;
     let headlineNights: number | null = null;
     if (price?.name) {
       const nightsMatch = price.name.match(/(\d+)\s*nights?/i);
@@ -1211,6 +1234,9 @@ export class PublicCatalogService {
     }
     if (headlineNights === null && Number.isFinite(Number(attrs.priceNights)) && Number(attrs.priceNights) > 0) {
       headlineNights = Number(attrs.priceNights);
+    }
+    if (headlineNights === null && availableNights.length > 0) {
+      headlineNights = availableNights[0];
     }
     return {
       id: row.id,

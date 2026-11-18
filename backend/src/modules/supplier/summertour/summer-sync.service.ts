@@ -464,6 +464,11 @@ export class SummerSyncService {
       supplier: "Summertour",
       supplierCode: "SUMMERTOUR",
       startingPrice: minPrice,
+      // The public tour card and the PDP calendar open on the nearest priced
+      // day. These fields were previously only present for suppliers whose
+      // adapters wrote them, so Summertour cards had no date at all.
+      priceDate: uniqueDates[0],
+      priceNights: offers.find((o) => o.departureDate === uniqueDates[0])?.nights ?? nights,
       currency,
       offerCount: offers.length,
       rooms: uniqueRooms,

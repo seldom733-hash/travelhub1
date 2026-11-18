@@ -45,6 +45,13 @@ export default function TourDetail({
 }) {
   const locale = useLocale();
   const displayTitle = displayTourName(title);
+  const availableDates = Array.isArray(attributes?.availableDates)
+    ? (attributes.availableDates as unknown[])
+        .filter((value): value is string => typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value))
+        .sort()
+    : [];
+  const initialPriceDate =
+    (attributes?.priceDate as string | undefined) || availableDates[0] || null;
   const [selectedEntry, setSelectedEntry] = useState<SupplierPriceCalendarEntry | null>(null);
   // Auto-select must only apply ONCE (the first month that yields data) — a
   // later user click or month change must never be overridden.
@@ -312,7 +319,7 @@ export default function TourDetail({
                 onSelect={handleCalendarSelect}
                 selectedDate={selectedEntry?.date ?? null}
                 onEntriesLoaded={handleEntriesLoaded}
-                initialMonth={(attributes?.priceDate as string | undefined) ?? null}
+                initialMonth={initialPriceDate}
               />
             ) : null}
             <p className="mt-3 text-xs text-ink/60">
