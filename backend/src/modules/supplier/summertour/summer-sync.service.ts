@@ -407,6 +407,7 @@ export class SummerSyncService {
     );
     let minPrice = 0;
     let currency = cheapest?.price.currency ?? "USD";
+    let flightAddonAmount: number | null = null;
     if (cheapest) {
       if (isGds) {
         const [priced] = await this.pricing.applyToOffers(
@@ -420,6 +421,7 @@ export class SummerSyncService {
         });
         minPrice = withAir?.price.amount ?? priced?.price.amount ?? 0;
         currency = withAir?.price.currency ?? priced?.price.currency ?? currency;
+        flightAddonAmount = withAir?.flightAddon?.amount ?? null;
       } else {
         minPrice = cheapest.price.amount;
         if (!offers.some((o) => o.pricing)) {
@@ -464,6 +466,7 @@ export class SummerSyncService {
       supplier: "Summertour",
       supplierCode: "SUMMERTOUR",
       startingPrice: minPrice,
+      flightAddonAmount,
       // The public tour card and the PDP calendar open on the nearest priced
       // day. These fields were previously only present for suppliers whose
       // adapters wrote them, so Summertour cards had no date at all.

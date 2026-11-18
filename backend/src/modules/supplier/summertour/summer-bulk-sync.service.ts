@@ -242,6 +242,7 @@ export class SummerBulkSyncService {
     );
     let minPrice = 0;
     let currency = cheapest?.price.currency ?? "USD";
+    let flightAddonAmount: number | null = null;
     if (cheapest) {
       if (isGds) {
         const [priced] = await this.pricing.applyToOffers(
@@ -255,6 +256,7 @@ export class SummerBulkSyncService {
         });
         minPrice = withAir?.price.amount ?? priced?.price.amount ?? 0;
         currency = withAir?.price.currency ?? priced?.price.currency ?? currency;
+        flightAddonAmount = withAir?.flightAddon?.amount ?? null;
       } else {
         minPrice = cheapest.price.amount;
         if (!offers.some((o) => o.pricing)) {
@@ -299,6 +301,7 @@ export class SummerBulkSyncService {
       supplier: "Summertour",
       supplierCode: "SUMMERTOUR",
       startingPrice: minPrice,
+      flightAddonAmount,
       priceDate: uniqueDates[0],
       priceNights: offers.find((o) => o.departureDate === uniqueDates[0])?.nights ?? nights,
       currency,

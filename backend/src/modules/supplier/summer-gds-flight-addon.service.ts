@@ -29,6 +29,23 @@ export class SummerGdsFlightAddonService {
     private readonly pricing: SupplierPricingService,
   ) {}
 
+  /** Public card-time add-on for a product that was synced before AZAL was available. */
+  async addonFor(
+    program: string,
+    departureDate: string | null | undefined,
+    nights: number | null | undefined,
+    passengers: { adults: number; children?: number; childAges?: number[] } = { adults: 2 },
+  ): Promise<number | null> {
+    const airport = SummerGdsFlightAddonService.GDS_AIRPORT[String(program)];
+    const n = Math.round(Number(nights) || 0);
+    if (!airport || !departureDate || n <= 0) return null;
+    return this.minRoundTrip(airport, departureDate, addDays(departureDate, n), {
+      adults: Math.max(1, Number(passengers.adults) || 2),
+      children: Math.max(0, Number(passengers.children) || 0),
+      childAges: passengers.childAges ?? [],
+    });
+  }
+
   /** Add AZAL round-trip flight cost to Summertour GDS search offers. */
   async applyToOffers(
     offers: SupplierOffer[],

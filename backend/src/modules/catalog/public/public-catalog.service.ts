@@ -21,7 +21,7 @@
  * никогда не подставляется 0. Availability (§12): только существующие строки
  * Availability (discovery-read, не Booking).
  */
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { Prisma } from "../../../generated/prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { HotelMatchingService } from "../hotel/hotel-matching.service";
@@ -29,6 +29,7 @@ import { TourMatchingService } from "../tour-matching.service";
 import { applyCanonicalName } from "../hotel/hotel-identity";
 import { NotFoundError, ValidationDomainError } from "../../../shared/errors";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
+import { SummerGdsFlightAddonService } from "../../supplier/summer-gds-flight-addon.service";
 import { SIGNED_URL_TTL_SECONDS } from "../media/product-media.service";
 import { hotelPhotoUrl } from "../hotel/hotel-photo-url";
 import type { ObjectStorageService } from "../media/storage/storage.interface";
@@ -141,6 +142,7 @@ export class PublicCatalogService {
     private readonly hotelMatching?: HotelMatchingService,
     private readonly tourMatching?: TourMatchingService,
     private readonly pricing?: SupplierPricingService,
+    @Optional() private readonly gdsAddon?: SummerGdsFlightAddonService,
   ) {}
 
   // ── Visibility predicate (§3/§16/§17) ────────────────────────────────────
@@ -1183,7 +1185,28 @@ export class PublicCatalogService {
       const currency = String(attrs.supplierBaseCurrency ?? attrs.currency ?? "AZN");
       const fx = await this.pricing.resolveFxSafe(supplierCode, currency);
       const { pricing } = this.pricing.applyWithFx(resolution, base, currency, fx);
-      return { amount: pricing.publicPrice.toFixed(2), currency: pricing.supplierCurrency };
+      let publicAmount = Number(pricing.publicPrice);
+      // GDS cards whose last sync ran without AZAL: add the flight at read
+      // time. New syncs write flightAddonAmount, so they are not double-counted.
+      if (
+        supplierCode === "SUMMERTOUR" &&
+        !attrs.flightAddonAmount &&
+        (String(attrs.tourIncValue) === "256" || String(attrs.tourIncValue) === "238")
+      ) {
+        const dates = Array.isArray(attrs.availableDates) ? attrs.availableDates : [];
+        const departureDate =
+          (typeof attrs.priceDate === "string" ? attrs.priceDate : null) ??
+          (typeof dates[0] === "string" ? dates[0] : null);
+        const nightsValue = Number(attrs.priceNights ?? attrs.nights ?? 0);
+        const addon = await this.gdsAddon?.addonFor(
+          String(attrs.tourIncValue),
+          departureDate,
+          nightsValue,
+          { adults: Math.max(1, Number(attrs.priceAdults) || 2) },
+        );
+        if (addon != null) publicAmount += addon;
+      }
+      return { amount: publicAmount.toFixed(2), currency: pricing.supplierCurrency };
     } catch {
       return null;
     }
