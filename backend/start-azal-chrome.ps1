@@ -1,9 +1,8 @@
 $ErrorActionPreference = "Stop"
 
-# AZAL + Aviasales Chrome / CDP configuration
-# Both suppliers use the same browser session over CDP:
-#   AZAL       — Cloudflare-protected UI, keep the AZAL tab open.
-#   Aviasales  — AWS WAF session cookies, keep the Aviasales tab open.
+# AZAL + Aviasales Chrome / CDP configuration.
+# The browser is intentionally opened OFF-SCREEN: the backend needs the CDP
+# session and the supplier cookies, but the operator must not see the window.
 $port = 9222
 $chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe"
 $profile = Join-Path $env:LOCALAPPDATA "Google\Chrome\AZAL-CDP"
@@ -21,65 +20,71 @@ function Test-Cdp {
     }
 }
 
-Write-Host ""
-Write-Host "=== TravelHub AZAL + Aviasales Chrome ===" -ForegroundColor Cyan
-Write-Host ""
-
-# 1. Reuse an already running Chrome/CDP session.
-if (Test-Cdp) {
-    Write-Host "CDP is already available on port $port." -ForegroundColor Green
-
-    # Open both supplier tabs in the ALREADY RUNNING CDP browser. Do not start
-    # another Chrome with a different profile: that would create tabs outside
-    # the CDP session the backend reads.
-    try {
-        $cdpBase = "http://127.0.0.1:$port"
-        Invoke-RestMethod -Method Put -Uri "$cdpBase/json/new?$([uri]::EscapeDataString($azalUrl))" -TimeoutSec 5 | Out-Null
-        Invoke-RestMethod -Method Put -Uri "$cdpBase/json/new?$([uri]::EscapeDataString($aviasalesUrl))" -TimeoutSec 5 | Out-Null
-        Write-Host "AZAL opened: $azalUrl" -ForegroundColor Green
-        Write-Host "Aviasales opened: $aviasalesUrl" -ForegroundColor Green
-    }
-    catch {
-        Write-Host "CDP is ready, but supplier tabs could not be opened automatically." -ForegroundColor Yellow
-        Write-Host "Open these URLs manually in the CDP Chrome window:" -ForegroundColor Yellow
-        Write-Host "  $azalUrl" -ForegroundColor Yellow
-        Write-Host "  $aviasalesUrl" -ForegroundColor Yellow
-    }
-
-    exit 0
+function Get-CdpProcesses {
+    Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe'" |
+        Where-Object {
+            $_.CommandLine -and (
+                $_.CommandLine -match [regex]::Escape("--remote-debugging-port=$port") -or
+                $_.CommandLine -match [regex]::Escape($profile)
+            )
+        }
 }
 
-# 2. Verify Chrome installation.
+Write-Host ""
+Write-Host "=== TravelHub AZAL + Aviasales Chrome (invisible) ===" -ForegroundColor Cyan
+Write-Host ""
+
+# 1. Close previous dedicated CDP windows completely. A new run must never
+#    reuse a window from the previous run.
+$old = @(Get-CdpProcesses)
+if ($old.Count -gt 0) {
+    Write-Host "Closing previous CDP Chrome processes: $($old.Count)" -ForegroundColor Yellow
+    $pids = @($old | Select-Object -ExpandProperty ProcessId -Unique)
+    foreach ($procId in $pids) {
+        # cmd wrapper suppresses taskkill's expected "process not found" error
+        # when a child Chrome process already exited.
+        & cmd.exe /c "taskkill /PID $procId /T /F >nul 2>&1" | Out-Null
+    }
+    for ($i = 0; $i -lt 15; $i++) {
+        Start-Sleep -Milliseconds 300
+        if (-not (Test-Cdp) -and @(Get-CdpProcesses).Count -eq 0) { break }
+    }
+}
+
+# 2. Verify Chrome installation and prepare the dedicated profile.
 if (-not (Test-Path $chrome)) {
     throw "Google Chrome was not found: $chrome"
 }
-
-# 3. Create the dedicated supplier profile directory.
 New-Item -ItemType Directory -Force -Path $profile | Out-Null
 
-Write-Host "Starting Chrome with CDP..." -ForegroundColor Yellow
+# 3. Start a NEW off-screen Chrome. Keep a real headed browser (not headless):
+#    AZAL Cloudflare and Aviasales WAF need a normal browser profile.
+Write-Host "Starting invisible Chrome with CDP..." -ForegroundColor Yellow
 Write-Host "Port    : $port"
 Write-Host "Profile : $profile"
 Write-Host "AZAL    : $azalUrl"
 Write-Host "Aviasales: $aviasalesUrl"
 Write-Host ""
 
-# 4. Start a dedicated Chrome profile with remote debugging and open both suppliers.
 Start-Process -FilePath $chrome -ArgumentList @(
     "--remote-debugging-port=$port",
     "--user-data-dir=$profile",
     "--no-first-run",
     "--no-default-browser-check",
+    "--window-position=-32000,-32000",
+    "--window-size=1280,900",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
+    "--disable-features=CalculateNativeWinOcclusion",
+    "--new-window",
     $azalUrl,
     $aviasalesUrl
-)
+) -WindowStyle Hidden
 
-# 5. Wait until CDP is available.
+# 4. Wait for CDP. The window itself remains off-screen.
 $ready = $false
-
-for ($i = 0; $i -lt 30; $i++) {
+for ($i = 0; $i -lt 40; $i++) {
     Start-Sleep -Seconds 1
-
     if (Test-Cdp) {
         $ready = $true
         break
@@ -87,26 +92,25 @@ for ($i = 0; $i -lt 30; $i++) {
 }
 
 if (-not $ready) {
-    throw "Chrome started, but CDP port $port did not become available within 30 seconds."
+    throw "Chrome started, but CDP port $port did not become available within 40 seconds."
 }
 
 Write-Host ""
 Write-Host "CDP is ready: http://127.0.0.1:$port" -ForegroundColor Green
-Write-Host "AZAL opened automatically: $azalUrl" -ForegroundColor Green
-Write-Host "Aviasales opened automatically: $aviasalesUrl" -ForegroundColor Green
+Write-Host "Chrome window is off-screen (not visible)." -ForegroundColor Green
+Write-Host "AZAL tab:      $azalUrl"
+Write-Host "Aviasales tab: $aviasalesUrl"
 Write-Host ""
 
-# 6. Show the current CDP browser information.
+# 5. Browser info for diagnostics.
 try {
     $info = Invoke-RestMethod -Uri $versionUrl -TimeoutSec 3
     Write-Host "Browser: $($info.Browser)" -ForegroundColor Gray
     Write-Host "Protocol: $($info.'Protocol-Version')" -ForegroundColor Gray
 }
 catch {
-    # CDP is already confirmed above; this is informational only.
+    # CDP already confirmed; this is informational only.
 }
 
 Write-Host ""
-Write-Host "If AZAL shows a Cloudflare verification, complete it in Chrome once." -ForegroundColor Yellow
-Write-Host "If Aviasales asks for a WAF check, complete it in Chrome once." -ForegroundColor Yellow
-Write-Host "Keep both supplier tabs open while TravelHub is running." -ForegroundColor Yellow
+Write-Host "Do not close these tabs: the backend uses this CDP session." -ForegroundColor Yellow
