@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
- * Manual date entry (`дд.мм.гггг`) without a native date picker.
- * The public value is ISO (`yyyy-mm-dd`); the user can type the date as text.
+ * Date input with BOTH:
+ *  - manual entry (`дд.мм.гггг`, text);
+ *  - calendar picker (native date input opened by the calendar button).
+ * The public value is ISO (`yyyy-mm-dd`).
  */
 export default function DateTextInput({
   value,
@@ -18,6 +20,7 @@ export default function DateTextInput({
   placeholder?: string;
 }) {
   const [text, setText] = useState(toDisplay(value));
+  const pickerRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setText(toDisplay(value));
@@ -40,16 +43,53 @@ export default function DateTextInput({
     }
   }
 
+  function openPicker() {
+    const picker = pickerRef.current;
+    if (!picker) return;
+    try {
+      picker.showPicker();
+    } catch {
+      picker.focus();
+      picker.click();
+    }
+  }
+
   return (
-    <input
-      type="text"
-      inputMode="numeric"
-      autoComplete="off"
-      className={className}
-      value={text}
-      placeholder={placeholder}
-      onChange={(e) => handleChange(e.target.value)}
-    />
+    <span className="relative block">
+      <input
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        className={`${className ?? ""} pr-9`}
+        value={text}
+        placeholder={placeholder}
+        onChange={(e) => handleChange(e.target.value)}
+      />
+      <button
+        type="button"
+        onClick={openPicker}
+        aria-label="Открыть календарь"
+        className="absolute right-1 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded text-ink/50 hover:bg-panel hover:text-ink"
+      >
+        <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="3" y="5" width="18" height="16" rx="2" />
+          <path d="M8 3v4M16 3v4M3 10h18" />
+        </svg>
+      </button>
+      <input
+        ref={pickerRef}
+        type="date"
+        tabIndex={-1}
+        aria-hidden="true"
+        className="absolute bottom-0 right-6 h-px w-px opacity-0"
+        value={value || ""}
+        onChange={(e) => {
+          const next = e.target.value;
+          setText(toDisplay(next));
+          onChange(next);
+        }}
+      />
+    </span>
   );
 }
 
