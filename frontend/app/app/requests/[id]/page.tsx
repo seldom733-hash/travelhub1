@@ -127,10 +127,25 @@ function ProgressBadge({ progress, locale }: { progress: "AWAITING_TRAVELERS" | 
   const cls = progress === "FINAL_CONFIRMED"
     ? "bg-emerald-100 text-emerald-700 border-emerald-200"
     : progress === "DATA_FILLED"
-      ? "bg-sky-100 text-sky-700 border-sky-200"
+      ? "bg-brand/15 text-brand-dark border-brand/20"
       : "bg-amber-100 text-amber-700 border-amber-200";
   return <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium ${cls}`}>{t(key, locale)}</span>;
 }
+
+const REQUEST_TIMELINE_KEYS: Record<string, string> = {
+  "Заявка создана": "request.timeline.created",
+  "SLA поставщика до": "request.timeline.supplier_sla",
+  "Ответ поставщика": "request.timeline.supplier_response",
+  "Клиент должен ответить до": "request.timeline.customer_deadline",
+  "Клиент подтвердил": "request.timeline.customer_accepted",
+  "Конвертирована в заказ": "request.timeline.converted",
+  "Заказ создан": "request.timeline.order_created",
+  "Бронирование создано": "request.timeline.booking_created",
+  "Оплата инициирована": "request.timeline.payment_started",
+  "Оплачено": "request.timeline.paid",
+  "Дата услуги": "request.timeline.service_date",
+  "Завершено": "request.timeline.completed",
+};
 
 export default function RequestDetailPage() {
   const locale = useLocale();
@@ -290,7 +305,7 @@ export default function RequestDetailPage() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="text-sm text-slate-400">{t("crm.loading", locale)}</div>
+        <div className="text-sm text-ink/60">{t("crm.loading", locale)}</div>
       </div>
     );
   }
@@ -301,7 +316,7 @@ export default function RequestDetailPage() {
         <div className="text-sm text-red-500">{error || t("crm.not_found", locale)}</div>
         <Link
           href="/app/requests"
-          className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+          className="rounded-lg border border-line bg-white px-4 py-2 text-sm text-ink/60 hover:bg-panel"
         >
           ← {t("crm.back_to_list", locale)}
         </Link>
@@ -340,13 +355,13 @@ export default function RequestDetailPage() {
             user ? (
               <>
                 {r.status === "NEW" && canSelfAssign && (
-                  <button type="button" disabled={selfBusy} onClick={() => void selfAssign()} className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 disabled:opacity-50">
-                    {selfBusy ? "Назначение…" : "Взять себе"}
+                  <button type="button" disabled={selfBusy} onClick={() => void selfAssign()} className="rounded-lg border border-brand/20 px-3 py-1.5 text-xs font-semibold text-brand-dark disabled:opacity-50">
+                    {selfBusy ? t("request.action.assigning", locale) : t("request.action.take", locale)}
                   </button>
                 )}
                 {r.status === "NEW" && canStart && (
-                  <button type="button" disabled={startBusy} onClick={() => void startProcessing()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
-                    {startBusy ? "Запуск…" : "Начать обработку"}
+                  <button type="button" disabled={startBusy} onClick={() => void startProcessing()} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+                    {startBusy ? t("request.action.starting", locale) : t("request.action.start", locale)}
                   </button>
                 )}
                 <RequestActionBar
@@ -377,7 +392,7 @@ export default function RequestDetailPage() {
                 r.customerName ? (
                   <>
                     <span className="font-medium">{r.customerName}</span>
-                    {r.customerCode && <span className="ml-2 text-xs text-gray-500">{r.customerCode}</span>}
+                    {r.customerCode && <span className="ml-2 text-xs text-ink/60">{r.customerCode}</span>}
                   </>
                 ) : r.customerCode ? (
                   <span className="font-mono text-xs">{r.customerCode}</span>
@@ -387,7 +402,7 @@ export default function RequestDetailPage() {
                 r.productName ? (
                   <>
                     <span className="font-medium">{r.productName}</span>
-                    {r.productCode && <span className="ml-2 text-xs text-gray-500">{r.productCode}</span>}
+                    {r.productCode && <span className="ml-2 text-xs text-ink/60">{r.productCode}</span>}
                   </>
                 ) : r.productCode ? (
                   <span className="font-mono text-xs">{r.productCode}</span>
@@ -397,7 +412,7 @@ export default function RequestDetailPage() {
                 r.partnerName ? (
                   <>
                     <span className="font-medium">{r.partnerName}</span>
-                    {r.partnerCode && <span className="ml-2 text-xs text-gray-500">{r.partnerCode}</span>}
+                    {r.partnerCode && <span className="ml-2 text-xs text-ink/60">{r.partnerCode}</span>}
                   </>
                 ) : r.partnerCode ? (
                   <span className="font-mono text-xs">{r.partnerCode}</span>
@@ -434,11 +449,11 @@ export default function RequestDetailPage() {
               // открыт по статусу заявки, права проверяет сервер (403 → сообщение).
               const travelersEditable = !closed;
               const inputCls =
-                "w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-slate-300";
+                "w-full rounded-md border border-line bg-white px-2.5 py-1.5 text-sm outline-none focus:border-line";
               return (
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span className="text-slate-500">{ti("reqflow.travelers_progress", locale, { n: rows.length, m: expected })}</span>
+                    <span className="text-ink/60">{ti("reqflow.travelers_progress", locale, { n: rows.length, m: expected })}</span>
                     <span
                       className={`rounded-full px-2.5 py-0.5 font-medium ${
                         ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
@@ -447,16 +462,16 @@ export default function RequestDetailPage() {
                       {t(ready ? "reqflow.travelers_ready" : "reqflow.travelers_incomplete", locale)}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400">{t("reqflow.travelers_hint", locale)}</p>
+                  <p className="text-xs text-ink/60">{t("reqflow.travelers_hint", locale)}</p>
 
                   {rows.length > 0 && (
-                    <div className="divide-y divide-slate-100">
+                    <div className="divide-y divide-line">
                       {rows.map((tr, i) => (
                         <div key={tr.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
-                          <div className="text-sm text-gray-700">
-                            <span className="mr-2 font-mono text-[10px] text-slate-400">#{i + 1}</span>
+                          <div className="text-sm text-ink">
+                            <span className="mr-2 font-mono text-[10px] text-ink/60">#{i + 1}</span>
                             {tr.lastName} {tr.firstName}
-                            <span className="ml-2 text-xs text-gray-400">
+                            <span className="ml-2 text-xs text-ink/60">
                               {tr.birthDate ? fmtDate(tr.birthDate) : "—"}
                             </span>
                           </div>
@@ -466,7 +481,7 @@ export default function RequestDetailPage() {
                                 type="button"
                                 disabled={travelerBusy}
                                 onClick={() => startTravelerEdit(tr)}
-                                className="text-xs text-blue-600 hover:underline disabled:opacity-40"
+                                className="text-xs text-brand hover:underline disabled:opacity-40"
                               >
                                 {t("reqflow.traveler_edit", locale)}
                               </button>
@@ -486,17 +501,17 @@ export default function RequestDetailPage() {
                   )}
 
                   {rows.length === 0 && (
-                    <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                    <div className="rounded-lg bg-panel px-4 py-3 text-xs text-ink/60">
                       {t("reqflow.progress.awaiting", locale)}
                     </div>
                   )}
 
                   {travelersEditable && (
-                    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                    <div className="rounded-lg border border-line bg-panel/60 p-3">
                       {travelerEditing ? (
                         <div className="grid gap-3 sm:grid-cols-3">
                           <label className="block text-xs">
-                            <span className="mb-1 block text-slate-500">{t("reqflow.traveler_first_name", locale)} *</span>
+                            <span className="mb-1 block text-ink/60">{t("reqflow.traveler_first_name", locale)} *</span>
                             <input
                               type="text"
                               className={inputCls}
@@ -505,7 +520,7 @@ export default function RequestDetailPage() {
                             />
                           </label>
                           <label className="block text-xs">
-                            <span className="mb-1 block text-slate-500">{t("reqflow.traveler_last_name", locale)} *</span>
+                            <span className="mb-1 block text-ink/60">{t("reqflow.traveler_last_name", locale)} *</span>
                             <input
                               type="text"
                               className={inputCls}
@@ -514,7 +529,7 @@ export default function RequestDetailPage() {
                             />
                           </label>
                           <label className="block text-xs">
-                            <span className="mb-1 block text-slate-500">{t("reqflow.traveler_birth_date", locale)} *</span>
+                            <span className="mb-1 block text-ink/60">{t("reqflow.traveler_birth_date", locale)} *</span>
                             <input
                               type="date"
                               className={inputCls}
@@ -527,7 +542,7 @@ export default function RequestDetailPage() {
                               type="button"
                               disabled={travelerBusy}
                               onClick={() => void saveTraveler()}
-                              className="rounded-lg bg-slate-800 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-40"
+                              className="rounded-lg bg-ink px-4 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark disabled:opacity-40"
                             >
                               {t("reqflow.traveler_save", locale)}
                             </button>
@@ -538,7 +553,7 @@ export default function RequestDetailPage() {
                                 setTravelerEditing(null);
                                 setTravelerError(null);
                               }}
-                              className="rounded-lg border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                              className="rounded-lg border border-line bg-white px-4 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel disabled:opacity-40"
                             >
                               {t("reqflow.traveler_cancel", locale)}
                             </button>
@@ -549,7 +564,7 @@ export default function RequestDetailPage() {
                           type="button"
                           disabled={travelerBusy}
                           onClick={() => startTravelerEdit()}
-                          className="rounded-lg border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                          className="rounded-lg border border-line bg-white px-4 py-1.5 text-xs font-semibold text-ink hover:bg-panel disabled:opacity-40"
                         >
                           + {t("reqflow.traveler_add", locale)}
                         </button>
@@ -561,7 +576,7 @@ export default function RequestDetailPage() {
                   )}
 
                   {closed && (
-                    <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                    <div className="rounded-lg bg-panel px-3 py-2 text-xs text-ink/60">
                       {t("reqflow.travelers_locked", locale)}
                     </div>
                   )}
@@ -584,7 +599,7 @@ export default function RequestDetailPage() {
               } />
             </EntityFieldGrid>
             {(r.supplierPriceProposal || r.supplierNote) && (
-              <div className="mt-4 border-t border-slate-100 pt-4 space-y-2">
+              <div className="mt-4 border-t border-line pt-4 space-y-2">
                 {r.supplierPriceProposal && (
                   <EntityField label={t("requests.proposed_price", locale)} value={`${r.supplierPriceProposal} ${r.displayedCurrency ?? ""}`} />
                 )}
@@ -627,7 +642,7 @@ export default function RequestDetailPage() {
           {timeline && timeline.length > 0 && (
             <EntitySectionCard title={t("detail.sections.timeline", locale)}>
               <EntityTimeline
-                items={timeline.map((item, idx) => ({ key: String(idx), label: item.label, timestamp: item.timestamp }))}
+                items={timeline.map((item, idx) => ({ key: String(idx), label: REQUEST_TIMELINE_KEYS[item.label] ? t(REQUEST_TIMELINE_KEYS[item.label], locale) : item.label, timestamp: item.timestamp }))}
               />
             </EntitySectionCard>
           )}
@@ -658,18 +673,18 @@ export default function RequestDetailPage() {
                 <div className="flex flex-wrap items-center gap-3">
                   <ProgressBadge progress={r.convertedOrder.travelerProgress ?? null} locale={locale} />
                   {r.convertedOrder.travelerCount != null && (
-                    <span className="text-xs text-gray-500">{r.convertedOrder.travelerCount} {t("reqflow.travelers", locale).toLowerCase()}</span>
+                    <span className="text-xs text-ink/60">{r.convertedOrder.travelerCount} {t("reqflow.travelers", locale).toLowerCase()}</span>
                   )}
                 </div>
                 {r.convertedOrder.travelerProgress !== "FINAL_CONFIRMED" && (
                   <button
                     onClick={() => router.push(`/app/orders/${r.convertedOrder!.id}`)}
-                    className="rounded-lg px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                    className="rounded-lg px-4 py-2 text-sm font-medium text-white bg-brand hover:bg-brand-dark"
                   >
                     {t("reqflow.continue_order", locale)} →
                   </button>
                 )}
-                <div className="border-t border-slate-100 pt-4">
+                <div className="border-t border-line pt-4">
                   <EntityFieldGrid>
                     <EntityField label={t("crm.col.created", locale)} value={
                       r.convertedOrder.createdAt ? fmtTs(r.convertedOrder.createdAt) : null
@@ -680,14 +695,14 @@ export default function RequestDetailPage() {
                   </EntityFieldGrid>
                 </div>
                 {r.convertedPayments && r.convertedPayments.length > 0 && (
-                  <div className="border-t border-slate-100 pt-4">
-                    <div className="mb-2 text-xs font-medium uppercase text-slate-400">{t("crm.detail.payments", locale)}</div>
+                  <div className="border-t border-line pt-4">
+                    <div className="mb-2 text-xs font-medium uppercase text-ink/60">{t("crm.detail.payments", locale)}</div>
                     <div className="space-y-2">
                       {r.convertedPayments.map((p) => (
                         <EntityRow key={p.id}>
-                          <span className="font-mono text-[10px] text-slate-400">{p.referenceNumber}</span>
+                          <span className="font-mono text-[10px] text-ink/60">{p.referenceNumber}</span>
                           <StatusBadge status={p.status} />
-                          <span className="text-sm text-gray-700">{p.amount} {p.currency}</span>
+                          <span className="text-sm text-ink">{p.amount} {p.currency}</span>
                           {p.paidAt && <span className="text-xs text-green-600">{ti("requests.paid_at", locale, { date: fmtDate(p.paidAt) ?? "" })}</span>}
                         </EntityRow>
                       ))}
@@ -695,18 +710,18 @@ export default function RequestDetailPage() {
                   </div>
                 )}
                 {(r as any).convertedRefund && (
-                  <div className="border-t border-slate-100 pt-4">
-                    <div className="mb-2 text-xs font-medium uppercase text-slate-400">{t("crm.detail.refunds", locale)}</div>
+                  <div className="border-t border-line pt-4">
+                    <div className="mb-2 text-xs font-medium uppercase text-ink/60">{t("crm.detail.refunds", locale)}</div>
                     <EntityRow>
-                      <span className="font-mono text-[10px] text-slate-400">{(r as any).convertedRefund.referenceNumber}</span>
+                      <span className="font-mono text-[10px] text-ink/60">{(r as any).convertedRefund.referenceNumber}</span>
                       <StatusBadge status={(r as any).convertedRefund.status} />
-                      <span className="text-sm text-gray-700">{(r as any).convertedRefund.amount} {(r as any).convertedRefund.currency}</span>
+                      <span className="text-sm text-ink">{(r as any).convertedRefund.amount} {(r as any).convertedRefund.currency}</span>
                     </EntityRow>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="text-sm text-slate-400">{t("reqflow.no_linked_order", locale)}</div>
+              <div className="text-sm text-ink/60">{t("reqflow.no_linked_order", locale)}</div>
             )}
           </EntitySectionCard>
         </EntityDetailWide>

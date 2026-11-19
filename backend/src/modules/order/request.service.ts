@@ -105,10 +105,9 @@ export function computeRequestAvailableActions(
     // Phase 3: + деньги (design §8) — без валидных денег convert=false.
     convert:
       canEdit &&
-      hasD3AcceptSnapshot &&
       hasAcceptedMoney &&
       request.status === "CUSTOMER_ACCEPTED" &&
-      request.convertedOrderId === null,
+      !request.convertedOrderId,
   };
 }
 

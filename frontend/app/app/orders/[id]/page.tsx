@@ -288,14 +288,14 @@ export default function OrderDetailPage() {
   };
 
   if (loading) {
-    return <div className="flex h-full items-center justify-center"><div className="text-sm text-slate-400">{t("crm.loading", locale)}</div></div>;
+    return <div className="flex h-full items-center justify-center"><div className="text-sm text-ink/60">{t("crm.loading", locale)}</div></div>;
   }
 
   if (error || !order) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <div className="text-sm text-red-500">{error || t("crm.not_found", locale)}</div>
-        <Link href="/app/orders" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">{t("crm.back_to_list", locale)}</Link>
+        <Link href="/app/orders" className="rounded-lg border border-line bg-white px-4 py-2 text-sm text-ink/60 hover:bg-panel">{t("crm.back_to_list", locale)}</Link>
       </div>
     );
   }
@@ -360,7 +360,7 @@ export default function OrderDetailPage() {
           {/* SECONDARY: Finance — shown on Order only while it has no active Booking */}
           {order.linkedBooking ? (
             <EntitySectionCard title={t("bookings.financial", locale)}>
-              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+              <div className="rounded-lg border border-brand/20 bg-brand/10 px-3 py-2 text-sm text-ink">
                 Заказ перешёл в бронь. Финансы и платежи ведутся в карточке брони{" "}
                 <Link href={`/app/bookings/${order.linkedBooking.id}`} className="font-semibold underline">
                   {order.linkedBooking.referenceNumber}
@@ -384,16 +384,16 @@ export default function OrderDetailPage() {
                   type="button"
                   data-testid="order-create-payment-button"
                   onClick={() => setCreatePaymentOpen(true)}
-                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                  className="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark"
                 >
-                  Платёж клиента
+                  {t("order.payment.client", locale)}
                 </button>
                 <button
                   type="button"
                   onClick={() => setSupplierPaymentOpen(true)}
                   className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
                 >
-                  Платёж поставщику
+                  {t("order.payment.supplier", locale)}
                 </button>
               </div>
             )}
@@ -409,9 +409,9 @@ export default function OrderDetailPage() {
                   <EntityRow key={item.id} className="justify-between">
                     <div>
                       <EntityLink href={`/app/catalog/${item.id}`}>{item.title}</EntityLink>
-                      <div className="mt-0.5 text-slate-400">{item.type} · ×{item.quantity}</div>
+                      <div className="mt-0.5 text-ink/60">{item.type} · ×{item.quantity}</div>
                     </div>
-                    <span className="text-slate-500">{formatPrice(item.amount, item.currency, locale) ?? "—"}</span>
+                    <span className="text-ink/60">{formatPrice(item.amount, item.currency, locale) ?? "—"}</span>
                   </EntityRow>
                 ))}
               </div>
@@ -421,7 +421,7 @@ export default function OrderDetailPage() {
           {/* Туристы: до final-confirm — редактируемо (permissions); после — read-only */}
           <EntitySectionCard title={t("d3.travelers_title", locale)}>
             {immutableTravelers && (
-              <div className="mb-3 text-xs text-slate-400">{t("d3.locked", locale)}</div>
+              <div className="mb-3 text-xs text-ink/60">{t("d3.locked", locale)}</div>
             )}
             <TravelerCollectionPanel orderId={id} />
           </EntitySectionCard>
@@ -487,9 +487,9 @@ export default function OrderDetailPage() {
         {!order.linkedBooking && (
           <EntityDetailWide>
           <EntitySectionCard title={t("finance.client_payments", locale) || "Платежи клиента"}>
-            {finHistoryLoading && <div className="text-xs text-slate-400">{t("crm.loading", locale)}</div>}
+            {finHistoryLoading && <div className="text-xs text-ink/60">{t("crm.loading", locale)}</div>}
             {!finHistoryLoading && ledgerRows.length === 0 && finHistory.refunds.length === 0 && (
-              <div className="text-xs text-slate-400">{t("finance.no_history", locale) || "Нет финансовых событий"}</div>
+              <div className="text-xs text-ink/60">{t("finance.no_history", locale) || "Нет финансовых событий"}</div>
             )}
             {!finHistoryLoading && ledgerRows.length > 0 && (
               <PaymentsTable
@@ -504,12 +504,12 @@ export default function OrderDetailPage() {
                 {finHistory.refunds.map((r) => (
                   <EntityRow key={r.id} className="justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] text-slate-400">{r.code}</span>
+                      <span className="font-mono text-[10px] text-ink/60">{r.code}</span>
                       <StatusBadge status={r.status} />
                       <span className="text-red-600">{formatPrice(r.amount, r.currency, locale)}</span>
-                      {r.reason && <span className="text-slate-400">({r.reason})</span>}
+                      {r.reason && <span className="text-ink/60">({r.reason})</span>}
                     </div>
-                    <span className="text-slate-400">{formatTs(r.processedAt ?? r.approvedAt ?? r.requestedAt ?? r.createdAt, locale)}</span>
+                    <span className="text-ink/60">{formatTs(r.processedAt ?? r.approvedAt ?? r.requestedAt ?? r.createdAt, locale)}</span>
                   </EntityRow>
                 ))}
               </div>

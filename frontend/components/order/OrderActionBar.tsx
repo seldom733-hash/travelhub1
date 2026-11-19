@@ -13,16 +13,21 @@ import { t, useLocale } from "@/lib/i18n";
  */
 
 const ACTION_UI: Record<string, { labelKey: string; cls: string; confirmKey?: string }> = {
-  process: { labelKey: "order.action_short.process", cls: "bg-sky-700 hover:bg-sky-800" },
+  process: { labelKey: "order.action_short.process", cls: "bg-brand-dark hover:bg-brand-dark" },
   markWaitingData: { labelKey: "order.action_short.markWaitingData", cls: "bg-amber-700 hover:bg-amber-800" },
   resumeProcessing: { labelKey: "order.action_short.resumeProcessing", cls: "bg-teal-700 hover:bg-teal-800" },
   confirm: { labelKey: "order.action_short.confirm", cls: "bg-violet-700 hover:bg-violet-800" },
-  send: { labelKey: "order.action_short.send", cls: "bg-blue-700 hover:bg-blue-800" },
+  send: { labelKey: "order.action_short.send", cls: "bg-brand-dark hover:bg-brand-dark" },
   complete: { labelKey: "order.action_short.complete", cls: "bg-emerald-700 hover:bg-emerald-800" },
-  close: { labelKey: "order.action_short.close", cls: "bg-slate-700 hover:bg-slate-800", confirmKey: "order.action_confirm.close" },
+  close: { labelKey: "order.action_short.close", cls: "bg-brand-dark hover:bg-ink", confirmKey: "order.action_confirm.close" },
   cancel: { labelKey: "order.action_short.cancel", cls: "bg-red-600 hover:bg-red-700", confirmKey: "order.action_confirm.cancel" },
   problem: { labelKey: "order.action_short.problem", cls: "bg-orange-700 hover:bg-orange-800" },
-  suspend: { labelKey: "order.action_short.suspend", cls: "bg-slate-600 hover:bg-slate-700" },
+  suspend: { labelKey: "order.action_short.suspend", cls: "bg-brand hover:bg-brand-dark" },
+  requestCancellation: {
+    labelKey: "order.action_short.requestCancellation",
+    cls: "bg-red-600 hover:bg-red-700",
+    confirmKey: "order.action_confirm.cancel",
+  },
   // Stage 1 (Order → Request): сервер-авторитетная проекция отдаёт команду
   // только из active-статуса и при granular-праве order.cancel.
   returnToRequest: {
@@ -50,7 +55,7 @@ export default function OrderActionBar({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {actions.map((action) => {
-        const ui = ACTION_UI[action] ?? { labelKey: action, cls: "bg-slate-600 hover:bg-slate-700" };
+        const ui = ACTION_UI[action] ?? { labelKey: action, cls: "bg-brand hover:bg-brand-dark" };
         const busy = busyAction === action;
         return (
           <button

@@ -267,7 +267,7 @@ export default function MonthlyCalendar({
           if (msg.includes("503") || msg.includes("500") || msg.includes("Concurrency") || msg.includes("Rate limit") || msg.includes("circuit is OPEN") || msg.includes("Too Many") || msg.includes("Internal Server Error")) {
             console.log(`[MonthlyCalendar] 500/503 retry dedup ${year}-${String(month+1).padStart(2,"0")} in 1.2s msg=${msg.slice(0,80)}`);
             setTimeout(() => fetchMonth(forceRefresh), 1200);
-            setError("Слишком много запросов, повторная попытка...");
+            setError(t("supplier.error.rate_limit", locale));
             setErrorKind("ERROR");
             return;
           }
