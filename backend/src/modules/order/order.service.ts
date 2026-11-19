@@ -1822,6 +1822,19 @@ export class OrderService {
         linkedRequestCode = linked.code;
       }
 
+      // Site-created Orders need the traveler party before moving forward.
+      // Manual request-created Orders already carry it.
+      const expectedTravelers = order.travelerCount ?? 0;
+      const travelersIncomplete =
+        expectedTravelers > 0 &&
+        (order.travelers.length < expectedTravelers ||
+          order.travelers.some((t) => t.dataCompleteness !== "COMPLETE"));
+      if (travelersIncomplete && ["confirm", "waitFirstPayment", "send"].includes(action)) {
+        throw new ValidationDomainError(
+          "Введите данные туристов: заполните гражданство и паспортные данные перед переходом к следующему шагу",
+        );
+      }
+
       // D3 SR R3 (Booking eligibility, hard §16): traveler-bearing D3 Order
       // (принятый checkout c traveler party list) НЕ может перейти в
       // READY_FOR_BOOKING / Booking до финального подтверждения собранных
