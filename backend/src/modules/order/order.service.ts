@@ -236,7 +236,6 @@ export function computeAvailableOrderActions(
     // Data is already confirmed: the next step is confirm order, not another
     // "waiting for data"/"resume processing" round-trip.
     if (action === "close" && order.returnedToRequestAt) continue;
-    if (action === "close" && order.returnedToRequestAt) continue;
     if (order.finalConfirmedAt && action === "markWaitingData") continue;
     if (order.finalConfirmedAt && action === "resumeProcessing" && order.status === "WAITING_FOR_DATA") continue;
     // confirm требует полные данные всех туристов (как в orderAction).
@@ -681,6 +680,8 @@ export class OrderService {
         /** Supplier Markup Phase 4 §4.6: frozen commercial snapshot из Request
          *  (verbatim → Order.commercialSnapshot; immutable, Gate G). */
         commercialSnapshot: Record<string, unknown> | null;
+        /** Manually entered cost from the originating Request service lines. */
+        costPrice?: string | null;
       };
       actor: { id: string | null; username: string } | null;
       orderRequestedEventId?: string | null;
@@ -761,8 +762,15 @@ export class OrderService {
         // Supplier Markup Phase 4 §4.6: verbatim commercial snapshot из frozen
         // Request (JSON; immutable после создания — пересчёт только при
         // конверсии, НЕ позднейшим MarkupRule change). Legacy → колонка null.
-        ...(r.commercialSnapshot
-          ? { commercialSnapshot: r.commercialSnapshot as Prisma.InputJsonValue }
+        ...(r.commercialSnapshot || r.costPrice
+          ? {
+              commercialSnapshot: {
+                ...(r.commercialSnapshot ?? {}),
+                ...(r.costPrice
+                  ? { netSupplierCost: r.costPrice, supplierPrice: r.costPrice }
+                  : {}),
+              } as Prisma.InputJsonValue,
+            }
           : {}),
         acquisitionSource: "MARKETPLACE",
         subtotal: amount,
@@ -2735,7 +2743,8 @@ export class OrderService {
       const price = dto.price ?? Number(attributes.priceLocal ?? attributes.startingPrice ?? 0);
       if (!Number.isFinite(price) || price < 0) throw new BadRequestException("price must be a non-negative number");
       const currency = order.currency;
-      const amount = Number((price * quantity).toFixed(2));
+      // Money policy: Decimal arithmetic with half-up 2dp rounding (same as sales.money.ts).
+      const amount = new Prisma.Decimal(price).mul(new Prisma.Decimal(quantity)).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
       const item = await tx.orderItem.create({
         data: {
           orderId,
@@ -2751,7 +2760,7 @@ export class OrderService {
         },
       });
       const updated = await tx.order.update({ where: { id: orderId }, data: { amount: { increment: amount }, version: { increment: 1 }, updatedBy: actor.id } });
-      await tx.orderHistory.create({ data: { orderId, action: "SERVICE_ADDED", to: item.id, source: "API", actorId: actor.id, actorName: actor.username, comment: `Добавлена услуга ${product.title}`, fields: { productId: product.id, amount } } });
+      await tx.orderHistory.create({ data: { orderId, action: "SERVICE_ADDED", to: item.id, source: "API", actorId: actor.id, actorName: actor.username, comment: `Добавлена услуга ${product.title}`, fields: { productId: product.id, amount: amount.toNumber() } } });
       return { item, orderAmount: updated.amount, currency: updated.currency };
     });
   }

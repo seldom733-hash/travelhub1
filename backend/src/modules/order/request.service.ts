@@ -1602,6 +1602,17 @@ export class RequestService {
     } | null;
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // Preserve manually entered cost from the Request service lines.
+      const requestServices = await tx.requestService.findMany({
+        where: { requestId },
+        select: { data: true },
+      });
+      const costPrice = requestServices.reduce((sum, service) => {
+        const data = (service.data ?? {}) as Record<string, unknown>;
+        const value = Number(data.costPrice);
+        return Number.isFinite(value) && value > 0 ? sum + value : sum;
+      }, 0);
+
       // CAS-claim: CUSTOMER_ACCEPTED → CONVERTED (один победитель при гонке).
       const claim = await tx.request.updateMany({
         where: { id: requestId, status: "CUSTOMER_ACCEPTED" },
@@ -1638,6 +1649,7 @@ export class RequestService {
           // commercial snapshot → Order (immutable; MarkupRule change не
           // пересчитывает принятые деньги). Legacy без snapshot → null.
           commercialSnapshot: existing.commercialSnapshot as unknown as Record<string, unknown> | null,
+          costPrice: costPrice > 0 ? costPrice.toFixed(2) : null,
         },
         actor,
       });

@@ -26,6 +26,7 @@ import RequestActionBar, {
 } from "@/components/request/RequestActionBar";
 import { requestActionLabel } from "@/lib/commerce-history-labels";
 import { useCurrentUser } from "@/lib/use-user";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 interface RequestHistoryRow {
   id: string;
@@ -530,11 +531,10 @@ export default function RequestDetailPage() {
                           </label>
                           <label className="block text-xs">
                             <span className="mb-1 block text-ink/60">{t("reqflow.traveler_birth_date", locale)} *</span>
-                            <input
-                              type="date"
+                            <DateTextInput
                               className={inputCls}
                               value={travelerForm.birthDate}
-                              onChange={(e) => setTravelerForm((f) => ({ ...f, birthDate: e.target.value }))}
+                              onChange={(v) => setTravelerForm((f) => ({ ...f, birthDate: v }))}
                             />
                           </label>
                           <div className="flex gap-2 sm:col-span-3">
