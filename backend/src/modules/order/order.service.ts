@@ -216,6 +216,9 @@ export function computeAvailableOrderActions(
   activeBlockingBookings = 0,
   freeOrderItems?: number,
   hasCapturedClientPayment = true,
+  /** Request→Order: traveler data is supplied by the accepted Request, so the
+   * "waiting for data" round-trip is not applicable. */
+  convertedFromRequest = false,
 ): OrderAction[] {
   const d3Scope = (order.travelerCount ?? 0) > 0 && order.termsAcceptedAt !== null;
   const actions: OrderAction[] = [];
@@ -223,6 +226,7 @@ export function computeAvailableOrderActions(
     const t = TRANSITIONS[action];
     if (!t.from.includes(order.status)) continue;
     if (!granted.includes(ACTION_PERMISSIONS[action])) continue;
+    if (convertedFromRequest && action === "markWaitingData") continue;
     // Stage 2 fix (Bug 2): блокирует только реально активный Booking;
     // исторический (returned/cancelled) не должен прятать кнопку.
     if ((action === "returnToRequest" || action === "cancel" || action === "complete" || action === "close") && activeBlockingBookings > 0) continue;
@@ -1268,20 +1272,19 @@ export class OrderService {
     const hasCapturedClientPayment = (await this.prisma.payment.count({
       where: { orderId: order.id, status: "CAPTURED" },
     })) > 0;
+    const linkedRequest = await this.prisma.request.findFirst({
+      where: { convertedOrderId: order.id },
+      select: { id: true, referenceNumber: true, status: true, code: true },
+      orderBy: { createdAt: "desc" },
+    });
     const availableActions = computeAvailableOrderActions(
       order,
       grantedPermissions,
       activeBlockingBookings,
       freeOrderItems,
       hasCapturedClientPayment,
+      Boolean(linkedRequest),
     );
-
-    // D5 §11: Request→Order canonical relation (Request.convertedOrderId).
-    const linkedRequest = await this.prisma.request.findFirst({
-      where: { convertedOrderId: order.id },
-      select: { id: true, referenceNumber: true, status: true, code: true },
-      orderBy: { createdAt: "desc" },
-    });
 
     // D5 §12: связанная бронь — exactly linked Booking для этого Order (V1: 1:1).
     const linkedBooking = await this.prisma.booking.findFirst({
