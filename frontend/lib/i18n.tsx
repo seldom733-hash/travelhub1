@@ -1901,6 +1901,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "crm.detail.total_partners": { ru: "Партнёров", az: "Tərəfdaşlar", en: "Partners" },
   "crm.detail.no_partners": { ru: "Партнёров пока нет", az: "Hələ tərəfdaş yoxdur", en: "No partners yet" },
   "crm.detail.total_amount": { ru: "Сумма", az: "Məbləğ", en: "Amount" },
+  "crm.detail.cost_amount": { ru: "Себестоимость", az: "Maya dəyəri", en: "Cost" },
   "crm.detail.service_date": { ru: "Дата услуги", az: "Xidmət tarixi", en: "Service date" },
   "crm.detail.paid_amount": { ru: "Оплачено", az: "Ödənilib", en: "Paid" },
   "crm.detail.refunded_amount": { ru: "Возвращено", az: "Geri qaytarılıb", en: "Refunded" },

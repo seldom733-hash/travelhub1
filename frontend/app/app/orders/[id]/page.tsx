@@ -80,6 +80,7 @@ interface OrderDetail {
   updatedAt: string;
   travelerCount: number | null;
   pinnedRequirements: unknown;
+  commercialSnapshot?: { netSupplierCost?: string | number; supplierPrice?: string | number } | null;
   availableActions?: string[];
   linkedRequest?: { id: string; referenceNumber: string; status: string } | null;
   linkedBooking?: { id: string; referenceNumber: string; status: string; code?: string } | null;
@@ -372,6 +373,13 @@ export default function OrderDetailPage() {
           <EntitySectionCard title={t("bookings.financial", locale)}>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               <EntityFinanceCell label={t("crm.detail.total_amount", locale)} value={formatPrice(order.amount, order.currency, locale)} tone="neutral" />
+              {Number(order.commercialSnapshot?.netSupplierCost ?? order.commercialSnapshot?.supplierPrice ?? 0) > 0 && (
+                <EntityFinanceCell
+                  label={t("crm.detail.cost_amount", locale)}
+                  value={formatPrice(String(order.commercialSnapshot?.netSupplierCost ?? order.commercialSnapshot?.supplierPrice), order.currency, locale)}
+                  tone="neutral"
+                />
+              )}
               <EntityFinanceCell label={t("crm.detail.paid_amount", locale)} value={formatPrice(order.paidAmount, order.currency, locale)} tone="positive" />
               <EntityFinanceCell label={t("crm.detail.refunded_amount", locale)} value={formatPrice(order.refundedAmount, order.currency, locale)} tone="negative" />
               <EntityFinanceCell label={t("finance.due_amount", locale)} value={formatPrice(order.dueAmount, order.currency, locale)} tone="warning" />
