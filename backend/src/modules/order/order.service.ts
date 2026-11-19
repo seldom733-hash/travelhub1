@@ -830,6 +830,7 @@ export class OrderService {
     // поля pinned, что и в traveler-мутациях): FIO+birthDate всегда есть,
     // остальные Order-стадии ещё не заполнены → INCOMPLETE по pinned.
     const pinnedForCompleteness = (r.pinnedRequirements ?? null) as TravelerFullRequirements | null;
+    let requestTravelersComplete = requestTravelers.length > 0;
     for (const rt of requestTravelers) {
       const completenessValues: Partial<Record<TravelerField, string | Date | null | undefined>> = {
         firstName: rt.firstName,
@@ -840,6 +841,8 @@ export class OrderService {
         passportNumber: rt.passportNumber as string | null,
         passportExpiry: rt.passportExpiry,
       };
+      const completeness = this.computeTravelerCompleteness(pinnedForCompleteness, completenessValues);
+      if (completeness !== "COMPLETE") requestTravelersComplete = false;
       await tx.orderTraveler.create({
         data: {
           orderId: order.id,
@@ -852,10 +855,17 @@ export class OrderService {
           passportSeries: rt.passportSeries,
           passportNumber: rt.passportNumber,
           passportExpiry: rt.passportExpiry,
-          dataCompleteness: this.computeTravelerCompleteness(pinnedForCompleteness, completenessValues),
+          dataCompleteness: completeness,
           version: 1,
         },
       });
+    }
+
+    // Request travelers are the accepted source of truth. When every copied
+    // traveler already has the required document data, the order starts with
+    // final traveler confirmation and does not need the "waiting for data" step.
+    if (requestTravelersComplete) {
+      await tx.order.update({ where: { id: order.id }, data: { finalConfirmedAt: submittedAt } });
     }
 
     await tx.fulfillment.create({ data: { orderId: order.id, status: "NOT_STARTED", notes: null } });
@@ -1562,8 +1572,9 @@ export class OrderService {
     pinned: TravelerFullRequirements | null,
     values: Partial<Record<TravelerField, string | Date | null | undefined>>,
   ): "COMPLETE" | "INCOMPLETE" {
-    // Registry traveler block requires passport + citizenship for every order.
-    if (!String(values.citizenship ?? "").trim() || !String(values.passportSeries ?? "").trim() || !String(values.passportNumber ?? "").trim()) {
+    // Registry traveler block requires a document number + citizenship.
+    // `passportSeries` is optional: manual/site requests provide the number.
+    if (!String(values.citizenship ?? "").trim() || !String(values.passportNumber ?? "").trim()) {
       return "INCOMPLETE";
     }
     if (!pinned) {

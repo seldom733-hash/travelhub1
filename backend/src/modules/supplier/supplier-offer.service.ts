@@ -224,7 +224,10 @@ export class SupplierOfferService {
     const cached = this.cache.getPrice(cacheKey);
     if (cached) {
       this.metrics.cacheHit++;
-      return this.priceBoundary(cached, ref.supplierCode, ref.searchContext.service ?? "tours");
+      return this.withSummerGdsAddon(
+        await this.priceBoundary(cached, ref.supplierCode, ref.searchContext.service ?? "tours"),
+        ref,
+      );
     }
     this.metrics.cacheMiss++;
 
@@ -232,7 +235,30 @@ export class SupplierOfferService {
     this.cache.setPrice(cacheKey, snapshot);
     this.metrics.priceRefresh++;
 
-    return this.priceBoundary(snapshot, ref.supplierCode, ref.searchContext.service ?? "tours");
+    return this.withSummerGdsAddon(
+      await this.priceBoundary(snapshot, ref.supplierCode, ref.searchContext.service ?? "tours"),
+      ref,
+    );
+  }
+
+  /** Server-authoritative re-check must include the AZAL flight for GDS tours. */
+  private async withSummerGdsAddon(
+    snapshot: SupplierPriceSnapshot,
+    ref: SupplierOfferRef,
+  ): Promise<SupplierPriceSnapshot> {
+    if (ref.supplierCode !== "SUMMERTOUR") return snapshot;
+    const addon = await this.summerGdsFlight.addonFor(
+      String(ref.searchContext.tourIncValue ?? ""),
+      ref.searchContext.departureDateFrom,
+      ref.searchContext.nightsFrom,
+      {
+        adults: ref.searchContext.adults ?? 2,
+        children: ref.searchContext.children ?? 0,
+        childAges: ref.searchContext.childAges ?? [],
+      },
+    );
+    if (addon == null) return snapshot;
+    return { ...snapshot, amount: Math.round((snapshot.amount + addon) * 100) / 100 };
   }
 
   /**
