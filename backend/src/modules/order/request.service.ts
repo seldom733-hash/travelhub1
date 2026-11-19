@@ -214,6 +214,8 @@ interface CreateRequestDto {
   primarySupplierCode?: string;
   assignedManagerId?: string;
   services?: RequestServiceInput[];
+  /** Trip facts entered on the request form (country/dates/pax). */
+  tripDetails?: Record<string, unknown>;
 }
 
 const REQUEST_TYPES = [
@@ -412,7 +414,9 @@ export class RequestService {
           displayedCurrency: dto.displayedCurrency ?? null,
           confirmedPrice: null,
           confirmedCurrency: null,
-          pinnedRequirements: Prisma.JsonNull,
+          pinnedRequirements: dto.tripDetails
+            ? (dto.tripDetails as Prisma.InputJsonValue)
+            : Prisma.JsonNull,
           supplierResponseDeadline,
           supplierRespondedAt: null,
           supplierDecision: null,
@@ -482,6 +486,9 @@ export class RequestService {
           firstName: t.firstName,
           lastName: t.lastName,
           birthDate: new Date(`${t.birthDate}T00:00:00.000Z`),
+          citizenship: t.citizenship ?? null,
+          passportNumber: t.passportNumber ?? null,
+          passportExpiry: t.passportExpiry ? new Date(`${t.passportExpiry}T00:00:00.000Z`) : null,
         })),
       });
     }

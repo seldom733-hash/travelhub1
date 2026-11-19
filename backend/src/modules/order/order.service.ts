@@ -675,7 +675,7 @@ export class OrderService {
         displayedPrice: string | null;
         displayedCurrency: string | null;
         customerAcceptedAt: Date | null;
-        pinnedRequirements: Record<string, string> | null;
+        pinnedRequirements: Record<string, unknown> | null;
         travelerCount: number | null;
         /** Supplier Markup Phase 4 §4.6: frozen commercial snapshot из Request
          *  (verbatim → Order.commercialSnapshot; immutable, Gate G). */

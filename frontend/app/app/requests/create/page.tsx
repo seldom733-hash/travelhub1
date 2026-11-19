@@ -206,6 +206,17 @@ export default function CreateRequestPage() {
     );
   }, [travelerStats]);
 
+  useEffect(() => {
+    if (!serviceStart && !serviceEnd) return;
+    setServices((prev) =>
+      prev.map((service) =>
+        service.kind === "HOTEL" || service.kind === "TOUR_PACKAGE"
+          ? { ...service, data: { ...service.data, checkIn: serviceStart, checkOut: serviceEnd } }
+          : service,
+      ),
+    );
+  }, [serviceStart, serviceEnd]);
+
   function fillTravelerFromCustomer(customer: Customer | null) {
     if (!customer) return;
     setTravelers((prev) => {
@@ -215,6 +226,19 @@ export default function CreateRequestPage() {
       return [{ ...first, firstName: customer.firstName ?? "", lastName: customer.lastName ?? "" }, ...prev.slice(1)];
     });
   }
+
+  useEffect(() => {
+    if (!customerIsTraveler) return;
+    const firstName = customerMode === "existing" ? selectedCustomer?.firstName : newCustomer.firstName;
+    const lastName = customerMode === "existing" ? selectedCustomer?.lastName : newCustomer.lastName;
+    if (!firstName && !lastName) return;
+    setTravelers((prev) => {
+      if (prev.length === 0) return prev;
+      const first = prev[0];
+      if (first.firstName === (firstName ?? "") && first.lastName === (lastName ?? "")) return prev;
+      return [{ ...first, firstName: firstName ?? first.firstName, lastName: lastName ?? first.lastName }, ...prev.slice(1)];
+    });
+  }, [customerIsTraveler, customerMode, selectedCustomer?.firstName, selectedCustomer?.lastName, newCustomer.firstName, newCustomer.lastName]);
 
   useEffect(() => {
     Promise.all([
@@ -336,7 +360,22 @@ export default function CreateRequestPage() {
         ...(salePrice ? { displayedPrice: Number(salePrice), displayedCurrency: currency } : {}),
         quantity: travelers.length,
         travelerCount: travelers.length,
-        travelers: travelers.map((t) => ({ firstName: t.firstName.trim(), lastName: t.lastName.trim(), birthDate: t.birthDate })),
+        travelers: travelers.map((t) => ({
+          firstName: t.firstName.trim(),
+          lastName: t.lastName.trim(),
+          birthDate: t.birthDate,
+          citizenship: t.citizenship || undefined,
+          passportNumber: t.passportNumber || undefined,
+          passportExpiry: t.passportExpiry || undefined,
+        })),
+        tripDetails: {
+          ...(rows[0]?.data ?? {}),
+          dateFrom: serviceStart || undefined,
+          dateTo: serviceEnd || undefined,
+          adults: travelerStats.adults,
+          children: travelerStats.children,
+          childAges: travelerStats.childAges,
+        },
         services: rows.map((s) => ({ serviceType: s.kind, supplierCode: s.supplierCode || undefined, supplierName: s.supplierName || undefined, title: s.title || s.data.hotelName || kindLabel(locale, s.kind), data: { ...s.data, salePrice, costPrice, currency, startDate: serviceStart, endDate: serviceEnd } })),
       };
       const created = await api.post<{ id: string; referenceNumber: string; commerceSequence?: string }>("/requests", payload);
@@ -502,7 +541,7 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
   const label = "grid gap-1 text-[11px] font-medium text-ink/60";
   const d = service.data;
   const [hotelSearch, setHotelSearch] = useState(d.hotelName ?? service.title ?? "");
-  const [hotelResults, setHotelResults] = useState<Array<{ id: string; name: string; suppliers?: string[] }>>([]);
+  const [hotelResults, setHotelResults] = useState<Array<{ id: string; name: string; suppliers?: string[]; countryCode?: string; cityName?: string; resortName?: string }>>([]);
   useEffect(() => {
     if (service.kind !== "HOTEL" && service.kind !== "TOUR_PACKAGE") return;
     const query = hotelSearch.trim();
@@ -511,22 +550,50 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
       const params = new URLSearchParams({ limit: "20" });
       if (d.country) params.set("country", d.country);
       if (query) params.set("q", query);
-      api.get<Array<{ id: string; name: string; suppliers?: string[] }>>(`/hotel-directory/hotels?${params.toString()}`)
+      api.get<Array<{ id: string; name: string; suppliers?: string[]; countryCode?: string; cityName?: string; resortName?: string }>>(`/hotel-directory/hotels?${params.toString()}`)
         .then((rows) => setHotelResults(Array.isArray(rows) ? rows : [])).catch(() => setHotelResults([]));
     }, 250);
     return () => window.clearTimeout(timer);
   }, [hotelSearch, d.country, d.city, service.kind]);
-  const chooseHotel = (hotel: { id: string; name: string; suppliers?: string[] }) => {
+  useEffect(() => {
+    if (!d.city || d.cityId || cities.length === 0) return;
+    const match = cities.find((city) => (city.names[locale] ?? city.names.ru ?? city.code).toLowerCase() === String(d.city).toLowerCase());
+    if (match) onData("cityId", match.id);
+  }, [cities, d.city, d.cityId, locale, onData]);
+
+  const chooseHotel = (hotel: { id: string; name: string; suppliers?: string[]; countryCode?: string; cityName?: string; resortName?: string }) => {
     setHotelSearch(hotel.name);
     onSelectHotel({ id: hotel.id, title: hotel.name });
     onData("hotelName", hotel.name);
+    if (hotel.countryCode) {
+      const country = countries.find((c) => c.code === hotel.countryCode);
+      if (country) {
+        setSelectedCountryId(country.id);
+        onData("country", country.code);
+      }
+    }
+    const cityName = hotel.cityName || hotel.resortName;
+    if (cityName) onData("city", cityName);
     if (hotel.suppliers?.[0] && !service.supplierCode) onChange({ supplierCode: hotel.suppliers[0], supplierName: hotel.suppliers[0] });
+    setHotelResults([]);
   };
   const supplier = <label className={label}>{tr("Поставщик услуги", "Xidmət təchizatçısı", "Service supplier")}<select className={input} value={service.supplierCode} onChange={(e) => { const code = e.target.value; const row = suppliers.find((s) => s.code === code); onChange({ supplierCode: code, supplierName: row?.name ?? "" }); }}><option value="">{tr("Выберите", "Seçin", "Select")}</option>{suppliers.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}</select></label>;
 
   if (service.kind === "HOTEL" || service.kind === "TOUR_PACKAGE") return <div className="grid gap-3 sm:grid-cols-2">
     {supplier}
-    <label className={label}>{tr("Название отеля", "Otel adı", "Hotel name")}<input className={input} value={hotelSearch} onChange={(e) => { setHotelSearch(e.target.value); onData("hotelName", e.target.value); }} placeholder={tr("Начните вводить название отеля", "Otel adını yazmağa başlayın", "Start typing a hotel name")} /></label>
+    <label className={`${label} relative`}>{tr("Название отеля", "Otel adı", "Hotel name")}
+      <input className={input} value={hotelSearch} onChange={(e) => { setHotelSearch(e.target.value); onData("hotelName", e.target.value); }} placeholder={tr("Начните вводить название отеля", "Otel adını yazmağa başlayın", "Start typing a hotel name")} />
+      {hotelResults.length > 0 && (
+        <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-52 overflow-auto rounded-lg border border-line bg-white shadow-xl">
+          {hotelResults.map((p) => (
+            <button key={p.id} type="button" onClick={() => chooseHotel(p)} className="flex w-full items-center justify-between border-b px-3 py-2 text-left text-[11px] last:border-0 hover:bg-panel">
+              <span>{p.name}</span>
+              <span className="text-ink/60">{p.resortName ?? p.cityName ?? p.suppliers?.join(", ")}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </label>
     <label className={label}>{tr("Страна", "Ölkə", "Country")}<Combobox options={countries.map((c) => ({ value: c.id, label: c.names[locale] ?? c.names.ru ?? c.code }))} value={selectedCountryId} onChange={(v) => { setSelectedCountryId(v); const row = countries.find((c) => c.id === v); onData("country", row?.code ?? ""); }} placeholder={tr("Начните вводить страну", "Ölkə adını yazın", "Start typing a country")} /></label>
     <label className={label}>{tr("Город", "Şəhər", "City")}<Combobox options={cities.map((c) => ({ value: c.id, label: c.names[locale] ?? c.names.ru ?? c.code }))} value={d.cityId ?? ""} onChange={(v) => { const row = cities.find((c) => c.id === v); onData("cityId", v); onData("city", row?.code ?? row?.names[locale] ?? ""); }} placeholder={tr("Начните вводить город", "Şəhər adını yazın", "Start typing a city")} /></label>
     <label className={label}>{tr("Заезд", "Giriş", "Check-in")}<DateTextInput className={input} value={d.checkIn ?? ""} onChange={(v) => onData("checkIn", v)} /></label>
@@ -538,7 +605,7 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
     <label className={label}>{tr("Взрослых", "Böyüklər", "Adults")}<input type="number" min="1" className={input} value={d.adults ?? "2"} onChange={(e) => onData("adults", e.target.value)} /></label>
     <label className={label}>{tr("Детей", "Uşaqlar", "Children")}<input type="number" min="0" className={input} value={d.children ?? "0"} onChange={(e) => onData("children", e.target.value)} /></label>
     <label className={label}>{tr("Возраст детей", "Uşaqların yaşı", "Children ages")}<input className={input} value={d.childrenAges ?? ""} onChange={(e) => onData("childrenAges", e.target.value)} /></label>
-    {hotelResults.length > 0 && <div className="sm:col-span-2"><div className="mb-1 text-[10px] text-ink/60">{tr("Найденные отели поставщиков", "Təchizatçı otelləri", "Supplier hotels")}</div><div className="max-h-48 overflow-auto rounded-lg border">{hotelResults.map((p) => <button key={p.id} type="button" onClick={() => chooseHotel(p)} className="flex w-full items-center justify-between border-b px-2 py-1.5 text-left text-[11px] last:border-0 hover:bg-panel"><span>{p.name}</span><span className="text-ink/60">{p.suppliers?.join(", ")}</span></button>)}</div></div>}
+
   </div>;
 
   if (service.kind === "FLIGHT") {

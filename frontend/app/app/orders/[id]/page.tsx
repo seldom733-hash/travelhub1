@@ -145,6 +145,7 @@ export default function OrderDetailPage() {
   // Prompt §4: + Создать платеж из Order detail (RBAC finance.payment.create);
   // orderId фиксирован — текущий Order заменить нельзя.
   const canCreatePayment = useCan("finance.payment.create");
+  const trip = (order?.pinnedRequirements ?? {}) as Record<string, unknown>;
   const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
   const [supplierPaymentOpen, setSupplierPaymentOpen] = useState(false);
   const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
@@ -355,6 +356,16 @@ export default function OrderDetailPage() {
               )}
               <EntityField label={t("reqflow.travelers", locale)} value={order.travelerCount ?? null} />
               <EntityField label={t("crm.col.created", locale)} value={formatTs(order.createdAt, locale)} />
+            </EntityFieldGrid>
+          </EntitySectionCard>
+
+          <EntitySectionCard title={t("order.trip.title", locale)}>
+            <EntityFieldGrid>
+              <EntityField label={t("order.trip.country", locale)} value={(trip.country as string) || "—"} />
+              <EntityField label={t("order.trip.hotel", locale)} value={(trip.hotelName as string) || "—"} />
+              <EntityField label={t("order.trip.dates", locale)} value={[trip.dateFrom, trip.dateTo].filter(Boolean).join(" — ") || "—"} />
+              <EntityField label={t("order.trip.adults", locale)} value={trip.adults != null ? String(trip.adults) : "—"} />
+              <EntityField label={t("order.trip.children", locale)} value={trip.children != null ? String(trip.children) : "—"} />
             </EntityFieldGrid>
           </EntitySectionCard>
 
