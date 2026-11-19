@@ -216,9 +216,8 @@ export function computeAvailableOrderActions(
   activeBlockingBookings = 0,
   freeOrderItems?: number,
   hasCapturedClientPayment = true,
-  /** Request→Order: traveler data is supplied by the accepted Request, so the
-   * "waiting for data" round-trip is not applicable. */
-  convertedFromRequest = false,
+  /** Manual request with copied travelers: no "waiting for data" round-trip. */
+  manualRequestWithTravelers = false,
 ): OrderAction[] {
   const d3Scope = (order.travelerCount ?? 0) > 0 && order.termsAcceptedAt !== null;
   const actions: OrderAction[] = [];
@@ -226,7 +225,7 @@ export function computeAvailableOrderActions(
     const t = TRANSITIONS[action];
     if (!t.from.includes(order.status)) continue;
     if (!granted.includes(ACTION_PERMISSIONS[action])) continue;
-    if (convertedFromRequest && action === "markWaitingData") continue;
+    if (manualRequestWithTravelers && action === "markWaitingData") continue;
     // Stage 2 fix (Bug 2): блокирует только реально активный Booking;
     // исторический (returned/cancelled) не должен прятать кнопку.
     if ((action === "returnToRequest" || action === "cancel" || action === "complete" || action === "close") && activeBlockingBookings > 0) continue;
@@ -1284,16 +1283,22 @@ export class OrderService {
     })) > 0;
     const linkedRequest = await this.prisma.request.findFirst({
       where: { convertedOrderId: order.id },
-      select: { id: true, referenceNumber: true, status: true, code: true },
+      select: { id: true, referenceNumber: true, status: true, code: true, productSnapshot: true },
       orderBy: { createdAt: "desc" },
     });
+    // Manual request-created orders already carry the traveler composition.
+    // A request created from a public product offer may have no travelers yet
+    // and still needs the "waiting for data" step.
+    const manualRequestWithTravelers = Boolean(
+      linkedRequest && !linkedRequest.productSnapshot && order.travelers.length > 0,
+    );
     const availableActions = computeAvailableOrderActions(
       order,
       grantedPermissions,
       activeBlockingBookings,
       freeOrderItems,
       hasCapturedClientPayment,
-      Boolean(linkedRequest),
+      manualRequestWithTravelers,
     );
 
     // D5 §12: связанная бронь — exactly linked Booking для этого Order (V1: 1:1).
