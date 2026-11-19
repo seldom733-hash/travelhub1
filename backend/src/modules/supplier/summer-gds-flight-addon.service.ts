@@ -181,15 +181,8 @@ export class SummerGdsFlightAddonService {
       const airport = SummerGdsFlightAddonService.GDS_AIRPORT[p];
       if (airport) return airport;
     }
-    return this.airportOfText(
-      `${query.destination ?? ""} ${query.tourIncName ?? ""} ${(query.tourIncNames ?? []).join(" ")}`,
-    );
-  }
-
-  private airportOfText(text: string): string | null {
-    const value = text.toLowerCase();
-    if (/antalya|белек|кемер|сиде|алания/.test(value)) return "AYT";
-    if (/istanbul|стамбул/.test(value)) return "IST";
+    // Do NOT infer GDS from the destination name: Summer also sells regular
+    // packages to Antalya/Istanbul, and those must not receive the AZAL add-on.
     return null;
   }
 
