@@ -94,7 +94,7 @@ type DealRow = {
   supplierBasePriceAzn: string;
   channel: string;
   trip: { country: string | null; dateFrom: string | null; dateTo: string | null; nights: number | null; adults: number | null; children: number | null };
-  services: Array<{ id: string; title: string; type: string; serviceDate: string | null; clientPrice: string; cost: string; income: string; mediaId: string | null }>;
+  services: Array<{ id: string; title: string; type: string; serviceDate: string | null; dateFrom?: string | null; dateTo?: string | null; supplierName?: string | null; clientPrice: string; cost: string; income: string; mediaId: string | null }>;
   markupAmount: string;
   commissionAmount: string;
   clientReceived: string;
@@ -538,23 +538,34 @@ export class DealsService {
       const itemRows = order?.items ?? [];
       const configuredServices = requestServicesByRequest.get(request.id) ?? [];
       const services = configuredServices.length > 0
-        ? configuredServices.map((service) => ({
-            id: service.id,
-            title: service.title || service.supplierName || service.serviceType,
-            type: service.serviceType,
-            serviceDate: dateFrom,
-            clientPrice: fixed(0),
-            cost: fixed(0),
-            income: fixed(0),
-            mediaId: null,
-          }))
+        ? configuredServices.map((service) => {
+            const data = (service.data ?? {}) as Record<string, unknown>;
+            const lineFrom = String(data.startDate ?? data.checkIn ?? data.departureDate ?? data.travelDate ?? dateFrom ?? "") || null;
+            const lineTo = String(data.endDate ?? data.checkOut ?? data.arrivalDate ?? dateTo ?? "") || null;
+            const lineSale = money(data.salePrice as string | number | null | undefined);
+            const lineCost = money(data.costPrice as string | number | null | undefined);
+            return {
+              id: service.id,
+              title: service.title || service.supplierName || service.serviceType,
+              type: service.serviceType,
+              serviceDate: lineFrom,
+              dateFrom: lineFrom,
+              dateTo: lineTo,
+              supplierName: service.supplierName ?? null,
+              clientPrice: fixed(lineSale),
+              cost: fixed(lineCost),
+              income: fixed(lineSale - lineCost),
+              mediaId: null,
+            };
+          })
         : itemRows.length > 0
         ? itemRows.map((item) => {
             const itemAmount = money(item.amount);
             const itemCost = sales > 0 ? cost * (itemAmount / sales) : 0;
-            return { id: item.id, title: item.title, type: item.type, serviceDate: item.serviceDate ? item.serviceDate.toISOString() : null, clientPrice: fixed(itemAmount), cost: fixed(itemCost), income: fixed(itemAmount - itemCost), mediaId: mediaByProduct.get(item.productId ?? "") ?? null };
+            const itemDate = item.serviceDate ? item.serviceDate.toISOString() : null;
+            return { id: item.id, title: item.title, type: item.type, serviceDate: itemDate, dateFrom: itemDate, dateTo: itemDate, supplierName: null, clientPrice: fixed(itemAmount), cost: fixed(itemCost), income: fixed(itemAmount - itemCost), mediaId: mediaByProduct.get(item.productId ?? "") ?? null };
           })
-        : [{ id: request.id, title: String(snapshot.productTitle ?? product?.title ?? "—"), type: String(snapshot.type ?? product?.type ?? "—"), serviceDate: dateFrom, clientPrice: fixed(sales), cost: fixed(cost), income: fixed(expectedIncome), mediaId: null }];
+        : [{ id: request.id, title: String(snapshot.productTitle ?? product?.title ?? "—"), type: String(snapshot.type ?? product?.type ?? "—"), serviceDate: dateFrom, dateFrom, dateTo, supplierName: null, clientPrice: fixed(sales), cost: fixed(cost), income: fixed(expectedIncome), mediaId: null }];
       return {
         sequence: request.commerceSequence,
         requestId: request.id,
