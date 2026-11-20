@@ -48,8 +48,8 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     headingKey: "nav.group.operations",
     items: [
-      { href: "/app/finance/deals", icon: "📊", labelKey: "nav.finance_deals", permission: "finance.overview.read" },
       { href: "/app/requests/create", icon: "➕", labelKey: "nav.request_create", permission: "order.edit_noncritical" },
+      { href: "/app/finance/deals", icon: "📊", labelKey: "nav.finance_deals", permission: "finance.overview.read" },
       { href: "/app/documents", icon: "📄", labelKey: "nav.documents", permission: "documents.read" },
     ],
   },
@@ -147,6 +147,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const locale = useLocale();
   const [mounted, setMounted] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [pendingPayments, setPendingPayments] = useState(0);
   const [unreadRequests, setUnreadRequests] = useState(0);
   const [dealNotifications, setDealNotifications] = useState(0);
@@ -167,6 +168,16 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     window.addEventListener("resize", apply);
     return () => window.removeEventListener("resize", apply);
   }, []);
+
+  // Keep the group containing the current route expanded on navigation.
+  useEffect(() => {
+    const activeGroup = NAV_GROUPS.find((group) =>
+      group.headingKey && group.items.some((item) => isDashboardPath(item.href, pathname)),
+    );
+    if (activeGroup?.headingKey) {
+      setOpenGroups((prev) => (prev[activeGroup.headingKey!] ? prev : { ...prev, [activeGroup.headingKey!]: true }));
+    }
+  }, [pathname]);
 
   // Sync ref for animations / effects.
   useEffect(() => {
@@ -307,11 +318,17 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             return (
               <div key={gi}>
                 {group.headingKey && !collapsed && (
-                  <div className="mt-4 mb-1 px-5 text-[10px] font-semibold uppercase tracking-wider text-white/50">
-                    {t(group.headingKey, locale)}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOpenGroups((prev) => ({ ...prev, [group.headingKey!]: !prev[group.headingKey!] }))}
+                    className="mt-4 mb-1 flex w-full items-center justify-between px-5 text-[10px] font-semibold uppercase tracking-wider text-white/50 hover:text-white/80"
+                    aria-expanded={Boolean(openGroups[group.headingKey!])}
+                  >
+                    <span>{t(group.headingKey, locale)}</span>
+                    <span className="text-[9px]">{openGroups[group.headingKey!] ? "▲" : "▼"}</span>
+                  </button>
                 )}
-                {visibleItems.map((item) => {
+                {(collapsed || !group.headingKey || openGroups[group.headingKey!]) && visibleItems.map((item) => {
                   const active = isDashboardPath(item.href, pathname);
                   const label = t(item.labelKey, locale);
                   return (
