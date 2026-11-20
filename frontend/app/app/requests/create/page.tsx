@@ -369,7 +369,7 @@ export default function CreateRequestPage() {
       ? services.filter((s) => s.enabled)
       : [primaryService()];
     if (rows.length === 0) { setError(tr("Добавьте хотя бы одну услугу", "Ən azı bir xidmət əlavə edin", "Add at least one service")); return; }
-    if (rows.some((s) => !s.supplierCode)) { setError(tr("Выберите поставщика для каждой услуги", "Hər xidmət üçün təchizatçı seçin", "Select a supplier for each service")); return; }
+    if (rows.some((s) => !s.supplierCode && s.kind !== "VISA")) { setError(tr("Выберите поставщика для каждой услуги", "Hər xidmət üçün təchizatçı seçin", "Select a supplier for each service")); return; }
     setBusy(true);
     try {
       const customerId = await createCustomerIfNeeded();
@@ -400,7 +400,7 @@ export default function CreateRequestPage() {
           children: travelerStats.children,
           childAges: travelerStats.childAges,
         },
-        services: rows.map((s) => ({ serviceType: s.kind, supplierCode: s.supplierCode || undefined, supplierName: s.supplierName || undefined, title: s.title || s.data.hotelName || kindLabel(locale, s.kind), data: { ...s.data, salePrice, costPrice, currency, startDate: serviceStart, endDate: serviceEnd } })),
+        services: rows.map((s) => ({ serviceType: s.kind, supplierCode: s.supplierCode === "NO_SUPPLIER" ? undefined : s.supplierCode || undefined, supplierName: s.supplierName || undefined, title: s.title || s.data.hotelName || kindLabel(locale, s.kind), data: { ...s.data, salePrice, costPrice, currency, startDate: serviceStart, endDate: serviceEnd } })),
       };
       const created = await api.post<{ id: string; referenceNumber: string; commerceSequence?: string }>("/requests", payload);
       setResult(created);
@@ -625,7 +625,7 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
     setHotelOpen(false);
     setHotelResults([]);
   };
-  const supplier = <label className={label}>{tr("Поставщик услуги", "Xidmət təchizatçısı", "Service supplier")}<select className={input} value={service.supplierCode} onChange={(e) => { const code = e.target.value; const row = suppliers.find((s) => s.code === code); onChange({ supplierCode: code, supplierName: row?.name ?? "" }); }}><option value="">{tr("Выберите", "Seçin", "Select")}</option>{suppliers.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}</select></label>;
+  const supplier = <label className={label}>{tr("Поставщик услуги", "Xidmət təchizatçısı", "Service supplier")}<select className={input} value={service.supplierCode} onChange={(e) => { const code = e.target.value; const row = suppliers.find((s) => s.code === code); onChange({ supplierCode: code, supplierName: code === "NO_SUPPLIER" ? "" : row?.name ?? "" }); }}><option value="">{tr("Выберите", "Seçin", "Select")}</option>{service.kind === "VISA" && <option value="NO_SUPPLIER">{tr("Без поставщика", "Təchizatçı olmadan", "Without supplier")}</option>}{suppliers.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}</select></label>;
 
   if (service.kind === "HOTEL" || service.kind === "TOUR_PACKAGE") return <div className="grid gap-3 sm:grid-cols-2">
     {supplier}
