@@ -349,6 +349,10 @@ export default function CreateRequestPage() {
     return from || "—";
   }
 
+  const savedServices = services.filter((s) => savedServiceKeys.includes(s.key));
+  const packageTotalCost = savedServices.reduce((sum, s) => sum + Number(s.data.costPrice || costPrice || 0), 0);
+  const packageTotalSale = savedServices.reduce((sum, s) => sum + Number(s.data.salePrice || salePrice || 0), 0);
+
   function primaryService(): ServiceDraft {
     if (requestType === "CUSTOM_PACKAGE") {
       return services.find((s) => s.kind === activePackageKind && s.enabled) ?? ensureService(activePackageKind);
@@ -392,13 +396,15 @@ export default function CreateRequestPage() {
     try {
       const customerId = await createCustomerIfNeeded();
       const firstDate = rows.map((s) => s.data.startDate || s.data.checkIn || s.data.departureDate || s.data.travelDate || "").find(Boolean) || undefined;
+      const packageSaleTotal = rows.reduce((sum, s) => sum + Number(s.data.salePrice || salePrice || 0), 0);
+      const effectiveSalePrice = requestType === "CUSTOM_PACKAGE" ? packageSaleTotal : Number(salePrice || 0);
       const payload = {
         ...(customerId ? { customerId } : {}),
         ...(managerId ? { assignedManagerId: managerId } : {}),
         requestType,
         primarySupplierCode: primarySupplierCode || rows[0]?.supplierCode || undefined,
         requestedServiceDate: serviceStart || firstDate,
-        ...(salePrice ? { displayedPrice: Number(salePrice), displayedCurrency: currency } : {}),
+        ...(effectiveSalePrice > 0 ? { displayedPrice: effectiveSalePrice, displayedCurrency: currency } : {}),
         quantity: travelers.length,
         travelerCount: travelers.length,
         travelers: travelers.map((t) => ({
@@ -418,7 +424,17 @@ export default function CreateRequestPage() {
           children: travelerStats.children,
           childAges: travelerStats.childAges,
         },
-        services: rows.map((s) => ({ serviceType: s.kind, supplierCode: s.supplierCode === "NO_SUPPLIER" ? undefined : s.supplierCode || undefined, supplierName: s.supplierName || undefined, title: s.title || s.data.hotelName || kindLabel(locale, s.kind), data: { ...s.data, salePrice, costPrice, currency, startDate: serviceStart, endDate: serviceEnd } })),
+        services: rows.map((s) => {
+          const lineCost = s.data.costPrice || costPrice;
+          const lineSale = s.data.salePrice || salePrice;
+          return {
+            serviceType: s.kind,
+            supplierCode: s.supplierCode === "NO_SUPPLIER" ? undefined : s.supplierCode || undefined,
+            supplierName: s.supplierName || undefined,
+            title: s.title || s.data.hotelName || kindLabel(locale, s.kind),
+            data: { ...s.data, salePrice: lineSale, costPrice: lineCost, currency, startDate: serviceStart, endDate: serviceEnd },
+          };
+        }),
       };
       const created = await api.post<{ id: string; referenceNumber: string; commerceSequence?: string }>("/requests", payload);
       setResult(created);
@@ -490,16 +506,6 @@ export default function CreateRequestPage() {
       <select className={input} value={managerId} onChange={(e) => setManagerId(e.target.value)}><option value="">{tr("Автоматическое распределение", "Avtomatik paylama", "Automatic distribution")}</option>{managers.map((m) => <option key={m.userId} value={m.userId}>{m.name} · {m.active ?? 0}</option>)}</select>
     </section>
 
-    <section className="rounded-xl border border-line bg-white p-4 shadow-sm">
-      <h2 className="mb-3 text-sm font-semibold">{tr("Цены и сроки услуги", "Qiymətlər və xidmət müddəti", "Prices and service dates")}</h2>
-      <div className="grid gap-3 sm:grid-cols-5">
-        <label className={label}>{tr("Себестоимость", "Maya dəyəri", "Cost")}<input className={input} inputMode="decimal" value={costPrice} onChange={(e) => setCostPrice(e.target.value.replace(",", "."))} /></label>
-        <label className={label}>{tr("Цена продажи", "Satış qiyməti", "Sale price")}<input className={input} inputMode="decimal" value={salePrice} onChange={(e) => setSalePrice(e.target.value.replace(",", "."))} /></label>
-        <label className={label}>{tr("Валюта", "Valyuta", "Currency")}<select className={input} value={currency} onChange={(e) => setCurrency(e.target.value)}><option value="AZN">AZN</option><option value="USD">USD</option><option value="EUR">EUR</option></select></label>
-        <label className={label}>{tr("Начало услуги", "Xidmətin başlanğıcı", "Service start")}<DateTextInput className={input} value={serviceStart} onChange={setServiceStart} /></label>
-        <label className={label}>{tr("Конец услуги", "Xidmətin sonu", "Service end")}<DateTextInput className={input} value={serviceEnd} onChange={setServiceEnd} /></label>
-      </div>
-    </section>
 
     <section className="rounded-xl border border-line bg-white p-4 shadow-sm">
       <h2 className="mb-3 text-sm font-semibold">{tr("Туристы", "Turistlər", "Travelers")}</h2>
@@ -550,19 +556,34 @@ export default function CreateRequestPage() {
           <div className="border-b bg-panel px-3 py-2 text-xs font-semibold">
             {tr("Сохранённые услуги", "Yadda saxlanılan xidmətlər", "Saved services")}
           </div>
-          {services.filter((s) => savedServiceKeys.includes(s.key)).map((s) => (
+          {savedServices.map((s) => (
             <div key={s.key} className="flex flex-wrap items-center gap-3 border-b px-3 py-2 text-xs last:border-0">
               <span className="min-w-32 font-semibold">{kindLabel(locale, s.kind)}</span>
               <span className="text-ink/60">{s.supplierName || tr("Без поставщика", "Təchizatçı olmadan", "Without supplier")}</span>
               <span className="text-ink/60">{serviceDates(s)}</span>
-              <span className="font-mono">{costPrice || "—"} / {salePrice || "—"} {currency}</span>
+              <span className="font-mono">{s.data.costPrice || costPrice || "—"} / {s.data.salePrice || salePrice || "—"} {currency}</span>
               <button type="button" onClick={() => deleteService(s.key)} className="ml-auto font-semibold text-rose-600 hover:text-rose-700">
                 {tr("Удалить", "Sil", "Delete")}
               </button>
             </div>
           ))}
+          <div className="flex flex-wrap items-center gap-3 bg-panel px-3 py-2 text-xs font-semibold">
+            <span>{tr("Итого по пакету", "Paket üzrə cəmi", "Package total")}</span>
+            <span className="ml-auto font-mono">{packageTotalCost.toFixed(2)} / {packageTotalSale.toFixed(2)} {currency}</span>
+          </div>
         </div>
       )}
+    </section>
+
+    <section className="rounded-xl border border-line bg-white p-4 shadow-sm">
+      <h2 className="mb-3 text-sm font-semibold">{tr("Цены и сроки услуги", "Qiymətlər və xidmət müddəti", "Prices and service dates")}</h2>
+      <div className="grid gap-3 sm:grid-cols-5">
+        <label className={label}>{tr("Себестоимость", "Maya dəyəri", "Cost")}<input className={input} inputMode="decimal" value={costPrice} onChange={(e) => setCostPrice(e.target.value.replace(",", "."))} /></label>
+        <label className={label}>{tr("Цена продажи", "Satış qiyməti", "Sale price")}<input className={input} inputMode="decimal" value={salePrice} onChange={(e) => setSalePrice(e.target.value.replace(",", "."))} /></label>
+        <label className={label}>{tr("Валюта", "Valyuta", "Currency")}<select className={input} value={currency} onChange={(e) => setCurrency(e.target.value)}><option value="AZN">AZN</option><option value="USD">USD</option><option value="EUR">EUR</option></select></label>
+        <label className={label}>{tr("Начало услуги", "Xidmətin başlanğıcı", "Service start")}<DateTextInput className={input} value={serviceStart} onChange={setServiceStart} /></label>
+        <label className={label}>{tr("Конец услуги", "Xidmətin sonu", "Service end")}<DateTextInput className={input} value={serviceEnd} onChange={setServiceEnd} /></label>
+      </div>
     </section>
 
     <div className="flex justify-end gap-2 pb-8"><Link href="/app/finance/deals" className="rounded-lg border px-4 py-2 text-sm">{tr("Отмена", "Ləğv et", "Cancel")}</Link><button type="button" disabled={busy} onClick={() => void submit()} className="rounded-lg bg-[#0f6b5f] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? tr("Создание…", "Yaradılır…", "Creating…") : tr("Создать запрос", "Sorğu yarat", "Create request")}</button></div>
@@ -668,9 +689,13 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
     setHotelResults([]);
   };
   const supplier = <label className={label}>{tr("Поставщик услуги", "Xidmət təchizatçısı", "Service supplier")}<select className={input} value={service.supplierCode} onChange={(e) => { const code = e.target.value; const row = suppliers.find((s) => s.code === code); onChange({ supplierCode: code, supplierName: code === "NO_SUPPLIER" ? "" : row?.name ?? "" }); }}><option value="">{tr("Выберите", "Seçin", "Select")}</option>{service.kind === "VISA" && <option value="NO_SUPPLIER">{tr("Без поставщика", "Təchizatçı olmadan", "Without supplier")}</option>}{suppliers.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}</select></label>;
+  const servicePriceFields = <div className="grid gap-3 sm:grid-cols-2 sm:col-span-2">
+    <label className={label}>{tr("Себестоимость услуги", "Xidmətin maya dəyəri", "Service cost")}<input className={input} inputMode="decimal" value={d.costPrice ?? ""} onChange={(e) => onData("costPrice", e.target.value.replace(",", "."))} /></label>
+    <label className={label}>{tr("Цена услуги", "Xidmətin qiyməti", "Service price")}<input className={input} inputMode="decimal" value={d.salePrice ?? ""} onChange={(e) => onData("salePrice", e.target.value.replace(",", "."))} /></label>
+  </div>;
 
   if (service.kind === "HOTEL" || service.kind === "TOUR_PACKAGE") return <div className="grid gap-3 sm:grid-cols-2">
-    {supplier}
+    {supplier}{servicePriceFields}
     <label className={`${label} relative`}>{tr("Название отеля", "Otel adı", "Hotel name")}
       <input className={input} value={hotelSearch} onClick={() => setHotelOpen((open) => !open)} onBlur={() => window.setTimeout(() => setHotelOpen(false), 150)} onChange={(e) => { setHotelSearch(e.target.value); setHotelOpen(true); onData("hotelName", e.target.value); }} placeholder={tr("Начните вводить название отеля", "Otel adını yazmağa başlayın", "Start typing a hotel name")} />
       {hotelOpen && hotelResults.length > 0 && (
@@ -701,7 +726,7 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
   if (service.kind === "FLIGHT") {
     const segments = JSON.parse(d.segments || '[{"from":"","to":"","departureDate":"","arrivalDate":"","airline":"","class":"","fare":"","baggage":"","carryOn":""}]');
     const saveSegments = (rows: any[]) => onData("segments", JSON.stringify(rows));
-    return <div className="space-y-3">{supplier}{segments.map((seg: any, i: number) => <div key={i} className="rounded-lg border p-3"><div className="mb-2 text-[11px] font-semibold">{tr("Сегмент", "Seqment", "Segment")} {i + 1}</div><div className="grid gap-2 sm:grid-cols-3">
+    return <div className="space-y-3">{supplier}{servicePriceFields}{segments.map((seg: any, i: number) => <div key={i} className="rounded-lg border p-3"><div className="mb-2 text-[11px] font-semibold">{tr("Сегмент", "Seqment", "Segment")} {i + 1}</div><div className="grid gap-2 sm:grid-cols-3">
       <label className={label}>{tr("Откуда", "Haradan", "From")}<input className={input} value={seg.from} onChange={(e) => { const rows = [...segments]; rows[i] = { ...seg, from: e.target.value }; saveSegments(rows); }} /></label>
       <label className={label}>{tr("Куда", "Hara", "To")}<input className={input} value={seg.to} onChange={(e) => { const rows = [...segments]; rows[i] = { ...seg, to: e.target.value }; saveSegments(rows); }} /></label>
       <label className={label}>{tr("Вылет", "Uçuş", "Departure")}<input type="datetime-local" className={input} value={seg.departureDate} onChange={(e) => { const rows = [...segments]; rows[i] = { ...seg, departureDate: e.target.value }; saveSegments(rows); }} /></label>
@@ -713,13 +738,13 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
     </div></div>)}<div className="flex gap-2"><button type="button" className="rounded border px-3 py-1.5 text-xs" onClick={() => { const reversed = { ...segments[0], from: segments[0]?.to ?? "", to: segments[0]?.from ?? "" }; saveSegments([...segments, reversed]); }}>+ {tr("Добавить обратный рейс", "Geri uçuş əlavə et", "Add return flight")}</button><button type="button" className="rounded border px-3 py-1.5 text-xs" onClick={() => saveSegments([...segments, { from: "", to: "", departureDate: "", arrivalDate: "", airline: "", class: "", baggage: "", carryOn: "" }])}>+ {tr("Добавить сегмент", "Seqment əlavə et", "Add segment")}</button></div></div>;
   }
 
-  if (service.kind === "TRANSFER") return <div className="grid gap-3 sm:grid-cols-2">{supplier}<label className={label}>{tr("Место подачи", "Təqdim yeri", "Pickup")}<input className={input} value={d.from ?? ""} onChange={(e) => onData("from", e.target.value)} /></label><label className={label}>{tr("Назначение", "Təyinat", "Destination")}<input className={input} value={d.to ?? ""} onChange={(e) => onData("to", e.target.value)} /></label><label className={label}>{tr("Дата и время", "Tarix və vaxt", "Date/time")}<input type="datetime-local" className={input} value={d.datetime ?? ""} onChange={(e) => onData("datetime", e.target.value)} /></label><label className={label}>{tr("Пассажиры", "Sərnişinlər", "Passengers")}<input type="number" className={input} value={d.passengers ?? "1"} onChange={(e) => onData("passengers", e.target.value)} /></label><label className={label}>{tr("Транспорт", "Nəqliyyat", "Vehicle")}<input className={input} value={d.vehicle ?? ""} onChange={(e) => onData("vehicle", e.target.value)} /></label><label className={label}>{tr("Комментарий", "Şərh", "Comment")}<input className={input} value={d.comment ?? ""} onChange={(e) => onData("comment", e.target.value)} /></label></div>;
+  if (service.kind === "TRANSFER") return <div className="grid gap-3 sm:grid-cols-2">{supplier}{servicePriceFields}<label className={label}>{tr("Место подачи", "Təqdim yeri", "Pickup")}<input className={input} value={d.from ?? ""} onChange={(e) => onData("from", e.target.value)} /></label><label className={label}>{tr("Назначение", "Təyinat", "Destination")}<input className={input} value={d.to ?? ""} onChange={(e) => onData("to", e.target.value)} /></label><label className={label}>{tr("Дата и время", "Tarix və vaxt", "Date/time")}<input type="datetime-local" className={input} value={d.datetime ?? ""} onChange={(e) => onData("datetime", e.target.value)} /></label><label className={label}>{tr("Пассажиры", "Sərnişinlər", "Passengers")}<input type="number" className={input} value={d.passengers ?? "1"} onChange={(e) => onData("passengers", e.target.value)} /></label><label className={label}>{tr("Транспорт", "Nəqliyyat", "Vehicle")}<input className={input} value={d.vehicle ?? ""} onChange={(e) => onData("vehicle", e.target.value)} /></label><label className={label}>{tr("Комментарий", "Şərh", "Comment")}<input className={input} value={d.comment ?? ""} onChange={(e) => onData("comment", e.target.value)} /></label></div>;
 
-  if (service.kind === "INSURANCE") return <div className="grid gap-3 sm:grid-cols-2">{supplier}<label className={label}>{tr("Страна действия", "Qüvvədə olan ölkə", "Coverage country")}<select className={input} value={d.country ?? ""} onChange={(e) => { const row = countries.find((c) => c.code === e.target.value || c.id === e.target.value); onData("country", row?.code ?? e.target.value); }}><option value="">{tr("Выберите страну", "Ölkə seçin", "Select country")}</option>{countries.map((c) => <option key={c.id} value={c.code}>{c.names[locale] ?? c.names.ru ?? c.code}</option>)}</select></label><label className={label}>{tr("Начало", "Başlanğıc", "Start")}<DateTextInput className={input} value={d.startDate ?? ""} onChange={(v) => onData("startDate", v)} /></label><label className={label}>{tr("Окончание", "Son", "End")}<DateTextInput className={input} value={d.endDate ?? ""} onChange={(v) => onData("endDate", v)} /></label><label className={label}>{tr("Застрахованных", "Sığortalananlar", "Insured")}<input type="number" className={input} value={d.insured ?? "1"} onChange={(e) => onData("insured", e.target.value)} /></label><label className={label}>{tr("Тип страхования", "Sığorta növü", "Insurance type")}<input className={input} value={d.insuranceType ?? ""} onChange={(e) => onData("insuranceType", e.target.value)} /></label></div>;
+  if (service.kind === "INSURANCE") return <div className="grid gap-3 sm:grid-cols-2">{supplier}{servicePriceFields}<label className={label}>{tr("Страна действия", "Qüvvədə olan ölkə", "Coverage country")}<select className={input} value={d.country ?? ""} onChange={(e) => { const row = countries.find((c) => c.code === e.target.value || c.id === e.target.value); onData("country", row?.code ?? e.target.value); }}><option value="">{tr("Выберите страну", "Ölkə seçin", "Select country")}</option>{countries.map((c) => <option key={c.id} value={c.code}>{c.names[locale] ?? c.names.ru ?? c.code}</option>)}</select></label><label className={label}>{tr("Начало", "Başlanğıc", "Start")}<DateTextInput className={input} value={d.startDate ?? ""} onChange={(v) => onData("startDate", v)} /></label><label className={label}>{tr("Окончание", "Son", "End")}<DateTextInput className={input} value={d.endDate ?? ""} onChange={(v) => onData("endDate", v)} /></label><label className={label}>{tr("Застрахованных", "Sığortalananlar", "Insured")}<input type="number" className={input} value={d.insured ?? "1"} onChange={(e) => onData("insured", e.target.value)} /></label><label className={label}>{tr("Тип страхования", "Sığorta növü", "Insurance type")}<input className={input} value={d.insuranceType ?? ""} onChange={(e) => onData("insuranceType", e.target.value)} /></label></div>;
 
-  if (service.kind === "VISA") return <div className="grid gap-3 sm:grid-cols-2">{supplier}<label className={label}>{tr("Страна назначения", "Təyinat ölkəsi", "Destination country")}<select className={input} value={d.country ?? ""} onChange={(e) => { const row = countries.find((c) => c.code === e.target.value || c.id === e.target.value); onData("country", row?.code ?? e.target.value); }}><option value="">{tr("Выберите страну", "Ölkə seçin", "Select country")}</option>{countries.map((c) => <option key={c.id} value={c.code}>{c.names[locale] ?? c.names.ru ?? c.code}</option>)}</select></label><label className={label}>{tr("Тип визы", "Viza növü", "Visa type")}<input className={input} value={d.visaType ?? ""} onChange={(e) => onData("visaType", e.target.value)} /></label><label className={label}>{tr("Заявителей", "Müraciət edənlər", "Applicants")}<input type="number" className={input} value={d.applicants ?? "1"} onChange={(e) => onData("applicants", e.target.value)} /></label><label className={label}>{tr("Дата поездки", "Səfər tarixi", "Travel date")}<DateTextInput className={input} value={d.travelDate ?? ""} onChange={(v) => onData("travelDate", v)} /></label></div>;
+  if (service.kind === "VISA") return <div className="grid gap-3 sm:grid-cols-2">{supplier}{servicePriceFields}<label className={label}>{tr("Страна назначения", "Təyinat ölkəsi", "Destination country")}<select className={input} value={d.country ?? ""} onChange={(e) => { const row = countries.find((c) => c.code === e.target.value || c.id === e.target.value); onData("country", row?.code ?? e.target.value); }}><option value="">{tr("Выберите страну", "Ölkə seçin", "Select country")}</option>{countries.map((c) => <option key={c.id} value={c.code}>{c.names[locale] ?? c.names.ru ?? c.code}</option>)}</select></label><label className={label}>{tr("Тип визы", "Viza növü", "Visa type")}<input className={input} value={d.visaType ?? ""} onChange={(e) => onData("visaType", e.target.value)} /></label><label className={label}>{tr("Заявителей", "Müraciət edənlər", "Applicants")}<input type="number" className={input} value={d.applicants ?? "1"} onChange={(e) => onData("applicants", e.target.value)} /></label><label className={label}>{tr("Дата поездки", "Səfər tarixi", "Travel date")}<DateTextInput className={input} value={d.travelDate ?? ""} onChange={(v) => onData("travelDate", v)} /></label></div>;
 
-  if (service.kind === "CRUISE") return <div className="grid gap-3 sm:grid-cols-2">{supplier}<label className={label}>{tr("Название круиза", "Kruiz adı", "Cruise name")}<input className={input} value={d.cruiseName ?? ""} onChange={(e) => onData("cruiseName", e.target.value)} /></label><label className={label}>{tr("Судно", "Gəmi", "Ship")}<input className={input} value={d.ship ?? ""} onChange={(e) => onData("ship", e.target.value)} /></label><label className={label}>{tr("Маршрут", "Marşrut", "Route")}<input className={input} value={d.route ?? ""} onChange={(e) => onData("route", e.target.value)} /></label><label className={label}>{tr("Начало", "Başlanğıc", "Start")}<DateTextInput className={input} value={d.startDate ?? ""} onChange={(v) => onData("startDate", v)} /></label><label className={label}>{tr("Окончание", "Son", "End")}<DateTextInput className={input} value={d.endDate ?? ""} onChange={(v) => onData("endDate", v)} /></label><label className={label}>{tr("Каюта", "Kabina", "Cabin")}<input className={input} value={d.cabin ?? ""} onChange={(e) => onData("cabin", e.target.value)} /></label></div>;
+  if (service.kind === "CRUISE") return <div className="grid gap-3 sm:grid-cols-2">{supplier}{servicePriceFields}<label className={label}>{tr("Название круиза", "Kruiz adı", "Cruise name")}<input className={input} value={d.cruiseName ?? ""} onChange={(e) => onData("cruiseName", e.target.value)} /></label><label className={label}>{tr("Судно", "Gəmi", "Ship")}<input className={input} value={d.ship ?? ""} onChange={(e) => onData("ship", e.target.value)} /></label><label className={label}>{tr("Маршрут", "Marşrut", "Route")}<input className={input} value={d.route ?? ""} onChange={(e) => onData("route", e.target.value)} /></label><label className={label}>{tr("Начало", "Başlanğıc", "Start")}<DateTextInput className={input} value={d.startDate ?? ""} onChange={(v) => onData("startDate", v)} /></label><label className={label}>{tr("Окончание", "Son", "End")}<DateTextInput className={input} value={d.endDate ?? ""} onChange={(v) => onData("endDate", v)} /></label><label className={label}>{tr("Каюта", "Kabina", "Cabin")}<input className={input} value={d.cabin ?? ""} onChange={(e) => onData("cabin", e.target.value)} /></label></div>;
 
-  return <div className="grid gap-3 sm:grid-cols-2">{supplier}<label className={label}>{tr("Название услуги", "Xidmətin adı", "Service name")}<input className={input} value={service.title} onChange={(e) => onChange({ title: e.target.value })} /></label><label className={label}>{tr("Описание", "Təsvir", "Description")}<input className={input} value={d.description ?? ""} onChange={(e) => onData("description", e.target.value)} /></label><label className={label}>{tr("Дата оказания", "Göstərilmə tarixi", "Service date")}<DateTextInput className={input} value={d.travelDate ?? ""} onChange={(v) => onData("travelDate", v)} /></label></div>;
+  return <div className="grid gap-3 sm:grid-cols-2">{supplier}{servicePriceFields}<label className={label}>{tr("Название услуги", "Xidmətin adı", "Service name")}<input className={input} value={service.title} onChange={(e) => onChange({ title: e.target.value })} /></label><label className={label}>{tr("Описание", "Təsvir", "Description")}<input className={input} value={d.description ?? ""} onChange={(e) => onData("description", e.target.value)} /></label><label className={label}>{tr("Дата оказания", "Göstərilmə tarixi", "Service date")}<DateTextInput className={input} value={d.travelDate ?? ""} onChange={(v) => onData("travelDate", v)} /></label></div>;
 }
