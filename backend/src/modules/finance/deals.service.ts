@@ -63,6 +63,8 @@ type DealRow = {
   orderCode: string | null;
   bookingId: string | null;
   bookingCode: string | null;
+  bookingStatus: string | null;
+  bookingCompletedAt: string | null;
   stage: "REQUEST" | "ORDER" | "BOOKING";
   stageLabel: string;
   status: string;
@@ -377,7 +379,7 @@ export class DealsService {
     const resolvedOrderIds = [...new Set([...orderIds, ...orders.map((o) => o.id)])];
     const orderProductIds = [...new Set(orders.flatMap((o) => o.items.map((i) => i.productId)).filter((id): id is string => Boolean(id)))];
     const [bookings, payments, refunds, payouts, obligations, settlements, customers, products, supplierWriteOffs, media, clientWriteOffs] = await Promise.all([
-      this.prisma.booking.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, referenceNumber: true, orderId: true, status: true, amount: true, currency: true } }),
+      this.prisma.booking.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, referenceNumber: true, orderId: true, status: true, completedAt: true, amount: true, currency: true } }),
       this.prisma.payment.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, paymentMethod: true, paidAt: true, createdAt: true, orderId: true } }),
       this.prisma.refund.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, processedAt: true, createdAt: true, orderId: true, paymentId: true } }),
       this.prisma.supplierPayout.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, direction: true, occurredAt: true, orderId: true, supplierCode: true, partnerId: true, method: true } }),
@@ -563,6 +565,8 @@ export class DealsService {
         orderCode: order?.referenceNumber ?? null,
         bookingId: booking?.id ?? null,
         bookingCode: booking?.referenceNumber ?? null,
+        bookingStatus: booking?.status ?? null,
+        bookingCompletedAt: booking?.completedAt ? booking.completedAt.toISOString() : null,
         stage,
         stageLabel: cancelled ? "Отменена" : stage === "BOOKING" ? "Бронь" : stage === "ORDER" ? "Заказ" : "Заявка",
         status,

@@ -8,6 +8,8 @@ export interface DealRow {
   orderCode: string | null;
   bookingId: string | null;
   bookingCode: string | null;
+  bookingStatus?: string | null;
+  bookingCompletedAt?: string | null;
   stage: "REQUEST" | "ORDER" | "BOOKING";
   stageLabel: string;
   status: string;
