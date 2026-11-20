@@ -163,7 +163,7 @@ function newService(kind: ServiceKind): ServiceDraft {
 }
 
 const input = "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-[#0f6b5f] focus:ring-2 focus:ring-[#0f6b5f]/10";
-const label = "grid gap-1 text-[11px] font-medium text-ink/60";
+const label = "grid gap-1 text-[11px] font-medium text-ink";
 
 export default function CreateRequestPage() {
   const locale = useLocale();
@@ -616,8 +616,8 @@ export default function CreateRequestPage() {
           {savedServices.map((s) => (
             <div key={s.key} className="flex flex-wrap items-center gap-3 border-b px-3 py-2 text-xs last:border-0">
               <span className="min-w-32 font-semibold">{kindLabel(locale, s.kind)}</span>
-              <span className="text-ink/60">{s.supplierName || tr("Без поставщика", "Təchizatçı olmadan", "Without supplier")}</span>
-              <span className="text-ink/60">{serviceDates(s)}</span>
+              <span className="text-ink">{s.supplierName || tr("Без поставщика", "Təchizatçı olmadan", "Without supplier")}</span>
+              <span className="text-ink">{serviceDates(s)}</span>
               <span className="font-mono">{s.data.costPrice || "—"} / {s.data.salePrice || "—"} {currency}</span>
               <button type="button" onClick={() => deleteService(s.key)} className="ml-auto font-semibold text-rose-600 hover:text-rose-700">
                 {tr("Удалить", "Sil", "Delete")}
@@ -704,7 +704,7 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
 }) {
   const tr = (ru: string, az: string, en: string) => (locale === "az" ? az : locale === "en" ? en : ru);
   const input = "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm";
-  const label = "grid gap-1 text-[11px] font-medium text-ink/60";
+  const label = "grid gap-1 text-[11px] font-medium text-ink";
   const d = service.data;
   const airportCity = (airport: AirportOption) => locale === "ru"
     ? (airport.cityNameRu || airport.cityName)
@@ -774,7 +774,7 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
     );
     return <div className="space-y-4">
       <div className="rounded-lg border border-line p-3">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">{tr("Общие данные", "Ümumi məlumatlar", "General")}</h3>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink">{tr("Общие данные", "Ümumi məlumatlar", "General")}</h3>
         <div className="grid gap-3 sm:grid-cols-2">
           {supplier}{servicePriceFields}
           <label className={label}>{tr("Страна", "Ölkə", "Country")}<Combobox options={countries.map((c) => ({ value: c.id, label: c.names[locale] ?? c.names.ru ?? c.code }))} value={selectedCountryId} onChange={(v) => { setSelectedCountryId(v); const row = countries.find((c) => c.id === v); onData("country", row?.code ?? ""); }} placeholder={tr("Начните вводить страну", "Ölkə adını yazın", "Start typing a country")} /></label>
@@ -788,7 +788,7 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
         </div>
       </div>
       <div className="rounded-lg border border-line p-3">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">{tr("Данные отеля", "Otel məlumatları", "Hotel data")}</h3>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink">{tr("Данные отеля", "Otel məlumatları", "Hotel data")}</h3>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className={`${label} relative`}>{tr("Название отеля", "Otel adı", "Hotel name")}
             <input className={input} value={hotelSearch} onClick={() => setHotelOpen((open) => !open)} onBlur={() => window.setTimeout(() => setHotelOpen(false), 150)} onChange={(e) => { setHotelSearch(e.target.value); setHotelOpen(true); onData("hotelName", e.target.value); }} placeholder={tr("Начните вводить название отеля", "Otel adını yazmağa başlayın", "Start typing a hotel name")} />
@@ -808,14 +808,14 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
         </div>
       </div>
       {isTour && <div className="rounded-lg border border-line p-3">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">{tr("Данные авиа", "Avia məlumatları", "Flight data")}</h3>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink">{tr("Данные авиа", "Avia məlumatları", "Flight data")}</h3>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="sm:col-span-2 text-[10px] font-semibold uppercase text-ink/50">{tr("Начало услуги", "Xidmətin başlanğıcı", "Service start")}</div>
+          <div className="sm:col-span-2 text-[10px] font-semibold uppercase text-ink">{tr("Начало услуги", "Xidmətin başlanğıcı", "Service start")}</div>
           {airportField("flightFromAirport", tr("Аэропорт вылета", "Uçuş aeroportu", "Departure airport"))}
           {airportField("flightToAirport", tr("Аэропорт прилёта", "Gəliş aeroportu", "Arrival airport"))}
           <label className={label}>{tr("Время вылета", "Uçuş vaxtı", "Departure time")}<input type="time" className={input} value={d.flightDepartureTime ?? ""} onChange={(e) => onData("flightDepartureTime", e.target.value)} /></label>
           <label className={label}>{tr("Время прилёта", "Gəliş vaxtı", "Arrival time")}<input type="time" className={input} value={d.flightArrivalTime ?? ""} onChange={(e) => onData("flightArrivalTime", e.target.value)} /></label>
-          <div className="sm:col-span-2 mt-2 text-[10px] font-semibold uppercase text-ink/50">{tr("Конец услуги", "Xidmətin sonu", "Service end")}</div>
+          <div className="sm:col-span-2 mt-2 text-[10px] font-semibold uppercase text-ink">{tr("Конец услуги", "Xidmətin sonu", "Service end")}</div>
           {airportField("returnFromAirport", tr("Аэропорт вылета (обратно)", "Uçuş aeroportu (geri)", "Return departure airport"))}
           {airportField("returnToAirport", tr("Аэропорт прилёта (обратно)", "Gəliş aeroportu (geri)", "Return arrival airport"))}
           <label className={label}>{tr("Время вылета (обратно)", "Uçuş vaxtı (geri)", "Return departure time")}<input type="time" className={input} value={d.returnDepartureTime ?? ""} onChange={(e) => onData("returnDepartureTime", e.target.value)} /></label>
