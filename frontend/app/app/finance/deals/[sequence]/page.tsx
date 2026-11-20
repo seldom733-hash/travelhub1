@@ -274,6 +274,9 @@ export default function DealDetailPage() {
     let list = bookingActions.filter(
       (action) => !["prepare", "requestClarification", "problem"].includes(action),
     );
+    if (["COMPLETED", "CANCELLED"].includes(deal.status)) {
+      list = list.filter((action) => !["returnToOrder", "requestCancellation"].includes(action));
+    }
     if (list.includes("returnToOrder") || list.includes("requestCancellation")) {
       list = list.filter((action) => action !== "cancel");
     }
@@ -298,6 +301,7 @@ export default function DealDetailPage() {
   const canConfirmPayment = canManagePayments && Boolean(pendingPayment);
   const closeBlockedByServiceDate = Boolean(serviceEndIso && !["CANCELLED", "CANCELLATION_APPROVED"].includes(deal.status) && serviceEndIso >= todayIso);
   const effectiveOrderActions = readOnly || deal.stage === "BOOKING" ? [] : availableActions.filter((a) => {
+    if (["FULFILLED", "CLOSED", "CANCELLED"].includes(deal.status) && a === "returnToRequest") return false;
     if (isCancellationApproved && ["cancel", "close", "reopen"].includes(a)) return false;
     return !(a === "close" && (hasOutstandingDebt || closeBlockedByServiceDate));
   });

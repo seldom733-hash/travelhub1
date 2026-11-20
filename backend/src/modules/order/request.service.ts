@@ -511,6 +511,7 @@ export class RequestService {
           lastName: t.lastName,
           birthDate: new Date(`${t.birthDate}T00:00:00.000Z`),
           citizenship: t.citizenship ?? null,
+          passportSeries: t.passportSeries ?? null,
           passportNumber: t.passportNumber ?? null,
           passportExpiry: t.passportExpiry ? new Date(`${t.passportExpiry}T00:00:00.000Z`) : null,
         })),

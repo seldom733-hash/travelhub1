@@ -229,6 +229,7 @@ export function computeAvailableOrderActions(
     if (!granted.includes(ACTION_PERMISSIONS[action])) continue;
     if (manualRequestWithTravelers && action === "markWaitingData") continue;
     if (hasFinancialOperations && action === "returnToRequest") continue;
+    if (action === "returnToRequest" && ["FULFILLED", "CLOSED", "CANCELLED"].includes(order.status)) continue;
     // Stage 2 fix (Bug 2): блокирует только реально активный Booking;
     // исторический (returned/cancelled) не должен прятать кнопку.
     if ((action === "returnToRequest" || action === "cancel" || action === "complete" || action === "close") && activeBlockingBookings > 0) continue;

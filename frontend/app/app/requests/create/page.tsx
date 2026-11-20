@@ -78,6 +78,7 @@ interface Traveler {
   citizenship: string;
   documentType: string;
   passportNumber: string;
+  passportSeries: string;
   passportIssuedAt: string;
   passportExpiry: string;
 }
@@ -117,7 +118,7 @@ function kindLabel(locale: string, kind: ServiceKind) {
 }
 
 function newTraveler(): Traveler {
-  return { firstName: "", lastName: "", middleName: "", birthDate: "", citizenship: "", documentType: "PASSPORT", passportNumber: "", passportIssuedAt: "", passportExpiry: "" };
+  return { firstName: "", lastName: "", middleName: "", birthDate: "", citizenship: "", documentType: "PASSPORT", passportSeries: "", passportNumber: "", passportIssuedAt: "", passportExpiry: "" };
 }
 
 function newService(kind: ServiceKind): ServiceDraft {
@@ -366,6 +367,7 @@ export default function CreateRequestPage() {
           birthDate: t.birthDate,
           citizenship: t.citizenship || undefined,
           passportNumber: t.passportNumber || undefined,
+          passportSeries: t.passportSeries || undefined,
           passportExpiry: t.passportExpiry || undefined,
         })),
         tripDetails: {
@@ -470,6 +472,7 @@ export default function CreateRequestPage() {
           <label className={label}>{tr("Дата рождения", "Doğum tarixi", "Date of birth")}<DateTextInput className={input} value={t.birthDate} onChange={(v) => setTravelers(travelers.map((x, i) => i === index ? { ...x, birthDate: v } : x))} /></label>
           <label className={label}>{tr("Гражданство", "Vətəndaşlıq", "Citizenship")}<input className={input} value={t.citizenship} onChange={(e) => setTravelers(travelers.map((x, i) => i === index ? { ...x, citizenship: e.target.value } : x))} /></label>
           <label className={label}>{tr("Тип документа", "Sənəd növü", "Document type")}<select className={input} value={t.documentType} onChange={(e) => setTravelers(travelers.map((x, i) => i === index ? { ...x, documentType: e.target.value } : x))}><option value="PASSPORT">{tr("Паспорт", "Pasport", "Passport")}</option><option value="ID">ID</option></select></label>
+          <label className={label}>{tr("Серия документа", "Sənəd seriyası", "Document series")}<input className={input} value={t.passportSeries} onChange={(e) => setTravelers(travelers.map((x, i) => i === index ? { ...x, passportSeries: e.target.value } : x))} /></label>
           <label className={label}>{tr("Номер паспорта", "Pasport nömrəsi", "Passport number")}<input className={input} value={t.passportNumber} onChange={(e) => setTravelers(travelers.map((x, i) => i === index ? { ...x, passportNumber: e.target.value } : x))} /></label>
           <label className={label}>{tr("Дата выдачи", "Verilmə tarixi", "Issued at")}<DateTextInput className={input} value={t.passportIssuedAt} onChange={(v) => setTravelers(travelers.map((x, i) => i === index ? { ...x, passportIssuedAt: v } : x))} /></label>
           <label className={label}>{tr("Срок действия", "Etibarlıdır", "Expiry")}<DateTextInput className={input} value={t.passportExpiry} onChange={(v) => setTravelers(travelers.map((x, i) => i === index ? { ...x, passportExpiry: v } : x))} /></label>
