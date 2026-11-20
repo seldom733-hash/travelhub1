@@ -218,6 +218,8 @@ export function computeAvailableOrderActions(
   hasCapturedClientPayment = true,
   /** Manual request with copied travelers: no "waiting for data" round-trip. */
   manualRequestWithTravelers = false,
+  /** Return-to-Request is not available once any client payment/refund exists. */
+  hasFinancialOperations = false,
 ): OrderAction[] {
   const d3Scope = (order.travelerCount ?? 0) > 0 && order.termsAcceptedAt !== null;
   const actions: OrderAction[] = [];
@@ -226,6 +228,7 @@ export function computeAvailableOrderActions(
     if (!t.from.includes(order.status)) continue;
     if (!granted.includes(ACTION_PERMISSIONS[action])) continue;
     if (manualRequestWithTravelers && action === "markWaitingData") continue;
+    if (hasFinancialOperations && action === "returnToRequest") continue;
     // Stage 2 fix (Bug 2): блокирует только реально активный Booking;
     // исторический (returned/cancelled) не должен прятать кнопку.
     if ((action === "returnToRequest" || action === "cancel" || action === "complete" || action === "close") && activeBlockingBookings > 0) continue;
@@ -1292,6 +1295,9 @@ export class OrderService {
     const manualRequestWithTravelers = Boolean(
       linkedRequest && !linkedRequest.productSnapshot && order.travelers.length > 0,
     );
+    const financialOperations =
+      (await this.prisma.payment.count({ where: { orderId: order.id } })) +
+      (await this.prisma.refund.count({ where: { orderId: order.id } }));
     const availableActions = computeAvailableOrderActions(
       order,
       grantedPermissions,
@@ -1299,6 +1305,7 @@ export class OrderService {
       freeOrderItems,
       hasCapturedClientPayment,
       manualRequestWithTravelers,
+      financialOperations > 0,
     );
 
     // D5 §12: связанная бронь — exactly linked Booking для этого Order (V1: 1:1).
