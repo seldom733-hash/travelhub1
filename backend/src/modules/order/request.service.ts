@@ -281,6 +281,10 @@ export class RequestService {
         if (Number.isNaN(date.getTime())) throw new BadRequestException("Invalid service date");
         data.requestedServiceDate = date;
       } else data.requestedServiceDate = null;
+      data.pinnedRequirements = {
+        ...((request.pinnedRequirements ?? {}) as Record<string, unknown>),
+        dateFrom: input.requestedServiceDate || null,
+      };
       changes.requestedServiceDate = input.requestedServiceDate;
     }
     if (input.travelerCount !== undefined) {
@@ -294,7 +298,7 @@ export class RequestService {
         if (Number.isNaN(end.getTime())) throw new BadRequestException("Invalid service end date");
       }
       data.pinnedRequirements = {
-        ...((request.pinnedRequirements ?? {}) as Record<string, unknown>),
+        ...(((data.pinnedRequirements as Record<string, unknown> | undefined) ?? request.pinnedRequirements ?? {}) as Record<string, unknown>),
         dateTo: input.serviceEndDate || null,
       };
       changes.serviceEndDate = input.serviceEndDate;
@@ -306,6 +310,15 @@ export class RequestService {
       const updated = await tx.request.update({ where: { id: requestId }, data });
       if (input.customerId !== undefined && request.convertedOrderId) {
         await tx.order.update({ where: { id: request.convertedOrderId }, data: { customerId: input.customerId || null, version: { increment: 1 } } });
+      }
+      if (input.requestedServiceDate !== undefined && request.convertedOrderId) {
+        await tx.order.update({
+          where: { id: request.convertedOrderId },
+          data: {
+            serviceDate: input.requestedServiceDate ? new Date(`${input.requestedServiceDate}T00:00:00.000Z`) : null,
+            version: { increment: 1 },
+          },
+        });
       }
       await tx.requestHistory.create({ data: { requestId, action: "DETAILS_UPDATED", actorId: actor.id, actorName: actor.username, comment: JSON.stringify(changes) } });
       return updated;

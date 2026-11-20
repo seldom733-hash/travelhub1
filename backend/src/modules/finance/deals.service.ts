@@ -524,9 +524,9 @@ export class DealsService {
       const nights = Number(attrs.nights ?? snapOffer.nights ?? 0) || null;
       const country = request.tripCountry ?? (typeof attrs.country === "string" ? attrs.country : typeof snapOffer.country === "string" ? snapOffer.country : null);
       const pinnedTrip = (request.pinnedRequirements ?? {}) as Record<string, unknown>;
-      const dateFrom = typeof pinnedTrip.dateFrom === "string"
-        ? pinnedTrip.dateFrom
-        : request.requestedServiceDate ? request.requestedServiceDate.toISOString() : null;
+      const dateFrom = request.requestedServiceDate
+        ? request.requestedServiceDate.toISOString()
+        : typeof pinnedTrip.dateFrom === "string" ? pinnedTrip.dateFrom : null;
       const dateTo = typeof pinnedTrip.dateTo === "string"
         ? pinnedTrip.dateTo
         : dateFrom && nights ? new Date(new Date(dateFrom).getTime() + nights * 86400000).toISOString() : null;
