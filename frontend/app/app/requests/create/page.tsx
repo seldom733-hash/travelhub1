@@ -381,6 +381,9 @@ export default function CreateRequestPage() {
   }
 
   function saveService(key: string) {
+    const service = services.find((s) => s.key === key);
+    if (service) setActivePackageKind(service.kind);
+    setRequestType("CUSTOM_PACKAGE");
     setSavedServiceKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
   }
 
