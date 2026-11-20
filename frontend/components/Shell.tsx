@@ -67,7 +67,6 @@ export const NAV_GROUPS: NavGroup[] = [
     headingKey: "nav.group.commercial",
     items: [
       { href: "/app/catalog", icon: "📚", labelKey: "nav.catalog", permission: "catalog.product.read" },
-      { href: "/app/crm", icon: "🤝", labelKey: "nav.crm", permission: "crm.customer.read" },
       { href: "/app/sales/assignment", icon: "🧭", labelKey: "nav.assignment", permission: "request.load.read" },
       { href: "/app/my-status", icon: "🟢", labelKey: "nav.my_status", permission: "request.load.read" },
       { href: "/app/marketing", icon: "📣", labelKey: "nav.marketing", permission: "marketing.campaign.read" },
@@ -86,6 +85,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/app/hotel-directory", icon: "🏨", labelKey: "nav.hotels", permission: "hotel_directory.read" },
       { href: "/app/references/service-types", icon: "🧾", labelKey: "nav.service_types", permission: "hotel_directory.read" },
       { href: "/app/references/airports", icon: "✈️", labelKey: "nav.airports", permission: "hotel_directory.read" },
+      { href: "/app/references/clients", icon: "👥", labelKey: "nav.clients", permission: "crm.customer.read" },
+      { href: "/app/references/suppliers", icon: "🏭", labelKey: "nav.suppliers", permission: "crm.partner.read" },
       { href: "/app/references/dictionaries", icon: "📚", labelKey: "nav.dictionaries", permission: "catalog.product.read_own" },
     ],
   },
