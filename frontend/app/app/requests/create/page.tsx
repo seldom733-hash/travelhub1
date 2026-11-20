@@ -587,11 +587,12 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
   const label = "grid gap-1 text-[11px] font-medium text-ink/60";
   const d = service.data;
   const [hotelSearch, setHotelSearch] = useState(d.hotelName ?? service.title ?? "");
+  const [hotelOpen, setHotelOpen] = useState(false);
   const [hotelResults, setHotelResults] = useState<Array<{ id: string; name: string; suppliers?: string[]; countryCode?: string; cityName?: string; resortName?: string }>>([]);
   useEffect(() => {
     if (service.kind !== "HOTEL" && service.kind !== "TOUR_PACKAGE") return;
     const query = hotelSearch.trim();
-    if (query.length < 2 && !d.country) { setHotelResults([]); return; }
+    if (!hotelOpen && query.length < 2) { setHotelResults([]); return; }
     const timer = window.setTimeout(() => {
       const params = new URLSearchParams({ limit: "20" });
       if (d.country) params.set("country", d.country);
@@ -600,7 +601,7 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
         .then((rows) => setHotelResults(Array.isArray(rows) ? rows : [])).catch(() => setHotelResults([]));
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [hotelSearch, d.country, d.city, service.kind]);
+  }, [hotelSearch, d.country, d.city, service.kind, hotelOpen]);
   useEffect(() => {
     if (!d.city || d.cityId || cities.length === 0) return;
     const match = cities.find((city) => (city.names[locale] ?? city.names.ru ?? city.code).toLowerCase() === String(d.city).toLowerCase());
@@ -621,6 +622,7 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
     const cityName = hotel.cityName || hotel.resortName;
     if (cityName) onData("city", cityName);
     if (hotel.suppliers?.[0] && !service.supplierCode) onChange({ supplierCode: hotel.suppliers[0], supplierName: hotel.suppliers[0] });
+    setHotelOpen(false);
     setHotelResults([]);
   };
   const supplier = <label className={label}>{tr("Поставщик услуги", "Xidmət təchizatçısı", "Service supplier")}<select className={input} value={service.supplierCode} onChange={(e) => { const code = e.target.value; const row = suppliers.find((s) => s.code === code); onChange({ supplierCode: code, supplierName: row?.name ?? "" }); }}><option value="">{tr("Выберите", "Seçin", "Select")}</option>{suppliers.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}</select></label>;
@@ -628,11 +630,11 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
   if (service.kind === "HOTEL" || service.kind === "TOUR_PACKAGE") return <div className="grid gap-3 sm:grid-cols-2">
     {supplier}
     <label className={`${label} relative`}>{tr("Название отеля", "Otel adı", "Hotel name")}
-      <input className={input} value={hotelSearch} onChange={(e) => { setHotelSearch(e.target.value); onData("hotelName", e.target.value); }} placeholder={tr("Начните вводить название отеля", "Otel adını yazmağa başlayın", "Start typing a hotel name")} />
-      {hotelResults.length > 0 && (
+      <input className={input} value={hotelSearch} onClick={() => setHotelOpen((open) => !open)} onBlur={() => window.setTimeout(() => setHotelOpen(false), 150)} onChange={(e) => { setHotelSearch(e.target.value); setHotelOpen(true); onData("hotelName", e.target.value); }} placeholder={tr("Начните вводить название отеля", "Otel adını yazmağa başlayın", "Start typing a hotel name")} />
+      {hotelOpen && hotelResults.length > 0 && (
         <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-52 overflow-auto rounded-lg border border-line bg-white shadow-xl">
           {hotelResults.map((p) => (
-            <button key={p.id} type="button" onClick={() => chooseHotel(p)} className="flex w-full items-center justify-between border-b px-3 py-2 text-left text-[11px] last:border-0 hover:bg-panel">
+            <button key={p.id} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => chooseHotel(p)} className="flex w-full items-center justify-between border-b px-3 py-2 text-left text-[11px] last:border-0 hover:bg-panel">
               <span>{p.name}</span>
               <span className="text-ink/60">{p.resortName ?? p.cityName ?? p.suppliers?.join(", ")}</span>
             </button>
