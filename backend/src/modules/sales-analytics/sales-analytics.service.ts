@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { resolveDealCost, shouldUseObligationCost } from "../finance/deal-cost";
 
@@ -87,7 +87,7 @@ export function resolveSalesPeriod(q: SalesAnalyticsQuery, now = new Date()): Pe
     case "PREVIOUS_YEAR": start = prevYearStart; end = prevYearEnd; break;
     case "CUSTOM": {
       const s = parseDate(q.startDate), e = parseDate(q.endDate);
-      if (!s || !e) throw new Error("CUSTOM requires startDate and endDate (YYYY-MM-DD)");
+      if (!s || !e) throw new BadRequestException("CUSTOM requires startDate and endDate (YYYY-MM-DD)");
       start = zonedMidnight(s[0], s[1], s[2], timezone);
       end = addDays(zonedMidnight(e[0], e[1], e[2], timezone), 1);
       break;

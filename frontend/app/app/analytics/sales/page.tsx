@@ -128,6 +128,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
 
   useEffect(() => {
     let alive = true;
+    if (preset === "CUSTOM" && (!startDate || !endDate)) { setLoading(false); return; }
     setLoading(true); setError("");
     api.get<any>(`/sales-analytics/dashboard?${query}`)
       .then((r) => { if (alive) { setData(r); if (!managerId) setManagerOptions(r.managers ?? []); } })
@@ -160,7 +161,17 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
         </div>
         <div className="flex flex-wrap items-end gap-2 text-xs">
           <label className="flex flex-col gap-1"><span className="text-ink/60">{L("Период")}</span>
-            <select value={preset} onChange={(e) => setPreset(e.target.value)} className="rounded-lg border bg-white px-2 py-1.5">
+            <select value={preset} onChange={(e) => {
+              const next = e.target.value;
+              if (next === "CUSTOM" && (!startDate || !endDate)) {
+                const d = new Date();
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, "0");
+                setStartDate(`${y}-${m}-01`);
+                setEndDate(`${y}-${m}-${String(d.getDate()).padStart(2, "0")}`);
+              }
+              setPreset(next);
+            }} className="rounded-lg border bg-white px-2 py-1.5">
               {PRESETS.map(([v, l]) => <option key={v} value={v}>{L(l)}</option>)}
             </select>
           </label>
