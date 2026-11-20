@@ -111,18 +111,24 @@ export class HotelDirectoryService {
   }
 
   async createAirport(
-    input: { code: string; name?: string; countryCode?: string; countryName?: string; cityName?: string },
+    input: { code: string; name?: string; countryCode?: string; countryName?: string; cityName?: string; countryNameRu?: string; countryNameEn?: string; cityNameRu?: string; cityNameEn?: string },
     actor?: AuthUser | null,
   ) {
     const code = String(input.code ?? "").trim().toUpperCase();
     if (!code) throw new ConflictException("Airport code is required");
+    const countryName = String(input.countryName ?? "").trim();
+    const cityName = String(input.cityName ?? "").trim();
     const row = await this.prisma.airport.create({
       data: {
         code,
         name: String(input.name ?? code).trim() || code,
         countryCode: String(input.countryCode ?? "").trim().toUpperCase(),
-        countryName: String(input.countryName ?? "").trim(),
-        cityName: String(input.cityName ?? "").trim(),
+        countryName,
+        cityName,
+        countryNameRu: String(input.countryNameRu ?? countryName).trim(),
+        countryNameEn: String(input.countryNameEn ?? countryName).trim(),
+        cityNameRu: String(input.cityNameRu ?? cityName).trim(),
+        cityNameEn: String(input.cityNameEn ?? cityName).trim(),
       },
     });
     await this.audit(actor, "hotel_directory.airports.create", "Airport", row.id, row);

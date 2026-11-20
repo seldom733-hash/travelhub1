@@ -549,6 +549,10 @@ model Airport {
   countryCode String   @default("")
   countryName String   @default("")
   cityName    String   @default("")
+  countryNameRu String @default("")
+  countryNameEn String @default("")
+  cityNameRu    String @default("")
+  cityNameEn    String @default("")
   status      CategoryStatus @default(ACTIVE)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

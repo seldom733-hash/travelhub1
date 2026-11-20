@@ -66,7 +66,7 @@ export class HotelDirectoryController {
   @Post("airports")
   @RequirePermissions("hotel_directory.create")
   createAirport(
-    @Body() body: { code: string; name?: string; countryCode?: string; countryName?: string; cityName?: string },
+    @Body() body: { code: string; name?: string; countryCode?: string; countryName?: string; cityName?: string; countryNameRu?: string; countryNameEn?: string; cityNameRu?: string; cityNameEn?: string },
     @CurrentUser() actor: AuthUser,
   ) {
     return this.directory.createAirport(body, actor);

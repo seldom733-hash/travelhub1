@@ -76,6 +76,10 @@ interface AirportOption {
   countryCode: string;
   countryName: string;
   cityName: string;
+  countryNameRu?: string;
+  countryNameEn?: string;
+  cityNameRu?: string;
+  cityNameEn?: string;
 }
 
 interface Traveler {
@@ -251,16 +255,6 @@ export default function CreateRequestPage() {
     setSalePrice(totalSale > 0 ? totalSale.toFixed(2) : "");
   }, [services, requestType]);
 
-  useEffect(() => {
-    if (!serviceStart && !serviceEnd) return;
-    setServices((prev) =>
-      prev.map((service) =>
-        service.kind === "HOTEL" || service.kind === "TOUR_PACKAGE"
-          ? { ...service, data: { ...service.data, checkIn: serviceStart, checkOut: serviceEnd } }
-          : service,
-      ),
-    );
-  }, [serviceStart, serviceEnd]);
 
   async function fillTravelerFromCustomer(customer: Customer | null) {
     if (!customer) return;
@@ -381,6 +375,8 @@ export default function CreateRequestPage() {
   }
 
   function updateData(key: string, field: string, value: string) {
+    if (field === "checkIn") setServiceStart(value);
+    if (field === "checkOut") setServiceEnd(value);
     setServices((prev) => prev.map((s) => (s.key === key ? { ...s, data: { ...s.data, [field]: value } } : s)));
   }
 
@@ -710,6 +706,9 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
   const input = "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm";
   const label = "grid gap-1 text-[11px] font-medium text-ink/60";
   const d = service.data;
+  const airportCity = (airport: AirportOption) => locale === "ru"
+    ? (airport.cityNameRu || airport.cityName)
+    : locale === "en" ? (airport.cityNameEn || airport.cityName) : airport.cityName;
   const [hotelSearch, setHotelSearch] = useState(d.hotelName ?? service.title ?? "");
   const [hotelOpen, setHotelOpen] = useState(false);
   const [hotelResults, setHotelResults] = useState<Array<{ id: string; name: string; suppliers?: string[]; countryCode?: string; cityName?: string; resortName?: string }>>([]);
@@ -769,7 +768,7 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
       <label className={label}>{title}
         <select className={input} value={d[field] ?? ""} onChange={(e) => onData(field, e.target.value)}>
           <option value="">{tr("Выберите аэропорт", "Aeroport seçin", "Select airport")}</option>
-          {airports.map((airport) => <option key={airport.code} value={airport.code}>{airport.code} — {airport.cityName || airport.name}</option>)}
+          {airports.map((airport) => <option key={airport.code} value={airport.code}>{airport.code} — {airportCity(airport) || airport.name}</option>)}
         </select>
       </label>
     );

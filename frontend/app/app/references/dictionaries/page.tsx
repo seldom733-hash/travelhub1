@@ -19,6 +19,7 @@ export default function DictionariesPage() {
   const [error, setError] = useState("");
   const [addType, setAddType] = useState("room-types");
   const [addName, setAddName] = useState("");
+  const [addCode, setAddCode] = useState("");
   const [addBusy, setAddBusy] = useState(false);
   const [addNotice, setAddNotice] = useState("");
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
@@ -70,13 +71,23 @@ export default function DictionariesPage() {
   async function addEntry() {
     setAddNotice(""); setError("");
     if (addName.trim().length < 2) { setError(tr("Введите название (минимум 2 символа)", "Ad daxil edin (ən azı 2 simvol)", "Enter a name (at least 2 characters)")); return; }
+    if (!addCode.trim()) { setError(tr("Введите код", "Kod daxil edin", "Enter code")); return; }
     setAddBusy(true);
     try {
-      await api.post("/tour-builder/dictionaries/entries", { type: addType, name: addName.trim(), lang: locale === "az" ? "az" : locale === "en" ? "en" : "ru" });
+      const lang = locale === "az" ? "az" : locale === "en" ? "en" : "ru";
+      if (addType === "service-types") {
+        const names = { ru: lang === "ru" ? addName.trim() : "", en: lang === "en" ? addName.trim() : "", az: lang === "az" ? addName.trim() : "" };
+        await api.post("/hotel-directory/service-types", { code: addCode.trim().toUpperCase(), names, name: addName.trim(), lang });
+        const rows = await api.get<ServiceType[]>("/hotel-directory/service-types");
+        setServiceTypes(Array.isArray(rows) ? rows : []);
+      } else {
+        await api.post("/tour-builder/dictionaries/entries", { type: addType, name: addName.trim(), lang });
+        const dict = await api.get<Data>("/tour-builder/dictionaries");
+        setData(dict);
+      }
       setAddName("");
+      setAddCode("");
       setAddNotice(tr("Запись добавлена в базу", "Qeyd bazaya əlavə edildi", "Entry added to the database"));
-      const dict = await api.get<Data>("/tour-builder/dictionaries");
-      setData(dict);
     } catch (e) { setError((e as Error).message); } finally { setAddBusy(false); }
   }
   async function addServiceType() {
@@ -99,10 +110,11 @@ export default function DictionariesPage() {
     <div><h1 className="text-2xl font-semibold">{tr("Справочники", "Lüğətlər", "Dictionaries")}</h1><p className="mt-1 text-sm text-ink/60">{tr("Единые справочники платформы. Значения используются при создании запросов.", "Platformanın vahid lüğətləri. Sorğu yaradarkən istifadə olunur.", "Platform dictionaries used when creating requests.")}</p></div>
     {error && <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
     {canManage && <section className="rounded-xl border border-line bg-white p-4">
-      <h2 className="mb-2 text-sm font-semibold">{tr("Добавить новый тип", "Yeni növ əlavə et", "Add a new type")}</h2>
+      <h2 className="mb-2 text-sm font-semibold">{tr("Добавить новый элемент", "Yeni element əlavə et", "Add a new element")}</h2>
       <p className="mb-3 text-xs text-ink/60">{tr("Запись сразу сохраняется в базе. Доступно только администратору. Дубли и опечатки проверяются автоматически.", "Qeyd dərhal bazada saxlanılır. Yalnız administrator üçün. Dublikatlar və yazı səhvləri avtomatik yoxlanılır.", "The entry is saved immediately. Admin only. Duplicates and typos are checked automatically.")}</p>
-      <div className="grid gap-2 sm:grid-cols-[220px_1fr_auto]">
+      <div className="grid gap-2 sm:grid-cols-[220px_160px_1fr_auto]">
         <select className="rounded-lg border px-3 py-2 text-sm" value={addType} onChange={(e) => setAddType(e.target.value)}>
+          <option value="service-types">{tr("Типы услуг", "Xidmət növləri", "Service types")}</option>
           <option value="room-types">{tr("Типы номеров", "Otaq növləri", "Room types")}</option>
           <option value="placement-types">{tr("Типы размещения", "Yerləşmə növləri", "Accommodation types")}</option>
           <option value="meal-types">{tr("Типы питания", "Qidalanma növləri", "Meal types")}</option>
@@ -110,18 +122,12 @@ export default function DictionariesPage() {
           <option value="airline-classes">{tr("Классы авиабилетов", "Aviabilet sinifləri", "Airline classes")}</option>
           <option value="baggage-allowances">{tr("Нормы багажа", "Baqaj normaları", "Baggage allowances")}</option>
         </select>
-        <input className="rounded-lg border px-3 py-2 text-sm" value={addName} onChange={(e) => setAddName(e.target.value)} placeholder={tr("Название нового типа", "Yeni növün adı", "New type name")} />
+        <input className="rounded-lg border px-3 py-2 text-sm font-mono" value={addCode} onChange={(e) => setAddCode(e.target.value.toUpperCase())} placeholder={tr("Код", "Kod", "Code")} />
+        <input className="rounded-lg border px-3 py-2 text-sm" value={addName} onChange={(e) => setAddName(e.target.value)} placeholder={tr("Название нового элемента", "Yeni elementin adı", "New element name")} />
         <button type="button" disabled={addBusy} onClick={() => void addEntry()} className="rounded-lg bg-[#0f6b5f] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{addBusy ? tr("Проверка…", "Yoxlanılır…", "Checking…") : tr("Добавить", "Əlavə et", "Add")}</button>
       </div>
       {addNotice && <div className="mt-2 rounded bg-emerald-50 px-2 py-1 text-xs text-emerald-700">{addNotice}</div>}
     </section>}
-    <section className="rounded-xl border border-line bg-white p-4">
-      <h2 className="mb-3 text-sm font-semibold">{tr("Страны и города", "Ölkələr və şəhərlər", "Countries and cities")}</h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="grid gap-1 text-xs">{tr("Страна", "Ölkə", "Country")}<select className="rounded-lg border px-3 py-2" value={countryId} onChange={(e) => setCountryId(e.target.value)}><option value="">{tr("Все страны", "Bütün ölkələr", "All countries")}</option>{countries.map((c) => <option key={c.id} value={c.id}>{name(c)}</option>)}</select></label>
-        <label className="grid gap-1 text-xs">{tr("Города", "Şəhərlər", "Cities")}<select className="rounded-lg border px-3 py-2" disabled={!countryId}><option>{countryId ? tr("Выберите город", "Şəhər seçin", "Select city") : tr("Сначала выберите страну", "Əvvəlcə ölkə seçin", "Select country first")}</option>{cities.map((c) => <option key={c.id}>{name(c)}</option>)}</select></label>
-      </div>
-    </section>
     <section className="rounded-xl border border-line bg-white p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">{tr("Типы услуг", "Xidmət növləri", "Service types")}</h2>

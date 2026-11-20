@@ -6,7 +6,7 @@ import { useLocale } from "@/lib/i18n";
 import { useCan } from "@/lib/use-can";
 import { hotelDirectoryApi } from "@/lib/hotel-directory-api";
 
-interface Airport { id: string; code: string; name: string; countryCode: string; countryName: string; cityName: string; status: string }
+interface Airport { id: string; code: string; name: string; countryCode: string; countryName: string; cityName: string; countryNameRu: string; countryNameEn: string; cityNameRu: string; cityNameEn: string; status: string }
 
 export default function AirportsPage() {
   const locale = useLocale();
@@ -17,6 +17,8 @@ export default function AirportsPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const tr = (ru: string, az: string, en: string) => (locale === "az" ? az : locale === "en" ? en : ru);
+  const city = (row: Airport) => locale === "ru" ? (row.cityNameRu || row.cityName) : locale === "en" ? (row.cityNameEn || row.cityName) : row.cityName;
+  const country = (row: Airport) => locale === "ru" ? (row.countryNameRu || row.countryName) : locale === "en" ? (row.countryNameEn || row.countryName) : row.countryName;
 
   async function load() { try { setRows(await hotelDirectoryApi.airports()); } catch (e) { setError((e as Error).message); } }
   useEffect(() => { void load(); }, []);
@@ -37,7 +39,7 @@ export default function AirportsPage() {
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
 
-  const filtered = rows.filter((row) => !search.trim() || `${row.code} ${row.name} ${row.cityName} ${row.countryName}`.toLowerCase().includes(search.trim().toLowerCase()));
+  const filtered = rows.filter((row) => !search.trim() || `${row.code} ${row.name} ${city(row)} ${country(row)}`.toLowerCase().includes(search.trim().toLowerCase()));
 
   return <div>
     <PageHeader title={tr("Аэропорты", "Aeroportlar", "Airports")} breadcrumbs={["Navitravel", tr("Справочники", "Lüğətlər", "Dictionaries"), tr("Аэропорты", "Aeroportlar", "Airports")]} />
@@ -56,7 +58,7 @@ export default function AirportsPage() {
       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tr("Поиск по коду, городу, стране", "Kod, şəhər, ölkə üzrə axtar", "Search by code, city, country")} className="w-full max-w-md rounded-lg border bg-white px-3 py-2 text-sm" />
       <div className="overflow-auto rounded-xl border border-line bg-white">
         <table className="w-full min-w-[700px] text-left text-xs"><thead className="bg-panel text-ink/60"><tr><th className="px-4 py-2">Code</th><th className="px-4 py-2">{tr("Аэропорт", "Aeroport", "Airport")}</th><th className="px-4 py-2">{tr("Город", "Şəhər", "City")}</th><th className="px-4 py-2">{tr("Страна", "Ölkə", "Country")}</th><th className="px-4 py-2">Status</th></tr></thead>
-          <tbody>{filtered.map((row) => <tr key={row.id} className="border-t"><td className="px-4 py-2 font-mono font-semibold">{row.code}</td><td className="px-4 py-2">{row.name}</td><td className="px-4 py-2">{row.cityName || "—"}</td><td className="px-4 py-2">{row.countryName} {row.countryCode ? `(${row.countryCode})` : ""}</td><td className="px-4 py-2">{row.status}</td></tr>)}</tbody>
+          <tbody>{filtered.map((row) => <tr key={row.id} className="border-t"><td className="px-4 py-2 font-mono font-semibold">{row.code}</td><td className="px-4 py-2">{row.name}</td><td className="px-4 py-2">{city(row) || "—"}</td><td className="px-4 py-2">{country(row)} {row.countryCode ? `(${row.countryCode})` : ""}</td><td className="px-4 py-2">{row.status}</td></tr>)}</tbody>
         </table>
       </div>
     </div>
