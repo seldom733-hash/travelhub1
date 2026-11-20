@@ -145,6 +145,7 @@ export default function CreateRequestPage() {
   const [primarySupplierCode, setPrimarySupplierCode] = useState("");
   const [travelers, setTravelers] = useState<Traveler[]>([newTraveler()]);
   const [services, setServices] = useState<ServiceDraft[]>([newService("TOUR_PACKAGE")]);
+  const [savedServiceKeys, setSavedServiceKeys] = useState<string[]>([]);
   const [salePrice, setSalePrice] = useState("");
   const [costPrice, setCostPrice] = useState("");
   const [currency, setCurrency] = useState("AZN");
@@ -331,6 +332,23 @@ export default function CreateRequestPage() {
     setServices((prev) => prev.map((s) => (s.key === key ? { ...s, data: { ...s.data, [field]: value } } : s)));
   }
 
+  function saveService(key: string) {
+    setSavedServiceKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
+  }
+
+  function deleteService(key: string) {
+    setServices((prev) => prev.filter((s) => s.key !== key));
+    setSavedServiceKeys((prev) => prev.filter((saved) => saved !== key));
+  }
+
+  function serviceDates(service: ServiceDraft): string {
+    const d = service.data;
+    const from = d.checkIn || d.startDate || d.departureDate || d.travelDate;
+    const to = d.checkOut || d.endDate || d.arrivalDate;
+    if (from && to) return `${from} — ${to}`;
+    return from || "—";
+  }
+
   function primaryService(): ServiceDraft {
     if (requestType === "CUSTOM_PACKAGE") {
       return services.find((s) => s.kind === activePackageKind && s.enabled) ?? ensureService(activePackageKind);
@@ -432,7 +450,7 @@ export default function CreateRequestPage() {
 
     <section className="rounded-xl border border-line bg-white p-4 shadow-sm">
       <h2 className="mb-3 text-sm font-semibold">{tr("Тип запроса", "Sorğu növü", "Request type")}</h2>
-      <div className="flex flex-wrap gap-2">{TYPES.map((t) => <button key={t.value} type="button" onClick={() => { setRequestType(t.value); const kind: ServiceKind = t.value === "CUSTOM_PACKAGE" ? "HOTEL" : t.value === "FLIGHT_BOOKING" ? "FLIGHT" : (t.value as ServiceKind); setServices([newService(kind)]); }} className={`rounded-lg border px-3 py-2 text-xs font-medium ${requestType === t.value ? "border-[#0f6b5f] bg-[#eef8f3] text-[#0f6b5f]" : "border-line text-ink/60"}`}>{t[locale === "az" ? "az" : locale === "en" ? "en" : "ru"]}</button>)}</div>
+      <div className="flex flex-wrap gap-2">{TYPES.map((t) => <button key={t.value} type="button" onClick={() => { setRequestType(t.value); const kind: ServiceKind = t.value === "CUSTOM_PACKAGE" ? "HOTEL" : t.value === "FLIGHT_BOOKING" ? "FLIGHT" : (t.value as ServiceKind); setServices([newService(kind)]); setSavedServiceKeys([]); }} className={`rounded-lg border px-3 py-2 text-xs font-medium ${requestType === t.value ? "border-[#0f6b5f] bg-[#eef8f3] text-[#0f6b5f]" : "border-line text-ink/60"}`}>{t[locale === "az" ? "az" : locale === "en" ? "en" : "ru"]}</button>)}</div>
     </section>
 
     <section className="rounded-xl border border-line bg-white p-4 shadow-sm">
@@ -507,6 +525,13 @@ export default function CreateRequestPage() {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">{tr("Поставщик", "Təchizatçı", "Supplier")}</h2><select className="rounded-lg border px-2 py-1.5 text-xs" value={primarySupplierCode} onChange={(e) => setPrimarySupplierCode(e.target.value)}><option value="">{tr("Основной поставщик", "Əsas təchizatçı", "Primary supplier")}</option>{suppliers.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}</select></div>
       {requestType === "CUSTOM_PACKAGE" && <div className="mb-3 flex flex-wrap gap-1">{PACKAGE_KINDS.map((k) => <button key={k} type="button" onClick={() => { setActivePackageKind(k); ensureService(k); }} className={`rounded border px-2 py-1 text-[11px] ${activePackageKind === k ? "border-[#0f6b5f] bg-[#eef8f3] text-[#0f6b5f]" : ""}`}>{kindLabel(locale, k)}</button>)}</div>}
       {visibleService ? <ServiceFields service={visibleService} locale={locale} suppliers={suppliers} primarySupplierCode={primarySupplierCode} hotelQuery={hotelQuery} setHotelQuery={setHotelQuery} hotelOptions={hotelOptions} onSelectHotel={(p) => { updateService(visibleService.key, { title: p.title }); updateData(visibleService.key, "hotelName", p.title); }} onChange={(patch) => updateService(visibleService.key, patch)} onData={(field, value) => updateData(visibleService.key, field, value)} dictionary={dictionary} countries={countries} cities={cities} selectedCountryId={selectedCountryId} setSelectedCountryId={setSelectedCountryId} /> : <button type="button" className="rounded-lg border px-3 py-2 text-xs" onClick={() => setServices([...services, newService(currentKind)])}>+ {tr("Добавить услугу", "Xidmət əlavə et", "Add service")}</button>}
+      {requestType === "CUSTOM_PACKAGE" && visibleService && (
+        <div className="mt-3">
+          <button type="button" onClick={() => saveService(visibleService.key)} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark">
+            {tr("Сохранить услугу", "Xidməti yadda saxla", "Save service")}
+          </button>
+        </div>
+      )}
       <div className="mt-3">
         <button
           type="button"
@@ -520,7 +545,24 @@ export default function CreateRequestPage() {
           + {tr("Добавить услугу", "Xidmət əlavə et", "Add service")}
         </button>
       </div>
-      {requestType === "CUSTOM_PACKAGE" && <div className="mt-3 space-y-2">{services.map((s) => <label key={s.key} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={s.enabled} onChange={(e) => updateService(s.key, { enabled: e.target.checked })} />{kindLabel(locale, s.kind)} · {s.supplierName || tr("поставщик не выбран", "təchizatçı seçilməyib", "supplier not selected")}</label>)}</div>}
+      {requestType === "CUSTOM_PACKAGE" && savedServiceKeys.length > 0 && (
+        <div className="mt-4 overflow-hidden rounded-lg border border-line">
+          <div className="border-b bg-panel px-3 py-2 text-xs font-semibold">
+            {tr("Сохранённые услуги", "Yadda saxlanılan xidmətlər", "Saved services")}
+          </div>
+          {services.filter((s) => savedServiceKeys.includes(s.key)).map((s) => (
+            <div key={s.key} className="flex flex-wrap items-center gap-3 border-b px-3 py-2 text-xs last:border-0">
+              <span className="min-w-32 font-semibold">{kindLabel(locale, s.kind)}</span>
+              <span className="text-ink/60">{s.supplierName || tr("Без поставщика", "Təchizatçı olmadan", "Without supplier")}</span>
+              <span className="text-ink/60">{serviceDates(s)}</span>
+              <span className="font-mono">{costPrice || "—"} / {salePrice || "—"} {currency}</span>
+              <button type="button" onClick={() => deleteService(s.key)} className="ml-auto font-semibold text-rose-600 hover:text-rose-700">
+                {tr("Удалить", "Sil", "Delete")}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
 
     <div className="flex justify-end gap-2 pb-8"><Link href="/app/finance/deals" className="rounded-lg border px-4 py-2 text-sm">{tr("Отмена", "Ləğv et", "Cancel")}</Link><button type="button" disabled={busy} onClick={() => void submit()} className="rounded-lg bg-[#0f6b5f] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? tr("Создание…", "Yaradılır…", "Creating…") : tr("Создать запрос", "Sorğu yarat", "Create request")}</button></div>
