@@ -34,6 +34,25 @@ export const hotelDirectoryApi = {
       status?: string;
     },
   ) => api.post<HotelDirectoryEntry>(`${BASE}/${type}`, body),
+  createHotel: (body: {
+    name: string;
+    countryName?: string;
+    countryCode?: string;
+    cityName?: string;
+    resortName?: string;
+    stars?: number | null;
+    categoryLabel?: string | null;
+  }) => api.post<{
+    id: string;
+    name: string;
+    countryCode: string;
+    countryName: string;
+    cityName: string;
+    resortName: string;
+    stars: number | null;
+    categoryLabel: string | null;
+    suppliers: string[];
+  }>(`${BASE}/hotels`, body),
   update: (type: HotelDirectoryType, id: string, body: object) =>
     api.patch<HotelDirectoryEntry>(`${BASE}/${type}/${id}`, body),
   remove: (type: HotelDirectoryType, id: string) =>

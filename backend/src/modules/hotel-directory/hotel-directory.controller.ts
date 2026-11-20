@@ -63,6 +63,15 @@ export class HotelDirectoryController {
     return this.directory.listHotels({ q, country, limit: limit ? Number(limit) : undefined });
   }
 
+  @Post("hotels")
+  @RequirePermissions("hotel_directory.create")
+  createHotel(
+    @Body() body: { name: string; countryName?: string; countryCode?: string; cityName?: string; resortName?: string; stars?: number | null; categoryLabel?: string | null },
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.directory.createHotel(body, actor);
+  }
+
   @Get(":type")
   @RequirePermissions("hotel_directory.read")
   list(@Param("type") type: string, @Query("status") status?: string) {

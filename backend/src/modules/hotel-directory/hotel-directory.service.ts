@@ -12,6 +12,7 @@ import {
   CreateDirectoryEntryDto,
   UpdateDirectoryEntryDto,
 } from "./hotel-directory.dto";
+import { cleanHotelName, normalizeName } from "../catalog/hotel/hotel-identity";
 
 export const HOTEL_DIRECTORY_TYPES = [
   "categories",
@@ -100,6 +101,41 @@ export class HotelDirectoryService {
       select: { id: true, name: true, countryCode: true, countryName: true, cityName: true, resortName: true, stars: true, categoryLabel: true },
     });
     return rows.map((row) => ({ ...row, suppliers: [] as string[] }));
+  }
+
+  async createHotel(
+    input: {
+      name: string;
+      countryName?: string;
+      countryCode?: string;
+      cityName?: string;
+      resortName?: string;
+      stars?: number | null;
+      categoryLabel?: string | null;
+    },
+    actor?: AuthUser | null,
+  ) {
+    const name = cleanHotelName(String(input.name ?? "").trim());
+    if (!name) throw new ConflictException("Hotel name is required");
+    const normalizedName = normalizeName(name);
+    const countryCode = String(input.countryCode ?? "").trim().toUpperCase();
+    const countryName = String(input.countryName ?? "").trim();
+    const cityName = String(input.cityName ?? "").trim();
+    const hotel = await this.prisma.hotel.create({
+      data: {
+        name,
+        normalizedName,
+        countryCode,
+        countryName,
+        cityName,
+        resortName: String(input.resortName ?? "").trim(),
+        stars: typeof input.stars === "number" ? input.stars : null,
+        categoryLabel: input.categoryLabel ?? null,
+      },
+      select: { id: true, name: true, countryCode: true, countryName: true, cityName: true, resortName: true, stars: true, categoryLabel: true },
+    });
+    await this.audit(actor, "hotel_directory.hotels.create", "Hotel", hotel.id, hotel);
+    return { ...hotel, suppliers: [] as string[] };
   }
 
   list(type: HotelDirectoryType, status?: string) {

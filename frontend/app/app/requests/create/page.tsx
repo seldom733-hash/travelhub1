@@ -311,7 +311,7 @@ export default function CreateRequestPage() {
 
   useEffect(() => {
     if (!selectedCountryId) { setCities([]); return; }
-    api.get<any>(`/geo/cities?countryId=${encodeURIComponent(selectedCountryId)}`).then((geo) => setCities(Array.isArray(geo) ? geo : geo?.value ?? [])).catch(() => setCities([]));
+    api.get<any>(`/geo/cities?countryId=${encodeURIComponent(selectedCountryId)}&status=ACTIVE`).then((geo) => setCities(Array.isArray(geo) ? geo : geo?.value ?? [])).catch(() => setCities([]));
   }, [selectedCountryId]);
 
   function ensureService(kind: ServiceKind): ServiceDraft {
