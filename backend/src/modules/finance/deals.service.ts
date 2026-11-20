@@ -480,8 +480,10 @@ export class DealsService {
       });
       const returnedToRequest = order?.status === "CANCELLED" && request.status !== "CONVERTED" && !["CANCELLED_BY_CUSTOMER", "REJECTED", "UNAVAILABLE", "EXPIRED"].includes(request.status);
       const activeBooking = booking && !["CANCELLED", "COMPLETED", "SUPPLIER_REJECTED"].includes(booking.status) ? booking : null;
-      const stage = returnedToRequest ? "REQUEST" : activeBooking ? "BOOKING" : order ? "ORDER" : "REQUEST";
-      const status = returnedToRequest ? request.status : activeBooking?.status ?? order?.status ?? request.status;
+      // Stage is the deepest existing entity in the commerce chain. A completed
+      // booking must still read as BOOKING, not fall back to ORDER/REQUEST.
+      const stage = returnedToRequest ? "REQUEST" : booking ? "BOOKING" : order ? "ORDER" : "REQUEST";
+      const status = returnedToRequest ? request.status : booking?.status ?? order?.status ?? request.status;
       const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(status);
       const cancelledForDebt = order?.status === "CANCELLED" || Boolean(order?.cancelledAt && !order?.returnedToRequestAt);
       const rawSupplierDebt = cancelledForDebt
