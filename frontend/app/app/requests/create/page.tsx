@@ -529,28 +529,49 @@ export default function CreateRequestPage() {
 
 function Combobox({ options, value, onChange, placeholder }: { options: Array<{ value: string; label: string }>; value: string; onChange: (value: string) => void; placeholder: string }) {
   const [query, setQuery] = useState(options.find((option) => option.value === value)?.label ?? "");
-  const [listId] = useState(() => `combobox-${Math.random().toString(36).slice(2)}`);
+  const [open, setOpen] = useState(false);
   useEffect(() => {
     setQuery(options.find((option) => option.value === value)?.label ?? "");
-  }, [value, options]);
+  }, [value]);
+  const filtered = options
+    .filter((option) => option.label.toLowerCase().includes(query.trim().toLowerCase()))
+    .slice(0, 50);
   return (
-    <>
+    <div className="relative">
       <input
         className={input}
         value={query}
-        list={listId}
+        onFocus={() => setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 150)}
         onChange={(e) => {
           const next = e.target.value;
           setQuery(next);
+          setOpen(true);
           const match = options.find((option) => option.label.toLowerCase() === next.toLowerCase());
           onChange(match?.value ?? "");
         }}
         placeholder={placeholder}
       />
-      <datalist id={listId}>
-        {options.map((option) => <option key={option.value} value={option.label} />)}
-      </datalist>
-    </>
+      {open && filtered.length > 0 && (
+        <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-52 overflow-auto rounded-lg border border-line bg-white shadow-xl">
+          {filtered.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setQuery(option.label);
+                setOpen(false);
+                onChange(option.value);
+              }}
+              className="block w-full px-3 py-2 text-left text-[11px] hover:bg-panel"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
