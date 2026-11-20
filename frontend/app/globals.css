@@ -433,3 +433,18 @@ input[type="date"]::-webkit-datetime-edit-year-field {
 .hero-overlay-copy .text-gold-gradient {
   color: #d8efc9 !important;
 }
+
+/* Sales analytics: labels and values are black; only placeholders stay muted. */
+.analytics-sales :is(h1, h2, h3, th, td, label, p, span, div, button, a, select, option) {
+  color: #1d2a20;
+}
+.analytics-sales input,
+.analytics-sales select,
+.analytics-sales textarea {
+  color: #1d2a20;
+}
+.analytics-sales input::placeholder,
+.analytics-sales textarea::placeholder {
+  color: #98a2b3;
+  opacity: 1;
+}
