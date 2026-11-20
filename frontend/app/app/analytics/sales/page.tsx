@@ -67,6 +67,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
   const [error, setError] = useState("");
   const [selectedManager, setSelectedManager] = useState<any>(null);
   const [managerOptions, setManagerOptions] = useState<any[]>([]);
+  const [serviceTypes, setServiceTypes] = useState<Array<{ code: string; names: Record<string, string> }>>([]);
   const [activityFilter, setActivityFilter] = useState("all");
   const [drill, setDrill] = useState<any>(null);
   const [drillLoading, setDrillLoading] = useState("");
@@ -81,6 +82,12 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
     if (q.get("source")) setSource(q.get("source")!);
     if (q.get("status")) setStatus(q.get("status")!);
     if (q.get("dealTab") === "closed") setDealTab("closed");
+  }, []);
+
+  useEffect(() => {
+    api.get<Array<{ code: string; names: Record<string, string> }>>("/hotel-directory/service-types")
+      .then((rows) => setServiceTypes(Array.isArray(rows) ? rows : []))
+      .catch(() => setServiceTypes([]));
   }, []);
 
   async function openDrilldown(k: string) {
@@ -169,7 +176,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
           </label>
           <label className="flex flex-col gap-1"><span className="text-ink/60">{L("Услуга")}</span>
             <select value={serviceType} onChange={(e) => setServiceType(e.target.value)} className="rounded-lg border bg-white px-2 py-1.5">
-              <option value="">{L("Все")}</option>{["TOUR_PACKAGE", "HOTEL", "FLIGHT", "TRANSFER", "INSURANCE", "VISA", "CRUISE", "OTHER"].map((x) => <option key={x}>{x}</option>)}
+              <option value="">{L("Все")}</option>{serviceTypes.map((x) => <option key={x.code} value={x.code === "TOUR" ? "TOUR_PACKAGE" : x.code}>{x.names?.[locale] ?? x.names?.ru ?? x.code}</option>)}
             </select>
           </label>
           <label className="flex flex-col gap-1"><span className="text-ink/60">{L("Источник")}</span><input value={source} onChange={(e) => setSource(e.target.value)} placeholder={L("Все")} className="w-28 rounded-lg border bg-white px-2 py-1.5" /></label><label className="flex flex-col gap-1"><span className="text-ink/60">{L("Статус")}</span><select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-lg border bg-white px-2 py-1.5"><option value="">{L("Все")}</option><option value="NEW">{L("Новая")}</option><option value="CHECKING">{L("Проверка")}</option><option value="SUPPLIER_TIMEOUT">{L("Поставщик не ответил")}</option><option value="PRICE_CHANGED">{L("Цена изменилась")}</option><option value="CUSTOMER_ACCEPTED">{L("Клиент подтвердил")}</option><option value="CONFIRMED">{L("Подтверждена")}</option><option value="CONVERTED">{L("Сконвертирована")}</option><option value="REJECTED">{L("Отклонена")}</option><option value="UNAVAILABLE">{L("Недоступна")}</option><option value="EXPIRED">{L("Истекла")}</option><option value="CUSTOMER_PAYMENT_TIMEOUT">{L("Клиент не оплатил")}</option><option value="CANCELLED_BY_CUSTOMER">{L("Клиент отказался")}</option></select></label>

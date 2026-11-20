@@ -148,8 +148,16 @@ const STATUS_EN: Record<string, string> = {
   CUSTOMER_PAYMENT_TIMEOUT: "Customer payment timeout", CANCELLED_BY_CUSTOMER: "Cancelled by customer",
 };
 
+const STATUS_RU: Record<string, string> = {
+  NEW: "Новая", CHECKING: "Проверка", SUPPLIER_TIMEOUT: "Поставщик не ответил",
+  PRICE_CHANGED: "Цена изменилась", CUSTOMER_ACCEPTED: "Клиент подтвердил", CONFIRMED: "Подтверждена",
+  CONVERTED: "Сконвертирована", REJECTED: "Отклонена", UNAVAILABLE: "Недоступна",
+  EXPIRED: "Истекла", CUSTOMER_PAYMENT_TIMEOUT: "Клиент не оплатил",
+  CANCELLED_BY_CUSTOMER: "Клиент отказался", CANCELLED: "Отменена",
+};
+
 export function saStatus(locale: Locale, status: string): string {
   if (locale === "az") return STATUS_AZ[status] ?? status;
   if (locale === "en") return STATUS_EN[status] ?? status;
-  return saText("ru", status === "NEW" ? "Новая" : status === "CHECKING" ? "Проверка" : status === "CONFIRMED" ? "Подтверждена" : status === "CONVERTED" ? "Сконвертирована" : status === "REJECTED" ? "Отклонена" : status === "UNAVAILABLE" ? "Недоступна" : status === "EXPIRED" ? "Истекла" : status === "CUSTOMER_ACCEPTED" ? "Клиент подтвердил" : status === "CUSTOMER_PAYMENT_TIMEOUT" ? "Клиент не оплатил" : status === "CANCELLED_BY_CUSTOMER" ? "Клиент отказался" : status);
+  return STATUS_RU[status] ?? status;
 }
