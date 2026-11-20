@@ -353,7 +353,8 @@ export class RequestService {
     if (dto.quantity !== undefined && (!Number.isInteger(dto.quantity) || dto.quantity < 1)) {
       throw new BadRequestException("quantity must be a positive integer");
     }
-    const requestType = dto.requestType ?? null;
+    const rawRequestType = dto.requestType ?? null;
+    const requestType = String(rawRequestType) === "TOUR" ? "TOUR_PACKAGE" : rawRequestType;
     if (requestType && !REQUEST_TYPES.includes(requestType as RequestType)) {
       throw new BadRequestException("Unknown requestType");
     }

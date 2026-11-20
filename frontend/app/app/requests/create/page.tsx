@@ -453,9 +453,10 @@ export default function CreateRequestPage() {
       const firstDate = rows.map((s) => s.data.startDate || s.data.checkIn || s.data.departureDate || s.data.travelDate || "").find(Boolean) || undefined;
       const packageSaleTotal = rows.reduce((sum, s) => sum + Number(s.data.salePrice || 0), 0);
       const effectiveSalePrice = requestType === "CUSTOM_PACKAGE" ? packageSaleTotal : Number(salePrice || 0);
-      const effectiveRequestType = rows.length > 1
+      const rawRequestType = rows.length > 1
         ? "CUSTOM_PACKAGE"
         : (rows[0]?.requestTypeCode ?? KIND_TO_SERVICE_TYPE[rows[0]?.kind ?? "TOUR_PACKAGE"] ?? requestType);
+      const effectiveRequestType = rawRequestType === "TOUR" ? "TOUR_PACKAGE" : rawRequestType;
       const payload = {
         ...(customerId ? { customerId } : {}),
         ...(managerId ? { assignedManagerId: managerId } : {}),
