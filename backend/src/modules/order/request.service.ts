@@ -268,8 +268,8 @@ export class RequestService {
     private readonly assignment: AssignmentService,
   ) {}
 
-  async updateDealDetails(requestId: string, input: { customerId?: string | null; requestedServiceDate?: string | null; travelerCount?: number | null; tripCountry?: string | null; sourceChannel?: string | null }, actor: { id: string; username: string }) {
-    const request = await this.prisma.request.findUnique({ where: { id: requestId }, select: { id: true, status: true, convertedOrderId: true } });
+  async updateDealDetails(requestId: string, input: { customerId?: string | null; requestedServiceDate?: string | null; serviceEndDate?: string | null; travelerCount?: number | null; tripCountry?: string | null; sourceChannel?: string | null }, actor: { id: string; username: string }) {
+    const request = await this.prisma.request.findUnique({ where: { id: requestId }, select: { id: true, status: true, convertedOrderId: true, pinnedRequirements: true } });
     if (!request) throw new NotFoundException("Request not found");
     if (["CANCELLED", "COMPLETED"].includes(request.status)) throw new BadRequestException("Request can no longer be edited");
     const data: Record<string, unknown> = {};
@@ -287,6 +287,17 @@ export class RequestService {
       if (input.travelerCount !== null && (!Number.isInteger(input.travelerCount) || input.travelerCount < 1)) throw new BadRequestException("travelerCount must be a positive integer");
       data.travelerCount = input.travelerCount;
       changes.travelerCount = input.travelerCount;
+    }
+    if (input.serviceEndDate !== undefined) {
+      if (input.serviceEndDate) {
+        const end = new Date(`${input.serviceEndDate}T00:00:00.000Z`);
+        if (Number.isNaN(end.getTime())) throw new BadRequestException("Invalid service end date");
+      }
+      data.pinnedRequirements = {
+        ...((request.pinnedRequirements ?? {}) as Record<string, unknown>),
+        dateTo: input.serviceEndDate || null,
+      };
+      changes.serviceEndDate = input.serviceEndDate;
     }
     if (input.tripCountry !== undefined) { data.tripCountry = input.tripCountry?.trim() || null; changes.tripCountry = data.tripCountry; }
     if (input.sourceChannel !== undefined) { data.sourceChannel = input.sourceChannel?.trim() || null; changes.sourceChannel = data.sourceChannel; }

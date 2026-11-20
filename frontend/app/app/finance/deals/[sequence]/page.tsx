@@ -13,6 +13,7 @@ import CreateSupplierPaymentForm from "@/components/finance/CreateSupplierPaymen
 import { sendWhatsAppMessage, uploadWhatsAppFile, whatsappMediaUrl, type WhatsAppConversationRow, type WhatsAppTimelineItem, type WhatsAppUploadResult } from "@/lib/whatsapp";
 import OperationalNotes from "@/components/OperationalNotes";
 import { useCurrentUser } from "@/lib/use-user";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 const TABS = [
   ["overview", "Общая информация"], ["services", "Услуги и расчёты"], ["client", "Платежи клиента"],
@@ -481,21 +482,24 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 function DealEditModal({ deal, onClose, onSaved }: { deal: DealRow; onClose: () => void; onSaved: () => void }) {
   const [customers, setCustomers] = React.useState<Array<{ id: string; firstName?: string | null; lastName?: string | null }>>([]);
-  const [form, setForm] = React.useState({ customerId: deal.customerId ?? "", tripCountry: deal.trip.country ?? "", sourceChannel: deal.channel ?? "", requestedServiceDate: deal.trip.dateFrom?.slice(0, 10) ?? "", travelerCount: deal.travelerCount ? String(deal.travelerCount) : "" });
+  const [form, setForm] = React.useState({ customerId: deal.customerId ?? "", tripCountry: deal.trip.country ?? "", sourceChannel: deal.channel ?? "", requestedServiceDate: deal.trip.dateFrom?.slice(0, 10) ?? "", serviceEndDate: deal.trip.dateTo?.slice(0, 10) ?? "", travelerCount: deal.travelerCount ? String(deal.travelerCount) : "" });
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState("");
   React.useEffect(() => { api.get<{ items: Array<{ id: string; firstName?: string | null; lastName?: string | null }> }>("/customers?pageSize=100").then((r) => setCustomers(r.items ?? [])).catch(() => undefined); }, []);
   async function save() {
     setBusy(true); setErr("");
     try {
-      await api.patch(`/requests/${deal.requestId}/details`, { customerId: form.customerId || null, tripCountry: form.tripCountry || null, sourceChannel: form.sourceChannel || null, requestedServiceDate: form.requestedServiceDate || null, travelerCount: form.travelerCount ? Number(form.travelerCount) : null });
+      await api.patch(`/requests/${deal.requestId}/details`, { customerId: form.customerId || null, tripCountry: form.tripCountry || null, sourceChannel: form.sourceChannel || null, requestedServiceDate: form.requestedServiceDate || null, serviceEndDate: form.serviceEndDate || null, travelerCount: form.travelerCount ? Number(form.travelerCount) : null });
       onSaved();
     } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
   }
   return <Modal title="Редактировать сделку" onClose={onClose}><div className="grid gap-3 text-xs">
     <label className="grid gap-1">Клиент<select value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5"><option value="">— не выбран —</option>{customers.map((c) => <option key={c.id} value={c.id}>{[c.firstName, c.lastName].filter(Boolean).join(" ") || c.id}</option>)}</select></label>
     <label className="grid gap-1">Страна<input value={form.tripCountry} onChange={(e) => setForm({ ...form, tripCountry: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" /></label>
-    <label className="grid gap-1">Дата услуги<input type="date" value={form.requestedServiceDate} onChange={(e) => setForm({ ...form, requestedServiceDate: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" /></label>
+    <div className="grid grid-cols-2 gap-2">
+      <label className="grid gap-1">Дата начала<DateTextInput value={form.requestedServiceDate} onChange={(v) => setForm({ ...form, requestedServiceDate: v })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" /></label>
+      <label className="grid gap-1">Дата окончания<DateTextInput value={form.serviceEndDate} onChange={(v) => setForm({ ...form, serviceEndDate: v })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" /></label>
+    </div>
     <label className="grid gap-1">Туристы<input type="number" min={1} value={form.travelerCount} onChange={(e) => setForm({ ...form, travelerCount: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" /></label>
     <label className="grid gap-1">Канал<input value={form.sourceChannel} onChange={(e) => setForm({ ...form, sourceChannel: e.target.value })} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" /></label>
     {err && <div className="rounded bg-rose-50 px-2 py-1 text-rose-700">{err}</div>}

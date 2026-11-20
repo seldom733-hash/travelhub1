@@ -277,7 +277,7 @@ export class RequestController {
 
   @Patch(":id/details")
   @RequirePermissions("order.edit_noncritical")
-  updateDetails(@Param("id") id: string, @Body() body: { customerId?: string | null; requestedServiceDate?: string | null; travelerCount?: number | null; tripCountry?: string | null; sourceChannel?: string | null }, @CurrentUser() actor: AuthedRequest["user"]) {
+  updateDetails(@Param("id") id: string, @Body() body: { customerId?: string | null; requestedServiceDate?: string | null; serviceEndDate?: string | null; travelerCount?: number | null; tripCountry?: string | null; sourceChannel?: string | null }, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.requestService.updateDealDetails(id, body, { id: actor.id, username: actor.username });
   }
 

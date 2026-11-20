@@ -523,8 +523,13 @@ export class DealsService {
       const attrs = productAttributes;
       const nights = Number(attrs.nights ?? snapOffer.nights ?? 0) || null;
       const country = request.tripCountry ?? (typeof attrs.country === "string" ? attrs.country : typeof snapOffer.country === "string" ? snapOffer.country : null);
-      const dateFrom = request.requestedServiceDate ? request.requestedServiceDate.toISOString() : null;
-      const dateTo = dateFrom && nights ? new Date(new Date(dateFrom).getTime() + nights * 86400000).toISOString() : null;
+      const pinnedTrip = (request.pinnedRequirements ?? {}) as Record<string, unknown>;
+      const dateFrom = typeof pinnedTrip.dateFrom === "string"
+        ? pinnedTrip.dateFrom
+        : request.requestedServiceDate ? request.requestedServiceDate.toISOString() : null;
+      const dateTo = typeof pinnedTrip.dateTo === "string"
+        ? pinnedTrip.dateTo
+        : dateFrom && nights ? new Date(new Date(dateFrom).getTime() + nights * 86400000).toISOString() : null;
       const adults = Number(attrs.adults ?? 0) || null;
       const children = Number(attrs.children ?? 0) || null;
       const channel = request.sourceChannel ?? (commercial.priceSource === "PUBLIC" ? "Сайт (универсальный поиск)" : String(commercial.priceSource ?? "Ручное создание"));
