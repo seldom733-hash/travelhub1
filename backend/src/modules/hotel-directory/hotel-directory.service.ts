@@ -103,6 +103,34 @@ export class HotelDirectoryService {
     return rows.map((row) => ({ ...row, suppliers: [] as string[] }));
   }
 
+  listServiceTypes(status?: string) {
+    return this.prisma.serviceType.findMany({
+      where: status ? { status: status as never } : undefined,
+      orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
+    });
+  }
+
+  async createServiceType(
+    input: { code?: string; names?: { ru?: string; en?: string; az?: string }; name?: string; lang?: string; sortOrder?: number; status?: string },
+    actor?: AuthUser | null,
+  ) {
+    const names: Record<string, string> = { ...(input.names ?? {}) } as Record<string, string>;
+    const fallback = String(input.name ?? "").trim();
+    if (fallback) names[(input.lang === "az" ? "az" : input.lang === "en" ? "en" : "ru")] = fallback;
+    if (!names.ru && !names.en && !names.az) throw new ConflictException("Service type name is required");
+    const code = (input.code?.trim() || `ST-${Date.now().toString(36)}`).toUpperCase();
+    const row = await this.prisma.serviceType.create({
+      data: {
+        code,
+        names: names as Prisma.InputJsonValue,
+        sortOrder: input.sortOrder ?? 0,
+        status: (input.status ?? "ACTIVE") as never,
+      },
+    });
+    await this.audit(actor, "hotel_directory.service_types.create", "ServiceType", row.id, row);
+    return row;
+  }
+
   async createHotel(
     input: {
       name: string;

@@ -6,6 +6,7 @@ import { useLocale } from "@/lib/i18n";
 import { useCan } from "@/lib/use-can";
 
 interface Entry { id: string; code: string; names: Record<string, string>; status?: string }
+interface ServiceType { id: string; code: string; names: Record<string, string>; sortOrder: number; status: string }
 interface Data { mealTypes: Entry[]; roomTypes: Entry[]; placementTypes: Entry[]; viewTypes: Entry[]; airlineClasses: Entry[]; baggageAllowances: Entry[]; pendingRoomTypes?: Entry[] }
 
 export default function DictionariesPage() {
@@ -20,6 +21,9 @@ export default function DictionariesPage() {
   const [addName, setAddName] = useState("");
   const [addBusy, setAddBusy] = useState(false);
   const [addNotice, setAddNotice] = useState("");
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
+  const [serviceTypeName, setServiceTypeName] = useState("");
+  const [serviceTypeBusy, setServiceTypeBusy] = useState(false);
   const tr = (ru: string, az: string, en: string) => (locale === "az" ? az : locale === "en" ? en : ru);
 
   useEffect(() => {
@@ -30,6 +34,10 @@ export default function DictionariesPage() {
       setData(dict);
       setCountries(Array.isArray(geo) ? geo : geo?.value ?? []);
     }).catch((e) => setError((e as Error).message));
+  }, []);
+
+  useEffect(() => {
+    api.get<ServiceType[]>("/hotel-directory/service-types").then((rows) => setServiceTypes(Array.isArray(rows) ? rows : [])).catch(() => setServiceTypes([]));
   }, []);
 
   useEffect(() => {
@@ -71,14 +79,28 @@ export default function DictionariesPage() {
       setData(dict);
     } catch (e) { setError((e as Error).message); } finally { setAddBusy(false); }
   }
-  const table = (title: string, rows: Entry[], type: string) => <section className="rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b px-4 py-3 text-sm font-semibold">{title}</div><div className="max-h-80 overflow-auto"><table className="w-full text-left text-xs"><thead className="sticky top-0 bg-slate-50 text-slate-500"><tr><th className="px-4 py-2">{tr("Код", "Kod", "Code")}</th><th className="px-4 py-2">{tr("Название", "Ad", "Name")}</th><th className="px-4 py-2">{tr("Статус", "Status", "Status")}</th>{canManage && <th className="px-4 py-2">{tr("Действия", "Əməliyyatlar", "Actions")}</th>}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} className="border-t"><td className="px-4 py-2 font-mono">{row.code}</td><td className="px-4 py-2">{name(row)}</td><td className="px-4 py-2">{row.status ?? "ACTIVE"}</td>{canManage && <td className="px-4 py-2"><div className="flex gap-2"><button type="button" title={tr("Редактировать", "Redaktə et", "Edit")} onClick={() => void editEntry(type, row)} className="text-[#0f6b5f]">✎</button><button type="button" title={tr("Удалить", "Sil", "Delete")} onClick={() => void removeEntry(type, row)} className="text-rose-600">✕</button></div></td>}</tr>)}</tbody></table></div></section>;
+  async function addServiceType() {
+    setError("");
+    if (!serviceTypeName.trim()) return;
+    setServiceTypeBusy(true);
+    try {
+      const lang = locale === "az" ? "az" : locale === "en" ? "en" : "ru";
+      const names = { ru: lang === "ru" ? serviceTypeName.trim() : "", en: lang === "en" ? serviceTypeName.trim() : "", az: lang === "az" ? serviceTypeName.trim() : "" };
+      await api.post("/hotel-directory/service-types", { names, name: serviceTypeName.trim(), lang });
+      setServiceTypeName("");
+      const rows = await api.get<ServiceType[]>("/hotel-directory/service-types");
+      setServiceTypes(Array.isArray(rows) ? rows : []);
+    } catch (e) { setError((e as Error).message); } finally { setServiceTypeBusy(false); }
+  }
+
+  const table = (title: string, rows: Entry[], type: string) => <section className="rounded-xl border border-line bg-white shadow-sm"><div className="border-b px-4 py-3 text-sm font-semibold">{title}</div><div className="max-h-80 overflow-auto"><table className="w-full text-left text-xs"><thead className="sticky top-0 bg-panel text-ink/60"><tr><th className="px-4 py-2">{tr("Код", "Kod", "Code")}</th><th className="px-4 py-2">{tr("Название", "Ad", "Name")}</th><th className="px-4 py-2">{tr("Статус", "Status", "Status")}</th>{canManage && <th className="px-4 py-2">{tr("Действия", "Əməliyyatlar", "Actions")}</th>}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} className="border-t"><td className="px-4 py-2 font-mono">{row.code}</td><td className="px-4 py-2">{name(row)}</td><td className="px-4 py-2">{row.status ?? "ACTIVE"}</td>{canManage && <td className="px-4 py-2"><div className="flex gap-2"><button type="button" title={tr("Редактировать", "Redaktə et", "Edit")} onClick={() => void editEntry(type, row)} className="text-[#0f6b5f]">✎</button><button type="button" title={tr("Удалить", "Sil", "Delete")} onClick={() => void removeEntry(type, row)} className="text-rose-600">✕</button></div></td>}</tr>)}</tbody></table></div></section>;
 
   return <div className="space-y-4 p-4 lg:p-6">
-    <div><h1 className="text-2xl font-semibold">{tr("Справочники", "Lüğətlər", "Dictionaries")}</h1><p className="mt-1 text-sm text-slate-500">{tr("Единые справочники платформы. Значения используются при создании запросов.", "Platformanın vahid lüğətləri. Sorğu yaradarkən istifadə olunur.", "Platform dictionaries used when creating requests.")}</p></div>
+    <div><h1 className="text-2xl font-semibold">{tr("Справочники", "Lüğətlər", "Dictionaries")}</h1><p className="mt-1 text-sm text-ink/60">{tr("Единые справочники платформы. Значения используются при создании запросов.", "Platformanın vahid lüğətləri. Sorğu yaradarkən istifadə olunur.", "Platform dictionaries used when creating requests.")}</p></div>
     {error && <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
-    {canManage && <section className="rounded-xl border border-slate-200 bg-white p-4">
+    {canManage && <section className="rounded-xl border border-line bg-white p-4">
       <h2 className="mb-2 text-sm font-semibold">{tr("Добавить новый тип", "Yeni növ əlavə et", "Add a new type")}</h2>
-      <p className="mb-3 text-xs text-slate-500">{tr("Запись сразу сохраняется в базе. Доступно только администратору. Дубли и опечатки проверяются автоматически.", "Qeyd dərhal bazada saxlanılır. Yalnız administrator üçün. Dublikatlar və yazı səhvləri avtomatik yoxlanılır.", "The entry is saved immediately. Admin only. Duplicates and typos are checked automatically.")}</p>
+      <p className="mb-3 text-xs text-ink/60">{tr("Запись сразу сохраняется в базе. Доступно только администратору. Дубли и опечатки проверяются автоматически.", "Qeyd dərhal bazada saxlanılır. Yalnız administrator üçün. Dublikatlar və yazı səhvləri avtomatik yoxlanılır.", "The entry is saved immediately. Admin only. Duplicates and typos are checked automatically.")}</p>
       <div className="grid gap-2 sm:grid-cols-[220px_1fr_auto]">
         <select className="rounded-lg border px-3 py-2 text-sm" value={addType} onChange={(e) => setAddType(e.target.value)}>
           <option value="room-types">{tr("Типы номеров", "Otaq növləri", "Room types")}</option>
@@ -93,13 +115,26 @@ export default function DictionariesPage() {
       </div>
       {addNotice && <div className="mt-2 rounded bg-emerald-50 px-2 py-1 text-xs text-emerald-700">{addNotice}</div>}
     </section>}
-    <section className="rounded-xl border border-slate-200 bg-white p-4">
+    <section className="rounded-xl border border-line bg-white p-4">
       <h2 className="mb-3 text-sm font-semibold">{tr("Страны и города", "Ölkələr və şəhərlər", "Countries and cities")}</h2>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-xs">{tr("Страна", "Ölkə", "Country")}<select className="rounded-lg border px-3 py-2" value={countryId} onChange={(e) => setCountryId(e.target.value)}><option value="">{tr("Все страны", "Bütün ölkələr", "All countries")}</option>{countries.map((c) => <option key={c.id} value={c.id}>{name(c)}</option>)}</select></label>
         <label className="grid gap-1 text-xs">{tr("Города", "Şəhərlər", "Cities")}<select className="rounded-lg border px-3 py-2" disabled={!countryId}><option>{countryId ? tr("Выберите город", "Şəhər seçin", "Select city") : tr("Сначала выберите страну", "Əvvəlcə ölkə seçin", "Select country first")}</option>{cities.map((c) => <option key={c.id}>{name(c)}</option>)}</select></label>
       </div>
     </section>
+    <section className="rounded-xl border border-line bg-white p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">{tr("Типы услуг", "Xidmət növləri", "Service types")}</h2>
+        {canManage && (
+          <div className="flex gap-2">
+            <input value={serviceTypeName} onChange={(e) => setServiceTypeName(e.target.value)} placeholder={tr("Название услуги", "Xidmətin adı", "Service name")} className="rounded-lg border px-3 py-2 text-sm" />
+            <button type="button" disabled={serviceTypeBusy} onClick={() => void addServiceType()} className="rounded-lg bg-[#0f6b5f] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{tr("Добавить услугу", "Xidmət əlavə et", "Add service")}</button>
+          </div>
+        )}
+      </div>
+      <div className="overflow-auto"><table className="w-full text-left text-xs"><thead className="bg-panel text-ink/60"><tr><th className="px-4 py-2">Код</th><th className="px-4 py-2">Название</th><th className="px-4 py-2">Статус</th></tr></thead><tbody>{serviceTypes.map((row) => <tr key={row.id} className="border-t"><td className="px-4 py-2 font-mono">{row.code}</td><td className="px-4 py-2">{row.names?.[locale] ?? row.names?.ru ?? row.code}</td><td className="px-4 py-2">{row.status}</td></tr>)}</tbody></table></div>
+    </section>
+
     <div className="grid gap-4 xl:grid-cols-2">
       {table(tr("Типы питания", "Qidalanma növləri", "Meal types"), data.mealTypes, "meal-types")}
       {table(tr("Типы размещения", "Yerləşmə növləri", "Accommodation types"), data.placementTypes, "placement-types")}

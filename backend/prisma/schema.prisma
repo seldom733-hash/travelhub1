@@ -541,6 +541,19 @@ model CategorySchema {
 // Product); Category schemas may reference codes. Status reuses
 // catalog.CategoryStatus (ACTIVE/INACTIVE).
 
+/// Platform dictionary of service types used by the request workspace.
+model ServiceType {
+  id        String         @id @default(uuid())
+  code      String         @unique
+  names     Json // { ru, en, az }
+  sortOrder Int            @default(0)
+  status    CategoryStatus @default(ACTIVE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@schema("catalog")
+}
+
 /// Категория отеля (звёздность / формат): 5*, 4*, HV-1…
 model HotelCategory {
   id        String         @id @default(uuid())

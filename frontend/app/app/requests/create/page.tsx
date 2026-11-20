@@ -86,6 +86,7 @@ interface Traveler {
 interface ServiceDraft {
   key: string;
   kind: ServiceKind;
+  requestTypeCode?: string;
   enabled: boolean;
   supplierCode: string;
   supplierName: string;
@@ -107,6 +108,30 @@ const TYPES: Array<{ value: RequestType; ru: string; az: string; en: string }> =
 ];
 
 const PACKAGE_KINDS: ServiceKind[] = ["HOTEL", "FLIGHT", "TRANSFER", "INSURANCE", "VISA"];
+const SERVICE_TYPE_KIND: Record<string, ServiceKind> = {
+  TOUR: "TOUR_PACKAGE",
+  TOUR_PACKAGE: "TOUR_PACKAGE",
+  CUSTOM_PACKAGE: "TOUR_PACKAGE",
+  HOTEL: "HOTEL",
+  FLIGHT: "FLIGHT",
+  FLIGHT_BOOKING: "FLIGHT",
+  CRUISE: "CRUISE",
+  TRANSFER: "TRANSFER",
+  INSURANCE: "INSURANCE",
+  VISA: "VISA",
+  OTHER: "OTHER",
+};
+
+const KIND_TO_SERVICE_TYPE: Partial<Record<ServiceKind, string>> = {
+  TOUR_PACKAGE: "TOUR",
+  HOTEL: "HOTEL",
+  FLIGHT: "FLIGHT",
+  CRUISE: "CRUISE",
+  TRANSFER: "TRANSFER",
+  INSURANCE: "INSURANCE",
+  VISA: "VISA",
+  OTHER: "OTHER",
+};
 
 function typeLabel(locale: string, value: RequestType) {
   const row = TYPES.find((x) => x.value === value);
@@ -122,7 +147,7 @@ function newTraveler(): Traveler {
 }
 
 function newService(kind: ServiceKind): ServiceDraft {
-  return { key: `${kind}-${Math.random().toString(36).slice(2, 9)}`, kind, enabled: true, supplierCode: "", supplierName: "", title: "", data: {} };
+  return { key: `${kind}-${Math.random().toString(36).slice(2, 9)}`, kind, requestTypeCode: KIND_TO_SERVICE_TYPE[kind], enabled: true, supplierCode: "", supplierName: "", title: "", data: {} };
 }
 
 const input = "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-[#0f6b5f] focus:ring-2 focus:ring-[#0f6b5f]/10";
@@ -142,6 +167,7 @@ export default function CreateRequestPage() {
   const [managerId, setManagerId] = useState("");
   const [managers, setManagers] = useState<Manager[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [serviceTypes, setServiceTypes] = useState<Array<{ code: string; names: Record<string, string> }>>([]);
   const [primarySupplierCode, setPrimarySupplierCode] = useState("");
   const [travelers, setTravelers] = useState<Traveler[]>([newTraveler()]);
   const [services, setServices] = useState<ServiceDraft[]>([newService("TOUR_PACKAGE")]);
@@ -302,6 +328,12 @@ export default function CreateRequestPage() {
   }, [hotelQuery]);
 
   useEffect(() => {
+    api.get<Array<{ code: string; names: Record<string, string> }>>("/hotel-directory/service-types")
+      .then((rows) => setServiceTypes(Array.isArray(rows) ? rows : []))
+      .catch(() => setServiceTypes([]));
+  }, []);
+
+  useEffect(() => {
     if (currentUser && ["SALES_MANAGER", "SALES_HEAD"].includes(currentUser.role) && !managerId) {
       setManagerId(currentUser.id);
     }
@@ -376,6 +408,10 @@ export default function CreateRequestPage() {
   }, [requestType, services, activePackageKind]);
 
   const currentKind: ServiceKind = requestType === "CUSTOM_PACKAGE" ? activePackageKind : requestType === "FLIGHT_BOOKING" ? "FLIGHT" : (requestType as ServiceKind);
+  const serviceTypeOptions = serviceTypes.length > 0
+    ? serviceTypes.map((row) => ({ code: row.code, label: row.names?.[locale] ?? row.names?.ru ?? row.code }))
+    : TYPES.map((row) => ({ code: row.value, label: row[locale === "az" ? "az" : locale === "en" ? "en" : "ru"] }));
+  const visibleServiceType = visibleService ? KIND_TO_SERVICE_TYPE[visibleService.kind] ?? "OTHER" : "TOUR";
 
   async function createCustomerIfNeeded(): Promise<string | null> {
     if (customerMode === "existing") return selectedCustomer?.id ?? null;
@@ -406,10 +442,13 @@ export default function CreateRequestPage() {
       const firstDate = rows.map((s) => s.data.startDate || s.data.checkIn || s.data.departureDate || s.data.travelDate || "").find(Boolean) || undefined;
       const packageSaleTotal = rows.reduce((sum, s) => sum + Number(s.data.salePrice || 0), 0);
       const effectiveSalePrice = requestType === "CUSTOM_PACKAGE" ? packageSaleTotal : Number(salePrice || 0);
+      const effectiveRequestType = rows.length > 1
+        ? "CUSTOM_PACKAGE"
+        : (rows[0]?.requestTypeCode ?? KIND_TO_SERVICE_TYPE[rows[0]?.kind ?? "TOUR_PACKAGE"] ?? requestType);
       const payload = {
         ...(customerId ? { customerId } : {}),
         ...(managerId ? { assignedManagerId: managerId } : {}),
-        requestType,
+        requestType: effectiveRequestType,
         primarySupplierCode: primarySupplierCode || rows[0]?.supplierCode || undefined,
         requestedServiceDate: serviceStart || firstDate,
         ...(effectiveSalePrice > 0 ? { displayedPrice: effectiveSalePrice, displayedCurrency: currency } : {}),
@@ -473,11 +512,6 @@ export default function CreateRequestPage() {
     {error && <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
 
     <section className="rounded-xl border border-line bg-white p-4 shadow-sm">
-      <h2 className="mb-3 text-sm font-semibold">{tr("Тип запроса", "Sorğu növü", "Request type")}</h2>
-      <div className="flex flex-wrap gap-2">{TYPES.map((t) => <button key={t.value} type="button" onClick={() => { setRequestType(t.value); const kind: ServiceKind = t.value === "CUSTOM_PACKAGE" ? "HOTEL" : t.value === "FLIGHT_BOOKING" ? "FLIGHT" : (t.value as ServiceKind); setServices([newService(kind)]); setSavedServiceKeys([]); }} className={`rounded-lg border px-3 py-2 text-xs font-medium ${requestType === t.value ? "border-[#0f6b5f] bg-[#eef8f3] text-[#0f6b5f]" : "border-line text-ink/60"}`}>{t[locale === "az" ? "az" : locale === "en" ? "en" : "ru"]}</button>)}</div>
-    </section>
-
-    <section className="rounded-xl border border-line bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold">{tr("Покупатель", "Müştəri", "Customer")}</h2><div className="flex gap-1"><button type="button" onClick={() => setCustomerMode("existing")} className={`rounded px-2 py-1 text-[11px] ${customerMode === "existing" ? "bg-[#0f6b5f] text-white" : "border"}`}>{tr("Существующий", "Mövcud", "Existing")}</button><button type="button" onClick={() => setCustomerMode("new")} className={`rounded px-2 py-1 text-[11px] ${customerMode === "new" ? "bg-[#0f6b5f] text-white" : "border"}`}>{tr("Новый", "Yeni", "New")}</button></div></div>
       {customerMode === "existing" ? <div className="space-y-2">
         <input className={input} value={customerSearch} onChange={(e) => { setCustomerSearch(e.target.value); setCustomerListOpen(true); }} onFocus={() => setCustomerListOpen(true)} placeholder={tr("Поиск по имени, телефону или email", "Ad, telefon və ya e-poçtla axtar", "Search by name, phone or email")} />
@@ -536,9 +570,16 @@ export default function CreateRequestPage() {
     </section>
 
     <section className="rounded-xl border border-line bg-white p-4 shadow-sm">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">{tr("Поставщик", "Təchizatçı", "Supplier")}</h2><select className="rounded-lg border px-2 py-1.5 text-xs" value={primarySupplierCode} onChange={(e) => setPrimarySupplierCode(e.target.value)}><option value="">{tr("Основной поставщик", "Əsas təchizatçı", "Primary supplier")}</option>{suppliers.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}</select></div>
-      {requestType === "CUSTOM_PACKAGE" && <div className="mb-3 flex flex-wrap gap-1">{PACKAGE_KINDS.map((k) => <button key={k} type="button" onClick={() => { setActivePackageKind(k); ensureService(k); }} className={`rounded border px-2 py-1 text-[11px] ${activePackageKind === k ? "border-[#0f6b5f] bg-[#eef8f3] text-[#0f6b5f]" : ""}`}>{kindLabel(locale, k)}</button>)}</div>}
-      {visibleService ? <ServiceFields service={visibleService} locale={locale} suppliers={suppliers} primarySupplierCode={primarySupplierCode} hotelQuery={hotelQuery} setHotelQuery={setHotelQuery} hotelOptions={hotelOptions} onSelectHotel={(p) => { updateService(visibleService.key, { title: p.title }); updateData(visibleService.key, "hotelName", p.title); }} onChange={(patch) => updateService(visibleService.key, patch)} onData={(field, value) => updateData(visibleService.key, field, value)} dictionary={dictionary} countries={countries} cities={cities} selectedCountryId={selectedCountryId} setSelectedCountryId={setSelectedCountryId} /> : <button type="button" className="rounded-lg border px-3 py-2 text-xs" onClick={() => setServices([...services, newService(currentKind)])}>+ {tr("Добавить услугу", "Xidmət əlavə et", "Add service")}</button>}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">{tr("Поставщик", "Təchizatçı", "Supplier")}</h2><label className="flex items-center gap-2 text-[11px] text-ink/60">{tr("Тип услуги", "Xidmətin növü", "Service type")}<select className="rounded-lg border px-2 py-1.5 text-xs" value={visibleServiceType} onChange={(e) => {
+        const code = e.target.value;
+        const kind = SERVICE_TYPE_KIND[code] ?? "OTHER";
+        setActivePackageKind(kind);
+        setRequestType("CUSTOM_PACKAGE");
+        if (visibleService) updateService(visibleService.key, { kind, requestTypeCode: code });
+        else setServices([newService(kind)]);
+      }}>{serviceTypeOptions.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></label></div>
+
+      {visibleService ? <ServiceFields service={visibleService} locale={locale} suppliers={suppliers} primarySupplierCode={primarySupplierCode} hotelQuery={hotelQuery} setHotelQuery={setHotelQuery} hotelOptions={hotelOptions} onSelectHotel={(p) => { updateService(visibleService.key, { title: p.title }); updateData(visibleService.key, "hotelName", p.title); }} onChange={(patch) => updateService(visibleService.key, patch)} onData={(field, value) => updateData(visibleService.key, field, value)} dictionary={dictionary} countries={countries} cities={cities} selectedCountryId={selectedCountryId} setSelectedCountryId={setSelectedCountryId} /> : <button type="button" className="rounded-lg border px-3 py-2 text-xs" onClick={() => { setServices([...services, newService(currentKind)]); setRequestType("CUSTOM_PACKAGE"); }}>+ {tr("Добавить услугу", "Xidmət əlavə et", "Add service")}</button>}
       {visibleService && (
         <div className="mt-3">
           <button type="button" onClick={() => saveService(visibleService.key)} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark">

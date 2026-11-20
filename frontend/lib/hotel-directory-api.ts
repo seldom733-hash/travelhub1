@@ -53,6 +53,9 @@ export const hotelDirectoryApi = {
     categoryLabel: string | null;
     suppliers: string[];
   }>(`${BASE}/hotels`, body),
+  serviceTypes: () => api.get<Array<{ id: string; code: string; names: { ru: string; en: string; az: string }; sortOrder: number; status: string }>>(`${BASE}/service-types`),
+  createServiceType: (body: { names: { ru: string; en: string; az: string }; sortOrder?: number; status?: string }) =>
+    api.post<{ id: string; code: string; names: { ru: string; en: string; az: string }; sortOrder: number; status: string }>(`${BASE}/service-types`, body),
   update: (type: HotelDirectoryType, id: string, body: object) =>
     api.patch<HotelDirectoryEntry>(`${BASE}/${type}/${id}`, body),
   remove: (type: HotelDirectoryType, id: string) =>
