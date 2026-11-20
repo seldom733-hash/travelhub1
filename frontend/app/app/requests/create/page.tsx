@@ -209,6 +209,14 @@ export default function CreateRequestPage() {
   }, [travelerStats]);
 
   useEffect(() => {
+    if (requestType !== "CUSTOM_PACKAGE") return;
+    const totalCost = services.reduce((sum, service) => sum + Number(service.data.costPrice || 0), 0);
+    const totalSale = services.reduce((sum, service) => sum + Number(service.data.salePrice || 0), 0);
+    setCostPrice(totalCost > 0 ? totalCost.toFixed(2) : "");
+    setSalePrice(totalSale > 0 ? totalSale.toFixed(2) : "");
+  }, [services, requestType]);
+
+  useEffect(() => {
     if (!serviceStart && !serviceEnd) return;
     setServices((prev) =>
       prev.map((service) =>
@@ -350,8 +358,8 @@ export default function CreateRequestPage() {
   }
 
   const savedServices = services.filter((s) => savedServiceKeys.includes(s.key));
-  const packageTotalCost = savedServices.reduce((sum, s) => sum + Number(s.data.costPrice || costPrice || 0), 0);
-  const packageTotalSale = savedServices.reduce((sum, s) => sum + Number(s.data.salePrice || salePrice || 0), 0);
+  const packageTotalCost = savedServices.reduce((sum, s) => sum + Number(s.data.costPrice || 0), 0);
+  const packageTotalSale = savedServices.reduce((sum, s) => sum + Number(s.data.salePrice || 0), 0);
 
   function primaryService(): ServiceDraft {
     if (requestType === "CUSTOM_PACKAGE") {
@@ -396,7 +404,7 @@ export default function CreateRequestPage() {
     try {
       const customerId = await createCustomerIfNeeded();
       const firstDate = rows.map((s) => s.data.startDate || s.data.checkIn || s.data.departureDate || s.data.travelDate || "").find(Boolean) || undefined;
-      const packageSaleTotal = rows.reduce((sum, s) => sum + Number(s.data.salePrice || salePrice || 0), 0);
+      const packageSaleTotal = rows.reduce((sum, s) => sum + Number(s.data.salePrice || 0), 0);
       const effectiveSalePrice = requestType === "CUSTOM_PACKAGE" ? packageSaleTotal : Number(salePrice || 0);
       const payload = {
         ...(customerId ? { customerId } : {}),
@@ -425,8 +433,8 @@ export default function CreateRequestPage() {
           childAges: travelerStats.childAges,
         },
         services: rows.map((s) => {
-          const lineCost = s.data.costPrice || costPrice;
-          const lineSale = s.data.salePrice || salePrice;
+          const lineCost = s.data.costPrice || (requestType === "CUSTOM_PACKAGE" ? "" : costPrice);
+          const lineSale = s.data.salePrice || (requestType === "CUSTOM_PACKAGE" ? "" : salePrice);
           return {
             serviceType: s.kind,
             supplierCode: s.supplierCode === "NO_SUPPLIER" ? undefined : s.supplierCode || undefined,
@@ -531,7 +539,7 @@ export default function CreateRequestPage() {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">{tr("Поставщик", "Təchizatçı", "Supplier")}</h2><select className="rounded-lg border px-2 py-1.5 text-xs" value={primarySupplierCode} onChange={(e) => setPrimarySupplierCode(e.target.value)}><option value="">{tr("Основной поставщик", "Əsas təchizatçı", "Primary supplier")}</option>{suppliers.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}</select></div>
       {requestType === "CUSTOM_PACKAGE" && <div className="mb-3 flex flex-wrap gap-1">{PACKAGE_KINDS.map((k) => <button key={k} type="button" onClick={() => { setActivePackageKind(k); ensureService(k); }} className={`rounded border px-2 py-1 text-[11px] ${activePackageKind === k ? "border-[#0f6b5f] bg-[#eef8f3] text-[#0f6b5f]" : ""}`}>{kindLabel(locale, k)}</button>)}</div>}
       {visibleService ? <ServiceFields service={visibleService} locale={locale} suppliers={suppliers} primarySupplierCode={primarySupplierCode} hotelQuery={hotelQuery} setHotelQuery={setHotelQuery} hotelOptions={hotelOptions} onSelectHotel={(p) => { updateService(visibleService.key, { title: p.title }); updateData(visibleService.key, "hotelName", p.title); }} onChange={(patch) => updateService(visibleService.key, patch)} onData={(field, value) => updateData(visibleService.key, field, value)} dictionary={dictionary} countries={countries} cities={cities} selectedCountryId={selectedCountryId} setSelectedCountryId={setSelectedCountryId} /> : <button type="button" className="rounded-lg border px-3 py-2 text-xs" onClick={() => setServices([...services, newService(currentKind)])}>+ {tr("Добавить услугу", "Xidmət əlavə et", "Add service")}</button>}
-      {requestType === "CUSTOM_PACKAGE" && visibleService && (
+      {visibleService && (
         <div className="mt-3">
           <button type="button" onClick={() => saveService(visibleService.key)} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark">
             {tr("Сохранить услугу", "Xidməti yadda saxla", "Save service")}
@@ -551,7 +559,7 @@ export default function CreateRequestPage() {
           + {tr("Добавить услугу", "Xidmət əlavə et", "Add service")}
         </button>
       </div>
-      {requestType === "CUSTOM_PACKAGE" && savedServiceKeys.length > 0 && (
+      {savedServiceKeys.length > 0 && (
         <div className="mt-4 overflow-hidden rounded-lg border border-line">
           <div className="border-b bg-panel px-3 py-2 text-xs font-semibold">
             {tr("Сохранённые услуги", "Yadda saxlanılan xidmətlər", "Saved services")}
@@ -561,7 +569,7 @@ export default function CreateRequestPage() {
               <span className="min-w-32 font-semibold">{kindLabel(locale, s.kind)}</span>
               <span className="text-ink/60">{s.supplierName || tr("Без поставщика", "Təchizatçı olmadan", "Without supplier")}</span>
               <span className="text-ink/60">{serviceDates(s)}</span>
-              <span className="font-mono">{s.data.costPrice || costPrice || "—"} / {s.data.salePrice || salePrice || "—"} {currency}</span>
+              <span className="font-mono">{s.data.costPrice || "—"} / {s.data.salePrice || "—"} {currency}</span>
               <button type="button" onClick={() => deleteService(s.key)} className="ml-auto font-semibold text-rose-600 hover:text-rose-700">
                 {tr("Удалить", "Sil", "Delete")}
               </button>
@@ -691,7 +699,7 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
   const supplier = <label className={label}>{tr("Поставщик услуги", "Xidmət təchizatçısı", "Service supplier")}<select className={input} value={service.supplierCode} onChange={(e) => { const code = e.target.value; const row = suppliers.find((s) => s.code === code); onChange({ supplierCode: code, supplierName: code === "NO_SUPPLIER" ? "" : row?.name ?? "" }); }}><option value="">{tr("Выберите", "Seçin", "Select")}</option>{service.kind === "VISA" && <option value="NO_SUPPLIER">{tr("Без поставщика", "Təchizatçı olmadan", "Without supplier")}</option>}{suppliers.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}</select></label>;
   const servicePriceFields = <div className="grid gap-3 sm:grid-cols-2 sm:col-span-2">
     <label className={label}>{tr("Себестоимость услуги", "Xidmətin maya dəyəri", "Service cost")}<input className={input} inputMode="decimal" value={d.costPrice ?? ""} onChange={(e) => onData("costPrice", e.target.value.replace(",", "."))} /></label>
-    <label className={label}>{tr("Цена услуги", "Xidmətin qiyməti", "Service price")}<input className={input} inputMode="decimal" value={d.salePrice ?? ""} onChange={(e) => onData("salePrice", e.target.value.replace(",", "."))} /></label>
+    <label className={label}>{tr("Цена продажи", "Satış qiyməti", "Sale price")}<input className={input} inputMode="decimal" value={d.salePrice ?? ""} onChange={(e) => onData("salePrice", e.target.value.replace(",", "."))} /></label>
   </div>;
 
   if (service.kind === "HOTEL" || service.kind === "TOUR_PACKAGE") return <div className="grid gap-3 sm:grid-cols-2">
