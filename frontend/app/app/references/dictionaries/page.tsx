@@ -125,12 +125,6 @@ export default function DictionariesPage() {
     <section className="rounded-xl border border-line bg-white p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">{tr("Типы услуг", "Xidmət növləri", "Service types")}</h2>
-        {canManage && (
-          <div className="flex gap-2">
-            <input value={serviceTypeName} onChange={(e) => setServiceTypeName(e.target.value)} placeholder={tr("Название услуги", "Xidmətin adı", "Service name")} className="rounded-lg border px-3 py-2 text-sm" />
-            <button type="button" disabled={serviceTypeBusy} onClick={() => void addServiceType()} className="rounded-lg bg-[#0f6b5f] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{tr("Добавить услугу", "Xidmət əlavə et", "Add service")}</button>
-          </div>
-        )}
       </div>
       <div className="overflow-auto"><table className="w-full text-left text-xs"><thead className="bg-panel text-ink/60"><tr><th className="px-4 py-2">Код</th><th className="px-4 py-2">Название</th><th className="px-4 py-2">Статус</th></tr></thead><tbody>{serviceTypes.map((row) => <tr key={row.id} className="border-t"><td className="px-4 py-2 font-mono">{row.code}</td><td className="px-4 py-2">{row.names?.[locale] ?? row.names?.ru ?? row.code}</td><td className="px-4 py-2">{row.status}</td></tr>)}</tbody></table></div>
     </section>

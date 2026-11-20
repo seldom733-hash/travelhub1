@@ -70,6 +70,14 @@ interface GeoCity {
   names: Record<string, string>;
 }
 
+interface AirportOption {
+  code: string;
+  name: string;
+  countryCode: string;
+  countryName: string;
+  cityName: string;
+}
+
 interface Traveler {
   firstName: string;
   lastName: string;
@@ -180,6 +188,7 @@ export default function CreateRequestPage() {
   const [dictionary, setDictionary] = useState<{ mealTypes: DictionaryEntry[]; roomTypes: DictionaryEntry[]; placementTypes: DictionaryEntry[]; viewTypes: DictionaryEntry[]; airlineClasses: DictionaryEntry[]; baggageAllowances: DictionaryEntry[] }>({ mealTypes: [], roomTypes: [], placementTypes: [], viewTypes: [], airlineClasses: [], baggageAllowances: [] });
   const [countries, setCountries] = useState<GeoCountry[]>([]);
   const [cities, setCities] = useState<GeoCity[]>([]);
+  const [airports, setAirports] = useState<AirportOption[]>([]);
   const [selectedCountryId, setSelectedCountryId] = useState("");
   const [activePackageKind, setActivePackageKind] = useState<ServiceKind>("HOTEL");
   const [hotelQuery, setHotelQuery] = useState("");
@@ -331,6 +340,9 @@ export default function CreateRequestPage() {
     api.get<Array<{ code: string; names: Record<string, string> }>>("/hotel-directory/service-types")
       .then((rows) => setServiceTypes(Array.isArray(rows) ? rows : []))
       .catch(() => setServiceTypes([]));
+    api.get<AirportOption[]>("/hotel-directory/airports")
+      .then((rows) => setAirports(Array.isArray(rows) ? rows : []))
+      .catch(() => setAirports([]));
   }, []);
 
   useEffect(() => {
@@ -570,7 +582,7 @@ export default function CreateRequestPage() {
     </section>
 
     <section className="rounded-xl border border-line bg-white p-4 shadow-sm">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">{tr("Поставщик", "Təchizatçı", "Supplier")}</h2><label className="flex items-center gap-2 text-[11px] text-ink/60">{tr("Тип услуги", "Xidmətin növü", "Service type")}<select className="rounded-lg border px-2 py-1.5 text-xs" value={visibleServiceType} onChange={(e) => {
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">{tr("Услуги", "Xidmətlər", "Services")}</h2><label className="flex items-center gap-2 text-[11px] text-ink/60">{tr("Тип услуги", "Xidmətin növü", "Service type")}<select className="rounded-lg border px-2 py-1.5 text-xs" value={visibleServiceType} onChange={(e) => {
         const code = e.target.value;
         const kind = SERVICE_TYPE_KIND[code] ?? "OTHER";
         setActivePackageKind(kind);
@@ -579,7 +591,7 @@ export default function CreateRequestPage() {
         else setServices([newService(kind)]);
       }}>{serviceTypeOptions.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></label></div>
 
-      {visibleService ? <ServiceFields service={visibleService} locale={locale} suppliers={suppliers} primarySupplierCode={primarySupplierCode} hotelQuery={hotelQuery} setHotelQuery={setHotelQuery} hotelOptions={hotelOptions} onSelectHotel={(p) => { updateService(visibleService.key, { title: p.title }); updateData(visibleService.key, "hotelName", p.title); }} onChange={(patch) => updateService(visibleService.key, patch)} onData={(field, value) => updateData(visibleService.key, field, value)} dictionary={dictionary} countries={countries} cities={cities} selectedCountryId={selectedCountryId} setSelectedCountryId={setSelectedCountryId} /> : <button type="button" className="rounded-lg border px-3 py-2 text-xs" onClick={() => { setServices([...services, newService(currentKind)]); setRequestType("CUSTOM_PACKAGE"); }}>+ {tr("Добавить услугу", "Xidmət əlavə et", "Add service")}</button>}
+      {visibleService ? <ServiceFields service={visibleService} locale={locale} suppliers={suppliers} primarySupplierCode={primarySupplierCode} hotelQuery={hotelQuery} setHotelQuery={setHotelQuery} hotelOptions={hotelOptions} onSelectHotel={(p) => { updateService(visibleService.key, { title: p.title }); updateData(visibleService.key, "hotelName", p.title); }} onChange={(patch) => updateService(visibleService.key, patch)} onData={(field, value) => updateData(visibleService.key, field, value)} dictionary={dictionary} countries={countries} cities={cities} airports={airports} selectedCountryId={selectedCountryId} setSelectedCountryId={setSelectedCountryId} /> : <button type="button" className="rounded-lg border px-3 py-2 text-xs" onClick={() => { setServices([...services, newService(currentKind)]); setRequestType("CUSTOM_PACKAGE"); }}>+ {tr("Добавить услугу", "Xidmət əlavə et", "Add service")}</button>}
       {visibleService && (
         <div className="mt-3">
           <button type="button" onClick={() => saveService(visibleService.key)} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark">
@@ -687,12 +699,12 @@ function Combobox({ options, value, onChange, placeholder }: { options: Array<{ 
   );
 }
 
-function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQuery, setHotelQuery, hotelOptions, onSelectHotel, onChange, onData, dictionary, countries, cities, selectedCountryId, setSelectedCountryId }: {
+function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQuery, setHotelQuery, hotelOptions, onSelectHotel, onChange, onData, dictionary, countries, cities, airports, selectedCountryId, setSelectedCountryId }: {
   service: ServiceDraft; locale: string; suppliers: Supplier[]; primarySupplierCode: string;
   hotelQuery: string; setHotelQuery: (v: string) => void; hotelOptions: ProductOption[];
   onSelectHotel: (p: ProductOption) => void; onChange: (patch: Partial<ServiceDraft>) => void; onData: (field: string, value: string) => void;
   dictionary: { mealTypes: DictionaryEntry[]; roomTypes: DictionaryEntry[]; placementTypes: DictionaryEntry[]; viewTypes: DictionaryEntry[]; airlineClasses: DictionaryEntry[]; baggageAllowances: DictionaryEntry[] };
-  countries: GeoCountry[]; cities: GeoCity[]; selectedCountryId: string; setSelectedCountryId: (v: string) => void;
+  countries: GeoCountry[]; cities: GeoCity[]; airports: AirportOption[]; selectedCountryId: string; setSelectedCountryId: (v: string) => void;
 }) {
   const tr = (ru: string, az: string, en: string) => (locale === "az" ? az : locale === "en" ? en : ru);
   const input = "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm";
@@ -720,6 +732,14 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
     if (match) onData("cityId", match.id);
   }, [cities, d.city, d.cityId, locale, onData]);
 
+  useEffect(() => {
+    if (service.kind !== "TOUR_PACKAGE") return;
+    if (d.flightFromAirport && d.flightToAirport) {
+      if (d.returnFromAirport !== d.flightToAirport) onData("returnFromAirport", d.flightToAirport);
+      if (d.returnToAirport !== d.flightFromAirport) onData("returnToAirport", d.flightFromAirport);
+    }
+  }, [d.flightFromAirport, d.flightToAirport, d.returnFromAirport, d.returnToAirport, service.kind, onData]);
+
   const chooseHotel = (hotel: { id: string; name: string; suppliers?: string[]; countryCode?: string; cityName?: string; resortName?: string }) => {
     setHotelSearch(hotel.name);
     onSelectHotel({ id: hotel.id, title: hotel.name });
@@ -743,34 +763,68 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
     <label className={label}>{tr("Цена продажи", "Satış qiyməti", "Sale price")}<input className={input} inputMode="decimal" value={d.salePrice ?? ""} onChange={(e) => onData("salePrice", e.target.value.replace(",", "."))} /></label>
   </div>;
 
-  if (service.kind === "HOTEL" || service.kind === "TOUR_PACKAGE") return <div className="grid gap-3 sm:grid-cols-2">
-    {supplier}{servicePriceFields}
-    <label className={`${label} relative`}>{tr("Название отеля", "Otel adı", "Hotel name")}
-      <input className={input} value={hotelSearch} onClick={() => setHotelOpen((open) => !open)} onBlur={() => window.setTimeout(() => setHotelOpen(false), 150)} onChange={(e) => { setHotelSearch(e.target.value); setHotelOpen(true); onData("hotelName", e.target.value); }} placeholder={tr("Начните вводить название отеля", "Otel adını yazmağa başlayın", "Start typing a hotel name")} />
-      {hotelOpen && hotelResults.length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-52 overflow-auto rounded-lg border border-line bg-white shadow-xl">
-          {hotelResults.map((p) => (
-            <button key={p.id} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => chooseHotel(p)} className="flex w-full items-center justify-between border-b px-3 py-2 text-left text-[11px] last:border-0 hover:bg-panel">
-              <span>{p.name}</span>
-              <span className="text-ink/60">{p.resortName ?? p.cityName ?? p.suppliers?.join(", ")}</span>
-            </button>
-          ))}
+  if (service.kind === "HOTEL" || service.kind === "TOUR_PACKAGE") {
+    const isTour = service.kind === "TOUR_PACKAGE";
+    const airportField = (field: string, title: string) => (
+      <label className={label}>{title}
+        <select className={input} value={d[field] ?? ""} onChange={(e) => onData(field, e.target.value)}>
+          <option value="">{tr("Выберите аэропорт", "Aeroport seçin", "Select airport")}</option>
+          {airports.map((airport) => <option key={airport.code} value={airport.code}>{airport.code} — {airport.cityName || airport.name}</option>)}
+        </select>
+      </label>
+    );
+    return <div className="space-y-4">
+      <div className="rounded-lg border border-line p-3">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">{tr("Общие данные", "Ümumi məlumatlar", "General")}</h3>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {supplier}{servicePriceFields}
+          <label className={label}>{tr("Страна", "Ölkə", "Country")}<Combobox options={countries.map((c) => ({ value: c.id, label: c.names[locale] ?? c.names.ru ?? c.code }))} value={selectedCountryId} onChange={(v) => { setSelectedCountryId(v); const row = countries.find((c) => c.id === v); onData("country", row?.code ?? ""); }} placeholder={tr("Начните вводить страну", "Ölkə adını yazın", "Start typing a country")} /></label>
+          <label className={label}>{tr("Город", "Şəhər", "City")}<Combobox options={cities.map((c) => ({ value: c.id, label: c.names[locale] ?? c.names.ru ?? c.code }))} value={d.cityId ?? ""} onChange={(v) => { const row = cities.find((c) => c.id === v); onData("cityId", v); onData("city", row?.code ?? row?.names[locale] ?? ""); }} placeholder={tr("Начните вводить город", "Şəhər adını yazın", "Start typing a city")} /></label>
+          <label className={label}>{tr("Начало тура", "Turun başlanğıcı", "Tour start")}<DateTextInput className={input} value={d.checkIn ?? ""} onChange={(v) => onData("checkIn", v)} /></label>
+          <label className={label}>{tr("Конец тура", "Turun sonu", "Tour end")}<DateTextInput className={input} value={d.checkOut ?? ""} onChange={(v) => onData("checkOut", v)} /></label>
+          <label className={label}>{tr("Номеров", "Otaq sayı", "Rooms")}<input type="number" min="1" className={input} value={d.rooms ?? "1"} onChange={(e) => onData("rooms", e.target.value)} /></label>
+          <label className={label}>{tr("Взрослых", "Böyüklər", "Adults")}<input type="number" min="1" className={input} value={d.adults ?? "2"} onChange={(e) => onData("adults", e.target.value)} /></label>
+          <label className={label}>{tr("Детей", "Uşaqlar", "Children")}<input type="number" min="0" className={input} value={d.children ?? "0"} onChange={(e) => onData("children", e.target.value)} /></label>
+          <label className={label}>{tr("Возраст детей", "Uşaqların yaşı", "Children ages")}<input className={input} value={d.childrenAges ?? ""} onChange={(e) => onData("childrenAges", e.target.value)} /></label>
         </div>
-      )}
-    </label>
-    <label className={label}>{tr("Страна", "Ölkə", "Country")}<Combobox options={countries.map((c) => ({ value: c.id, label: c.names[locale] ?? c.names.ru ?? c.code }))} value={selectedCountryId} onChange={(v) => { setSelectedCountryId(v); const row = countries.find((c) => c.id === v); onData("country", row?.code ?? ""); }} placeholder={tr("Начните вводить страну", "Ölkə adını yazın", "Start typing a country")} /></label>
-    <label className={label}>{tr("Город", "Şəhər", "City")}<Combobox options={cities.map((c) => ({ value: c.id, label: c.names[locale] ?? c.names.ru ?? c.code }))} value={d.cityId ?? ""} onChange={(v) => { const row = cities.find((c) => c.id === v); onData("cityId", v); onData("city", row?.code ?? row?.names[locale] ?? ""); }} placeholder={tr("Начните вводить город", "Şəhər adını yazın", "Start typing a city")} /></label>
-    <label className={label}>{tr("Заезд", "Giriş", "Check-in")}<DateTextInput className={input} value={d.checkIn ?? ""} onChange={(v) => onData("checkIn", v)} /></label>
-    <label className={label}>{tr("Выезд", "Çıxış", "Check-out")}<DateTextInput className={input} value={d.checkOut ?? ""} onChange={(v) => onData("checkOut", v)} /></label>
-    <label className={label}>{tr("Тип номера", "Otaq növü", "Room type")}<select className={input} value={d.roomType ?? ""} onChange={(e) => onData("roomType", e.target.value)}><option value="">{tr("Выберите", "Seçin", "Select")}</option>{dictionary.roomTypes.map((x) => <option key={x.code} value={x.code}>{x.names[locale] ?? x.names.ru ?? x.code}</option>)}</select></label>
-    <label className={label}>{tr("Размещение", "Yerləşmə", "Accommodation")}<select className={input} value={d.accommodation ?? ""} onChange={(e) => onData("accommodation", e.target.value)}><option value="">{tr("Выберите", "Seçin", "Select")}</option>{dictionary.placementTypes.map((x) => <option key={x.code} value={x.code}>{x.names[locale] ?? x.names.ru ?? x.code}</option>)}</select></label>
-    <label className={label}>{tr("Питание", "Qidalanma", "Meal")}<select className={input} value={d.meal ?? ""} onChange={(e) => onData("meal", e.target.value)}><option value="">{tr("Выберите", "Seçin", "Select")}</option>{dictionary.mealTypes.map((x) => <option key={x.code} value={x.code}>{x.names[locale] ?? x.names.ru ?? x.code}</option>)}</select></label>
-    <label className={label}>{tr("Номеров", "Otaq sayı", "Rooms")}<input type="number" min="1" className={input} value={d.rooms ?? "1"} onChange={(e) => onData("rooms", e.target.value)} /></label>
-    <label className={label}>{tr("Взрослых", "Böyüklər", "Adults")}<input type="number" min="1" className={input} value={d.adults ?? "2"} onChange={(e) => onData("adults", e.target.value)} /></label>
-    <label className={label}>{tr("Детей", "Uşaqlar", "Children")}<input type="number" min="0" className={input} value={d.children ?? "0"} onChange={(e) => onData("children", e.target.value)} /></label>
-    <label className={label}>{tr("Возраст детей", "Uşaqların yaşı", "Children ages")}<input className={input} value={d.childrenAges ?? ""} onChange={(e) => onData("childrenAges", e.target.value)} /></label>
-
-  </div>;
+      </div>
+      <div className="rounded-lg border border-line p-3">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">{tr("Данные отеля", "Otel məlumatları", "Hotel data")}</h3>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className={`${label} relative`}>{tr("Название отеля", "Otel adı", "Hotel name")}
+            <input className={input} value={hotelSearch} onClick={() => setHotelOpen((open) => !open)} onBlur={() => window.setTimeout(() => setHotelOpen(false), 150)} onChange={(e) => { setHotelSearch(e.target.value); setHotelOpen(true); onData("hotelName", e.target.value); }} placeholder={tr("Начните вводить название отеля", "Otel adını yazmağa başlayın", "Start typing a hotel name")} />
+            {hotelOpen && hotelResults.length > 0 && (
+              <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-52 overflow-auto rounded-lg border border-line bg-white shadow-xl">
+                {hotelResults.map((p) => (
+                  <button key={p.id} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => chooseHotel(p)} className="flex w-full items-center justify-between border-b px-3 py-2 text-left text-[11px] last:border-0 hover:bg-panel">
+                    <span>{p.name}</span><span className="text-ink/60">{p.resortName ?? p.cityName ?? p.suppliers?.join(", ")}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </label>
+          <label className={label}>{tr("Тип номера", "Otaq növü", "Room type")}<select className={input} value={d.roomType ?? ""} onChange={(e) => onData("roomType", e.target.value)}><option value="">{tr("Выберите", "Seçin", "Select")}</option>{dictionary.roomTypes.map((x) => <option key={x.code} value={x.code}>{x.names[locale] ?? x.names.ru ?? x.code}</option>)}</select></label>
+          <label className={label}>{tr("Тип размещения", "Yerləşmə növü", "Accommodation")}<select className={input} value={d.accommodation ?? ""} onChange={(e) => onData("accommodation", e.target.value)}><option value="">{tr("Выберите", "Seçin", "Select")}</option>{dictionary.placementTypes.map((x) => <option key={x.code} value={x.code}>{x.names[locale] ?? x.names.ru ?? x.code}</option>)}</select></label>
+          <label className={label}>{tr("Тип питания", "Qidalanma növü", "Meal")}<select className={input} value={d.meal ?? ""} onChange={(e) => onData("meal", e.target.value)}><option value="">{tr("Выберите", "Seçin", "Select")}</option>{dictionary.mealTypes.map((x) => <option key={x.code} value={x.code}>{x.names[locale] ?? x.names.ru ?? x.code}</option>)}</select></label>
+        </div>
+      </div>
+      {isTour && <div className="rounded-lg border border-line p-3">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">{tr("Данные авиа", "Avia məlumatları", "Flight data")}</h3>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2 text-[10px] font-semibold uppercase text-ink/50">{tr("Начало услуги", "Xidmətin başlanğıcı", "Service start")}</div>
+          {airportField("flightFromAirport", tr("Аэропорт вылета", "Uçuş aeroportu", "Departure airport"))}
+          {airportField("flightToAirport", tr("Аэропорт прилёта", "Gəliş aeroportu", "Arrival airport"))}
+          <label className={label}>{tr("Время вылета", "Uçuş vaxtı", "Departure time")}<input type="time" className={input} value={d.flightDepartureTime ?? ""} onChange={(e) => onData("flightDepartureTime", e.target.value)} /></label>
+          <label className={label}>{tr("Время прилёта", "Gəliş vaxtı", "Arrival time")}<input type="time" className={input} value={d.flightArrivalTime ?? ""} onChange={(e) => onData("flightArrivalTime", e.target.value)} /></label>
+          <div className="sm:col-span-2 mt-2 text-[10px] font-semibold uppercase text-ink/50">{tr("Конец услуги", "Xidmətin sonu", "Service end")}</div>
+          {airportField("returnFromAirport", tr("Аэропорт вылета (обратно)", "Uçuş aeroportu (geri)", "Return departure airport"))}
+          {airportField("returnToAirport", tr("Аэропорт прилёта (обратно)", "Gəliş aeroportu (geri)", "Return arrival airport"))}
+          <label className={label}>{tr("Время вылета (обратно)", "Uçuş vaxtı (geri)", "Return departure time")}<input type="time" className={input} value={d.returnDepartureTime ?? ""} onChange={(e) => onData("returnDepartureTime", e.target.value)} /></label>
+          <label className={label}>{tr("Время прилёта (обратно)", "Gəliş vaxtı (geri)", "Return arrival time")}<input type="time" className={input} value={d.returnArrivalTime ?? ""} onChange={(e) => onData("returnArrivalTime", e.target.value)} /></label>
+        </div>
+      </div>}
+    </div>;
+  }
 
   if (service.kind === "FLIGHT") {
     const segments = JSON.parse(d.segments || '[{"from":"","to":"","departureDate":"","arrivalDate":"","airline":"","class":"","fare":"","baggage":"","carryOn":""}]');

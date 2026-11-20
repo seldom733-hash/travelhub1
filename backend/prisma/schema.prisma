@@ -541,6 +541,21 @@ model CategorySchema {
 // Product); Category schemas may reference codes. Status reuses
 // catalog.CategoryStatus (ACTIVE/INACTIVE).
 
+/// Platform dictionary of airports (IATA code + country/city).
+model Airport {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  countryCode String   @default("")
+  countryName String   @default("")
+  cityName    String   @default("")
+  status      CategoryStatus @default(ACTIVE)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@schema("catalog")
+}
+
 /// Platform dictionary of service types used by the request workspace.
 model ServiceType {
   id        String         @id @default(uuid())

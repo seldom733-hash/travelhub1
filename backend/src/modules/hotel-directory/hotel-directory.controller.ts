@@ -57,6 +57,21 @@ export class HotelDirectoryController {
     return this.directory.search(q ?? "", type, status);
   }
 
+  @Get("airports")
+  @RequirePermissions("hotel_directory.read")
+  airports(@Query("status") status?: string) {
+    return this.directory.listAirports(status);
+  }
+
+  @Post("airports")
+  @RequirePermissions("hotel_directory.create")
+  createAirport(
+    @Body() body: { code: string; name?: string; countryCode?: string; countryName?: string; cityName?: string },
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.directory.createAirport(body, actor);
+  }
+
   @Get("service-types")
   @RequirePermissions("hotel_directory.read")
   serviceTypes(@Query("status") status?: string) {

@@ -1180,6 +1180,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "nav.group.references": { ru: "СПРАВОЧНИКИ", az: "SORAQÇALAR", en: "REFERENCES" },
   "nav.geography": { ru: "География", az: "Coğrafiya", en: "Geography" },
   "nav.hotels": { ru: "Отели", az: "Otellər", en: "Hotels" },
+  "nav.service_types": { ru: "Типы услуг", az: "Xidmət növləri", en: "Service types" },
+  "nav.airports": { ru: "Аэропорты", az: "Aeroportlar", en: "Airports" },
   "nav.markup_matrix": { ru: "Наценки и комиссионные", az: "Marjalar və komissiyalar", en: "Markups & commissions" },
   "markup.matrix.title": { ru: "Матрица наценок поставщиков", az: "Təchizatçı marja matrisi", en: "Supplier markup matrix" },
   "markup.matrix.supplier": { ru: "Поставщик", az: "Təchizatçı", en: "Supplier" },

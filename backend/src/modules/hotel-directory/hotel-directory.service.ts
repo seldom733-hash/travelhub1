@@ -103,6 +103,32 @@ export class HotelDirectoryService {
     return rows.map((row) => ({ ...row, suppliers: [] as string[] }));
   }
 
+  listAirports(status?: string) {
+    return this.prisma.airport.findMany({
+      where: status ? { status: status as never } : undefined,
+      orderBy: [{ countryName: "asc" }, { cityName: "asc" }, { code: "asc" }],
+    });
+  }
+
+  async createAirport(
+    input: { code: string; name?: string; countryCode?: string; countryName?: string; cityName?: string },
+    actor?: AuthUser | null,
+  ) {
+    const code = String(input.code ?? "").trim().toUpperCase();
+    if (!code) throw new ConflictException("Airport code is required");
+    const row = await this.prisma.airport.create({
+      data: {
+        code,
+        name: String(input.name ?? code).trim() || code,
+        countryCode: String(input.countryCode ?? "").trim().toUpperCase(),
+        countryName: String(input.countryName ?? "").trim(),
+        cityName: String(input.cityName ?? "").trim(),
+      },
+    });
+    await this.audit(actor, "hotel_directory.airports.create", "Airport", row.id, row);
+    return row;
+  }
+
   listServiceTypes(status?: string) {
     return this.prisma.serviceType.findMany({
       where: status ? { status: status as never } : undefined,
