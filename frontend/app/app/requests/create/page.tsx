@@ -218,13 +218,35 @@ export default function CreateRequestPage() {
     );
   }, [serviceStart, serviceEnd]);
 
-  function fillTravelerFromCustomer(customer: Customer | null) {
+  async function fillTravelerFromCustomer(customer: Customer | null) {
     if (!customer) return;
+    let profile: {
+      firstName?: string | null;
+      lastName?: string | null;
+      birthDate?: string | null;
+      citizenship?: string | null;
+      passportSeries?: string | null;
+      passportNumber?: string | null;
+      passportExpiry?: string | null;
+    } | null = null;
+    try {
+      profile = await api.get<any>(`/customers/${customer.id}/travel-profile`);
+    } catch {
+      profile = null;
+    }
     setTravelers((prev) => {
       if (prev.length === 0) return prev;
       const first = prev[0];
-      if (first.firstName.trim() || first.lastName.trim()) return prev;
-      return [{ ...first, firstName: customer.firstName ?? "", lastName: customer.lastName ?? "" }, ...prev.slice(1)];
+      return [{
+        ...first,
+        firstName: profile?.firstName || customer.firstName || first.firstName,
+        lastName: profile?.lastName || customer.lastName || first.lastName,
+        birthDate: profile?.birthDate || first.birthDate,
+        citizenship: profile?.citizenship || first.citizenship,
+        passportSeries: profile?.passportSeries || first.passportSeries,
+        passportNumber: profile?.passportNumber || first.passportNumber,
+        passportExpiry: profile?.passportExpiry || first.passportExpiry,
+      }, ...prev.slice(1)];
     });
   }
 

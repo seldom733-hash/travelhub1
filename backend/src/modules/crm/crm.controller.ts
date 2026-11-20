@@ -250,6 +250,12 @@ export class CrmController {
     return res.send(svc.toCsv(columns, rows));
   }
 
+  @Get("customers/:id/travel-profile")
+  @RequirePermissions("crm.customer.read")
+  getCustomerTravelProfile(@Param("id") id: string) {
+    return this.crm.getCustomerTravelProfile(id);
+  }
+
   @Get("customers/:id")
   @RequirePermissions("crm.customer.read")
   getCustomer(@Param("id") id: string) {

@@ -344,6 +344,34 @@ export class CrmService {
     return customer;
   }
 
+  /**
+   * Latest traveler identity used by this customer. Used by the request form to
+   * prefill "customer is a traveler" with FIO / birth date / passport data.
+   */
+  async getCustomerTravelProfile(id: string) {
+    const customer = await this.prisma.customer.findUnique({ where: { id }, select: { id: true } });
+    if (!customer) throw new NotFoundError(`Customer ${id} not found`);
+    const traveler = await this.prisma.orderTraveler.findFirst({
+      where: { customerId: id },
+      orderBy: { order: { createdAt: "desc" } },
+      select: {
+        firstName: true,
+        lastName: true,
+        birthDate: true,
+        citizenship: true,
+        passportSeries: true,
+        passportNumber: true,
+        passportExpiry: true,
+      },
+    });
+    if (!traveler) return null;
+    return {
+      ...traveler,
+      birthDate: traveler.birthDate ? traveler.birthDate.toISOString().slice(0, 10) : null,
+      passportExpiry: traveler.passportExpiry ? traveler.passportExpiry.toISOString().slice(0, 10) : null,
+    };
+  }
+
   async updateCustomer(id: string, input: UpdateCustomerInput, actor?: string) {
     const result = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.customer.findUnique({ where: { id } });
