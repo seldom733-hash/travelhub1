@@ -471,13 +471,17 @@ export class DealsService {
       );
       const obligationCost = supplierObligations.reduce((sum, o) => sum + money(o.aznAmount), 0);
       const obligationDebt = supplierObligations.reduce((sum, o) => sum + money(o.remainingAmount), 0);
+      const requestServiceCost = (requestServicesByRequest.get(request.id) ?? []).reduce((sum, service) => {
+        const data = (service.data ?? {}) as Record<string, unknown>;
+        return sum + money(data.costPrice as string | number | null | undefined);
+      }, 0);
       // A supplier obligation equal to the customer sale is a legacy/demo
       // projection (auto-created from booking amount), not a cost. Use the
       // product's supplier price in that case.
       const cost = resolveDealCost({
         sales,
         obligationCost,
-        snapshotCost: costFromSnapshot,
+        snapshotCost: costFromSnapshot || requestServiceCost,
         productCost: costFromProduct,
       });
       const returnedToRequest = order?.status === "CANCELLED" && request.status !== "CONVERTED" && !["CANCELLED_BY_CUSTOMER", "REJECTED", "UNAVAILABLE", "EXPIRED"].includes(request.status);
