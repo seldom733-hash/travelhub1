@@ -65,6 +65,7 @@ const TRUNCATE_TABLES = [
   "constructor.ConstructorPageSection", "constructor.ConstructorPageVersion",
   "crm.Customer", "crm.CustomerHistory", "crm.Partner", "crm.Supplier",
   "decision.DecisionSignal",
+  "documents.Document", "documents.DocumentHistory", "documents.DocumentVersion",
   "events.ExternalIdempotencyRecord", "events.InboxEvent", "events.OutboxEvent",
   "finance.MarkupRule", "finance.MarkupRuleHistory", "finance.Payment",
   "finance.PaymentHistory", "finance.SupplierFxRate", "finance.SupplierFxRateHistory",
