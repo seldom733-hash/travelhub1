@@ -314,7 +314,7 @@ export default function DealDetailPage() {
       <div className="border-b border-[#e5e2da] bg-white px-4 py-3 lg:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="mb-1 flex items-center gap-1 text-[11px] text-[#98a2b3]"><Link href="/app/finance/deals" className="hover:text-[#0f6b5f]">{dealText(locale, "Финансы")}</Link><span>/</span><Link href="/app/finance/deals" className="hover:text-[#0f6b5f]">{dealText(locale, "Реестр продаж и взаиморасчётов")}</Link><span>/</span><span className="text-[#667085]">{dealText(locale, "Сделка №")} {deal.sequence}</span></div>
+            <div className="mb-1 flex items-center gap-1 text-[11px] text-[#98a2b3]"><Link href="/app/finance/deals" className="hover:text-[#0f6b5f]">{dealText(locale, "Финансы")}</Link><span>/</span><Link href="/app/finance/deals" className="hover:text-[#0f6b5f]">{dealText(locale, "Реестр сделок")}</Link><span>/</span><span className="text-[#667085]">{dealText(locale, "Сделка №")} {deal.sequence}</span></div>
             <div className="flex flex-wrap items-center gap-3">
               <Link href="/app/finance/deals" className="text-lg text-[#667085]">‹</Link>
               <h1 style={{ fontFamily: "var(--font-body), Manrope, sans-serif" }} className="font-sans text-[24px] font-semibold tracking-tight text-[#101828]">{dealText(locale, "Сделка №")} {deal.sequence}</h1>

@@ -30,6 +30,9 @@ const AZ: Record<string, string> = {
   "Например:": "Məsələn:",
   "Только отмены": "Yalnız ləğvlər",
   "Все заявки": "Bütün müraciətlər",
+  "Все сделки": "Bütün sövdələr",
+  "Статус сделки": "Sövdə statusu",
+  "Реестр сделок": "Sövdələr reyestri",
   "Только мои": "Yalnız mənim",
   "Все статусы": "Bütün statuslar",
   "Открытые": "Açıq",
@@ -372,6 +375,9 @@ const EN: Record<string, string> = {
   "Например:": "For example:",
   "Только отмены": "Cancellations only",
   "Все заявки": "All requests",
+  "Все сделки": "All deals",
+  "Статус сделки": "Deal status",
+  "Реестр сделок": "Deal register",
   "Только мои": "Only mine",
   "Все статусы": "All statuses",
   "Открытые": "Open",
@@ -721,7 +727,7 @@ export const DEAL_STATUS: Record<string, { az: string; en: string }> = {
   CANCELLATION_APPROVED: { az: "Ləğv təsdiqlənib", en: "Cancellation approved" },
   PROBLEM: { az: "Problem", en: "Problem" },
   SUSPENDED: { az: "Dayandırılıb", en: "Suspended" },
-  COMPLETED: { az: "Tamamlanıb", en: "Completed" },
+  COMPLETED: { az: "Tamamlanıb (rezervasiya)", en: "Completed (booking)" },
 };
 
 export const DEAL_FINANCIAL: Record<string, { az: string; en: string }> = {
@@ -751,7 +757,7 @@ export function dealStatus(locale: Locale, code: string): string {
     CHANGE_REQUESTED: "Запрошено изменение", SUPPLIER_REJECTED: "Поставщик отклонил",
     FULFILLED: "Завершён", READY_TO_CLOSE: "Готов к закрытию", CLOSED: "Закрыт", CANCELLED: "Отменён",
     CANCELLATION_REQUESTED: "Отмена запрошена", CANCELLATION_APPROVED: "Отмена согласована", PROBLEM: "Проблема",
-    SUSPENDED: "Приостановлен", COMPLETED: "Завершён",
+    SUSPENDED: "Приостановлен", COMPLETED: "Завершён (бронь)",
   } as Record<string, string>)[code] ?? code : code;
   const row = DEAL_STATUS[code];
   return row ? row[locale] : code;
