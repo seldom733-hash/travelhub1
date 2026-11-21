@@ -227,6 +227,19 @@ const LOSS_REASON: Record<string, Record<Locale, string>> = {
   "Клиент отказался от новых условий": { ru: "Клиент отказался от новых условий", az: "Müştəri yeni şərtlərdən imtina etdi", en: "Customer refused new terms" },
 };
 
+
+const RECONCILIATION_KIND: Record<string, Record<Locale, string>> = {
+  MISSING_ORDER_LINK: { ru: "Нет связи с заказом", az: "Sifarişlə əlaqə yoxdur", en: "Missing order link" },
+  MISSING_SETTLEMENT: { ru: "Нет финансового расчёта", az: "Maliyyə hesablaşması yoxdur", en: "Missing settlement" },
+  SETTLEMENT: { ru: "Расхождение с финансовым расчётом", az: "Maliyyə hesablaşması ilə fərq", en: "Settlement variance" },
+  ITEM_SUM: { ru: "Сумма позиций не совпадает", az: "Mövqelərin məbləği uyğun gəlmir", en: "Item amount mismatch" },
+  MISSING_COST: { ru: "Не заполнена себестоимость", az: "Maya dəyəri doldurulmayıb", en: "Missing cost" },
+};
+
+export function saReconciliationKind(locale: Locale, kind: string): string {
+  return RECONCILIATION_KIND[kind]?.[locale] ?? kind;
+}
+
 export function saLossReason(locale: Locale, reason: string): string {
   const status = saStatus(locale, reason);
   if (status !== reason) return status;
