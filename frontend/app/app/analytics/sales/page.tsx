@@ -17,7 +17,7 @@ const PRESETS: Array<[string, string]> = [
 ];
 const TABS: Array<[string, string]> = [
   ["overview", "Общая аналитика"], ["managers", "Менеджеры"], ["activity", "Активность и контроль"],
-  ["funnel", "Воронка продаж"], ["deals", "Завершённые сделки"], ["distribution", "Распределение"],
+  ["funnel", "Воронка продаж"],
 ];
 const KPI_LABELS: Record<string, string> = {
   requestsTotal: "Всего новых заявок", assigned: "Назначено менеджерам", accepted: "Принято в работу",
