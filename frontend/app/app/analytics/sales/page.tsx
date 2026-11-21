@@ -36,7 +36,6 @@ const GROUPS: Array<[string, string[]]> = [
   ["Заявки", ["requestsTotal", "assigned", "accepted", "inWork", "noFirstResponse", "proposalsSent", "lostRequests", "overdueRequests", "slaCompliance"]],
   ["Продажи", ["ordersCreated", "bookingsConfirmed", "completedDeals", "closedDeals", "cancelledOrders", "cancelledBookings"]],
   ["Конверсия", ["conversionRequestOrder", "conversionOrderBooking", "conversionRequestBooking", "conversionRequestCompleted", "conversionRequestClosed"]],
-  ["Финансы", ["salesAmount", "capturedRevenue", "costAmount", "grossProfit", "avgCheck", "refunds", "completedResult", "closedResult"]],
 ];
 
 function formatMoney(v: any, locale: Locale) { const tag = locale === "az" ? "az-AZ" : locale === "en" ? "en-GB" : "ru-RU"; return Number(v ?? 0).toLocaleString(tag, { maximumFractionDigits: 2 }); }
@@ -71,6 +70,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
   const [activityFilter, setActivityFilter] = useState("all");
   const [drill, setDrill] = useState<any>(null);
   const [drillLoading, setDrillLoading] = useState("");
+  const [financeKpi, setFinanceKpi] = useState<any>(null);
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -89,6 +89,16 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
       .then((rows) => setServiceTypes(Array.isArray(rows) ? rows : []))
       .catch(() => setServiceTypes([]));
   }, []);
+
+  useEffect(() => {
+    const period = data?.period;
+    if (!period?.start || !period?.end) return;
+    const start = String(period.start).slice(0, 10);
+    const end = new Date(new Date(period.end).getTime() - 1).toISOString().slice(0, 10);
+    api.get<any>(`/finance/deals?pageSize=1&dateFrom=${start}&dateTo=${end}`)
+      .then((r) => setFinanceKpi(r.kpi ?? null))
+      .catch(() => setFinanceKpi(null));
+  }, [data?.period?.start, data?.period?.end]);
 
   async function openDrilldown(k: string) {
     setDrillLoading(k); setError("");
@@ -202,6 +212,14 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>}
       {!loading && !error && data && <>
         {tab === "overview" && <>
+          <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              ["Поступления от клиентов", "Фактические поступления", financeKpi?.clientReceived, "💰"],
+              ["Дебиторская задолженность", "Клиенты должны компании", financeKpi?.clientDebt, "⏳"],
+              ["Кредиторская задолженность", "Компания должна поставщикам", financeKpi?.supplierDebt, "📌"],
+              ["Прибыль", "Продажи минус себестоимость", financeKpi?.grossMargin, "📈"],
+            ].map(([title, subtitle, value, icon]) => <div key={String(title)} className="rounded-xl border border-[#e5e2da] bg-white p-4 shadow-sm"><div className="flex items-center justify-between"><span className="text-[11px] font-medium uppercase tracking-wide text-ink/60">{L(String(title))}</span><span className="text-lg">{icon}</span></div><div className="mt-2 font-mono text-2xl font-semibold tabular-nums text-ink">{money(value)}</div><div className="mt-1 text-[11px] text-ink/50">{L(String(subtitle))}</div></div>)}
+          </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {GROUPS.map(([title, keys]) => (
               <div key={title} className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm">

@@ -5,6 +5,13 @@ import type { Locale } from "./i18n";
  * labels used by the analytics UI; missing keys fall back to Russian.
  */
 const AZ: Record<string, string> = {
+  "Поступления от клиентов": "Müştərilərdən daxilolmalar",
+  "Фактические поступления": "Faktiki daxilolmalar",
+  "Дебиторская задолженность": "Debitor borcu",
+  "Клиенты должны компании": "Müştərilər şirkətə borcludur",
+  "Кредиторская задолженность": "Kreditor borcu",
+  "Компания должна поставщикам": "Şirkət təchizatçılara borcludur",
+  "Продажи минус себестоимость": "Satış minus maya dəyəri",
   "Аналитика продаж": "Satış analitikası",
   "Заявки → заказы → бронирования → завершённые и закрытые сделки. Период:": "Müraciətlər → sifarişlər → rezervasiyalar → tamamlanmış və bağlanmış sövdələr. Dövr:",
   "Период": "Dövr",
@@ -70,6 +77,13 @@ const AZ: Record<string, string> = {
   "Без связи": "Əlaqəsiz",
 };
 const EN: Record<string, string> = {
+  "Поступления от клиентов": "Client receipts",
+  "Фактические поступления": "Actual receipts",
+  "Дебиторская задолженность": "Accounts receivable",
+  "Клиенты должны компании": "Clients owe the company",
+  "Кредиторская задолженность": "Accounts payable",
+  "Компания должна поставщикам": "Company owes suppliers",
+  "Продажи минус себестоимость": "Sales minus cost",
   "Новая": "New", "Проверка": "Checking", "Поставщик не ответил": "Supplier timeout",
   "Цена изменилась": "Price changed", "Клиент подтвердил": "Customer accepted",
   "Подтверждена": "Confirmed", "Сконвертирована": "Converted",
