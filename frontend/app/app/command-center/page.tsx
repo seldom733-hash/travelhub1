@@ -2,7 +2,7 @@
 
 import { DashboardPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { Suspense } from "react";
-import { CommandCenter } from "@/components/command-center/CommandCenter";
+import { DecisionCenter } from "@/components/command-center/DecisionCenter";
 
 /**
  * Step 3.2 Stage B — Platform Command Center UI.
@@ -15,7 +15,7 @@ import { CommandCenter } from "@/components/command-center/CommandCenter";
 export default function CommandCenterPage() {
   return (
     <Suspense fallback={<DashboardPageSkeleton />}>
-      <CommandCenter />
+      <DecisionCenter />
     </Suspense>
   );
 }
