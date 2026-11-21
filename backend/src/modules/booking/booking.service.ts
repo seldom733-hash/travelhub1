@@ -190,6 +190,7 @@ export function computeAvailableBookingActions(
   booking: { status: BookingStatus; orderId: string; returnedToOrder?: boolean },
   granted: readonly string[],
   orderStatus?: string,
+  everConfirmed = false,
 ): BookingAction[] {
   const actions: BookingAction[] = [];
   for (const action of Object.keys(TRANSITIONS) as BookingAction[]) {
@@ -210,6 +211,10 @@ export function computeAvailableBookingActions(
       && orderStatus === "READY_FOR_BOOKING"
       && ["CANCELLED", "SUPPLIER_REJECTED"].includes(booking.status)
     ) continue;
+    // PROBLEM after a confirmed/in-service booking requires a confirmed
+    // cancellation before returning to the order. Do not offer a button that
+    // the backend will reject with this guard.
+    if (action === "returnToOrder" && booking.status === "PROBLEM" && everConfirmed) continue;
     actions.push(action);
   }
   return actions;
@@ -530,7 +535,13 @@ export class BookingService {
             select: { id: true },
           })) !== null
         : false;
-    const availableActions = computeAvailableBookingActions({ ...booking, returnedToOrder }, grantedPermissions, (await this.prisma.order.findUnique({ where: { id: booking.orderId }, select: { status: true } }))?.status);
+    const everConfirmed = booking.status === "PROBLEM"
+      ? (await this.prisma.bookingHistory.findFirst({
+          where: { bookingId: booking.id, to: { in: ["CONFIRMED", "IN_SERVICE"] } },
+          select: { id: true },
+        })) !== null
+      : false;
+    const availableActions = computeAvailableBookingActions({ ...booking, returnedToOrder }, grantedPermissions, (await this.prisma.order.findUnique({ where: { id: booking.orderId }, select: { status: true } }))?.status, everConfirmed);
     return { ...booking, availableActions };
   }
 

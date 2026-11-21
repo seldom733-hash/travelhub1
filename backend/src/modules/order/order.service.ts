@@ -1345,7 +1345,12 @@ export class OrderService {
     const overpaidForClose = Prisma.Decimal.max(new Prisma.Decimal(0), netPaidForClose.minus(totalAmt));
     const closeBlockedByMoney = dueAmount.gt(0) || overpaidForClose.gt(0)
       || (["CANCELLED", "CANCELLATION_REQUESTED", "CANCELLATION_APPROVED"].includes(order.status) && refundableAmount.gt(0));
-    if (closeBlockedByMoney) {
+    const supplierDebtAgg = await this.prisma.supplierObligation.aggregate({
+      where: { orderId: order.id, status: { not: "CANCELLED" } },
+      _sum: { remainingAmount: true },
+    });
+    const supplierDebtForClose = new Prisma.Decimal(supplierDebtAgg._sum.remainingAmount ?? 0);
+    if (closeBlockedByMoney || supplierDebtForClose.gt(0)) {
       availableActions = availableActions.filter((action) => action !== "close");
     }
     // MULTI/PARTIAL: резерв активных платежей (PENDING/AUTHORIZED) — CREATE

@@ -95,6 +95,21 @@ function availableActionList(value) {
   return [];
 }
 
+
+function actionPriority(action) {
+  const order = [
+    "confirmPrice", "proposePrice", "customerAccept", "convert",
+    "process", "confirm", "waitFirstPayment", "send", "complete", "close",
+    "prepare", "service",
+    "approveCancellation", "rejectCancellation", "cancel", "reopen",
+    "customerDecline", "reject", "unavailable",
+    "returnToRequest", "returnToOrder", "requestClarification", "resume",
+    "problem", "suspend", "requestCancellation",
+  ];
+  const index = order.indexOf(action);
+  return index === -1 ? 100 : index;
+}
+
 function errorMessage(error) {
   return error instanceof Error ? error.message : String(error);
 }
@@ -337,7 +352,7 @@ class Runner {
     const started = Date.now();
     try {
       const { fixture, state } = await this.replay(pathActions);
-      const actions = state.actions;
+      const actions = [...state.actions].sort((a, b) => actionPriority(a) - actionPriority(b));
       const stateKey = `${state.entity}:${state.status}:${[...actions].sort().join(",")}`;
       for (const action of actions) {
         if (this.scenarios.length >= MAX_SCENARIOS) break;
@@ -412,7 +427,7 @@ class Runner {
     const root = { customerId: null, requestId: null, orderId: null, bookingId: null };
     const fixture = await this.createFixture("root");
     const state = await this.getState(fixture);
-    const rootActions = state.actions;
+    const rootActions = [...state.actions].sort((a, b) => actionPriority(a) - actionPriority(b));
     console.log(`[scenario] root ${state.entity}/${state.status}: ${rootActions.join(", ")}`);
     for (const action of rootActions) {
       if (this.scenarios.length >= MAX_SCENARIOS) break;
@@ -513,12 +528,14 @@ class Runner {
     ];
     const mdPath = path.join(OUT_DIR, `report-${RUN_ID}.md`);
     fs.writeFileSync(mdPath, lines.join("\n"), "utf8");
-    fs.writeFileSync(MAP_FILE, JSON.stringify({
-      runId: report.runId,
-      generatedAt: report.generatedAt,
-      actions: report.actions,
-      scenarios: report.scenariosDetail,
-    }, null, 2), "utf8");
+    if (report.mode !== "regression") {
+      fs.writeFileSync(MAP_FILE, JSON.stringify({
+        runId: report.runId,
+        generatedAt: report.generatedAt,
+        actions: report.actions,
+        scenarios: report.scenariosDetail,
+      }, null, 2), "utf8");
+    }
     console.log(`[scenario] report: ${jsonPath}`);
     console.log(`[scenario] report: ${mdPath}`);
     console.log(`[scenario] map: ${MAP_FILE}`);
