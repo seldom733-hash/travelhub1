@@ -17,6 +17,7 @@ type DealQuery = {
   country?: string;
   manager?: string;
   clientPayment?: string;
+  hasClientDebt?: string;
   supplierPayment?: string;
   financialStatus?: string;
   serviceType?: string;
@@ -386,6 +387,7 @@ export class DealsService {
       if (query.country && row.trip.country !== query.country) return false;
       if (query.manager && row.manager !== query.manager) return false;
       if (query.clientPayment && row.paymentStatus !== query.clientPayment) return false;
+      if (query.hasClientDebt === "1" && Number(row.clientDebt) <= 0) return false;
       if (query.supplierPayment && row.supplierPaymentStatus !== query.supplierPayment) return false;
       if (query.settlementStatus && row.settlementStatus !== query.settlementStatus) return false;
       if (query.financialStatus && row.financialStatus !== query.financialStatus) return false;

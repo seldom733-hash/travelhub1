@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import React from "react";
 import Link from "next/link";
 import { formatPrice, useLocale } from "@/lib/i18n";
@@ -39,7 +40,16 @@ export default function DealsPage() {
   const [columns, setColumns] = useState({ customer: true, supplier: true, travelers: true, cost: true, currentIncome: true });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [periodOpen, setPeriodOpen] = useState(false);
-  const [query, setQuery] = useState({ search: "", stage: "", status: "", statusGroup: "", cancellationReason: "", settlementStatus: "", scope: "", state: "", financialStatus: "", clientPayment: "", supplierPayment: "", serviceType: "", dateField: "createdAt", dateFrom: "", dateTo: "", supplierId: "", country: "", manager: "", sortBy: "createdAt", sortDirection: "desc" });
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState({ search: "", stage: "", status: "", statusGroup: searchParams.get("statusGroup") ?? "", cancellationReason: "", settlementStatus: "", scope: "", state: "", financialStatus: "", clientPayment: searchParams.get("clientPayment") ?? "", supplierPayment: "", serviceType: "", dateField: "createdAt", dateFrom: "", dateTo: "", supplierId: "", country: "", manager: "", sortBy: "createdAt", sortDirection: "desc" });
+  useEffect(() => {
+    const statusGroup = searchParams.get("statusGroup") ?? "";
+    const clientPayment = searchParams.get("clientPayment") ?? "";
+    const hasClientDebt = searchParams.get("hasClientDebt") ?? "";
+    if (!statusGroup && !clientPayment && !hasClientDebt) return;
+    setQuery((q) => ({ ...q, statusGroup, clientPayment, hasClientDebt }));
+  }, [searchParams]);
+
   const apiQuery = useMemo<DealQuery>(() => ({ ...query, page, pageSize }), [query, page, pageSize]);
   const load = useCallback(async () => { setLoading(true); setError(""); try { const r = await dealsApi.list(apiQuery); setData(r); } catch (e) { setError((e as Error).message); } finally { setLoading(false); } }, [apiQuery]);
   useEffect(() => { void load(); }, [load]);

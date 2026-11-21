@@ -224,14 +224,15 @@ export function DecisionCenter() {
     const supplierDebt = num(finance?.supplierDebt);
     const signalCount = overdue + lost + issues.length;
     const money = (v: unknown) => `${num(v).toLocaleString(locale === "az" ? "az-AZ" : locale === "en" ? "en-GB" : "ru-RU", { maximumFractionDigits: 2 })} ${finance?.currency ?? "AZN"}`;
-    const activityHref = `/app/analytics/sales/activity?${PRESET_QUERY}`;
+    const activityBaseHref = `/app/analytics/sales/activity?${PRESET_QUERY}`;
+    const activityHref = `${activityBaseHref}&activityFilter=overdue`;
     const signals = [
       { title: c.overdue, count: overdue, href: activityHref, tone: "amber" },
       { title: c.cancellations + " · " + c.deals, count: cancelledOrders, href: "/app/finance/deals?statusGroup=cancelled", tone: "rose" },
-      { title: c.cancellations + " · " + c.bookings, count: cancelledBookings, href: "/app/bookings", tone: "rose" },
+      { title: c.cancellations + " · " + c.bookings, count: cancelledBookings, href: "/app/finance/deals?statusGroup=cancelled", tone: "rose" },
       { title: c.reconciliation, count: issues.length, href: "#data-quality", tone: "rose" },
     ].filter((s) => s.count > 0);
-    return { k, issues, lost, overdue, cancelledOrders, cancelledBookings, clientDebt, supplierDebt, signalCount, money, signals, activityHref };
+    return { k, issues, lost, overdue, cancelledOrders, cancelledBookings, clientDebt, supplierDebt, signalCount, money, signals, activityBaseHref, activityHref };
   }, [data, finance, locale, c]);
 
   if (loading) {
@@ -269,9 +270,9 @@ export function DecisionCenter() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { label: c.attention, value: view.signalCount, tone: "border-amber-200 bg-amber-50 text-amber-800", href: view.activityHref },
-          { label: c.overdue, value: view.overdue, tone: "border-rose-200 bg-rose-50 text-rose-800", href: view.activityHref },
+          { label: c.overdue, value: view.overdue, tone: "border-rose-200 bg-rose-50 text-rose-800", href: `/app/analytics/sales/activity?${PRESET_QUERY}&activityFilter=overdue` },
           { label: c.reconciliation, value: view.issues.length, tone: "border-rose-200 bg-rose-50 text-rose-800", href: "#data-quality" },
-          { label: c.receivable, value: view.money(view.clientDebt), tone: "border-[#e5e2da] bg-white text-ink", href: "/app/finance/deals" },
+          { label: c.receivable, value: view.money(view.clientDebt), tone: "border-[#e5e2da] bg-white text-ink", href: "/app/finance/deals?hasClientDebt=1" },
         ].map((card) => (
           <Link key={card.label} href={card.href} className={`rounded-xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${card.tone}`}>
             <div className="text-[10px] font-semibold uppercase tracking-wide opacity-70">{card.label}</div>
@@ -374,17 +375,17 @@ export function DecisionCenter() {
           <h2 className="mb-3 text-sm font-semibold">{x.bottlenecks}</h2>
           <div className="grid gap-2 sm:grid-cols-2">
             {[
-              [x.noFirstResponse, context?.bottlenecks?.noFirstResponse],
-              [x.overdueRequests, context?.bottlenecks?.overdueRequests],
-              [x.waitingCustomer, context?.bottlenecks?.waitingCustomer],
-              [x.waitingSupplier, context?.bottlenecks?.waitingSupplier],
-              [x.awaitingConfirmation, context?.bottlenecks?.awaitingConfirmation],
-              [x.readyForBooking, context?.bottlenecks?.readyForBooking],
-              [x.problemBookings, context?.bottlenecks?.problemBookings],
-            ].map(([label, value]) => (
-              <div key={String(label)} className="flex items-center justify-between rounded-lg border border-[#ece9e2] px-3 py-2 text-xs">
+              [x.noFirstResponse, context?.bottlenecks?.noFirstResponse, `${view.activityBaseHref}&activityFilter=no_response`],
+              [x.overdueRequests, context?.bottlenecks?.overdueRequests, view.activityHref],
+              [x.waitingCustomer, context?.bottlenecks?.waitingCustomer, `${view.activityBaseHref}&activityFilter=waiting_customer`],
+              [x.waitingSupplier, context?.bottlenecks?.waitingSupplier, `${view.activityBaseHref}&activityFilter=waiting_supplier`],
+              [x.awaitingConfirmation, context?.bottlenecks?.awaitingConfirmation, "/app/finance/deals?status=AWAITING_CONFIRMATION"],
+              [x.readyForBooking, context?.bottlenecks?.readyForBooking, "/app/finance/deals?status=READY_FOR_BOOKING"],
+              [x.problemBookings, context?.bottlenecks?.problemBookings, "/app/finance/deals?status=PROBLEM"],
+            ].map(([label, value, href]) => (
+              <Link key={String(label)} href={String(href)} className="flex items-center justify-between rounded-lg border border-[#ece9e2] px-3 py-2 text-xs transition hover:bg-[#f8f7f3]">
                 <span className="text-ink/60">{label}</span><b className="font-mono">{num(value)}</b>
-              </div>
+              </Link>
             ))}
           </div>
         </section>

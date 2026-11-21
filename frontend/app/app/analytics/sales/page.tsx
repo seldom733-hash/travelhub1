@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { useLocale, type Locale } from "@/lib/i18n";
@@ -68,7 +68,8 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
   const [selectedManager, setSelectedManager] = useState<any>(null);
   const [managerOptions, setManagerOptions] = useState<any[]>([]);
   const [serviceTypes, setServiceTypes] = useState<Array<{ code: string; names: Record<string, string> }>>([]);
-  const [activityFilter, setActivityFilter] = useState("all");
+  const searchParams = useSearchParams();
+  const [activityFilter, setActivityFilter] = useState(searchParams.get("activityFilter") ?? "all");
   const [drill, setDrill] = useState<any>(null);
   const [drillLoading, setDrillLoading] = useState("");
   const [dailyView, setDailyView] = useState<"chart" | "table">("chart");
