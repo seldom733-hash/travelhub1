@@ -51,6 +51,8 @@ const KEEP_TABLES = [
   ["catalog", "ViewType"],
   ["catalog", "HotelCategory"],
   ["catalog", "PlacementType"],
+  ["finance", "SupplierFxRate"],
+  ["finance", "SupplierFxRateHistory"],
 ] as const;
 
 /** Бизнес-данные: эти таблицы обнуляются. */
@@ -68,7 +70,7 @@ const TRUNCATE_TABLES = [
   "documents.Document", "documents.DocumentHistory", "documents.DocumentVersion",
   "events.ExternalIdempotencyRecord", "events.InboxEvent", "events.OutboxEvent",
   "finance.MarkupRule", "finance.MarkupRuleHistory", "finance.Payment",
-  "finance.PaymentHistory", "finance.SupplierFxRate", "finance.SupplierFxRateHistory",
+  "finance.PaymentHistory",
   "geo.SupplierGeoLink",
   "order.Fulfillment", "order.Order", "order.OrderHistory", "order.OrderItem",
   "order.OrderTraveler", "order.Request", "order.RequestHistory", "order.RequestTraveler",
