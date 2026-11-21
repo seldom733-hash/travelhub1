@@ -168,6 +168,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
     if (activityFilter === "no_manager") return rows.filter((r: any) => !r.managerId);
     if (activityFilter === "no_response") return rows.filter((r: any) => !r.firstContactAt);
     if (activityFilter === "overdue") return rows.filter((r: any) => r.overdue);
+    if (activityFilter === "lost") return rows.filter((r: any) => ["REJECTED", "UNAVAILABLE", "EXPIRED", "CUSTOMER_PAYMENT_TIMEOUT", "CANCELLED_BY_CUSTOMER"].includes(r.status));
     if (activityFilter === "unprocessed") return rows.filter((r: any) => !r.processingStartedAt);
     if (activityFilter === "no_proposal") return rows.filter((r: any) => !r.proposalSent);
     if (activityFilter === "waiting_customer") return rows.filter((r: any) => r.waitingCustomer);

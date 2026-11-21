@@ -387,7 +387,7 @@ export class SalesAnalyticsService {
     const completedBookings = bookings.filter((b) => inScopeBooking(b) && orderById.get(b.orderId)?.status !== "CANCELLED" && dateIn(b.completedAt, p));
     const closedOrders = scopedOrders.filter((o) => o.status !== "CANCELLED" && dateIn(o.closedAt, p));
     const cancelledOrders = scopedOrders.filter((o) => dateIn(o.cancelledAt, p));
-    const cancelledBookings = bookings.filter((b) => inScopeBooking(b) && dateIn(b.cancelledAt, p));
+    const cancelledBookings = bookings.filter((b) => inScopeBooking(b) && ["CANCELLED", "SUPPLIER_REJECTED"].includes(b.status) && (dateIn(b.cancelledAt, p) || dateIn(b.updatedAt, p)));
     const completedOrders = scopedOrders.filter((o) => o.status !== "CANCELLED" && (dateIn(o.fulfilledAt, p) || bookings.some((b) => b.orderId === o.id && dateIn(b.completedAt, p))));
     const lostRequests = requests.filter((r) => ["REJECTED", "UNAVAILABLE", "EXPIRED", "CUSTOMER_PAYMENT_TIMEOUT", "CANCELLED_BY_CUSTOMER"].includes(r.status));
     const lossReasonMap = new Map<string, number>();
