@@ -231,7 +231,7 @@ export function DecisionCenter() {
     const activityHref = `${activityBaseHref}&activityFilter=overdue`;
     const signals = [
       { title: c.overdue, count: overdue, href: activityHref, tone: "amber" },
-      { title: x.cancelledRequests, count: lost, href: `${activityHref}&activityFilter=lost`, tone: "rose" },
+      { title: x.cancelledRequests, count: lost, href: `${activityBaseHref}&activityFilter=lost`, tone: "rose" },
       { title: x.cancelledOrders, count: cancelledOrders, href: "/app/finance/deals?stage=ORDER&statusGroup=cancelled", tone: "rose" },
       { title: x.cancelledBookings, count: cancelledBookings, href: "/app/finance/deals?stage=BOOKING&statusGroup=cancelled", tone: "rose" },
       { title: c.reconciliation, count: issues.length, href: "#data-quality", tone: "rose" },
