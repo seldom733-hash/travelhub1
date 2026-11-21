@@ -212,14 +212,23 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>}
       {!loading && !error && data && <>
         {tab === "overview" && <>
-          <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[
               ["Поступления от клиентов", "Фактические поступления", financeKpi?.clientReceived, "💰"],
               ["Оплачено поставщикам", "Фактические выплаты", financeKpi?.supplierPaid, "📤"],
               ["Дебиторская задолженность", "Клиенты должны компании", financeKpi?.clientDebt, "⏳"],
               ["Кредиторская задолженность", "Компания должна поставщикам", financeKpi?.supplierDebt, "📌"],
-              ["Прибыль", "Продажи минус себестоимость", financeKpi?.grossMargin, "📈"],
             ].map(([title, subtitle, value, icon]) => <div key={String(title)} className="rounded-xl border border-[#e5e2da] bg-white p-4 shadow-sm"><div className="flex items-center justify-between"><span className="text-[11px] font-medium uppercase tracking-wide text-ink/60">{L(String(title))}</span><span className="text-lg">{icon}</span></div><div className="mt-2 font-mono text-2xl font-semibold tabular-nums text-ink">{money(value)}</div><div className="mt-1 text-[11px] text-ink/50">{L(String(subtitle))}</div></div>)}
+          </div>
+          <div className="mb-3">
+            <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-ink/60">{L("Продажи и прибыль")}</div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                ["Сумма продаж", "Общая стоимость продаж", financeKpi?.salesAmount, "🧾"],
+                ["Себестоимость", "Закупочная стоимость услуг", financeKpi?.costAmount, "📦"],
+                ["Прибыль", "Продажи минус себестоимость", financeKpi?.grossMargin, "📈"],
+              ].map(([title, subtitle, value, icon]) => <div key={String(title)} className="rounded-xl border border-[#e5e2da] bg-white p-4 shadow-sm"><div className="flex items-center justify-between"><span className="text-[11px] font-medium uppercase tracking-wide text-ink/60">{L(String(title))}</span><span className="text-lg">{icon}</span></div><div className="mt-2 font-mono text-2xl font-semibold tabular-nums text-ink">{money(value)}</div><div className="mt-1 text-[11px] text-ink/50">{L(String(subtitle))}</div></div>)}
+            </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {GROUPS.map(([title, keys]) => (
