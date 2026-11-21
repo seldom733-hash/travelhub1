@@ -73,7 +73,7 @@ const TRUNCATE_TABLES = [
   "order.Fulfillment", "order.Order", "order.OrderHistory", "order.OrderItem",
   "order.OrderTraveler", "order.Request", "order.RequestHistory", "order.RequestTraveler",
   "security.AuditLog", "security.PartnerApplication", "security.PartnerApplicationHistory",
-  "security.ActivationToken", "security.UserWorkspaceLayout",
+  "security.ActivationToken", "security.UserNotification", "security.UserWorkspaceLayout",
   "whatsapp.WhatsAppAccount", "whatsapp.WhatsAppContact", "whatsapp.WhatsAppConversation",
   "whatsapp.WhatsAppInboundMessage", "whatsapp.WhatsAppOutboundMessage",
   "whatsapp.WhatsAppSessionLease",
