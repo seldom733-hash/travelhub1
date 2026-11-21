@@ -161,6 +161,9 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
     return rows;
   }, [data, activityFilter]);
   const periodLabel = data?.period ? `${new Date(data.period.start).toLocaleDateString("ru-RU")} — ${new Date(new Date(data.period.end).getTime() - 1).toLocaleDateString("ru-RU")}` : "";
+  const accumulatedCash = financeKpi
+    ? Number(financeKpi.clientReceived ?? 0) - Number(financeKpi.clientRefunded ?? 0) - Number(financeKpi.supplierPaid ?? 0) + Number(financeKpi.supplierRefunded ?? 0)
+    : 0;
 
   return (
     <div className="analytics-sales min-h-screen bg-[#f6f4ef] p-4 text-ink lg:p-6">
@@ -212,6 +215,19 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>}
       {!loading && !error && data && <>
         {tab === "overview" && <>
+          <div className="mb-3 rounded-xl border border-[#cfe5dc] bg-[#f2faf7] p-4 shadow-sm">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-medium uppercase tracking-wide text-ink/60">{L("Накопленные денежные средства по сделкам")}</div>
+                <div className="mt-1 font-mono text-3xl font-semibold tabular-nums text-[#0f6b5f]">{money(accumulatedCash)}</div>
+                <div className="mt-1 text-[11px] text-ink/50">{L("Поступления клиентов минус выплаты поставщикам. Не является остатком на банковском счёте.")}</div>
+              </div>
+              <div className="text-right text-[11px] text-ink/60">
+                <div>{L("Поступления от клиентов")}: <span className="font-mono font-semibold">{money(financeKpi?.clientReceived)}</span></div>
+                <div>{L("− Выплаты поставщикам")}: <span className="font-mono font-semibold">{money(financeKpi?.supplierPaid)}</span></div>
+              </div>
+            </div>
+          </div>
           <div className="mb-3">
             <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-ink/60">{L("Продажи и прибыль")}</div>
             <div className="grid gap-3 sm:grid-cols-3">

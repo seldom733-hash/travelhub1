@@ -7,6 +7,9 @@ import type { Locale } from "./i18n";
 const AZ: Record<string, string> = {
   "Поступления от клиентов": "Müştərilərdən daxilolmalar",
   "Продажи и прибыль": "Satış və mənfəət",
+  "Накопленные денежные средства по сделкам": "Sövdələr üzrə yığılmış pul vəsaitləri",
+  "Поступления клиентов минус выплаты поставщикам. Не является остатком на банковском счёте.": "Müştəri daxilolmaları minus təchizatçı ödənişləri. Bank hesabı qalığı deyil.",
+  "− Выплаты поставщикам": "− Təchizatçılara ödənişlər",
   "Общая стоимость продаж": "Satışların ümumi dəyəri",
   "Закупочная стоимость услуг": "Xidmətlərin maya dəyəri",
   "Оплачено поставщикам": "Təchizatçılara ödənilib",
@@ -84,6 +87,9 @@ const AZ: Record<string, string> = {
 const EN: Record<string, string> = {
   "Поступления от клиентов": "Client receipts",
   "Продажи и прибыль": "Sales and profit",
+  "Накопленные денежные средства по сделкам": "Accumulated cash on deals",
+  "Поступления клиентов минус выплаты поставщикам. Не является остатком на банковском счёте.": "Client receipts minus supplier payments. Not a bank account balance.",
+  "− Выплаты поставщикам": "− Supplier payments",
   "Общая стоимость продаж": "Total sales value",
   "Закупочная стоимость услуг": "Service purchase cost",
   "Оплачено поставщикам": "Paid to suppliers",
