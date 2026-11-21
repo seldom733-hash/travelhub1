@@ -538,8 +538,11 @@ export class DealsService {
         : dateFrom && nights ? new Date(new Date(dateFrom).getTime() + nights * 86400000).toISOString() : null;
       // The deal is completed only when both customer and supplier finances are
       // settled; it is closed when the service period has already ended.
+      // Booking completion itself is a booking-level event (Booking.COMPLETED)
+      // and must not be inferred from the deal's financial state.
       const tourEnded = Boolean(dateTo && new Date(`${String(dateTo).slice(0, 10)}T23:59:59`) < new Date());
-      if (!isCancelledDeal && stage === "BOOKING" && clientDebt <= 0 && supplierDebt <= 0) {
+      const bookingFinished = booking?.status === "COMPLETED";
+      if (!isCancelledDeal && bookingFinished && clientDebt <= 0 && supplierDebt <= 0) {
         stage = tourEnded ? "CLOSED" : "COMPLETED";
       }
       if (order?.status === "CLOSED") stage = "CLOSED";
