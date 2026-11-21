@@ -212,9 +212,10 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>}
       {!loading && !error && data && <>
         {tab === "overview" && <>
-          <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {[
               ["Поступления от клиентов", "Фактические поступления", financeKpi?.clientReceived, "💰"],
+              ["Оплачено поставщикам", "Фактические выплаты", financeKpi?.supplierPaid, "📤"],
               ["Дебиторская задолженность", "Клиенты должны компании", financeKpi?.clientDebt, "⏳"],
               ["Кредиторская задолженность", "Компания должна поставщикам", financeKpi?.supplierDebt, "📌"],
               ["Прибыль", "Продажи минус себестоимость", financeKpi?.grossMargin, "📈"],

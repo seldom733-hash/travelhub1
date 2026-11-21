@@ -6,6 +6,8 @@ import type { Locale } from "./i18n";
  */
 const AZ: Record<string, string> = {
   "Поступления от клиентов": "Müştərilərdən daxilolmalar",
+  "Оплачено поставщикам": "Təchizatçılara ödənilib",
+  "Фактические выплаты": "Faktiki ödənişlər",
   "Фактические поступления": "Faktiki daxilolmalar",
   "Дебиторская задолженность": "Debitor borcu",
   "Клиенты должны компании": "Müştərilər şirkətə borcludur",
@@ -78,6 +80,8 @@ const AZ: Record<string, string> = {
 };
 const EN: Record<string, string> = {
   "Поступления от клиентов": "Client receipts",
+  "Оплачено поставщикам": "Paid to suppliers",
+  "Фактические выплаты": "Actual payouts",
   "Фактические поступления": "Actual receipts",
   "Дебиторская задолженность": "Accounts receivable",
   "Клиенты должны компании": "Clients owe the company",
