@@ -85,6 +85,13 @@ const AZ: Record<string, string> = {
   "Отклонена": "Rədd edilib", "Недоступна": "Mövcud deyil", "Истекла": "Vaxtı bitib",
   "Клиент не оплатил": "Müştəri ödəmədi", "Клиент отказался": "Müştəri imtina etdi",
   "Потери к следующему этапу:": "Növbəti mərhələyə itkilər:", "записей:": "qeydlər:",
+  "Не перешли дальше на дату отчёта:": "Hesabat tarixinə növbəti mərhələyə keçməyib:",
+  "Потери": "İtkilər",
+  "Отменённые и отклонённые записи, а не незавершённые этапы.": "Ləğv edilmiş və rədd edilmiş qeydlər, tamamlanmamış mərhələlər deyil.",
+  "Отменённые заказы": "Ləğv edilmiş sifarişlər",
+  "Отменённые брони": "Ləğv edilmiş rezervasiyalar",
+  "Причины потерь заявок": "Müraciət itkilərinin səbəbləri",
+
   "Без связи": "Əlaqəsiz",
 };
 const EN: Record<string, string> = {
@@ -112,6 +119,13 @@ const EN: Record<string, string> = {
   "Отклонена": "Rejected", "Недоступна": "Unavailable", "Истекла": "Expired",
   "Клиент не оплатил": "Customer payment timeout", "Клиент отказался": "Cancelled by customer",
   "Потери к следующему этапу:": "Losses to next stage:", "записей:": "records:",
+  "Не перешли дальше на дату отчёта:": "Did not reach the next stage as of the report date:",
+  "Потери": "Losses",
+  "Отменённые и отклонённые записи, а не незавершённые этапы.": "Cancelled and rejected records, not unfinished stages.",
+  "Отменённые заказы": "Cancelled orders",
+  "Отменённые брони": "Cancelled bookings",
+  "Причины потерь заявок": "Request loss reasons",
+
   "Без связи": "Unlinked",
   "Аналитика продаж": "Sales analytics",
   "Заявки → заказы → бронирования → завершённые и закрытые сделки. Период:": "Requests → orders → bookings → completed and closed deals. Period:",
