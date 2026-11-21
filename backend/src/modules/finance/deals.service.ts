@@ -219,16 +219,18 @@ export class DealsService {
 
   private kpi(rows: DealRow[]) {
     const sum = (field: keyof DealRow) => rows.reduce((total, row) => total + Number(row[field] ?? 0), 0);
-    const salesRows = rows.filter((row) => row.stage !== "REQUEST");
-    const activeRows = salesRows.filter((row) => !row.isCancelledDeal);
-    const cancelledRows = salesRows.filter((row) => row.isCancelledDeal);
+    // Sales KPI covers ALL deals (including REQUEST) except cancelled ones.
+    // A cancellation therefore changes sales KPI, while the cancelled amount
+    // remains available separately as cancelledSalesAmount.
+    const activeRows = rows.filter((row) => !row.isCancelledDeal);
+    const cancelledRows = rows.filter((row) => row.isCancelledDeal);
     const salesAmount = activeRows.reduce((total, row) => total + Number(row.salesAmount), 0);
     const costAmount = activeRows.reduce((total, row) => total + Number(row.costAmount), 0);
     const expectedIncome = activeRows.reduce((total, row) => total + Number(row.expectedIncome ?? 0), 0);
     const currentIncome = activeRows.reduce((total, row) => total + Number(row.currentIncome ?? 0), 0);
     const cancellationIncome = cancelledRows.reduce((total, row) => total + Number(row.cancellationIncome ?? 0), 0);
     const cancellationLoss = cancelledRows.reduce((total, row) => total + Number(row.cancellationLoss ?? 0), 0);
-    const writeOffExpense = salesRows.reduce((total, row) => total + Number(row.writeOffExpense ?? 0), 0);
+    const writeOffExpense = rows.reduce((total, row) => total + Number(row.writeOffExpense ?? 0), 0);
     return {
       salesAmount: fixed(salesAmount),
       costAmount: fixed(costAmount),
@@ -237,7 +239,7 @@ export class DealsService {
       clientDebt: fixed(sum("clientDebt")),
       clientRefunded: fixed(sum("clientRefunded")),
       supplierPaid: fixed(sum("supplierPaid")),
-      supplierDebt: fixed(rows.filter((row) => row.stage !== "REQUEST").reduce((total, row) => total + Number(row.supplierDebt ?? 0), 0)),
+      supplierDebt: fixed(sum("supplierDebt")),
       supplierRefunded: fixed(sum("supplierRefunded")),
       clientPenalty: fixed(sum("clientPenalty")),
       supplierPenalty: fixed(sum("supplierPenalty")),
@@ -496,13 +498,15 @@ export class DealsService {
       const cancelledForDebt = order?.status === "CANCELLED" || Boolean(order?.cancelledAt && !order?.returnedToRequestAt);
       const rawSupplierDebt = cancelledForDebt
         ? Math.max(0, supplierPaid - supplierRefunded)
-        : cost > 0
-          ? Math.max(0, cost - supplierPaid + supplierRefunded)
-          : obligationDebt;
-      const supplierDebt = Math.max(0, rawSupplierDebt - supplierWriteOff);
+        // Actual supplier debt is the open obligation balance. A deal without
+        // a created SupplierObligation has no supplier debt yet (e.g. booking
+        // not confirmed), so it must not be projected from expected cost.
+        : obligationDebt;
       const cancelledOrder = cancelled || Boolean(order?.cancelledAt);
+      const activeForDebt = !cancelledOrder && stage !== "REQUEST" && order?.status !== "CLOSED";
+      const supplierDebt = activeForDebt ? Math.max(0, rawSupplierDebt - supplierWriteOff) : 0;
       const clientWriteOff = clientWriteOffs.filter((w) => w.orderId === order?.id).reduce((sum, w) => sum + money(w.amount), 0);
-      const clientDebt = cancelledOrder ? 0 : settlement
+      const clientDebt = !activeForDebt ? 0 : settlement
         ? Math.max(0, money(settlement.remainingToPay) - clientWriteOff)
         : Math.max(0, sales - captured + refundedTotal - clientWriteOff);
       const clientPenalty = ["CONFIRMED", "WITHHELD", "RECEIVED"].includes(settlement?.clientPenaltyStatus ?? "")

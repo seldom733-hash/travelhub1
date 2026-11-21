@@ -1780,6 +1780,9 @@ export class OrderService {
         if (activeBookings > 0) {
           throw new ConflictError(`Order ${order.code} has ${activeBookings} active booking(s); return or cancel them before cancelling the order`);
         }
+        // Cancellation is a financial close: it must not leave outstanding
+        // client/supplier balances or pending refunds behind.
+        await this.assertOrderDebtsCleared(tx, orderId, order.code, order.amount, order.status);
       }
 
       if (action === "requestCancellation" && !reason?.trim()) {
