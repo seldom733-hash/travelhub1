@@ -5,31 +5,11 @@ import React from "react";
 import Link from "next/link";
 import { formatPrice, useLocale } from "@/lib/i18n";
 import { dealText, dealStatus, dealFinancial } from "@/lib/deals-i18n";
-import { dealsApi, type DealKpi, type DealList, type DealQuery, type DealRow } from "@/lib/deals-api";
+import { dealsApi, type DealList, type DealQuery, type DealRow } from "@/lib/deals-api";
 import NotificationStrip from "@/components/NotificationStrip";
 
 function cancellationReasonRu(reason: string | null) { return reason ? ({ CUSTOMER_FAULT: "вина туриста", SUPPLIER_FAULT: "вина поставщика", NAVITRAVEL_FAULT: "вина Navitravel", FORCE_MAJEURE: "форс-мажор", MUTUAL_AGREEMENT: "взаимное соглашение" } as Record<string, string>)[reason] ?? reason : ""; }
 
-type KpiCard = { key: keyof DealKpi; label: string; icon: string; tone: string };
-const KPI: KpiCard[] = [
-  { key: "salesAmount", label: "Сумма продаж", icon: "₼", tone: "bg-brand/10 text-brand-dark" },
-  { key: "costAmount", label: "Себестоимость", icon: "▦", tone: "bg-violet-50 text-violet-700" },
-  { key: "clientReceived", label: "Получено от клиентов", icon: "↓", tone: "bg-emerald-50 text-emerald-700" },
-  { key: "clientDebt", label: "Долги клиентов", icon: "◷", tone: "bg-amber-50 text-amber-700" },
-  { key: "clientRefunded", label: "Возвращено клиентам", icon: "↩", tone: "bg-rose-50 text-rose-700" },
-  { key: "supplierPaid", label: "Оплачено поставщикам", icon: "↑", tone: "bg-brand/10 text-brand-dark" },
-  { key: "supplierDebt", label: "Долги поставщикам", icon: "◔", tone: "bg-orange-50 text-orange-700" },
-  { key: "supplierRefunded", label: "Возврат от поставщика", icon: "↪", tone: "bg-brand/10 text-brand-dark" },
-  { key: "clientPenalty", label: "Штрафы клиентам", icon: "!", tone: "bg-red-50 text-red-700" },
-  { key: "supplierPenalty", label: "Штрафы от поставщика", icon: "⚑", tone: "bg-fuchsia-50 text-fuchsia-700" },
-  { key: "expectedIncome", label: "Ожидаемый доход", icon: "↗", tone: "bg-emerald-50 text-emerald-700" },
-  { key: "currentIncome", label: "Текущий доход", icon: "✓", tone: "bg-teal-50 text-teal-700" },
-  { key: "cancelledSalesAmount", label: "Отменённые продажи", icon: "⊘", tone: "bg-rose-50 text-rose-700" },
-  { key: "cancellationIncome", label: "Доход от отмен", icon: "+", tone: "bg-emerald-50 text-emerald-700" },
-  { key: "cancellationLoss", label: "Убыток от отмен", icon: "−", tone: "bg-rose-50 text-rose-700" },
-  { key: "writeOffExpense", label: "Списания долгов", icon: "×", tone: "bg-amber-50 text-amber-700" },
-];
-const EMPTY: DealKpi = { salesAmount: "0", expectedGmv: "0", actualGmv: "0", executedGmv: "0", lostGmv: "0", potentialGmv: "0", costAmount: "0", grossMargin: "0", clientReceived: "0", clientDebt: "0", clientRefunded: "0", supplierPaid: "0", supplierDebt: "0", supplierRefunded: "0", clientPenalty: "0", supplierPenalty: "0", expectedIncome: "0", currentIncome: "0", cancelledSalesAmount: "0", lostIncome: "0", cancellationIncome: "0", cancellationLoss: "0", writeOffExpense: "0", cancelledCount: 0, currency: "AZN", count: 0 };
 const label: Record<string, string> = {
   NEW: "Новая", CHECKING: "Проверка", SUPPLIER_TIMEOUT: "Поставщик не ответил", PRICE_CHANGED: "Цена изменилась",
   CUSTOMER_ACCEPTED: "Клиент подтвердил", CONFIRMED: "Подтверждён", CONVERTED: "Сконвертирован", REJECTED: "Отклонён",
@@ -49,13 +29,11 @@ function tone(s: string) { if (/CANCEL|REJECT|FAIL/.test(s)) return "border-rose
 export default function DealsPage() {
   const locale = useLocale();
   const [data, setData] = useState<DealList | null>(null);
-  const [kpi, setKpi] = useState(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [modal, setModal] = useState<KpiCard | null>(null);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [columns, setColumns] = useState({ customer: true, supplier: true, travelers: true, cost: true, currentIncome: true });
@@ -63,7 +41,7 @@ export default function DealsPage() {
   const [periodOpen, setPeriodOpen] = useState(false);
   const [query, setQuery] = useState({ search: "", stage: "", status: "", statusGroup: "", cancellationReason: "", settlementStatus: "", scope: "", state: "", financialStatus: "", clientPayment: "", supplierPayment: "", serviceType: "", dateField: "createdAt", dateFrom: "", dateTo: "", supplierId: "", country: "", manager: "", sortBy: "createdAt", sortDirection: "desc" });
   const apiQuery = useMemo<DealQuery>(() => ({ ...query, page, pageSize }), [query, page, pageSize]);
-  const load = useCallback(async () => { setLoading(true); setError(""); try { const r = await dealsApi.list(apiQuery); setData(r); setKpi(r.kpi); } catch (e) { setError((e as Error).message); } finally { setLoading(false); } }, [apiQuery]);
+  const load = useCallback(async () => { setLoading(true); setError(""); try { const r = await dealsApi.list(apiQuery); setData(r); } catch (e) { setError((e as Error).message); } finally { setLoading(false); } }, [apiQuery]);
   useEffect(() => { void load(); }, [load]);
   const setFilter = (patch: Partial<typeof query>) => { setPage(1); setQuery((q) => ({ ...q, ...patch })); };
   const sortBy = (key: string) => setFilter({ sortBy: key, sortDirection: query.sortBy === key && query.sortDirection === "asc" ? "desc" : "asc" });
@@ -107,33 +85,6 @@ export default function DealsPage() {
 
       <div className="space-y-4 p-4 lg:p-6">
         <NotificationStrip scope="sales" />
-        <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-          {KPI.map((c) => <button key={c.key} type="button" title={c.key === "cancelledSalesAmount" ? "Σ сумма продаж сделок со статусами CANCELLED / CANCELLED_BY_CUSTOMER / SUPPLIER_REJECTED / REJECTED за выбранный период. Не включает возвраты и штрафы — они показаны отдельно." : undefined} onClick={() => c.key === "cancelledSalesAmount" ? setFilter({ statusGroup: query.statusGroup === "cancelled" ? "" : "cancelled", status: "" }) : setModal(c)} className={`flex items-start gap-2 rounded-xl border bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${c.key === "cancelledSalesAmount" && query.statusGroup === "cancelled" ? "border-rose-300 ring-1 ring-rose-200" : "border-[#e5e2da]"}`}><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-semibold ${c.tone}`}>{c.icon}</span><span className="min-w-0"><span className="block truncate text-[10px] font-medium uppercase tracking-wide text-[#667085]">{dealText(locale, c.label)}</span><span className="mt-1 block font-mono text-[16px] font-semibold tabular-nums text-[#101828]">{fmt(String(kpi[c.key] ?? "0"), kpi.currency)}</span></span></button>)}
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          {[
-            ["expectedGmv", "Ожидаемое GMV", "border-[#cfe5dc] bg-[#f2faf7] text-[#0f6b5f]"],
-            ["actualGmv", "Фактическое GMV", "border-[#d9e6e1] bg-white text-[#0f6b5f]"],
-            ["potentialGmv", "Потенциал (не оплачено)", "border-[#e5e2da] bg-white text-[#344054]"],
-            ["executedGmv", "Поступило денег", "border-[#cfe5dc] bg-[#eef8f3] text-emerald-700"],
-            ["lostGmv", "Упущенный GMV", "border-rose-200 bg-rose-50 text-rose-700"],
-          ].map(([key, label, tone]) => <div key={key} className={`rounded-xl border p-3 shadow-sm ${tone}`}><div className="text-[10px] font-medium uppercase tracking-wide opacity-70">{dealText(locale, label)}</div><div className="mt-1 font-mono text-[17px] font-semibold tabular-nums">{fmt(String(kpi[key as keyof DealKpi] ?? "0"), kpi.currency)}</div></div>)}
-        </div>
-
-        {Number(kpi.lostIncome) > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-rose-700">Потери дохода от отмен</div>
-              <div className="text-[11px] text-rose-700/80">Маржа отменённых сделок минус удержанные штрафы. Возвраты и штрафы отдельно, без двойного счёта.</div>
-            </div>
-            <div className="text-right">
-              <div className="font-mono text-xl font-semibold text-rose-800">{fmt(kpi.lostIncome, kpi.currency)}</div>
-              <button type="button" onClick={() => setFilter({ statusGroup: query.statusGroup === "cancelled" ? "" : "cancelled", status: "" })} className="text-[10px] font-semibold underline">Показать отменённые сделки</button>
-            </div>
-          </div>
-        )}
-
         <div className="rounded-xl border border-[#e5e2da] bg-white p-3 shadow-sm">
           <div className="flex flex-wrap items-center gap-2"><div className="relative min-w-[320px] flex-1"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink/60">⌕</span><input value={query.search} onChange={(e) => setFilter({ search: e.target.value })} placeholder={dealText(locale, "Поиск по номеру/коду (заявка, заказ, бронь), ФИО клиента или телефону")} className="w-full rounded-lg border border-[#e5e2da] bg-[#fbfaf7] py-2 pl-9 pr-3 text-xs outline-none focus:border-[#0f6b5f]" /></div><span className="text-[10px] text-[#98a2b3]">{dealText(locale, "Например:")}</span>{["00000001", "mkt-ord-00000001", "Алиев Эльвин", "+994 50 123 45 67"].map((h) => <button key={h} type="button" onClick={() => setFilter({ search: h })} className="rounded-full border border-[#e5e2da] bg-[#fbfaf7] px-2 py-1 text-[10px] text-[#475467]">{h}</button>)}<button type="button" onClick={() => setFilter({ statusGroup: query.statusGroup === "cancelled" ? "" : "cancelled", status: "" })} className={`rounded-full border px-2 py-1 text-[10px] ${query.statusGroup === "cancelled" ? "border-rose-300 bg-rose-50 text-rose-700" : "border-[#e5e2da] bg-[#fbfaf7] text-[#475467]"}`}>{dealText(locale, "Только отмены")}</button></div>
           <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[#f0eee8] pt-2">
@@ -171,7 +122,6 @@ export default function DealsPage() {
         </div>
       </div>
 
-      {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setModal(null)}><div className="max-h-[80vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white p-5" onClick={(e) => e.stopPropagation()}><div className="mb-3 flex justify-between"><h3 className="font-semibold">{modal.label}: {fmt(String(kpi[modal.key] ?? "0"), kpi.currency)}</h3><button type="button" onClick={() => setModal(null)}>✕</button></div>{data?.items.map((r) => <Link key={r.sequence} href={`/app/finance/deals/${r.sequence}`} className="flex justify-between border-b border-[#f0eee8] py-2 text-xs"><span>{r.sequence} · {r.customerName}</span><span className="font-mono">{fmt(String(r[modal.key as keyof DealRow] ?? "0"), r.currency)}</span></Link>)}</div></div>}
     </div>
   );
 }
