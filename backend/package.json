@@ -26,6 +26,9 @@
     "reset:platform": "ts-node src/seed/reset-platform.ts",
     "reset:full": "ts-node src/seed/reset-platform.ts",
     "reset:business": "ts-node src/seed/reset-business.ts",
+    "scenarios:discovery": "node test/scenarios/scenario-runner.js --mode=discovery",
+    "scenarios:regression": "node test/scenarios/scenario-runner.js --mode=regression",
+    "scenarios:change": "node test/scenarios/scenario-runner.js --mode=change",
     "start:dev": "powershell -ExecutionPolicy Bypass -File .\\start-azal-chrome.ps1 && npm run dev"
   },
   "dependencies": {

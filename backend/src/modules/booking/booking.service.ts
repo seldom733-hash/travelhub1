@@ -189,6 +189,7 @@ export const ACTION_PERMISSIONS: Record<BookingAction, string> = {
 export function computeAvailableBookingActions(
   booking: { status: BookingStatus; orderId: string; returnedToOrder?: boolean },
   granted: readonly string[],
+  orderStatus?: string,
 ): BookingAction[] {
   const actions: BookingAction[] = [];
   for (const action of Object.keys(TRANSITIONS) as BookingAction[]) {
@@ -200,6 +201,15 @@ export function computeAvailableBookingActions(
     // (CANCELLED/SUPPLIER_REJECTED) сам по себе не различает «отменена» и
     // «возвращена». Список всё ещё server-authoritative: frontend рендерит только его.
     if (action === "returnToOrder" && booking.returnedToOrder) continue;
+    // A cancelled/rejected booking whose order has already returned to
+    // READY_FOR_BOOKING has effectively released its item. Showing
+    // returnToOrder here produces a button that always answers 409
+    // "already returned" — keep the server action list truthful.
+    if (
+      action === "returnToOrder"
+      && orderStatus === "READY_FOR_BOOKING"
+      && ["CANCELLED", "SUPPLIER_REJECTED"].includes(booking.status)
+    ) continue;
     actions.push(action);
   }
   return actions;
@@ -520,7 +530,7 @@ export class BookingService {
             select: { id: true },
           })) !== null
         : false;
-    const availableActions = computeAvailableBookingActions({ ...booking, returnedToOrder }, grantedPermissions);
+    const availableActions = computeAvailableBookingActions({ ...booking, returnedToOrder }, grantedPermissions, (await this.prisma.order.findUnique({ where: { id: booking.orderId }, select: { status: true } }))?.status);
     return { ...booking, availableActions };
   }
 

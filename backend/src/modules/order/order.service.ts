@@ -1299,7 +1299,7 @@ export class OrderService {
     const financialOperations =
       (await this.prisma.payment.count({ where: { orderId: order.id } })) +
       (await this.prisma.refund.count({ where: { orderId: order.id } }));
-    const availableActions = computeAvailableOrderActions(
+    let availableActions = computeAvailableOrderActions(
       order,
       grantedPermissions,
       activeBlockingBookings,
@@ -1337,6 +1337,17 @@ export class OrderService {
     const refundableAmount = terminal && financialSettlement
       ? new Prisma.Decimal(financialSettlement.remainingToRefund)
       : Prisma.Decimal.max(new Prisma.Decimal(0), paidAmt.minus(refundedAmt));
+    // The close button must not be offered when closing is guaranteed to fail
+    // on financial guards: unpaid amount, overpayment to refund, or an
+    // outstanding cancellation refund. The action itself remains authoritative;
+    // this only keeps the server-provided action list truthful.
+    const netPaidForClose = Prisma.Decimal.max(new Prisma.Decimal(0), paidAmt.minus(refundedAmt));
+    const overpaidForClose = Prisma.Decimal.max(new Prisma.Decimal(0), netPaidForClose.minus(totalAmt));
+    const closeBlockedByMoney = dueAmount.gt(0) || overpaidForClose.gt(0)
+      || (["CANCELLED", "CANCELLATION_REQUESTED", "CANCELLATION_APPROVED"].includes(order.status) && refundableAmount.gt(0));
+    if (closeBlockedByMoney) {
+      availableActions = availableActions.filter((action) => action !== "close");
+    }
     // MULTI/PARTIAL: резерв активных платежей (PENDING/AUTHORIZED) — CREATE
     // доступно available = due − reserved (зеркало due-guard payment.service).
     // canonical dueAmount НЕ меняется (prompt §5: paid только CAPTURED).

@@ -1,0 +1,111 @@
+name: Scenario Regression
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master, main]
+    paths:
+      - "backend/src/modules/order/**"
+      - "backend/src/modules/booking/**"
+      - "backend/src/modules/finance/**"
+      - "backend/test/scenarios/**"
+      - ".github/workflows/scenario-regression.yml"
+
+concurrency:
+  group: scenario-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/travelhub1"
+  JWT_SECRET: "ci-jwt-secret-not-for-production"
+  ADMIN_USERNAME: admin
+  ADMIN_PASSWORD: admin123
+
+jobs:
+  scenario-regression:
+    name: Sales register · Scenario discovery + regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: travelhub1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Prisma client + migrations
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+
+      - name: Build backend
+        run: npm run build
+
+      - name: Start backend
+        run: |
+          node dist/main.js > ../scenario-backend.log 2>&1 &
+          echo $! > ../scenario-backend.pid
+          for i in $(seq 1 60); do
+            if curl -fsS -X POST http://127.0.0.1:4000/api/v1/auth/login \
+              -H 'Content-Type: application/json' \
+              -d '{"username":"admin","password":"admin123"}' >/dev/null; then
+              echo "backend ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "backend did not start"; cat ../scenario-backend.log; exit 1
+
+      - name: Discover scenarios
+        env:
+          SCENARIO_MAX_SCENARIOS: 40
+          SCENARIO_MAX_DEPTH: 10
+        run: npm run scenarios:discovery
+
+      - name: Regression replay
+        env:
+          SCENARIO_MAX_SCENARIOS: 40
+          SCENARIO_MAX_DEPTH: 10
+        run: npm run scenarios:regression
+
+      - name: Upload scenario reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scenario-reports
+          path: |
+            reports/scenario-runner
+            scenario-backend.log
+          if-no-files-found: warn
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f ../scenario-backend.pid ]; then kill "$(cat ../scenario-backend.pid)" || true; fi
