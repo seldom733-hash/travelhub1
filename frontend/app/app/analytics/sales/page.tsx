@@ -73,6 +73,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
   const [drillLoading, setDrillLoading] = useState("");
   const [dailyView, setDailyView] = useState<"chart" | "table">("chart");
   const [financeKpi, setFinanceKpi] = useState<any>(null);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -129,6 +130,16 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
     if (status) qs.set("status", status);
     return qs.toString();
   }, [preset, startDate, endDate, managerId, serviceType, source, status]);
+
+  useEffect(() => {
+    const period = data?.period;
+    if (!period?.start || !period?.end) return;
+    const start = String(period.start).slice(0, 10);
+    const end = new Date(new Date(period.end).getTime() - 1).toISOString().slice(0, 10);
+    api.get<any>(`/finance/deals/suppliers?dateFrom=${start}&dateTo=${end}`)
+      .then((r) => setSuppliers(r.items ?? []))
+      .catch(() => setSuppliers([]));
+  }, [data?.period?.start, data?.period?.end]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -289,6 +300,11 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
             ) : (
               <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-[11px]"><thead className="text-ink/60"><tr>{["Дата", "Заявки", "Заказы", "Брони", "Завершено", "Закрыто", "Продажи"].map((h) => <th key={h} className="px-2 py-1 font-medium">{L(h)}</th>)}</tr></thead><tbody>{(data.series ?? []).slice(-30).map((r: any) => <tr key={r.date} className="border-t border-line"><td className="px-2 py-1">{r.date}</td><td className="px-2 py-1">{r.requests}</td><td className="px-2 py-1">{r.orders}</td><td className="px-2 py-1">{r.bookings}</td><td className="px-2 py-1">{r.completed}</td><td className="px-2 py-1">{r.closed}</td><td className="px-2 py-1">{money(r.salesAmount)}</td></tr>)}</tbody></table></div>
             )}
+          </div>
+          <div className="mt-3 rounded-xl border border-[#e5e2da] bg-white p-3">
+            <div className="mb-2 text-xs font-semibold">{L("Продажи по поставщикам")}</div>
+            <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-[11px]"><thead className="bg-panel text-ink/60"><tr>{["Поставщик", "Сумма продаж", "Платежи клиентов", "Заявки", "Заказы", "Бронирования", "Доля завершения"].map((h) => <th key={h} className="px-2 py-2 font-medium">{L(h)}</th>)}</tr></thead><tbody>{[...suppliers].sort((a, b) => Number(b.salesAmount ?? 0) - Number(a.salesAmount ?? 0)).map((p: any) => <tr key={p.partnerId} className="border-t border-line"><td className="px-2 py-2 font-medium">{p.supplierName ?? p.supplierCode}</td><td className="px-2 py-2 font-mono">{money(p.salesAmount)}</td><td className="px-2 py-2 font-mono">{money(p.clientPayments)}</td><td className="px-2 py-2">{p.requests ?? 0}</td><td className="px-2 py-2">{p.orders ?? 0}</td><td className="px-2 py-2">{p.bookings ?? 0}</td><td className="px-2 py-2">{p.completionRate != null ? `${Number(p.completionRate).toFixed(1)}%` : "—"}</td></tr>)}</tbody></table></div>
+            {suppliers.length === 0 && <div className="py-2 text-[11px] text-ink/50">{L("Нет данных по поставщикам")}</div>}
           </div>
         </>}
 

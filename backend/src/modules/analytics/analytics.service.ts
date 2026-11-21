@@ -237,6 +237,7 @@ export interface PartnerPerformanceResponse {
     revenue: string;
     commission: string;
     ordersCount: number;
+    requestsCount: number;
     bookingsCount: number;
     activeProducts: number;
     bookingCompletionRate: number | null;
@@ -804,7 +805,7 @@ export class AnalyticsService {
     // HIGH-6: Query real metrics separately (no nested relations needed)
     // ── Phase 1: Independent queries ──
     // Marketplace-scoped: partner performance reflects Marketplace operational scope
-    const [orders, bookings, productCounts] =
+    const [orders, bookings, productCounts, requests] =
       await Promise.all([
         this.prisma.order.findMany({
           where: {
@@ -845,6 +846,14 @@ export class AnalyticsService {
               WHERE "status" = 'PUBLISHED' AND "partnerId" IS NOT NULL
               GROUP BY "partnerId"
             `,
+        this.prisma.request.findMany({
+          where: {
+            createdAt: { gte: current.start, lt: current.endExclusive },
+            partnerId: { not: null },
+            ...(effectivePartnerId ? { partnerId: effectivePartnerId } : {}),
+          },
+          select: { partnerId: true },
+        }),
       ]);
 
     // D10: Build order → sellerPartnerId mapping for bookings
@@ -912,6 +921,7 @@ export class AnalyticsService {
         revenueByCurrency: Record<string, number>; // cents
         commissionByCurrency: Record<string, number>; // cents
         ordersCount: number;
+        requestsCount: number;
         bookingsCount: number;
         confirmedBookings: number;
         completedBookings: number;
@@ -926,6 +936,7 @@ export class AnalyticsService {
           revenueByCurrency: {},
           commissionByCurrency: {},
           ordersCount: 0,
+          requestsCount: 0,
           bookingsCount: 0,
           confirmedBookings: 0,
           completedBookings: 0,
@@ -981,6 +992,13 @@ export class AnalyticsService {
       data.bookingsCount++;
       if (b.status === "CONFIRMED") data.confirmedBookings++;
       if (b.status === "COMPLETED") data.completedBookings++;
+    }
+
+    // Merge requests (request creation is attributed to the primary partner)
+    for (const r of requests) {
+      if (!r.partnerId) continue;
+      ensurePartner(r.partnerId);
+      byPartner.get(r.partnerId)!.requestsCount++;
     }
 
     // Merge active products
@@ -1046,6 +1064,7 @@ export class AnalyticsService {
           revenue: revenue.total,
           commission: commission.total,
           ordersCount: data.ordersCount,
+          requestsCount: data.requestsCount,
           bookingsCount: data.bookingsCount,
           activeProducts: data.activeProducts,
           bookingCompletionRate: completionRate,

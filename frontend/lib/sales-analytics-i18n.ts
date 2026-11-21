@@ -7,6 +7,10 @@ import type { Locale } from "./i18n";
 const AZ: Record<string, string> = {
   "Поступления от клиентов": "Müştərilərdən daxilolmalar",
   "Продажи и прибыль": "Satış və mənfəət",
+  "Продажи по поставщикам": "Təchizatçılar üzrə satışlar",
+  "Платежи клиентов": "Müştəri ödənişləri",
+  "Доля завершения": "Tamamlanma payı",
+  "Нет данных по поставщикам": "Təchizatçılar üzrə məlumat yoxdur",
   "Расхождений нет": "Fərq yoxdur",
   "График": "Qrafik",
   "Таблица": "Cədvəl",
@@ -97,6 +101,10 @@ const AZ: Record<string, string> = {
 const EN: Record<string, string> = {
   "Поступления от клиентов": "Client receipts",
   "Продажи и прибыль": "Sales and profit",
+  "Продажи по поставщикам": "Sales by supplier",
+  "Платежи клиентов": "Client payments",
+  "Доля завершения": "Completion rate",
+  "Нет данных по поставщикам": "No supplier data",
   "Расхождений нет": "No variances",
   "График": "Chart",
   "Таблица": "Table",

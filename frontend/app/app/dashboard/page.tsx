@@ -18,7 +18,7 @@ const CARDS = [
     icon: "📚",
     titleKey: "workspace.card.catalog",
     descKey: "workspace.card.catalog.desc",
-    color: "from-blue-500 to-blue-600",
+    color: "from-brand to-brand-dark",
     permission: "catalog.product.read",
   },
   {
@@ -58,15 +58,15 @@ const CARDS = [
     icon: "📊",
     titleKey: "workspace.card.command_center",
     descKey: "workspace.card.command_center.desc",
-    color: "from-indigo-500 to-blue-600",
+    color: "from-brand to-brand-dark",
     permission: "analytics.read",
   },
   {
-    href: "/app/analytics",
+    href: "/app/analytics/sales",
     icon: "📈",
     titleKey: "workspace.card.analytics",
     descKey: "workspace.card.analytics.desc",
-    color: "from-cyan-500 to-blue-500",
+    color: "from-brand to-brand",
     permission: "analytics.read",
   },
   {
@@ -90,7 +90,7 @@ const CARDS = [
     icon: "🛡",
     titleKey: "workspace.card.sellers",
     descKey: "workspace.card.sellers.desc",
-    color: "from-slate-500 to-slate-600",
+    color: "from-panel to-ink",
     permission: "seller_public_profile.review",
   },
   {
@@ -98,7 +98,7 @@ const CARDS = [
     icon: "👥",
     titleKey: "workspace.card.users",
     descKey: "workspace.card.users.desc",
-    color: "from-sky-500 to-indigo-500",
+    color: "from-brand to-brand",
     permission: "settings.write",
   },
 ];
@@ -112,28 +112,28 @@ export default function OverviewPage() {
 
   return (
     <div className="p-6 lg:p-10">
-      <h1 className="text-2xl font-bold text-slate-900">{t("nav.dashboard", locale)}</h1>
+      <h1 className="text-2xl font-bold text-ink">{t("nav.dashboard", locale)}</h1>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map((c) => (
           <Link
             key={c.href}
             href={c.href}
-            className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2"
+            className="group rounded-2xl border border-line bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
           >
             <div className={`flex size-12 items-center justify-center rounded-xl bg-gradient-to-br text-xl text-white ${c.color}`}>
               {c.icon}
             </div>
-            <div className="mt-3 text-base font-bold text-slate-900 group-hover:text-blue-600">
+            <div className="mt-3 text-base font-bold text-ink group-hover:text-brand">
               {t(c.titleKey, locale)}
             </div>
-            <div className="mt-1 text-xs text-slate-500">
+            <div className="mt-1 text-xs text-ink/60">
               {t(c.descKey, locale)}
             </div>
           </Link>
         ))}
         {hiddenCount > 0 && (
-          <div className="flex items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-xs text-slate-400">
+          <div className="flex items-center justify-center rounded-2xl border border-dashed border-line bg-panel p-5 text-center text-xs text-ink/60">
             {t("workspace.hidden_count", locale).replace("{n}", String(hiddenCount))}
           </div>
         )}

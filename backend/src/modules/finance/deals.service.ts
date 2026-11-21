@@ -206,6 +206,46 @@ export class DealsService {
     return this.kpi(this.filter(all, query));
   }
 
+  async supplierPerformance(query: DealQuery) {
+    const rows = this.filter(await this.loadRows(), query);
+    const groups = new Map<string, {
+      supplierCode: string; supplierName: string; requests: number;
+      salesAmount: number; clientPayments: number; orders: number;
+      bookings: number; completedBookings: number;
+    }>();
+    for (const row of rows) {
+      const code = row.primarySupplierCode ?? "UNASSIGNED";
+      const group = groups.get(code) ?? {
+        supplierCode: code,
+        supplierName: row.supplierName ?? (code === "UNASSIGNED" ? "Без поставщика" : code),
+        requests: 0,
+        salesAmount: 0,
+        clientPayments: 0,
+        orders: 0,
+        bookings: 0,
+        completedBookings: 0,
+      };
+      group.requests++;
+      if (!row.isCancelledDeal) group.salesAmount += Number(row.salesAmount);
+      group.clientPayments += Number(row.clientReceived);
+      if (row.orderId) group.orders++;
+      group.bookings += row.bookings.length;
+      group.completedBookings += row.bookings.filter((b) => b.status === "COMPLETED").length;
+      groups.set(code, group);
+    }
+    return {
+      items: [...groups.values()]
+        .map((g) => ({
+          ...g,
+          salesAmount: fixed(g.salesAmount),
+          clientPayments: fixed(g.clientPayments),
+          completionRate: g.bookings > 0 ? Math.round((g.completedBookings / g.bookings) * 10000) / 100 : null,
+        }))
+        .sort((a, b) => Number(b.salesAmount) - Number(a.salesAmount)),
+    };
+  }
+
+
   async exportRows(query: DealQuery) {
     const all = await this.loadRows();
     return this.filter(all, query);

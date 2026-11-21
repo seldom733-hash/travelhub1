@@ -521,7 +521,7 @@ export interface PartnerPerformanceResponse {
   period: { start: string; endExclusive: string; timezone: string; preset: string };
   partners: Array<{
     partnerId: string; partnerName: string; gmv: string; revenue: string;
-    commission: string; ordersCount: number; bookingsCount: number;
+    commission: string; ordersCount: number; requestsCount: number; bookingsCount: number;
     activeProducts: number; bookingCompletionRate: number | null;
   }>;
 }
