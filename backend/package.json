@@ -29,6 +29,7 @@
     "scenarios:discovery": "node test/scenarios/scenario-runner.js --mode=discovery",
     "scenarios:regression": "node test/scenarios/scenario-runner.js --mode=regression",
     "scenarios:change": "node test/scenarios/scenario-runner.js --mode=change",
+    "scenarios:coverage": "node test/scenarios/seed-filter-coverage.js",
     "start:dev": "powershell -ExecutionPolicy Bypass -File .\\start-azal-chrome.ps1 && npm run dev"
   },
   "dependencies": {
