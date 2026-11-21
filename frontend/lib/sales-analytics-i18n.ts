@@ -174,12 +174,26 @@ const STATUS_AZ: Record<string, string> = {
   PRICE_CHANGED: "Qiymət dəyişdi", CUSTOMER_ACCEPTED: "Müştəri təsdiqlədi", CONFIRMED: "Təsdiqlənib",
   CONVERTED: "Sifarişə çevrilib", REJECTED: "Rədd edilib", UNAVAILABLE: "Mövcud deyil",
   EXPIRED: "Vaxtı bitib", CUSTOMER_PAYMENT_TIMEOUT: "Müştəri ödəmədi", CANCELLED_BY_CUSTOMER: "Müştəri imtina etdi",
+  IN_PROCESSING: "İcradadır", WAITING_FOR_DATA: "Məlumat gözlənilir", READY_FOR_BOOKING: "Rezervasiyaya hazır",
+  WAITING_FOR_FIRST_PAYMENT: "İlk ödəniş gözlənilir", SENT_TO_BOOKING: "Rezervasiyaya göndərilib", PARTIALLY_FULFILLED: "Qismən icra edilib",
+  FULFILLED: "İcra edilib", READY_TO_CLOSE: "Bağlanmağa hazır", CLOSED: "Bağlanıb", CANCELLATION_REQUESTED: "Ləğv tələbi",
+  CANCELLATION_APPROVED: "Ləğv təsdiqlənib", CANCELLED: "Ləğv edilib", PROBLEM: "Problem", SUSPENDED: "Dayandırılıb",
+  PREPARING_REQUEST: "Sorğu hazırlanır", SENT_TO_SUPPLIER: "Təchizatçıya göndərilib", AWAITING_CONFIRMATION: "Təsdiq gözlənilir",
+  IN_SERVICE: "Xidmətdə", COMPLETED: "Tamamlanıb", NEEDS_CLARIFICATION: "Dəqiqləşdirmə tələb olunur",
+  SUPPLIER_REJECTED: "Təchizatçı rədd edib", CHANGE_REQUESTED: "Dəyişiklik tələb olunur",
 };
 const STATUS_EN: Record<string, string> = {
   NEW: "New", CHECKING: "Checking", SUPPLIER_TIMEOUT: "Supplier timeout", PRICE_CHANGED: "Price changed",
   CUSTOMER_ACCEPTED: "Customer accepted", CONFIRMED: "Confirmed", CONVERTED: "Converted",
   REJECTED: "Rejected", UNAVAILABLE: "Unavailable", EXPIRED: "Expired",
   CUSTOMER_PAYMENT_TIMEOUT: "Customer payment timeout", CANCELLED_BY_CUSTOMER: "Cancelled by customer",
+  IN_PROCESSING: "In processing", WAITING_FOR_DATA: "Waiting for data", READY_FOR_BOOKING: "Ready for booking",
+  WAITING_FOR_FIRST_PAYMENT: "Waiting for first payment", SENT_TO_BOOKING: "Sent to booking", PARTIALLY_FULFILLED: "Partially fulfilled",
+  FULFILLED: "Fulfilled", READY_TO_CLOSE: "Ready to close", CLOSED: "Closed", CANCELLATION_REQUESTED: "Cancellation requested",
+  CANCELLATION_APPROVED: "Cancellation approved", CANCELLED: "Cancelled", PROBLEM: "Problem", SUSPENDED: "Suspended",
+  PREPARING_REQUEST: "Preparing request", SENT_TO_SUPPLIER: "Sent to supplier", AWAITING_CONFIRMATION: "Awaiting confirmation",
+  IN_SERVICE: "In service", COMPLETED: "Completed", NEEDS_CLARIFICATION: "Needs clarification",
+  SUPPLIER_REJECTED: "Supplier rejected", CHANGE_REQUESTED: "Change requested",
 };
 
 const STATUS_RU: Record<string, string> = {
@@ -187,7 +201,14 @@ const STATUS_RU: Record<string, string> = {
   PRICE_CHANGED: "Цена изменилась", CUSTOMER_ACCEPTED: "Клиент подтвердил", CONFIRMED: "Подтверждена",
   CONVERTED: "Сконвертирована", REJECTED: "Отклонена", UNAVAILABLE: "Недоступна",
   EXPIRED: "Истекла", CUSTOMER_PAYMENT_TIMEOUT: "Клиент не оплатил",
-  CANCELLED_BY_CUSTOMER: "Клиент отказался", CANCELLED: "Отменена",
+  CANCELLED_BY_CUSTOMER: "Клиент отказался",
+  IN_PROCESSING: "В обработке", WAITING_FOR_DATA: "Ожидает данных", READY_FOR_BOOKING: "Готов к бронированию",
+  WAITING_FOR_FIRST_PAYMENT: "Ожидает первой оплаты", SENT_TO_BOOKING: "Отправлен на бронирование", PARTIALLY_FULFILLED: "Частично исполнен",
+  FULFILLED: "Исполнен", READY_TO_CLOSE: "Готов к закрытию", CLOSED: "Закрыт", CANCELLATION_REQUESTED: "Запрошена отмена",
+  CANCELLATION_APPROVED: "Отмена подтверждена", CANCELLED: "Отменён", PROBLEM: "Проблема", SUSPENDED: "Приостановлен",
+  PREPARING_REQUEST: "Подготовка запроса", SENT_TO_SUPPLIER: "Отправлен поставщику", AWAITING_CONFIRMATION: "Ожидает подтверждения",
+  IN_SERVICE: "В обслуживании", COMPLETED: "Завершён", NEEDS_CLARIFICATION: "Требует уточнения",
+  SUPPLIER_REJECTED: "Отклонён поставщиком", CHANGE_REQUESTED: "Запрошено изменение",
 };
 
 export function saStatus(locale: Locale, status: string): string {
