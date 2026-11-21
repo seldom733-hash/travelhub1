@@ -391,8 +391,11 @@ export class SalesAnalyticsService {
     const cohortCompleted = cohortOrders.filter((o) => !!o.fulfilledAt || (bookingByOrder.get(o.id) ?? []).some((b) => !!b.completedAt));
     const cohortClosed = cohortOrders.filter((o) => !!o.closedAt);
 
-    const salesOrders = ordersCreated.filter((o) => o.status !== "CANCELLED");
+    // Sales amount is the same qualified GMV used by Analytics/Command Center:
+    // orders in NEW have not become sales yet; cancelled orders are losses.
+    const salesOrders = ordersCreated.filter((o) => !["NEW", "CANCELLED"].includes(o.status));
     const salesAmount = salesOrders.reduce((s, o) => s + num(o.amount), 0);
+    const salesOrderIds = new Set(salesOrders.map((o) => o.id));
     const captured = payments.filter((x) => scopedOrderIdSet.has(x.orderId) && orderById.get(x.orderId)?.status !== "CANCELLED").reduce((s, x) => s + num(x.amount), 0);
     const refunded = refunds.filter((x) => scopedOrderIdSet.has(x.orderId) && orderById.get(x.orderId)?.status !== "CANCELLED").reduce((s, x) => s + num(x.amount), 0);
     const adjustmentAmount = adjustments.filter((x) => scopedOrderIdSet.has(x.orderId)).reduce((s, x) => s + num(x.amount), 0);
@@ -561,12 +564,12 @@ export class SalesAnalyticsService {
         if (o.fulfilledAt || (bookingByOrder.get(o.id) ?? []).some((b) => !!b.completedAt)) m.completed++;
         if (o.closedAt) m.closed++;
         if (o.cancelledAt) m.cancelledOrders++;
-        if (o.status !== "CANCELLED") {
+        if (salesOrderIds.has(o.id)) {
           m.salesAmount += num(o.amount);
-          m.capturedRevenue += paymentsByOrder.get(o.id) ?? 0;
-          m.refunds += refundsByOrder.get(o.id) ?? 0;
           m.grossProfit += num(o.amount) - costFor(o);
         }
+        m.capturedRevenue += paymentsByOrder.get(o.id) ?? 0;
+        m.refunds += refundsByOrder.get(o.id) ?? 0;
         m.cancelledBookings += (bookingByOrder.get(o.id) ?? []).filter((b) => !!b.cancelledAt).length;
       }
     }
@@ -600,9 +603,11 @@ export class SalesAnalyticsService {
         row.orders++;
         if ((bookingByOrder.get(o.id) ?? []).some((b) => !!b.confirmedAt)) row.bookings++;
         if (o.fulfilledAt) row.completed++;
-        row.salesAmount += num(o.amount);
+        if (salesOrderIds.has(o.id)) {
+          row.salesAmount += num(o.amount);
+          row.grossProfit += num(o.amount) - costFor(o);
+        }
         row.capturedRevenue += paymentsByOrder.get(o.id) ?? 0;
-        row.grossProfit += num(o.amount) - costFor(o);
       }
       serviceMap.set(t, row);
     }
@@ -618,7 +623,7 @@ export class SalesAnalyticsService {
         if ((bookingByOrder.get(o.id) ?? []).some((b) => !!b.confirmedAt)) row.bookings++;
         if (o.fulfilledAt) row.completed++;
         if (o.closedAt) row.closed++;
-        row.salesAmount += num(o.amount);
+        if (salesOrderIds.has(o.id)) row.salesAmount += num(o.amount);
       }
       sourceMap.set(s, row);
     }
@@ -697,7 +702,7 @@ export class SalesAnalyticsService {
         bookings: bookingsConfirmed.filter((b) => b.confirmedAt && b.confirmedAt >= d && b.confirmedAt < next).length,
         completed: completedOrders.filter((o) => (o.fulfilledAt ?? o.updatedAt) >= d && (o.fulfilledAt ?? o.updatedAt) < next).length,
         closed: closedOrders.filter((o) => o.closedAt && o.closedAt >= d && o.closedAt < next).length,
-        salesAmount: ordersCreated.filter((o) => o.createdAt >= d && o.createdAt < next).reduce((s, o) => s + num(o.amount), 0),
+        salesAmount: salesOrders.filter((o) => o.createdAt >= d && o.createdAt < next).reduce((s, o) => s + num(o.amount), 0),
       };
     });
 
