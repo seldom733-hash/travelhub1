@@ -39,6 +39,7 @@ const KEEP_TABLES = [
   ["security", "Permission"],
   ["security", "Role"],
   ["security", "RolePermission"],
+  ["security", "User"],
   ["geo", "GeoCountry"],
   ["geo", "GeoCity"],
   ["geo", "GeoAirport"],
@@ -51,6 +52,8 @@ const KEEP_TABLES = [
   ["catalog", "ViewType"],
   ["catalog", "HotelCategory"],
   ["catalog", "PlacementType"],
+  ["crm", "Partner"],
+  ["crm", "Supplier"],
   ["finance", "SupplierFxRate"],
   ["finance", "SupplierFxRateHistory"],
 ] as const;
@@ -65,7 +68,7 @@ const TRUNCATE_TABLES = [
   "communication.Communication",
   "constructor.ConstructorPage", "constructor.ConstructorPageAuditLog",
   "constructor.ConstructorPageSection", "constructor.ConstructorPageVersion",
-  "crm.Customer", "crm.CustomerHistory", "crm.Partner", "crm.Supplier",
+  "crm.Customer", "crm.CustomerHistory",
   "decision.DecisionSignal",
   "documents.Document", "documents.DocumentHistory", "documents.DocumentVersion",
   "events.ExternalIdempotencyRecord", "events.InboxEvent", "events.OutboxEvent",
@@ -109,29 +112,9 @@ async function main(): Promise<void> {
   for (const [k, v] of before) console.log(`  ${k}: ${v}`);
 
   // ── 1. TRUNCATE (одним оператором — Postgres сам разрулит порядок FK) ─────
-  //  CASCADE безопасен: доказано, что НИ ОДНА KEEP-таблица не имеет FK на
-  //  обнуляемую (см. проверку FK-графа) — каскад физически не может её тронуть.
-  //  Ниже — вторая страховка: явно дописываем любую таблицу, ссылающуюся на
-  //  security.User (нужно, чтобы DELETE non-admin прошёл без нарушения FK).
-  const userDeps = await prisma.$queryRawUnsafe<{ child_schema: string; child_table: string }[]>(`
-    SELECT DISTINCT kcu.table_schema AS child_schema, kcu.table_name AS child_table
-    FROM information_schema.table_constraints tc
-    JOIN information_schema.key_column_usage kcu
-      ON kcu.constraint_name = tc.constraint_name AND kcu.constraint_schema = tc.constraint_schema
-    JOIN information_schema.constraint_column_usage ccu
-      ON ccu.constraint_name = tc.constraint_name AND ccu.constraint_schema = tc.constraint_schema
-    WHERE tc.constraint_type = 'FOREIGN KEY'
-      AND ccu.table_schema = 'security' AND ccu.table_name = 'User'
-  `);
-
+  //  CASCADE безопасен: KEEP-таблицы (пользователи, поставщики, курсы и
+  //  справочники) не имеют FK на обнуляемые бизнес-таблицы.
   const truncateSet = new Set<string>(TRUNCATE_TABLES);
-  for (const d of userDeps) {
-    const key = `${d.child_schema}.${d.child_table}`;
-    if (KEEP_TABLES.some(([s, t]) => keepKey(s, t) === key)) {
-      throw new Error(`SAFE-STOP: KEEP-таблица ${key} ссылается на security.User — ручная проверка`);
-    }
-    truncateSet.add(key);
-  }
 
   const targets = [...truncateSet]
     .map((f) => {
@@ -143,17 +126,10 @@ async function main(): Promise<void> {
   console.log(`\n=== TRUNCATE ${truncateSet.size} таблиц ===`);
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${targets} CASCADE`);
 
-  // ── 2. Пользователи: оставляем ТОЛЬКО admin ──────────────────────────────
-  const deletedUsers = await prisma.$executeRawUnsafe(
-    `DELETE FROM "security"."User" WHERE "username" <> $1`,
-    KEEP_USER,
-  );
-  console.log(`\n=== Пользователи удалено: ${Number(deletedUsers)} (оставлен ${KEEP_USER}) ===`);
-
-  // ── 3. Счётчики кодов: в 0, кроме USR (admin = USR-00000001) ─────────────
-  await prisma.$executeRawUnsafe(`UPDATE "events"."BusinessSequence" SET "value" = 0`);
+  // ── 2. Счётчики кодов: сбрасываем только бизнес-номера; USR/PRN/SUP
+  //       принадлежат сохранённым пользователям и партнёрам и не трогаются. ──
   await prisma.$executeRawUnsafe(
-    `UPDATE "events"."BusinessSequence" SET "value" = 1 WHERE "prefix" = 'USR'`,
+    `UPDATE "events"."BusinessSequence" SET "value" = 0 WHERE "prefix" IN ('CUS','REQ','ORD','BKG','VCH','PPD','PAY','SBO','SPO')`,
   );
   // Мусорные артефакты concurrency-тестов.
   await prisma.$executeRawUnsafe(
@@ -175,9 +151,9 @@ async function main(): Promise<void> {
   const adminRows = await prisma.$queryRawUnsafe<{ n: bigint }[]>(
     `SELECT count(*)::bigint AS n FROM "security"."User" WHERE "username" = '${KEEP_USER}'`,
   );
-  const usersOk = usersAfter === 1 && Number(adminRows[0].n) === 1;
+  const usersOk = usersAfter === usersBefore && Number(adminRows[0].n) === 1;
   if (!usersOk) failed = true;
-  console.log(`  ${usersOk ? "OK  " : "FAIL"} security.User: ${usersAfter} (admin=${Number(adminRows[0].n)})`);
+  console.log(`  ${usersOk ? "OK  " : "FAIL"} security.User: ${usersAfter} (было ${usersBefore}, admin=${Number(adminRows[0].n)})`);
 
   const empties: string[] = [];
   for (const f of truncateSet) {
@@ -202,7 +178,7 @@ async function main(): Promise<void> {
   if (failed) {
     throw new Error("VERIFICATION FAILED — см. вывод выше");
   }
-  console.log("\nГотово: платформа обнулена, admin и справочники на месте.");
+  console.log("\nГотово: бизнес-данные обнулены, пользователи, поставщики и справочники сохранены.");
 }
 
 main()
