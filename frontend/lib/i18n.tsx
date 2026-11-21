@@ -3041,7 +3041,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   },
   // ── UI-DOC-ADMIN — Documents (admin/operator) ──
   "nav.documents": { ru: "Документы", az: "Sənədlər", en: "Documents" },
-  "nav.request_create": { ru: "Создание запроса", az: "Sorğu yaratma", en: "Create request" },
+  "nav.request_create": { ru: "Создание заявки", az: "Müraciət yaratma", en: "Create request" },
   "nav.dictionaries": { ru: "Справочники", az: "Lüğətlər", en: "Dictionaries" },
   "nav.hotels_reference": { ru: "Отели", az: "Otellər", en: "Hotels" },
   "documents.status.NOT_ISSUED": { ru: "Не сформирован", az: "Hələ formalaşdırılmayıb", en: "Not issued" },

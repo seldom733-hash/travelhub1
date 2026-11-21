@@ -517,7 +517,7 @@ export default function CreateRequestPage() {
 
   return <div className="mx-auto max-w-5xl space-y-4 p-4 lg:p-6">
     <div>
-      <h1 className="text-2xl font-semibold text-ink">{tr("Создание запроса", "Sorğu yaratma", "Create request")}</h1>
+      <h1 className="text-2xl font-semibold text-ink">{tr("Создание заявки", "Müraciət yaratma", "Create request")}</h1>
       <p className="mt-1 text-sm text-ink/60">{tr("Оформите запрос. После создания он появится в Реестре продаж.", "Sorğunu rəsmiləşdirin. Yaradıldıqdan sonra Satış reyestrində görünəcək.", "Create a request. It will appear in the Sales Register after saving.")}</p>
     </div>
 
@@ -647,7 +647,7 @@ export default function CreateRequestPage() {
       </div>
     </section>
 
-    <div className="flex justify-end gap-2 pb-8"><Link href="/app/finance/deals" className="rounded-lg border px-4 py-2 text-sm">{tr("Отмена", "Ləğv et", "Cancel")}</Link><button type="button" disabled={busy} onClick={() => void submit()} className="rounded-lg bg-[#0f6b5f] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? tr("Создание…", "Yaradılır…", "Creating…") : tr("Создать запрос", "Sorğu yarat", "Create request")}</button></div>
+    <div className="flex justify-end gap-2 pb-8"><Link href="/app/finance/deals" className="rounded-lg border px-4 py-2 text-sm">{tr("Отмена", "Ləğv et", "Cancel")}</Link><button type="button" disabled={busy} onClick={() => void submit()} className="rounded-lg bg-[#0f6b5f] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? tr("Создание…", "Yaradılır…", "Creating…") : tr("Создать заявку", "Müraciət yarat", "Create request")}</button></div>
   </div>;
 }
 
