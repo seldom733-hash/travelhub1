@@ -231,8 +231,26 @@ export class DealsService {
     const cancellationIncome = cancelledRows.reduce((total, row) => total + Number(row.cancellationIncome ?? 0), 0);
     const cancellationLoss = cancelledRows.reduce((total, row) => total + Number(row.cancellationLoss ?? 0), 0);
     const writeOffExpense = rows.reduce((total, row) => total + Number(row.writeOffExpense ?? 0), 0);
+    // GMV lifecycle:
+    // expected — all active deals (including unpaid requests);
+    // actual   — active deals having at least one captured client payment;
+    // executed — net cash received (captured payments minus refunds);
+    // lost     — cancelled deal value.
+    const actualRows = activeRows.filter((row) => Number(row.clientReceived) > 0);
+    const actualGmv = actualRows.reduce((total, row) => total + Number(row.salesAmount), 0);
+    // Cash collected on active deals only. Cash retained on cancelled deals is
+    // reported separately from GMV (it is no longer active sales).
+    const executedGmv = activeRows.reduce((total, row) => total + Number(row.clientReceived) - Number(row.clientRefunded), 0);
+    const lostGmv = cancelledRows.reduce((total, row) => total + Number(row.cancelledSalesAmount), 0);
+    const expectedGmv = salesAmount;
+    const potentialGmv = Math.max(0, expectedGmv - actualGmv);
     return {
       salesAmount: fixed(salesAmount),
+      expectedGmv: fixed(expectedGmv),
+      actualGmv: fixed(actualGmv),
+      executedGmv: fixed(executedGmv),
+      lostGmv: fixed(lostGmv),
+      potentialGmv: fixed(potentialGmv),
       costAmount: fixed(costAmount),
       grossMargin: fixed(salesAmount - costAmount),
       clientReceived: fixed(sum("clientReceived")),

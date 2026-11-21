@@ -29,7 +29,7 @@ const KPI: KpiCard[] = [
   { key: "cancellationLoss", label: "Убыток от отмен", icon: "−", tone: "bg-rose-50 text-rose-700" },
   { key: "writeOffExpense", label: "Списания долгов", icon: "×", tone: "bg-amber-50 text-amber-700" },
 ];
-const EMPTY: DealKpi = { salesAmount: "0", costAmount: "0", grossMargin: "0", clientReceived: "0", clientDebt: "0", clientRefunded: "0", supplierPaid: "0", supplierDebt: "0", supplierRefunded: "0", clientPenalty: "0", supplierPenalty: "0", expectedIncome: "0", currentIncome: "0", cancelledSalesAmount: "0", lostIncome: "0", cancellationIncome: "0", cancellationLoss: "0", writeOffExpense: "0", cancelledCount: 0, currency: "AZN", count: 0 };
+const EMPTY: DealKpi = { salesAmount: "0", expectedGmv: "0", actualGmv: "0", executedGmv: "0", lostGmv: "0", potentialGmv: "0", costAmount: "0", grossMargin: "0", clientReceived: "0", clientDebt: "0", clientRefunded: "0", supplierPaid: "0", supplierDebt: "0", supplierRefunded: "0", clientPenalty: "0", supplierPenalty: "0", expectedIncome: "0", currentIncome: "0", cancelledSalesAmount: "0", lostIncome: "0", cancellationIncome: "0", cancellationLoss: "0", writeOffExpense: "0", cancelledCount: 0, currency: "AZN", count: 0 };
 const label: Record<string, string> = {
   NEW: "Новая", CHECKING: "Проверка", SUPPLIER_TIMEOUT: "Поставщик не ответил", PRICE_CHANGED: "Цена изменилась",
   CUSTOMER_ACCEPTED: "Клиент подтвердил", CONFIRMED: "Подтверждён", CONVERTED: "Сконвертирован", REJECTED: "Отклонён",
@@ -109,6 +109,16 @@ export default function DealsPage() {
         <NotificationStrip scope="sales" />
         <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
           {KPI.map((c) => <button key={c.key} type="button" title={c.key === "cancelledSalesAmount" ? "Σ сумма продаж сделок со статусами CANCELLED / CANCELLED_BY_CUSTOMER / SUPPLIER_REJECTED / REJECTED за выбранный период. Не включает возвраты и штрафы — они показаны отдельно." : undefined} onClick={() => c.key === "cancelledSalesAmount" ? setFilter({ statusGroup: query.statusGroup === "cancelled" ? "" : "cancelled", status: "" }) : setModal(c)} className={`flex items-start gap-2 rounded-xl border bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${c.key === "cancelledSalesAmount" && query.statusGroup === "cancelled" ? "border-rose-300 ring-1 ring-rose-200" : "border-[#e5e2da]"}`}><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-semibold ${c.tone}`}>{c.icon}</span><span className="min-w-0"><span className="block truncate text-[10px] font-medium uppercase tracking-wide text-[#667085]">{dealText(locale, c.label)}</span><span className="mt-1 block font-mono text-[16px] font-semibold tabular-nums text-[#101828]">{fmt(String(kpi[c.key] ?? "0"), kpi.currency)}</span></span></button>)}
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {[
+            ["expectedGmv", "Ожидаемое GMV", "border-[#cfe5dc] bg-[#f2faf7] text-[#0f6b5f]"],
+            ["actualGmv", "Фактическое GMV", "border-[#d9e6e1] bg-white text-[#0f6b5f]"],
+            ["potentialGmv", "Потенциал (не оплачено)", "border-[#e5e2da] bg-white text-[#344054]"],
+            ["executedGmv", "Поступило денег", "border-[#cfe5dc] bg-[#eef8f3] text-emerald-700"],
+            ["lostGmv", "Упущенный GMV", "border-rose-200 bg-rose-50 text-rose-700"],
+          ].map(([key, label, tone]) => <div key={key} className={`rounded-xl border p-3 shadow-sm ${tone}`}><div className="text-[10px] font-medium uppercase tracking-wide opacity-70">{dealText(locale, label)}</div><div className="mt-1 font-mono text-[17px] font-semibold tabular-nums">{fmt(String(kpi[key as keyof DealKpi] ?? "0"), kpi.currency)}</div></div>)}
         </div>
 
         {Number(kpi.lostIncome) > 0 && (

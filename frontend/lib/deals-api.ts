@@ -72,6 +72,7 @@ export interface DealRow {
 
 export interface DealKpi {
   salesAmount: string; costAmount: string; grossMargin: string; clientReceived: string; clientDebt: string;
+  expectedGmv: string; actualGmv: string; executedGmv: string; lostGmv: string; potentialGmv: string;
   clientRefunded: string; supplierPaid: string; supplierDebt: string; supplierRefunded: string;
   clientPenalty: string; supplierPenalty: string; expectedIncome: string; currentIncome: string;
   cancelledSalesAmount: string; lostIncome: string;
