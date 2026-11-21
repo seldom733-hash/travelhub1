@@ -65,6 +65,7 @@ type DealRow = {
   bookingCode: string | null;
   bookingStatus: string | null;
   bookingCompletedAt: string | null;
+  bookings: Array<{ id: string; code: string; status: string; serviceDate: string | null; completedAt: string | null }>;
   stage: "REQUEST" | "ORDER" | "BOOKING" | "COMPLETED" | "CLOSED";
   stageLabel: string;
   status: string;
@@ -379,7 +380,7 @@ export class DealsService {
     const resolvedOrderIds = [...new Set([...orderIds, ...orders.map((o) => o.id)])];
     const orderProductIds = [...new Set(orders.flatMap((o) => o.items.map((i) => i.productId)).filter((id): id is string => Boolean(id)))];
     const [bookings, payments, refunds, payouts, obligations, settlements, customers, products, supplierWriteOffs, media, clientWriteOffs] = await Promise.all([
-      this.prisma.booking.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, referenceNumber: true, orderId: true, status: true, completedAt: true, amount: true, currency: true } }),
+      this.prisma.booking.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, referenceNumber: true, orderId: true, status: true, completedAt: true, serviceDate: true, amount: true, currency: true } }),
       this.prisma.payment.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, paymentMethod: true, paidAt: true, createdAt: true, orderId: true } }),
       this.prisma.refund.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, processedAt: true, createdAt: true, orderId: true, paymentId: true } }),
       this.prisma.supplierPayout.findMany({ where: { orderId: { in: resolvedOrderIds } }, select: { id: true, code: true, amount: true, currency: true, status: true, direction: true, occurredAt: true, orderId: true, supplierCode: true, partnerId: true, method: true } }),
@@ -440,6 +441,7 @@ export class DealsService {
     return requests.map((request) => {
       const order = request.convertedOrderId ? orders.find((o) => o.id === request.convertedOrderId) : orderBySequence.get(request.commerceSequence);
       const booking = order ? bookingByOrder.get(order.id) : undefined;
+      const bookingRows = order ? bookings.filter((b) => b.orderId === order.id) : [];
       const customer = request.customerId ? customerById.get(request.customerId) : undefined;
       const product = request.productId ? productById.get(request.productId) : undefined;
       const snapshot = (request.productSnapshot ?? {}) as Record<string, unknown>;
@@ -540,7 +542,11 @@ export class DealsService {
       // settled; it is closed when the service period has already ended.
       // Booking completion itself is a booking-level event (Booking.COMPLETED)
       // and must not be inferred from the deal's financial state.
-      const tourEnded = Boolean(dateTo && new Date(`${String(dateTo).slice(0, 10)}T23:59:59`) < new Date());
+      const tourEnded = Boolean(dateTo && (() => {
+        const raw = String(dateTo);
+        const end = new Date(raw.length <= 10 ? `${raw}T23:59:59` : raw);
+        return !Number.isNaN(end.getTime()) && end < new Date();
+      })());
       const bookingFinished = booking?.status === "COMPLETED";
       if (!isCancelledDeal && bookingFinished && clientDebt <= 0 && supplierDebt <= 0) {
         stage = tourEnded ? "CLOSED" : "COMPLETED";
@@ -592,6 +598,13 @@ export class DealsService {
         bookingCode: booking?.referenceNumber ?? null,
         bookingStatus: booking?.status ?? null,
         bookingCompletedAt: booking?.completedAt ? booking.completedAt.toISOString() : null,
+        bookings: bookingRows.map((b) => ({
+          id: b.id,
+          code: b.referenceNumber ?? b.code,
+          status: b.status,
+          serviceDate: b.serviceDate ? b.serviceDate.toISOString() : null,
+          completedAt: b.completedAt ? b.completedAt.toISOString() : null,
+        })),
         stage,
         stageLabel: cancelled ? "Отменена" : stage === "CLOSED" ? "Закрыта" : stage === "COMPLETED" ? "Завершена" : stage === "BOOKING" ? "Бронь" : stage === "ORDER" ? "Заказ" : "Заявка",
         status,

@@ -145,7 +145,6 @@ export class BookingSubscribers implements OnModuleInit {
 
         // Step 2.11: defensive consistency — каждый копируемый money fact
         // (amount + currency) валиден до записи (Decimal ≥ 0, ≤2dp, ISO 4217).
-        let bookingOrdinal = existing.length;
         for (const item of freeItems) {
           validateFrozenMoneyFact(item.amount, item.currency, "booking money fact");
         }
@@ -176,29 +175,32 @@ export class BookingSubscribers implements OnModuleInit {
         const bornCancelledAt = compensated ? new Date() : null;
 
         for (const item of freeItems) {
-          const code = await this.ids.nextCode(tx, "BKG");
-          bookingOrdinal += 1;
-          // Shared Commerce Sequence: derive Booking ref from Order's commerceSequence.
-          // Multi-item Order: same commerce root must not collide on Booking.referenceNumber
-          // (unique) — ordinal suffix keeps MKT-BKG-{root}-{n} stable per OrderItem.
-          const orderAttempt = /-(\d{1,2})$/.exec(order.referenceNumber ?? "")?.[1] ?? "";
-          let bookingRefNum = order.commerceSequence
-            ? `${this.refNum.commerceBookingRef(order.commerceSequence)}${orderAttempt ? `-${orderAttempt}` : ""}${bookingOrdinal > 1 ? `-${bookingOrdinal - 1}` : ""}`
-            : await this.generateBookingReferenceNumber(tx, order, item);
-          // A returned-to-request Order can be converted again with the same
-          // commerce sequence/attempt; old Booking references are still unique
-          // historical rows. Pick the next free root suffix instead of failing
-          // the whole BookingRequested event on a unique collision.
-          if (order.commerceSequence) {
-            const root = this.refNum.commerceBookingRef(order.commerceSequence);
-            let suffix = 0;
+          // Canonical booking number: common deal root + service ordinal
+          // (S1, S2, …). Re-bookings keep the root and add an attempt suffix
+          // (R2, R3, …), so historical bookings never reuse a number.
+          const serviceOrdinal = Math.max(1, order.items.findIndex((row) => row.id === item.id) + 1);
+          const orderAttemptMatch = /-(\d{1,2})$/.exec(order.referenceNumber ?? "");
+          const orderAttempt = orderAttemptMatch ? Number(orderAttemptMatch[1]) : 0;
+          const priorAttempts = existing.filter((row) => row.orderItemId === item.id).length;
+          const attempt = Math.max(orderAttempt + 1, priorAttempts + 1);
+          const root = order.commerceSequence ? this.refNum.commerceBookingRef(order.commerceSequence) : null;
+          let bookingRefNum: string;
+          let code: string;
+          if (root) {
+            const base = `${root}-S${serviceOrdinal}`;
+            let revision = attempt;
+            bookingRefNum = revision > 1 ? `${base}-R${revision}` : base;
             while (await tx.booking.findUnique({
               where: { referenceNumber: bookingRefNum },
               select: { id: true },
             })) {
-              suffix += 1;
-              bookingRefNum = `${root}-${suffix}`;
+              revision += 1;
+              bookingRefNum = `${base}-R${revision}`;
             }
+            code = bookingRefNum;
+          } else {
+            code = await this.ids.nextCode(tx, "BKG");
+            bookingRefNum = await this.generateBookingReferenceNumber(tx, order, item);
           }
           // Step 2.8: canonical cardinality 1 OrderItem → 1 Booking. orderItemId
           // (частичный unique — status <> CANCELLED AND rejectedAt IS NULL,

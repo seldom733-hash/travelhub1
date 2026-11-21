@@ -349,6 +349,9 @@ const AZ: Record<string, string> = {
   "Закрыта": "Bağlanıb",
   "Завершена": "Tamamlanıb",
   "Сделка завершена": "Sövdə tamamlandı",
+  "Брони по услугам": "Xidmətlər üzrə bronlar",
+  "Статус брони": "Bron statusu",
+  "Дата завершения": "Tamamlanma tarixi",
   "Сделка закрыта": "Sövdə bağlandı",
 };
 
@@ -696,6 +699,9 @@ const EN: Record<string, string> = {
   "Закрыта": "Closed",
   "Завершена": "Completed",
   "Сделка завершена": "Deal completed",
+  "Брони по услугам": "Bookings by service",
+  "Статус брони": "Booking status",
+  "Дата завершения": "Completion date",
   "Сделка закрыта": "Deal closed",
 };
 
