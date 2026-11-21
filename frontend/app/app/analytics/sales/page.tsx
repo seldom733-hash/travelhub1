@@ -313,10 +313,6 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
               <div className="rounded-lg border border-rose-200 bg-white p-3"><div className="text-[10px] uppercase tracking-wide text-ink/60">{L("Отменённые заказы")}</div><div className="mt-1 font-mono text-xl font-semibold text-rose-700">{kpis.cancelledOrders?.value ?? 0}</div></div>
               <div className="rounded-lg border border-rose-200 bg-white p-3"><div className="text-[10px] uppercase tracking-wide text-ink/60">{L("Отменённые брони")}</div><div className="mt-1 font-mono text-xl font-semibold text-rose-700">{kpis.cancelledBookings?.value ?? 0}</div></div>
             </div>
-            <div className="mt-3">
-              <div className="mb-1 text-[11px] font-semibold text-rose-800">{L("Причины потерь заявок")}</div>
-              {(data.lossReasons ?? []).length === 0 ? <div className="text-[11px] text-rose-700/60">{L("Потерь за период нет")}</div> : (data.lossReasons ?? []).map((r: any) => <div key={r.reason} className="flex justify-between border-t border-rose-100 py-1 text-[11px] text-rose-900/80"><span>{saLossReason(locale, String(r.reason))}</span><b>{r.count}</b></div>)}
-            </div>
           </div>
         </div>}
 
