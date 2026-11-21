@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { useLocale, type Locale } from "@/lib/i18n";
 import { saStatus, saText } from "@/lib/sales-analytics-i18n";
@@ -70,6 +71,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
   const [activityFilter, setActivityFilter] = useState("all");
   const [drill, setDrill] = useState<any>(null);
   const [drillLoading, setDrillLoading] = useState("");
+  const [dailyView, setDailyView] = useState<"chart" | "table">("chart");
   const [financeKpi, setFinanceKpi] = useState<any>(null);
 
   useEffect(() => {
@@ -263,8 +265,31 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
             <div className="rounded-xl border bg-white p-3 lg:col-span-2"><div className="mb-2 text-xs font-semibold">{L("Динамика заявок и заказов")}</div><div className="flex h-28 items-end gap-1">{(data.series ?? []).slice(-30).map((r: any) => <div key={r.date} className="flex flex-1 flex-col items-center justify-end gap-0.5" title={`${r.date}: заявки ${r.requests}, заказы ${r.orders}`}><div className="w-2 rounded-t bg-[#0f6b5f]" style={{ height: `${Math.max(2, (r.requests / Math.max(1, ...(data.series ?? []).map((x: any) => x.requests))) * 100)}%` }} /><div className="w-2 rounded-t bg-amber-400" style={{ height: `${Math.max(2, (r.orders / Math.max(1, ...(data.series ?? []).map((x: any) => x.orders))) * 100)}%` }} /></div>)}</div><div className="mt-1 flex gap-3 text-[9px] text-ink/60"><span>■ {L("Заявки")}</span><span className="text-amber-500">■ {L("Заказы")}</span></div></div>
           </div>
           <div className="mt-3 rounded-xl border border-[#e5e2da] bg-white p-3">
-            <div className="mb-2 text-xs font-semibold">{L("Динамика по дням")}</div>
-            <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-[11px]"><thead className="text-ink/60"><tr>{["Дата", "Заявки", "Заказы", "Брони", "Завершено", "Закрыто", "Продажи"].map((h) => <th key={h} className="px-2 py-1 font-medium">{L(h)}</th>)}</tr></thead><tbody>{(data.series ?? []).slice(-30).map((r: any) => <tr key={r.date} className="border-t border-line"><td className="px-2 py-1">{r.date}</td><td className="px-2 py-1">{r.requests}</td><td className="px-2 py-1">{r.orders}</td><td className="px-2 py-1">{r.bookings}</td><td className="px-2 py-1">{r.completed}</td><td className="px-2 py-1">{r.closed}</td><td className="px-2 py-1">{money(r.salesAmount)}</td></tr>)}</tbody></table></div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs font-semibold">{L("Динамика по дням")}</div>
+              <div className="flex rounded-lg border border-[#e5e2da] p-0.5 text-[11px]">
+                <button type="button" onClick={() => setDailyView("chart")} className={`rounded px-2 py-1 ${dailyView === "chart" ? "bg-[#0f6b5f] text-white" : "text-ink/60"}`}>{L("График")}</button>
+                <button type="button" onClick={() => setDailyView("table")} className={`rounded px-2 py-1 ${dailyView === "table" ? "bg-[#0f6b5f] text-white" : "text-ink/60"}`}>{L("Таблица")}</button>
+              </div>
+            </div>
+            {dailyView === "chart" ? (
+              <div className="h-[320px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={(data.series ?? []).slice(-30)} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ece9e2" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} minTickGap={18} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={32} />
+                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, borderColor: "#e5e2da" }} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Line type="monotone" dataKey="requests" name={L("Заявки")} stroke="#2f80ed" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="orders" name={L("Заказы")} stroke="#0f6b5f" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="bookings" name={L("Брони")} stroke="#d97706" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-[11px]"><thead className="text-ink/60"><tr>{["Дата", "Заявки", "Заказы", "Брони", "Завершено", "Закрыто", "Продажи"].map((h) => <th key={h} className="px-2 py-1 font-medium">{L(h)}</th>)}</tr></thead><tbody>{(data.series ?? []).slice(-30).map((r: any) => <tr key={r.date} className="border-t border-line"><td className="px-2 py-1">{r.date}</td><td className="px-2 py-1">{r.requests}</td><td className="px-2 py-1">{r.orders}</td><td className="px-2 py-1">{r.bookings}</td><td className="px-2 py-1">{r.completed}</td><td className="px-2 py-1">{r.closed}</td><td className="px-2 py-1">{money(r.salesAmount)}</td></tr>)}</tbody></table></div>
+            )}
           </div>
         </>}
 
