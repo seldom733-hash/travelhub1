@@ -695,8 +695,9 @@ export class SalesAnalyticsService {
     const series = Array.from({ length: Math.min(days, 90) }, (_, i) => {
       const d = addDays(new Date(p.start), i);
       const next = addDays(d, 1);
+      const dayParts = tzParts(d, p.timezone);
       return {
-        date: d.toISOString().slice(0, 10),
+        date: `${dayParts.y}-${String(dayParts.m).padStart(2, "0")}-${String(dayParts.d).padStart(2, "0")}`,
         requests: requests.filter((r) => r.createdAt >= d && r.createdAt < next).length,
         orders: ordersCreated.filter((o) => o.createdAt >= d && o.createdAt < next).length,
         bookings: bookingsConfirmed.filter((b) => b.confirmedAt && b.confirmedAt >= d && b.confirmedAt < next).length,
