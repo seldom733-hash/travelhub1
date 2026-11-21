@@ -347,6 +347,9 @@ const AZ: Record<string, string> = {
   "Отменена": "Ləğv edilib",
   "Выполнена": "İcra edilib",
   "Закрыта": "Bağlanıb",
+  "Завершена": "Tamamlanıb",
+  "Сделка завершена": "Sövdə tamamlandı",
+  "Сделка закрыта": "Sövdə bağlandı",
 };
 
 const EN: Record<string, string> = {
@@ -691,6 +694,9 @@ const EN: Record<string, string> = {
   "Отменена": "Cancelled",
   "Выполнена": "Fulfilled",
   "Закрыта": "Closed",
+  "Завершена": "Completed",
+  "Сделка завершена": "Deal completed",
+  "Сделка закрыта": "Deal closed",
 };
 
 export const DEAL_STATUS: Record<string, { az: string; en: string }> = {

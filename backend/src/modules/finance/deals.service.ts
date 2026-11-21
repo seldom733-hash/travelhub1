@@ -65,7 +65,7 @@ type DealRow = {
   bookingCode: string | null;
   bookingStatus: string | null;
   bookingCompletedAt: string | null;
-  stage: "REQUEST" | "ORDER" | "BOOKING";
+  stage: "REQUEST" | "ORDER" | "BOOKING" | "COMPLETED" | "CLOSED";
   stageLabel: string;
   status: string;
   orderStatus: string | null;
@@ -487,8 +487,8 @@ export class DealsService {
       const returnedToRequest = order?.status === "CANCELLED" && request.status !== "CONVERTED" && !["CANCELLED_BY_CUSTOMER", "REJECTED", "UNAVAILABLE", "EXPIRED"].includes(request.status);
       const activeBooking = booking && !["CANCELLED", "COMPLETED", "SUPPLIER_REJECTED"].includes(booking.status) ? booking : null;
       // Stage is the deepest existing entity in the commerce chain. A completed
-      // booking must still read as BOOKING, not fall back to ORDER/REQUEST.
-      const stage = returnedToRequest ? "REQUEST" : booking ? "BOOKING" : order ? "ORDER" : "REQUEST";
+      // booking must still read as BOOKING until the deal's finances are closed.
+      let stage: "REQUEST" | "ORDER" | "BOOKING" | "COMPLETED" | "CLOSED" = returnedToRequest ? "REQUEST" : booking ? "BOOKING" : order ? "ORDER" : "REQUEST";
       const status = returnedToRequest ? request.status : booking?.status ?? order?.status ?? request.status;
       const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(status);
       const cancelledForDebt = order?.status === "CANCELLED" || Boolean(order?.cancelledAt && !order?.returnedToRequestAt);
@@ -536,6 +536,13 @@ export class DealsService {
       const dateTo = typeof pinnedTrip.dateTo === "string"
         ? pinnedTrip.dateTo
         : dateFrom && nights ? new Date(new Date(dateFrom).getTime() + nights * 86400000).toISOString() : null;
+      // The deal is completed only when both customer and supplier finances are
+      // settled; it is closed when the service period has already ended.
+      const tourEnded = Boolean(dateTo && new Date(`${String(dateTo).slice(0, 10)}T23:59:59`) < new Date());
+      if (!isCancelledDeal && stage === "BOOKING" && clientDebt <= 0 && supplierDebt <= 0) {
+        stage = tourEnded ? "CLOSED" : "COMPLETED";
+      }
+      if (order?.status === "CLOSED") stage = "CLOSED";
       const adults = Number(attrs.adults ?? 0) || null;
       const children = Number(attrs.children ?? 0) || null;
       const channel = request.sourceChannel ?? (commercial.priceSource === "PUBLIC" ? "Сайт (универсальный поиск)" : String(commercial.priceSource ?? "Ручное создание"));
@@ -583,7 +590,7 @@ export class DealsService {
         bookingStatus: booking?.status ?? null,
         bookingCompletedAt: booking?.completedAt ? booking.completedAt.toISOString() : null,
         stage,
-        stageLabel: cancelled ? "Отменена" : stage === "BOOKING" ? "Бронь" : stage === "ORDER" ? "Заказ" : "Заявка",
+        stageLabel: cancelled ? "Отменена" : stage === "CLOSED" ? "Закрыта" : stage === "COMPLETED" ? "Завершена" : stage === "BOOKING" ? "Бронь" : stage === "ORDER" ? "Заказ" : "Заявка",
         status,
         orderStatus: order?.status ?? null,
         statusLabel: status,
