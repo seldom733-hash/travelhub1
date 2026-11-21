@@ -197,8 +197,27 @@ export class SalesAnalyticsService {
       "proposalsSent", "lostRequests", "overdueRequests",
     ]);
     let rows: any[] = [];
-    if (requestMetrics.has(metric)) rows = data.activity ?? [];
-    else if (metric === "ordersCreated") {
+    if (requestMetrics.has(metric)) {
+      const activity = data.activity ?? [];
+      if (metric === "requestsTotal") rows = activity;
+      else if (metric === "assigned") rows = activity.filter((r: any) => !!r.assignedAt);
+      else if (metric === "accepted") rows = activity.filter((r: any) => !!r.processingStartedAt);
+      else if (metric === "inWork") rows = activity.filter((r: any) => !TERMINAL_REQUEST.includes(r.status));
+      else if (metric === "noFirstResponse") rows = activity.filter((r: any) => !r.firstContactAt && !TERMINAL_REQUEST.includes(r.status));
+      else if (metric === "proposalsSent") rows = activity.filter((r: any) => !!r.proposalSent);
+      else if (metric === "lostRequests") rows = activity.filter((r: any) => ["REJECTED", "UNAVAILABLE", "EXPIRED", "CUSTOMER_PAYMENT_TIMEOUT", "CANCELLED_BY_CUSTOMER"].includes(r.status));
+      else if (metric === "overdueRequests") rows = activity.filter((r: any) => !!r.overdue);
+      else if (metric === "slaCompliance") rows = activity.filter((r: any) => r.slaCompliant === true);
+      else rows = activity;
+    } else if (metric === "conversionRequestOrder") {
+      rows = (data.activity ?? []).filter((r: any) => !!r.orderCode);
+    } else if (metric === "conversionOrderBooking" || metric === "conversionRequestBooking") {
+      rows = (data.activity ?? []).filter((r: any) => !!r.bookingCode);
+    } else if (metric === "conversionRequestCompleted") {
+      rows = (data.orders ?? []).filter((r: any) => !!r.fulfilledAt);
+    } else if (metric === "conversionRequestClosed") {
+      rows = (data.orders ?? []).filter((r: any) => !!r.closedAt);
+    } else if (metric === "ordersCreated") {
       rows = data.orders ?? [];
     } else if (metric === "cancelledOrders") {
       rows = (data.orders ?? []).filter((r: any) => r.status === "CANCELLED");
