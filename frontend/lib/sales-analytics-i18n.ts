@@ -216,3 +216,19 @@ export function saStatus(locale: Locale, status: string): string {
   if (locale === "en") return STATUS_EN[status] ?? status;
   return STATUS_RU[status] ?? status;
 }
+
+const LOSS_REASON: Record<string, Record<Locale, string>> = {
+  CUSTOMER_FAULT: { ru: "Вина клиента", az: "Müştərinin günahı", en: "Customer fault" },
+  SUPPLIER_FAULT: { ru: "Вина поставщика", az: "Təchizatçının günahı", en: "Supplier fault" },
+  NAVITRAVEL_FAULT: { ru: "Вина Navitravel", az: "Navitravel-in günahı", en: "Navitravel fault" },
+  FORCE_MAJEURE: { ru: "Форс-мажор", az: "Fors-major", en: "Force majeure" },
+  MUTUAL_AGREEMENT: { ru: "Взаимное соглашение", az: "Qarşılıqlı razılaşma", en: "Mutual agreement" },
+  CUSTOMER_REFUSED_NEW_TERMS: { ru: "Клиент отказался от новых условий", az: "Müştəri yeni şərtlərdən imtina etdi", en: "Customer refused new terms" },
+  "Клиент отказался от новых условий": { ru: "Клиент отказался от новых условий", az: "Müştəri yeni şərtlərdən imtina etdi", en: "Customer refused new terms" },
+};
+
+export function saLossReason(locale: Locale, reason: string): string {
+  const status = saStatus(locale, reason);
+  if (status !== reason) return status;
+  return LOSS_REASON[reason]?.[locale] ?? reason;
+}

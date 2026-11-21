@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { useLocale, type Locale } from "@/lib/i18n";
-import { saStatus, saText } from "@/lib/sales-analytics-i18n";
+import { saLossReason, saStatus, saText } from "@/lib/sales-analytics-i18n";
 
 const PRESETS: Array<[string, string]> = [
   ["TODAY", "Сегодня"], ["YESTERDAY", "Вчера"], ["LAST_7_DAYS", "Последние 7 дней"],
@@ -258,7 +258,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
           </div>
           {(data.reconciliation?.issues ?? []).length > 0 && <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px]"><div className="mb-1 font-semibold text-amber-800">Расхождения</div>{(data.reconciliation.issues ?? []).slice(0, 20).map((x: any, i: number) => <div key={i} className="flex justify-between border-t border-amber-100 py-1"><span className="font-mono">{x.orderCode}</span><span>{x.kind}</span><b>{money(x.amount)}</b></div>)}</div>}
           <div className="mt-3 grid gap-3 lg:grid-cols-3">
-            <div className="rounded-xl border bg-white p-3"><div className="mb-2 text-xs font-semibold">{L("Причины потерь")}</div>{(data.lossReasons ?? []).length === 0 ? <div className="text-[11px] text-ink/60">{L("Потерь за период нет")}</div> : (data.lossReasons ?? []).map((r: any) => <div key={r.reason} className="flex justify-between border-t border-line py-1 text-[11px]"><span className="truncate text-ink/60">{r.reason}</span><b>{r.count}</b></div>)}</div>
+            <div className="rounded-xl border bg-white p-3"><div className="mb-2 text-xs font-semibold">{L("Причины потерь")}</div>{(data.lossReasons ?? []).length === 0 ? <div className="text-[11px] text-ink/60">{L("Потерь за период нет")}</div> : (data.lossReasons ?? []).map((r: any) => <div key={r.reason} className="flex justify-between border-t border-line py-1 text-[11px]"><span className="truncate text-ink/60">{saLossReason(locale, String(r.reason))}</span><b>{r.count}</b></div>)}</div>
             <div className="rounded-xl border bg-white p-3 lg:col-span-2"><div className="mb-2 text-xs font-semibold">{L("Динамика заявок и заказов")}</div><div className="flex h-28 items-end gap-1">{(data.series ?? []).slice(-30).map((r: any) => <div key={r.date} className="flex flex-1 flex-col items-center justify-end gap-0.5" title={`${r.date}: заявки ${r.requests}, заказы ${r.orders}`}><div className="w-2 rounded-t bg-[#0f6b5f]" style={{ height: `${Math.max(2, (r.requests / Math.max(1, ...(data.series ?? []).map((x: any) => x.requests))) * 100)}%` }} /><div className="w-2 rounded-t bg-amber-400" style={{ height: `${Math.max(2, (r.orders / Math.max(1, ...(data.series ?? []).map((x: any) => x.orders))) * 100)}%` }} /></div>)}</div><div className="mt-1 flex gap-3 text-[9px] text-ink/60"><span>■ {L("Заявки")}</span><span className="text-amber-500">■ {L("Заказы")}</span></div></div>
           </div>
           <div className="mt-3 rounded-xl border border-[#e5e2da] bg-white p-3">
