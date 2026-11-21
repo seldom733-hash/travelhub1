@@ -42,6 +42,12 @@ export class DealsController {
     return this.deals.list({ ...queryFrom(query), viewerId: user.id });
   }
 
+  @Get("decision-context")
+  @RequirePermissions("finance.overview.read")
+  decisionContext() {
+    return this.deals.decisionContext();
+  }
+
   @Get("suppliers")
   @RequirePermissions("finance.overview.read")
   suppliers(@Query() query: Record<string, string | undefined>) {

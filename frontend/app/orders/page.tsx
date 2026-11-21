@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Step 1.6 §9: legacy internal route → canonical /app/* (страница сохранена в /app/orders). */
-export default function LegacyOrdersRedirect() {
-  redirect("/app/orders");
+/** Operations Center registry retired; the canonical registry is Sales Register. */
+export default function RetiredOperationsPage() {
+  redirect("/app/finance/deals");
 }

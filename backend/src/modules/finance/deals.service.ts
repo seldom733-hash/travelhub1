@@ -201,6 +201,52 @@ export class DealsService {
     };
   }
 
+  async decisionContext() {
+    const now = new Date();
+    const terminal = ["REJECTED", "UNAVAILABLE", "EXPIRED", "CUSTOMER_PAYMENT_TIMEOUT", "CANCELLED_BY_CUSTOMER", "CONVERTED"];
+    const [pendingApprovals, noFirstResponse, overdueRequests, waitingCustomer, waitingSupplier, awaitingConfirmation, readyForBooking, problemBookings, recentDecisions, rows] = await Promise.all([
+      this.prisma.cancellationApproval.count({ where: { status: "PENDING" } }),
+      this.prisma.request.count({ where: { firstContactAt: null, status: { notIn: terminal as any } } }),
+      this.prisma.request.count({ where: { slaDueAt: { lt: now }, status: { notIn: terminal as any } } }),
+      this.prisma.request.count({ where: { customerAcceptedAt: null, status: { in: ["PRICE_CHANGED", "CONFIRMED"] as any } } }),
+      this.prisma.request.count({ where: { supplierRespondedAt: null, status: { in: ["NEW", "CHECKING"] as any } } }),
+      this.prisma.booking.count({ where: { status: { in: ["SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION"] as any } } }),
+      this.prisma.order.count({ where: { status: "READY_FOR_BOOKING" as any } }),
+      this.prisma.booking.count({ where: { status: "PROBLEM" as any } }),
+      this.prisma.auditLog.findMany({
+        where: { action: { in: ["requestCancellation", "approveCancellation", "rejectCancellation", "cancel", "close", "refund"] } },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: { id: true, username: true, action: true, resource: true, resourceId: true, createdAt: true },
+      }),
+      this.loadRows(),
+    ]);
+    const active = rows.filter((r) => !r.isCancelledDeal);
+    const negative = active.filter((r) => Number(r.grossMargin) < 0);
+    const lowMargin = active.filter((r) => Number(r.grossMargin) >= 0 && Number(r.salesAmount) > 0 && Number(r.grossMargin) / Number(r.salesAmount) < 0.05);
+    const missingCost = active.filter((r) => Number(r.costAmount) <= 0);
+    return {
+      approvals: { pending: pendingApprovals },
+      bottlenecks: {
+        noFirstResponse,
+        overdueRequests,
+        waitingCustomer,
+        waitingSupplier,
+        awaitingConfirmation,
+        readyForBooking,
+        problemBookings,
+      },
+      margin: {
+        negativeCount: negative.length,
+        lowMarginCount: lowMargin.length,
+        missingCostCount: missingCost.length,
+        negativeAmount: fixed(negative.reduce((s, r) => s + Number(r.grossMargin), 0)),
+        examples: negative.slice(0, 5).map((r) => ({ sequence: r.sequence, orderCode: r.orderCode, customerName: r.customerName, salesAmount: r.salesAmount, grossMargin: r.grossMargin })),
+      },
+      recentDecisions: recentDecisions.map((d) => ({ ...d, createdAt: d.createdAt.toISOString() })),
+    };
+  }
+
   async summary(query: DealQuery) {
     const all = await this.loadRows();
     return this.kpi(this.filter(all, query));

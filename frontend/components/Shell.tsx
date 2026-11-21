@@ -42,7 +42,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/app/dashboard", icon: "🏠", labelKey: "nav.dashboard" },
       { href: "/app/command-center", icon: "📊", labelKey: "nav.command_center", permission: "analytics.read" },
       { href: "/app/analytics/sales", icon: "📉", labelKey: "nav.sales_analytics", permission: "sales.kpi.read" },
-      { href: "/app/bookings", icon: "📅", labelKey: "nav.bookings", permission: "booking.read" },
     ],
   },
   {
@@ -50,7 +49,6 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/app/requests/create", icon: "➕", labelKey: "nav.request_create", permission: "order.edit_noncritical" },
       { href: "/app/finance/deals", icon: "📊", labelKey: "nav.finance_deals", permission: "finance.overview.read" },
-      { href: "/app/documents", icon: "📄", labelKey: "nav.documents", permission: "documents.read" },
     ],
   },
   {

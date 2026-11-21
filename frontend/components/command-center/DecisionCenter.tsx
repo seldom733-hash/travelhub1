@@ -142,6 +142,34 @@ const COPY: Record<Locale, Copy> = {
   },
 };
 
+
+const EXTRA: Record<Locale, Record<string, string>> = {
+  ru: {
+    approvals: "Согласования", pendingApprovals: "Ожидают решения", noApprovals: "Нет ожидающих согласований",
+    bottlenecks: "Операционные узкие места", noFirstResponse: "Без первого ответа", overdueRequests: "Просроченные заявки",
+    waitingCustomer: "Ожидают клиента", waitingSupplier: "Ожидают поставщика", awaitingConfirmation: "Брони без подтверждения",
+    readyForBooking: "Готовы к брони, не отправлены", problemBookings: "Проблемные брони",
+    marginRisks: "Риски маржи", negativeMargin: "Отрицательная маржа", lowMargin: "Маржа ниже 5%", missingCost: "Без себестоимости",
+    noMarginRisks: "Рисков маржи нет", journal: "Журнал решений", noDecisions: "Решений пока нет",
+  },
+  az: {
+    approvals: "Təsdiqlər", pendingApprovals: "Qərar gözləyir", noApprovals: "Gözləyən təsdiq yoxdur",
+    bottlenecks: "Əməliyyat darboğazları", noFirstResponse: "İlk cavabsız", overdueRequests: "Gecikmiş müraciətlər",
+    waitingCustomer: "Müştəri gözləyir", waitingSupplier: "Təchizatçı gözləyir", awaitingConfirmation: "Təsdiqsiz rezervasiyalar",
+    readyForBooking: "Rezervasiyaya hazır, göndərilməyib", problemBookings: "Problemli rezervasiyalar",
+    marginRisks: "Marja riskləri", negativeMargin: "Mənfi marja", lowMargin: "Marja 5%-dən aşağı", missingCost: "Maya dəyəri yoxdur",
+    noMarginRisks: "Marja riski yoxdur", journal: "Qərarlar jurnalı", noDecisions: "Hələ qərar yoxdur",
+  },
+  en: {
+    approvals: "Approvals", pendingApprovals: "Pending decisions", noApprovals: "No pending approvals",
+    bottlenecks: "Operational bottlenecks", noFirstResponse: "No first response", overdueRequests: "Overdue requests",
+    waitingCustomer: "Waiting for customer", waitingSupplier: "Waiting for supplier", awaitingConfirmation: "Awaiting confirmation",
+    readyForBooking: "Ready for booking, not sent", problemBookings: "Problem bookings",
+    marginRisks: "Margin risks", negativeMargin: "Negative margin", lowMargin: "Margin below 5%", missingCost: "Missing cost",
+    noMarginRisks: "No margin risks", journal: "Decision log", noDecisions: "No decisions yet",
+  },
+};
+
 const PRESET_QUERY = "preset=CURRENT_MONTH&timezone=Asia%2FBaku";
 
 function num(v: unknown): number {
@@ -152,8 +180,10 @@ function num(v: unknown): number {
 export function DecisionCenter() {
   const locale = useLocale();
   const c = COPY[locale] ?? COPY.ru;
+  const x = EXTRA[locale] ?? EXTRA.ru;
   const [data, setData] = useState<any>(null);
   const [finance, setFinance] = useState<any>(null);
+  const [context, setContext] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -171,6 +201,8 @@ export function DecisionCenter() {
         if (start && end) {
           const deals = await api.get<any>(`/finance/deals?pageSize=1&dateFrom=${start}&dateTo=${end}`);
           if (alive) setFinance(deals.kpi ?? null);
+          const ctx = await api.get<any>("/finance/deals/decision-context");
+          if (alive) setContext(ctx);
         }
       } catch (e) {
         if (alive) setError((e as Error).message || c.error);
@@ -321,6 +353,68 @@ export function DecisionCenter() {
                   <span className="font-mono">{x.orderCode}</span>
                   <span className="truncate">{saReconciliationKind(locale, String(x.kind))}</span>
                   <b className="font-mono">{view.money(x.amount)}</b>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <section className="rounded-xl border border-[#e5e2da] bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-semibold">{x.approvals}</h2>
+          <div className="rounded-lg border border-[#ece9e2] p-3">
+            <div className="text-[10px] uppercase tracking-wide text-ink/50">{x.pendingApprovals}</div>
+            <div className="mt-1 font-mono text-2xl font-semibold">{context?.approvals?.pending ?? 0}</div>
+          </div>
+          {(context?.approvals?.pending ?? 0) === 0 && <div className="mt-2 text-[11px] text-ink/50">{x.noApprovals}</div>}
+        </section>
+
+        <section className="rounded-xl border border-[#e5e2da] bg-white p-4 shadow-sm lg:col-span-2">
+          <h2 className="mb-3 text-sm font-semibold">{x.bottlenecks}</h2>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              [x.noFirstResponse, context?.bottlenecks?.noFirstResponse],
+              [x.overdueRequests, context?.bottlenecks?.overdueRequests],
+              [x.waitingCustomer, context?.bottlenecks?.waitingCustomer],
+              [x.waitingSupplier, context?.bottlenecks?.waitingSupplier],
+              [x.awaitingConfirmation, context?.bottlenecks?.awaitingConfirmation],
+              [x.readyForBooking, context?.bottlenecks?.readyForBooking],
+              [x.problemBookings, context?.bottlenecks?.problemBookings],
+            ].map(([label, value]) => (
+              <div key={String(label)} className="flex items-center justify-between rounded-lg border border-[#ece9e2] px-3 py-2 text-xs">
+                <span className="text-ink/60">{label}</span><b className="font-mono">{num(value)}</b>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <section className="rounded-xl border border-[#e5e2da] bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-semibold">{x.marginRisks}</h2>
+          <div className="space-y-1.5">
+            {[
+              [x.negativeMargin, context?.margin?.negativeCount],
+              [x.lowMargin, context?.margin?.lowMarginCount],
+              [x.missingCost, context?.margin?.missingCostCount],
+            ].map(([label, value]) => (
+              <div key={String(label)} className="flex items-center justify-between border-t border-[#f0eee8] py-1.5 text-xs">
+                <span className="text-ink/60">{label}</span><b className="font-mono">{num(value)}</b>
+              </div>
+            ))}
+          </div>
+          {num(context?.margin?.negativeCount) + num(context?.margin?.lowMarginCount) + num(context?.margin?.missingCostCount) === 0 && <div className="mt-2 text-[11px] text-ink/50">{x.noMarginRisks}</div>}
+        </section>
+
+        <section className="rounded-xl border border-[#e5e2da] bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-semibold">{x.journal}</h2>
+          {(context?.recentDecisions ?? []).length === 0 ? <div className="text-[11px] text-ink/50">{x.noDecisions}</div> : (
+            <div className="space-y-1.5">
+              {(context.recentDecisions ?? []).slice(0, 8).map((d: any) => (
+                <div key={d.id} className="flex items-center justify-between gap-2 border-t border-[#f0eee8] py-1.5 text-[11px]">
+                  <span className="truncate">{d.action} · {d.username ?? "—"}</span>
+                  <span className="shrink-0 text-ink/50">{new Date(d.createdAt).toLocaleDateString(locale === "az" ? "az-AZ" : locale === "en" ? "en-GB" : "ru-RU")}</span>
                 </div>
               ))}
             </div>
