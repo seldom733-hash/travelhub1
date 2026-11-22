@@ -311,10 +311,17 @@ export default function MarkupAdminPage() {
     });
   }, [rows, serviceFilter, supplierFilter, search, countries, locale]);
 
+  const refreshCountries = () => {
+    void api.get<CountryOption[] | { value: CountryOption[] }>("/geo/directory")
+      .then((geo) => setCountries(Array.isArray(geo) ? geo : (geo.value ?? [])))
+      .catch(() => undefined);
+  };
+
   const openRow = (row: PricingRow) => {
     if (!canManage) return;
     setError("");
     setCountrySearch("");
+    refreshCountries();
     setForm({
       key: row.key,
       supplierCode: row.supplierCode,
@@ -414,7 +421,7 @@ export default function MarkupAdminPage() {
               {tr("Обновить")}
             </button>
             {canManage && (
-              <button type="button" onClick={() => { setCountrySearch(""); setForm({ ...EMPTY }); }} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+              <button type="button" onClick={() => { setCountrySearch(""); refreshCountries(); setForm({ ...EMPTY }); }} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
                 + {tr("Добавить правило")}
               </button>
             )}
