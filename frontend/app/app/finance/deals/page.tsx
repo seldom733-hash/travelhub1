@@ -39,13 +39,14 @@ export default function DealsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [periodOpen, setPeriodOpen] = useState(false);
   const searchParams = useSearchParams();
-  const [query, setQuery] = useState({ search: "", stage: "", status: "", statusGroup: searchParams.get("statusGroup") ?? "", cancellationReason: "", settlementStatus: "", scope: "", state: "", financialStatus: "", clientPayment: searchParams.get("clientPayment") ?? "", supplierPayment: "", serviceType: "", dateField: "createdAt", dateFrom: "", dateTo: "", supplierId: "", country: "", manager: "", sortBy: "createdAt", sortDirection: "desc" });
+  const [query, setQuery] = useState({ search: "", stage: "", status: "", statusGroup: searchParams.get("statusGroup") ?? "", marginRisk: searchParams.get("marginRisk") ?? "", cancellationReason: "", settlementStatus: "", scope: "", state: "", financialStatus: "", clientPayment: searchParams.get("clientPayment") ?? "", supplierPayment: "", serviceType: "", dateField: "createdAt", dateFrom: "", dateTo: "", supplierId: "", country: "", manager: "", sortBy: "createdAt", sortDirection: "desc" });
   useEffect(() => {
     const statusGroup = searchParams.get("statusGroup") ?? "";
     const clientPayment = searchParams.get("clientPayment") ?? "";
     const hasClientDebt = searchParams.get("hasClientDebt") ?? "";
-    if (!statusGroup && !clientPayment && !hasClientDebt) return;
-    setQuery((q) => ({ ...q, statusGroup, clientPayment, hasClientDebt }));
+    const marginRisk = searchParams.get("marginRisk") ?? "";
+    if (!statusGroup && !clientPayment && !hasClientDebt && !marginRisk) return;
+    setQuery((q) => ({ ...q, statusGroup, clientPayment, hasClientDebt, marginRisk }));
   }, [searchParams]);
 
   const apiQuery = useMemo<DealQuery>(() => ({ ...query, page, pageSize }), [query, page, pageSize]);

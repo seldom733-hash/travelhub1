@@ -22,6 +22,7 @@ function queryFrom(raw: Record<string, string | undefined>) {
     hasClientDebt: raw.hasClientDebt,
     supplierPayment: raw.supplierPayment,
     financialStatus: raw.financialStatus,
+    marginRisk: raw.marginRisk,
     serviceType: raw.serviceType,
     dateFrom: raw.dateFrom,
     dateTo: raw.dateTo,

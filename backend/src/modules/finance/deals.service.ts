@@ -20,6 +20,7 @@ type DealQuery = {
   hasClientDebt?: string;
   supplierPayment?: string;
   financialStatus?: string;
+  marginRisk?: string;
   serviceType?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -308,6 +309,9 @@ export class DealsService {
         missingCostCount: missingCost.length,
         negativeAmount: fixed(negative.reduce((s, r) => s + Number(r.grossMargin), 0)),
         examples: negative.slice(0, 5).map((r) => ({ sequence: r.sequence, orderCode: r.orderCode, customerName: r.customerName, salesAmount: r.salesAmount, grossMargin: r.grossMargin })),
+        negativeItems: negative.map((r) => ({ sequence: r.sequence, orderCode: r.orderCode, customerName: r.customerName, salesAmount: r.salesAmount, costAmount: r.costAmount, grossMargin: r.grossMargin })),
+        lowMarginItems: lowMargin.map((r) => ({ sequence: r.sequence, orderCode: r.orderCode, customerName: r.customerName, salesAmount: r.salesAmount, costAmount: r.costAmount, grossMargin: r.grossMargin })),
+        missingCostItems: missingCost.map((r) => ({ sequence: r.sequence, orderCode: r.orderCode, customerName: r.customerName, salesAmount: r.salesAmount, costAmount: r.costAmount, grossMargin: r.grossMargin })),
       },
       recentDecisions: recentDecisions.map((d) => ({ ...d, createdAt: d.createdAt.toISOString() })),
     };
@@ -456,6 +460,9 @@ export class DealsService {
       if (query.supplierPayment && row.supplierPaymentStatus !== query.supplierPayment) return false;
       if (query.settlementStatus && row.settlementStatus !== query.settlementStatus) return false;
       if (query.financialStatus && row.financialStatus !== query.financialStatus) return false;
+      if (query.marginRisk === "negative" && Number(row.grossMargin) >= 0) return false;
+      if (query.marginRisk === "low" && !(Number(row.grossMargin) >= 0 && Number(row.salesAmount) > 0 && Number(row.grossMargin) / Number(row.salesAmount) < 0.05)) return false;
+      if (query.marginRisk === "missing_cost" && Number(row.costAmount) > 0) return false;
       if (query.serviceType && row.productType !== query.serviceType) return false;
       if (from || to) {
         const value = query.dateField === "serviceDate"

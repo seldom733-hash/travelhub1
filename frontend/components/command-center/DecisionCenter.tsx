@@ -415,14 +415,24 @@ export function DecisionCenter() {
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <section className="rounded-xl border border-[#e5e2da] bg-white p-4 shadow-sm">
           <h2 className="mb-3 text-sm font-semibold">{x.marginRisks}</h2>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {[
-              [x.negativeMargin, context?.margin?.negativeCount],
-              [x.lowMargin, context?.margin?.lowMarginCount],
-              [x.missingCost, context?.margin?.missingCostCount],
-            ].map(([label, value]) => (
-              <div key={String(label)} className="flex items-center justify-between border-t border-[#f0eee8] py-1.5 text-xs">
-                <span className="text-ink/60">{label}</span><b className="font-mono">{num(value)}</b>
+              { label: x.negativeMargin, value: context?.margin?.negativeCount, href: "/app/finance/deals?marginRisk=negative", items: context?.margin?.negativeItems },
+              { label: x.lowMargin, value: context?.margin?.lowMarginCount, href: "/app/finance/deals?marginRisk=low", items: context?.margin?.lowMarginItems },
+              { label: x.missingCost, value: context?.margin?.missingCostCount, href: "/app/finance/deals?marginRisk=missing_cost", items: context?.margin?.missingCostItems },
+            ].map((group) => (
+              <div key={group.label} className="rounded-lg border border-[#f0eee8]">
+                <Link href={group.href} className="flex items-center justify-between px-3 py-2 text-xs transition hover:bg-[#f8f7f3]">
+                  <span className="font-medium text-ink">{group.label}</span><b className="font-mono text-ink">{num(group.value)} →</b>
+                </Link>
+                {(group.items ?? []).length > 0 && <div className="max-h-40 space-y-0.5 overflow-y-auto border-t border-[#f0eee8] px-2 py-1.5">
+                  {(group.items ?? []).map((item: any) => (
+                    <Link key={`${group.label}-${item.sequence}`} href={`/app/finance/deals/${item.sequence}`} className="flex items-center justify-between gap-2 rounded px-1 py-1 text-[10px] text-ink/70 hover:bg-white hover:text-ink">
+                      <span className="truncate">{item.sequence} · {item.customerName ?? "—"}</span>
+                      <span className="shrink-0 font-mono">{num(item.grossMargin).toLocaleString(locale === "az" ? "az-AZ" : locale === "en" ? "en-GB" : "ru-RU")} AZN</span>
+                    </Link>
+                  ))}
+                </div>}
               </div>
             ))}
           </div>
