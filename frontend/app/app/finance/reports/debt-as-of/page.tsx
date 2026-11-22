@@ -15,10 +15,31 @@ import Pagination from "@/components/Pagination";
 import TableExportButton from "@/components/TableExportButton";
 import { t, useLocale, formatPrice } from "@/lib/i18n";
 import { financeCenterApi, type ClientDebtAsOfReport, type DebtAsOfReport } from "@/lib/finance-center-api";
+import { api } from "@/lib/api";
 import { dealStatus } from "@/lib/deals-i18n";
 
 const PAGE_SIZE = 25;
 const today = () => new Date().toISOString().slice(0, 10);
+
+function debtStatusLabel(locale: string, status: string): string {
+  const labels: Record<string, Record<string, string>> = {
+    OPEN: { ru: "Открыт", az: "Açıq", en: "Open" },
+    PARTIALLY_PAID: { ru: "Частично оплачен", az: "Qismən ödənilib", en: "Partially paid" },
+    CLOSED: { ru: "Закрыт", az: "Bağlı", en: "Closed" },
+    CANCELLED: { ru: "Отменён", az: "Ləğv edilib", en: "Cancelled" },
+    UNKNOWN: { ru: "Неизвестно", az: "Naməlum", en: "Unknown" },
+    OVERDUE: { ru: "Просрочен", az: "Gecikmiş", en: "Overdue" },
+  };
+  return labels[status]?.[locale] ?? dealStatus(locale as "ru" | "az" | "en", status);
+}
+
+function warningLabel(locale: string, warning: string): string {
+  const match = warning.match(/^(\d+) obligation/);
+  const count = match?.[1] ?? "";
+  if (locale === "az") return `${count} öhdəliyin tarixi məbləğ hadisəsi yoxdur; tarixə məbləğ CƏRİ dəyərdir (LEGACY_CURRENT).`;
+  if (locale === "en") return `${count} obligation(s) have no historical amount events; their as-of amount is the CURRENT value (LEGACY_CURRENT).`;
+  return `${count} обязательств без исторических событий суммы; сумма на дату — ТЕКУЩЕЕ значение (LEGACY_CURRENT).`;
+}
 
 function paymentStatusLabel(locale: string, status: string): string {
   const labels: Record<string, Record<string, string>> = {
@@ -34,6 +55,7 @@ export default function SupplierDebtAsOfPage() {
   const locale = useLocale();
   const [asOf, setAsOf] = useState(today());
   const [supplierCode, setSupplierCode] = useState("");
+  const [partners, setPartners] = useState<Array<{ code: string; name: string }>>([]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [clientPage, setClientPage] = useState(1);
@@ -49,6 +71,11 @@ export default function SupplierDebtAsOfPage() {
       setClientReport(null);
     }
   }, [asOf, search, clientPage]);
+
+  useEffect(() => {
+    api.get<{ items?: Array<{ code: string; name: string }> }>("/partners?pageSize=300")
+      .then((data) => setPartners(data.items ?? [])).catch(() => setPartners([]));
+  }, []);
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -124,15 +151,17 @@ export default function SupplierDebtAsOfPage() {
           </label>
           <label className="text-sm">
             <span className="mb-1 block text-ink/60">{t("finance.debt_as_of.supplier", locale)}</span>
-            <input
+            <select
               value={supplierCode}
               onChange={(e) => {
                 setSupplierCode(e.target.value);
                 setPage(1);
               }}
-              placeholder="SUMMERTOUR"
-              className="rounded-lg border border-line px-3 py-2 text-sm"
-            />
+              className="min-w-56 rounded-lg border border-line bg-white px-3 py-2 text-sm"
+            >
+              <option value="">{t("finance.debt_as_of.supplier", locale)}</option>
+              {partners.map((partner) => <option key={partner.code} value={partner.code}>{partner.name}</option>)}
+            </select>
           </label>
           <label className="min-w-56 flex-1 text-sm">
             <span className="mb-1 block text-ink/60">{t("finance.debt_as_of.search", locale)}</span>
@@ -158,7 +187,7 @@ export default function SupplierDebtAsOfPage() {
 
         {report?.warnings.map((warning) => (
           <div key={warning} className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
-            {warning}
+            {warningLabel(locale, warning)}
           </div>
         ))}
 
@@ -210,7 +239,7 @@ export default function SupplierDebtAsOfPage() {
                     <tr key={row.obligationCode} className="border-b border-line/60 hover:bg-panel">
                       <td className="px-3 py-2 font-mono text-xs font-semibold">{row.obligationCode}</td>
                       <td className="px-3 py-2 text-xs">{row.invoiceNumber ?? "—"}</td>
-                      <td className="px-3 py-2">{row.partnerCode ?? row.supplierCode ?? "—"}</td>
+                      <td className="px-3 py-2">{row.partnerName ?? row.partnerCode ?? row.supplierCode ?? "—"}</td>
                       <td className="px-3 py-2 font-mono text-xs">{row.orderCode ?? row.bookingCode ?? "—"}</td>
                       <td className="px-3 py-2 text-right font-mono">
                         {row.sourceAmount} {row.sourceCurrency}
@@ -230,7 +259,7 @@ export default function SupplierDebtAsOfPage() {
                       </td>
                       <td className="px-3 py-2">
                         <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${tone(row.status)}`}>
-                          {dealStatus(locale, row.status)}
+                          {debtStatusLabel(locale, row.status)}
                         </span>
                         {row.precision === "LEGACY_CURRENT" && (
                           <span className="ml-1 text-[10px] text-amber-600">legacy</span>

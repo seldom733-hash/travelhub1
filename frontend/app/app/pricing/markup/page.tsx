@@ -207,6 +207,7 @@ export default function MarkupAdminPage() {
   const [supplierFilter, setSupplierFilter] = useState("");
   const [search, setSearch] = useState("");
   const [form, setForm] = useState<FormState | null>(null);
+  const [countrySearch, setCountrySearch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -313,6 +314,7 @@ export default function MarkupAdminPage() {
   const openRow = (row: PricingRow) => {
     if (!canManage) return;
     setError("");
+    setCountrySearch("");
     setForm({
       key: row.key,
       supplierCode: row.supplierCode,
@@ -393,6 +395,11 @@ export default function MarkupAdminPage() {
     return [...map.entries()].map(([code, name]) => ({ code, name })).sort((a, b) => a.name.localeCompare(b.name));
   }, [rows]);
   const services = useMemo(() => [...new Set(rows.map((r) => r.serviceType))].sort(), [rows]);
+  const countryOptions = useMemo(() => {
+    const needle = countrySearch.trim().toLowerCase();
+    if (!needle) return countries;
+    return countries.filter((country) => `${country.code} ${country.names?.[locale] ?? ""} ${country.names?.ru ?? ""} ${country.names?.en ?? ""}`.toLowerCase().includes(needle));
+  }, [countries, countrySearch, locale]);
 
   if (loading) return <WorkspacePageSkeleton />;
 
@@ -407,7 +414,7 @@ export default function MarkupAdminPage() {
               {tr("Обновить")}
             </button>
             {canManage && (
-              <button type="button" onClick={() => setForm({ ...EMPTY })} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+              <button type="button" onClick={() => { setCountrySearch(""); setForm({ ...EMPTY }); }} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
                 + {tr("Добавить правило")}
               </button>
             )}
@@ -561,8 +568,10 @@ export default function MarkupAdminPage() {
                 <span className="text-xs font-medium text-ink/60">{tr("Страны / группы стран")}</span>
                 <button type="button" onClick={() => setForm({ ...form, countryCodes: [] })} className="rounded-lg border border-line px-2 py-1 text-[11px] font-medium text-ink/60 hover:bg-panel">{tr("Все страны")}</button>
               </div>
+              <input value={countrySearch} onChange={(e) => setCountrySearch(e.target.value)} placeholder={tr("Поиск страны")} className="mb-2 w-full rounded-lg border border-line px-3 py-1.5 text-xs" />
+              <div className="mb-1 text-[11px] text-ink/50">{tr("Выбрано")}: {form.countryCodes.length}</div>
               <div className="grid max-h-40 gap-1 overflow-y-auto sm:grid-cols-2">
-                {countries.map((country) => (
+                {countryOptions.map((country) => (
                   <label key={country.code} className="flex items-center gap-2 rounded px-1 py-0.5 text-xs text-ink hover:bg-panel">
                     <input
                       type="checkbox"

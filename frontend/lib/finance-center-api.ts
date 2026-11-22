@@ -316,6 +316,7 @@ export interface DebtAsOfRow {
   invoiceNumber: string | null;
   supplierCode: string | null;
   partnerCode: string | null;
+  partnerName?: string | null;
   orderCode: string | null;
   bookingCode: string | null;
   sourceAmount: string;

@@ -28,6 +28,7 @@ export interface DebtAsOfRow {
   invoiceNumber: string | null;
   supplierCode: string | null;
   partnerCode: string | null;
+  partnerName: string | null;
   orderCode: string | null;
   bookingCode: string | null;
   sourceAmount: string;
@@ -149,10 +150,10 @@ export class SupplierDebtReportService {
       }),
       this.prisma.partner.findMany({
         where: { id: { in: [...new Set(obligations.map((o) => o.partnerId).filter((id): id is string => !!id))] } },
-        select: { id: true, code: true },
+        select: { id: true, code: true, name: true },
       }),
     ]);
-    const partnerCodes = new Map(partners.map((p) => [p.id, p.code]));
+    const partnerById = new Map(partners.map((p) => [p.id, p]));
     const paidByObligation = new Map<string, Prisma.Decimal>();
     for (const allocation of allocations) {
       paidByObligation.set(
@@ -197,7 +198,8 @@ export class SupplierDebtReportService {
         obligationCode: obligation.referenceNumber ?? obligation.code,
         invoiceNumber: obligation.invoiceNumber,
         supplierCode: obligation.supplierCode,
-        partnerCode: obligation.partnerId ? (partnerCodes.get(obligation.partnerId) ?? null) : null,
+        partnerCode: obligation.partnerId ? (partnerById.get(obligation.partnerId)?.code ?? null) : null,
+        partnerName: obligation.partnerId ? (partnerById.get(obligation.partnerId)?.name ?? null) : null,
         orderCode: obligation.commerceSequence ? `MKT-ORD-${obligation.commerceSequence}` : obligation.orderCode,
         bookingCode: obligation.commerceSequence && obligation.bookingCode ? `MKT-BKG-${obligation.commerceSequence}` : obligation.bookingCode,
         sourceAmount: toMoney2(obligation.sourceAmount, "sourceAmount").toString(),
