@@ -599,7 +599,7 @@ export class DealsService {
       // Stage is the deepest existing entity in the commerce chain. A completed
       // booking must still read as BOOKING until the deal's finances are closed.
       let stage: "REQUEST" | "ORDER" | "BOOKING" | "COMPLETED" | "CLOSED" | "CANCELLED" = returnedToRequest ? "REQUEST" : booking ? "BOOKING" : order ? "ORDER" : "REQUEST";
-      const status = returnedToRequest ? request.status : booking?.status ?? order?.status ?? request.status;
+      let status = returnedToRequest ? request.status : booking?.status ?? order?.status ?? request.status;
       const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(status);
       const cancelledForDebt = order?.status === "CANCELLED" || Boolean(order?.cancelledAt && !order?.returnedToRequestAt);
       const rawSupplierDebt = cancelledForDebt
@@ -622,6 +622,10 @@ export class DealsService {
         ? money(settlement?.supplierPenaltyShare)
         : 0;
       const isCancelledDeal = cancelled || Boolean(order?.cancelledAt && !order?.returnedToRequestAt);
+      // A cancelled deal has one canonical status: CANCELLED. Underlying
+      // order/booking statuses stay in history, but registry filters must not
+      // mix a cancelled row into CLOSED/BOOKING status cohorts.
+      if (isCancelledDeal) status = "CANCELLED";
       const completed = ["FULFILLED", "CLOSED"].includes(order?.status ?? "") || status === "COMPLETED";
       const income = computeDealIncome({
         isCancelledDeal,
