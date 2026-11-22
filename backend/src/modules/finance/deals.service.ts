@@ -309,9 +309,9 @@ export class DealsService {
         missingCostCount: missingCost.length,
         negativeAmount: fixed(negative.reduce((s, r) => s + Number(r.grossMargin), 0)),
         examples: negative.slice(0, 5).map((r) => ({ sequence: r.sequence, orderCode: r.orderCode, customerName: r.customerName, salesAmount: r.salesAmount, grossMargin: r.grossMargin })),
-        negativeItems: negative.map((r) => ({ sequence: r.sequence, orderCode: r.orderCode, customerName: r.customerName, salesAmount: r.salesAmount, costAmount: r.costAmount, grossMargin: r.grossMargin })),
-        lowMarginItems: lowMargin.map((r) => ({ sequence: r.sequence, orderCode: r.orderCode, customerName: r.customerName, salesAmount: r.salesAmount, costAmount: r.costAmount, grossMargin: r.grossMargin })),
-        missingCostItems: missingCost.map((r) => ({ sequence: r.sequence, orderCode: r.orderCode, customerName: r.customerName, salesAmount: r.salesAmount, costAmount: r.costAmount, grossMargin: r.grossMargin })),
+        negativeItems: negative.map((r) => ({ sequence: r.sequence, orderCode: r.orderCode, customerName: r.customerName, manager: r.manager, managerId: r.managerId, salesAmount: r.salesAmount, costAmount: r.costAmount, grossMargin: r.grossMargin })),
+        lowMarginItems: lowMargin.map((r) => ({ sequence: r.sequence, orderCode: r.orderCode, customerName: r.customerName, manager: r.manager, managerId: r.managerId, salesAmount: r.salesAmount, costAmount: r.costAmount, grossMargin: r.grossMargin })),
+        missingCostItems: missingCost.map((r) => ({ sequence: r.sequence, orderCode: r.orderCode, customerName: r.customerName, manager: r.manager, managerId: r.managerId, salesAmount: r.salesAmount, costAmount: r.costAmount, grossMargin: r.grossMargin })),
       },
       recentDecisions: recentDecisions.map((d) => ({ ...d, createdAt: d.createdAt.toISOString() })),
     };

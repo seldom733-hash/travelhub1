@@ -428,7 +428,7 @@ export function DecisionCenter() {
                 {(group.items ?? []).length > 0 && <div className="max-h-40 space-y-0.5 overflow-y-auto border-t border-[#f0eee8] px-2 py-1.5">
                   {(group.items ?? []).map((item: any) => (
                     <Link key={`${group.label}-${item.sequence}`} href={`/app/finance/deals/${item.sequence}`} className="flex items-center justify-between gap-2 rounded px-1 py-1 text-[10px] text-ink/70 hover:bg-white hover:text-ink">
-                      <span className="truncate">{item.sequence} · {item.customerName ?? "—"}</span>
+                      <span className="truncate">{item.sequence} · {item.customerName ?? "—"} · {item.manager ?? "—"}</span>
                       <span className="shrink-0 font-mono">{num(item.grossMargin).toLocaleString(locale === "az" ? "az-AZ" : locale === "en" ? "en-GB" : "ru-RU")} AZN</span>
                     </Link>
                   ))}
