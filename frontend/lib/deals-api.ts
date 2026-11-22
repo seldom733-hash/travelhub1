@@ -11,7 +11,7 @@ export interface DealRow {
   bookingStatus?: string | null;
   bookingCompletedAt?: string | null;
   bookings?: Array<{ id: string; code: string; status: string; serviceDate: string | null; completedAt: string | null }>;
-  stage: "REQUEST" | "ORDER" | "BOOKING" | "COMPLETED" | "CLOSED";
+  stage: "REQUEST" | "ORDER" | "BOOKING" | "COMPLETED" | "CLOSED" | "CANCELLED";
   stageLabel: string;
   status: string;
   orderStatus: string | null;

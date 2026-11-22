@@ -67,7 +67,7 @@ type DealRow = {
   bookingStatus: string | null;
   bookingCompletedAt: string | null;
   bookings: Array<{ id: string; code: string; status: string; serviceDate: string | null; completedAt: string | null }>;
-  stage: "REQUEST" | "ORDER" | "BOOKING" | "COMPLETED" | "CLOSED";
+  stage: "REQUEST" | "ORDER" | "BOOKING" | "COMPLETED" | "CLOSED" | "CANCELLED";
   stageLabel: string;
   status: string;
   orderStatus: string | null;
@@ -375,8 +375,7 @@ export class DealsService {
         const phoneMatch = searchDigits.length > 0 && digits(row.customerPhone ?? "").includes(searchDigits);
         if (!haystack.includes(search) && !(phoneMatch && searchDigits.length >= 3)) return false;
       }
-      if (query.stage === "CANCELLED") { if (!row.isCancelledDeal) return false; }
-      else if (query.stage && row.stage !== query.stage) return false;
+      if (query.stage && row.stage !== query.stage) return false;
       if (query.status && row.status !== query.status) return false;
       if (query.cancellationReason && row.cancellationReason !== query.cancellationReason) return false;
       if (query.statusGroup === "cancelled" && !row.isCancelledDeal && !["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED", "REJECTED"].includes(row.status)) return false;
@@ -599,7 +598,7 @@ export class DealsService {
       const activeBooking = booking && !["CANCELLED", "COMPLETED", "SUPPLIER_REJECTED"].includes(booking.status) ? booking : null;
       // Stage is the deepest existing entity in the commerce chain. A completed
       // booking must still read as BOOKING until the deal's finances are closed.
-      let stage: "REQUEST" | "ORDER" | "BOOKING" | "COMPLETED" | "CLOSED" = returnedToRequest ? "REQUEST" : booking ? "BOOKING" : order ? "ORDER" : "REQUEST";
+      let stage: "REQUEST" | "ORDER" | "BOOKING" | "COMPLETED" | "CLOSED" | "CANCELLED" = returnedToRequest ? "REQUEST" : booking ? "BOOKING" : order ? "ORDER" : "REQUEST";
       const status = returnedToRequest ? request.status : booking?.status ?? order?.status ?? request.status;
       const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(status);
       const cancelledForDebt = order?.status === "CANCELLED" || Boolean(order?.cancelledAt && !order?.returnedToRequestAt);
@@ -663,6 +662,7 @@ export class DealsService {
         stage = tourEnded ? "CLOSED" : "COMPLETED";
       }
       if (order?.status === "CLOSED") stage = "CLOSED";
+      if (isCancelledDeal) stage = "CANCELLED";
       const adults = Number(attrs.adults ?? 0) || null;
       const children = Number(attrs.children ?? 0) || null;
       const channel = request.sourceChannel ?? (commercial.priceSource === "PUBLIC" ? "Сайт (универсальный поиск)" : String(commercial.priceSource ?? "Ручное создание"));
@@ -717,7 +717,7 @@ export class DealsService {
           completedAt: b.completedAt ? b.completedAt.toISOString() : null,
         })),
         stage,
-        stageLabel: cancelled ? "Отменена" : stage === "CLOSED" ? "Закрыта" : stage === "COMPLETED" ? "Завершена" : stage === "BOOKING" ? "Бронь" : stage === "ORDER" ? "Заказ" : "Заявка",
+        stageLabel: stage === "CANCELLED" ? "Отменена" : stage === "CLOSED" ? "Закрыта" : stage === "COMPLETED" ? "Завершена" : stage === "BOOKING" ? "Бронь" : stage === "ORDER" ? "Заказ" : "Заявка",
         status,
         orderStatus: order?.status ?? null,
         statusLabel: status,
