@@ -103,11 +103,31 @@ export class HotelDirectoryService {
     return rows.map((row) => ({ ...row, suppliers: [] as string[] }));
   }
 
-  listAirports(status?: string) {
-    return this.prisma.airport.findMany({
+  async listAirports(status?: string) {
+    const rows = await this.prisma.geoAirport.findMany({
       where: status ? { status: status as never } : undefined,
-      orderBy: [{ countryName: "asc" }, { cityName: "asc" }, { code: "asc" }],
+      include: { city: { include: { country: true } } },
     });
+    return rows
+      .map((row) => {
+        const names = (row.names ?? {}) as Record<string, string>;
+        const cityNames = (row.city?.names ?? {}) as Record<string, string>;
+        const countryNames = (row.city?.country?.names ?? {}) as Record<string, string>;
+        return {
+          id: row.id,
+          code: row.code,
+          name: names.en || names.ru || row.code,
+          countryCode: row.city?.country?.code ?? "",
+          countryName: countryNames.en || countryNames.ru || "",
+          cityName: cityNames.en || cityNames.ru || "",
+          countryNameRu: countryNames.ru || countryNames.en || "",
+          countryNameEn: countryNames.en || countryNames.ru || "",
+          cityNameRu: cityNames.ru || cityNames.en || "",
+          cityNameEn: cityNames.en || cityNames.ru || "",
+          status: row.status,
+        };
+      })
+      .sort((a, b) => a.countryName.localeCompare(b.countryName) || a.cityName.localeCompare(b.cityName) || a.code.localeCompare(b.code));
   }
 
   async createAirport(

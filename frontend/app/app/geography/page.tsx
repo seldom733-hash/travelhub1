@@ -2,6 +2,7 @@
 
 import { WorkspacePageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import PanelFrame from "@/components/PanelFrame";
@@ -58,7 +59,9 @@ function GeographyContent() {
   const canUpdate = useCan("geography.update");
   const canDelete = useCan("geography.delete");
 
-  const [tab, setTab] = useState<Tab>("countries");
+  const searchParams = useSearchParams();
+  const initialTab = (["countries", "cities", "resorts", "airports"] as Tab[]).includes(searchParams.get("tab") as Tab) ? (searchParams.get("tab") as Tab) : "countries";
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -338,7 +341,7 @@ function GeographyContent() {
         actions={
           <button
             onClick={() => void load(tab, search, statusFilter, parentFilter)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+            className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 transition-colors hover:bg-panel"
           >
             {t("admin.table.refresh", locale)}
           </button>
@@ -346,7 +349,7 @@ function GeographyContent() {
       />
 
       <div className="space-y-4 p-6">
-        <div className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+        <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-white p-1 shadow-sm">
           {tabs.map((item) => (
             <button
               key={item.key}
@@ -354,8 +357,8 @@ function GeographyContent() {
               onClick={() => setTab(item.key)}
               className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
                 tab === item.key
-                  ? "bg-blue-600 text-white"
-                  : "text-slate-500 hover:bg-slate-100"
+                  ? "bg-brand text-white"
+                  : "text-ink/60 hover:bg-panel"
               }`}
             >
               {item.label}
@@ -368,12 +371,12 @@ function GeographyContent() {
             defaultValue={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder={t("geo.filter.search", locale) ?? "Поиск по коду или названию…"}
-            className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            className="w-64 rounded-lg border border-line bg-white px-3 py-1.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand"
           />
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+            className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-brand"
           >
             <option value="">{t("admin.filter.all_statuses", locale)}</option>
             <option value="ACTIVE">ACTIVE</option>
@@ -386,7 +389,7 @@ function GeographyContent() {
                 setParentFilter(e.target.value);
                 void load(tab, search, statusFilter, e.target.value);
               }}
-              className="max-w-64 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+              className="max-w-64 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-brand"
             >
               <option value="">
                 {tab === "cities"
@@ -404,12 +407,12 @@ function GeographyContent() {
             <button
               type="button"
               onClick={openCreate}
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+              className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-dark"
             >
               {t("geo.actions.create", locale) ?? "Создать"}
             </button>
           )}
-          {busy && <span className="text-xs text-slate-400">{t("admin.table.loading", locale)}</span>}
+          {busy && <span className="text-xs text-ink/60">{t("admin.table.loading", locale)}</span>}
         </div>
 
         {error && (
@@ -418,7 +421,7 @@ function GeographyContent() {
           </div>
         )}
 
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
           <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>
             <colgroup>
               <col style={{ width: "12%" }} />
@@ -428,7 +431,7 @@ function GeographyContent() {
               <col style={{ width: "12%" }} />
               <col style={{ width: "12%" }} />
             </colgroup>
-            <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+            <thead className="border-b border-line bg-panel text-xs uppercase tracking-wide text-ink/60">
               <tr>
                 <th className="px-4 py-2.5 font-medium">{t("geo.table.code", locale) ?? "Код"}</th>
                 <th className="px-4 py-2.5 font-medium">{t("geo.table.name", locale) ?? "Название"}</th>
@@ -449,13 +452,13 @@ function GeographyContent() {
                       ? "—"
                       : parents.find((p) => p.id === (r.cityId as string))?.label ?? (r.cityId as string) ?? "";
                 return (
-                  <tr key={row.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                  <tr key={row.id} className="border-b border-line last:border-0 hover:bg-panel">
                     <td className="px-4 py-2.5 font-mono text-xs font-semibold">{r.code as string}</td>
                     <td className="truncate px-4 py-2.5 font-medium">{names.ru ?? ""}</td>
-                    <td className="truncate px-4 py-2.5 text-xs text-slate-500">
+                    <td className="truncate px-4 py-2.5 text-xs text-ink/60">
                       {[names.en, names.az].filter(Boolean).join(" / ")}
                     </td>
-                    <td className="truncate px-4 py-2.5 text-xs text-slate-500">{parent}</td>
+                    <td className="truncate px-4 py-2.5 text-xs text-ink/60">{parent}</td>
                     <td className="px-4 py-2.5">
                       <StatusBadge status={(r.status as string) ?? ""} />
                     </td>
@@ -465,7 +468,7 @@ function GeographyContent() {
                           <button
                             type="button"
                             onClick={() => openEdit(row)}
-                            className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                            className="text-xs font-medium text-brand hover:text-ink"
                           >
                             {t("geo.actions.edit", locale) ?? "Изм."}
                           </button>
@@ -486,7 +489,7 @@ function GeographyContent() {
               })}
               {pageRows.length === 0 && !busy && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-ink/60">
                     {t("ops.empty_no_data", locale)}
                   </td>
                 </tr>
@@ -508,35 +511,35 @@ function GeographyContent() {
         >
           <div className="space-y-3 p-4">
             {!editing && (
-              <label className="block text-xs font-medium text-slate-600">
+              <label className="block text-xs font-medium text-ink/60">
                 {t("geo.table.code", locale) ?? "Код"}
                 <input
                   value={form.code}
                   onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
                   placeholder={tab === "countries" ? "GR" : "ATH"}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-sm outline-none focus:border-blue-400"
+                  className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 font-mono text-sm outline-none focus:border-brand"
                 />
               </label>
             )}
             {(["ru", "en", "az"] as const).map((lng) => (
-              <label key={lng} className="block text-xs font-medium text-slate-600">
+              <label key={lng} className="block text-xs font-medium text-ink/60">
                 {t("geo.form.name", locale) ?? "Название"} ({lng.toUpperCase()})
                 <input
                   value={form[lng]}
                   onChange={(e) => setForm((f) => ({ ...f, [lng]: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-blue-400"
+                  className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 text-sm outline-none focus:border-brand"
                 />
               </label>
             ))}
             {tab !== "countries" && !editing && (
-              <label className="block text-xs font-medium text-slate-600">
+              <label className="block text-xs font-medium text-ink/60">
                 {tab === "cities"
                   ? (t("geo.form.country", locale) ?? "Страна")
                   : (t("geo.form.city", locale) ?? "Город")}
                 <select
                   value={form.parentId}
                   onChange={(e) => setForm((f) => ({ ...f, parentId: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-400"
+                  className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-1.5 text-sm outline-none focus:border-brand"
                 >
                   <option value="">—</option>
                   {parents.map((p) => (
@@ -549,43 +552,43 @@ function GeographyContent() {
             )}
             {tab !== "countries" && (
               <div className="grid grid-cols-2 gap-2">
-                <label className="block text-xs font-medium text-slate-600">
+                <label className="block text-xs font-medium text-ink/60">
                   Lat
                   <input
                     value={form.latitude}
                     onChange={(e) => setForm((f) => ({ ...f, latitude: e.target.value }))}
                     placeholder="37.98"
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-blue-400"
+                    className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 text-sm outline-none focus:border-brand"
                   />
                 </label>
-                <label className="block text-xs font-medium text-slate-600">
+                <label className="block text-xs font-medium text-ink/60">
                   Lng
                   <input
                     value={form.longitude}
                     onChange={(e) => setForm((f) => ({ ...f, longitude: e.target.value }))}
                     placeholder="23.73"
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-blue-400"
+                    className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 text-sm outline-none focus:border-brand"
                   />
                 </label>
               </div>
             )}
             {tab === "airports" && (
-              <label className="block text-xs font-medium text-slate-600">
+              <label className="block text-xs font-medium text-ink/60">
                 TimeZone
                 <input
                   value={form.timeZone}
                   onChange={(e) => setForm((f) => ({ ...f, timeZone: e.target.value }))}
                   placeholder="Europe/Athens"
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-blue-400"
+                  className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 text-sm outline-none focus:border-brand"
                 />
               </label>
             )}
-            <label className="block text-xs font-medium text-slate-600">
+            <label className="block text-xs font-medium text-ink/60">
               Status
               <select
                 value={form.status}
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-400"
+                className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-1.5 text-sm outline-none focus:border-brand"
               >
                 <option value="ACTIVE">ACTIVE</option>
                 <option value="INACTIVE">INACTIVE</option>
@@ -595,7 +598,7 @@ function GeographyContent() {
               type="button"
               disabled={saving}
               onClick={() => void handleSave()}
-              className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+              className="w-full rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:opacity-50"
             >
               {saving
                 ? (t("admin.table.loading", locale) ?? "…")
