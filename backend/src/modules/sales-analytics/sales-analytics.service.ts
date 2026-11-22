@@ -171,11 +171,21 @@ export class SalesAnalyticsService {
       const old = prev.kpis[k] ?? 0;
       kpis[k] = { value: cur, previous: old, delta: delta(cur, old), pct: pct(cur, old) };
     }
+    const managerDirectory = await this.prisma.user.findMany({
+      where: { status: "ACTIVE", role: { code: "SALES_MANAGER" } },
+      select: { id: true, fullName: true, username: true },
+    });
+    const managerOptions = [...new Map([
+      ...managerDirectory.map((u) => [u.id, { managerId: u.id, manager: u.fullName ?? u.username }] as const),
+      ...current.managers.map((m: any) => [m.managerId ?? "unassigned", { managerId: m.managerId, manager: m.manager }] as const),
+    ]).values()].sort((a, b) => String(a.manager).localeCompare(String(b.manager)));
+
     return {
       period: { ...period, comparison: { start: previous.start, end: previous.end } },
       scope: { managerId: managerId ?? null, restricted: user?.role === "SALES_MANAGER" },
       kpis,
       managers: current.managers,
+      managerOptions,
       funnel: current.funnel,
       services: current.services,
       activity: current.activity,

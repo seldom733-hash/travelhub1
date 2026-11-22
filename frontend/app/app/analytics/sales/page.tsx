@@ -149,7 +149,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
     if (preset === "CUSTOM" && (!startDate || !endDate)) { setLoading(false); return; }
     setLoading(true); setError("");
     api.get<any>(`/sales-analytics/dashboard?${query}`)
-      .then((r) => { if (alive) { setData(r); if (!managerId) setManagerOptions(r.managers ?? []); } })
+      .then((r) => { if (alive) { setData(r); if (!managerId || r.managerOptions) setManagerOptions(r.managerOptions ?? r.managers ?? []); } })
       .catch((e) => { if (alive) setError((e as Error).message); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
