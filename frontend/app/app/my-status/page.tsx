@@ -36,8 +36,24 @@ export default function MyStatusPage() {
 
   return <div><PageHeader title={tr("Мой статус", "Mənim statusum", "My status")} breadcrumbs={["Navitravel", tr("Продажи", "Satış", "Sales"), tr("Мой статус", "Mənim statusum", "My status")]} />
     <div className="max-w-xl space-y-3 p-6">
-      <p className="text-sm text-slate-600">{tr("Статус влияет на автоматическое и ручное распределение заявок.", "Status sorğuların avtomatik və əl ilə bölgüsünə təsir edir.", "Your status affects automatic and manual request assignment.")}</p>
-      {OPTIONS.map((o) => <button key={o.value} type="button" disabled={busy} onClick={() => void set(o.value)} className={`w-full rounded-xl border p-4 text-left ${status === o.value ? "border-blue-500 bg-blue-50" : "border-line bg-white"}`}><div className="font-semibold">{o.label}</div><div className="text-xs text-slate-500">{o.hint}</div></button>)}
+      <p className="text-sm text-ink/60">{tr("Статус влияет на автоматическое и ручное распределение заявок.", "Status sorğuların avtomatik və əl ilə bölgüsünə təsir edir.", "Your status affects automatic and manual request assignment.")}</p>
+      {OPTIONS.map((o) => (
+        <label key={o.value} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${status === o.value ? "border-brand bg-brand/10" : "border-line bg-white"}`}>
+          <input
+            type="radio"
+            name="availability"
+            value={o.value}
+            checked={status === o.value}
+            disabled={busy}
+            onChange={() => void set(o.value)}
+            className="mt-1 size-4 accent-brand"
+          />
+          <span>
+            <span className="block font-semibold">{o.label}</span>
+            <span className="block text-xs text-ink/60">{o.hint}</span>
+          </span>
+        </label>
+      ))}
     </div>
   </div>;
 }
