@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/api";
 import { useLocale } from "@/lib/i18n";
@@ -43,6 +44,9 @@ export default function ManagerBonusesPage() {
   const canEdit = useCan("finance.deal.amounts.write");
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>(() => [new Date().toISOString().slice(0, 7)]);
   const [monthsOpen, setMonthsOpen] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [managerDeals, setManagerDeals] = useState<Record<string, any[]>>({});
+  const [dealsLoading, setDealsLoading] = useState<string | null>(null);
   const [basis, setBasis] = useState<BonusBasis>("closed_at");
   const [report, setReport] = useState<BonusReport | null>(null);
   const [error, setError] = useState("");
@@ -73,6 +77,31 @@ export default function ManagerBonusesPage() {
   }, [selectedPeriods, basis]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    setExpanded(null);
+    setManagerDeals({});
+  }, [selectedPeriods, basis]);
+
+  const toggleManager = async (row: BonusRow) => {
+    if (expanded === row.managerId) { setExpanded(null); return; }
+    setExpanded(row.managerId);
+    if (managerDeals[row.managerId]) return;
+    setDealsLoading(row.managerId);
+    try {
+      const data = await api.get<{ items: any[] }>(`/finance/deals?manager=${encodeURIComponent(row.manager)}&pageSize=100`);
+      const months = new Set(selectedPeriods);
+      const monthOf = (value: string | null | undefined) => value ? String(value).slice(0, 7) : "";
+      const items = (data.items ?? []).filter((deal) => {
+        if (basis === "closed_at") return months.has(monthOf(deal.closedAt));
+        return (deal.services ?? []).some((service: any) => months.has(monthOf(service.dateTo ?? service.serviceDate)));
+      });
+      setManagerDeals((current) => ({ ...current, [row.managerId]: items }));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDealsLoading(null);
+    }
+  };
 
   const setPercent = (managerId: string, value: string) => {
     setReport((current) => current ? {
@@ -131,6 +160,7 @@ export default function ManagerBonusesPage() {
                 {monthLabel(value)}
               </label>)}
             </div>
+            <button type="button" onClick={() => setMonthsOpen(false)} className="mt-2 w-full rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white">{tr("Готово", "Hazırdır", "Done")}</button>
           </div>}
         </div>
         <label className="text-sm">
@@ -182,31 +212,64 @@ export default function ManagerBonusesPage() {
           <tbody>
             {(report?.items ?? []).map((row) => {
               const bonus = Math.round(row.marginBase * row.percent) / 100;
-              return <tr key={row.managerId} className="border-t border-line">
-                <td className="px-4 py-3 font-medium text-ink">{row.manager}</td>
-                <td className="px-4 py-3 text-right font-mono">{row.closedDeals}</td>
-                <td className="px-4 py-3 text-right font-mono">{row.closedServices}</td>
-                <td className="px-4 py-3 text-right font-mono">{money(row.marginBase)}</td>
-                <td className="px-4 py-3 text-right">
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.01}
-                    value={row.percent}
-                    disabled={!canEdit}
-                    onChange={(e) => setPercent(row.managerId, e.target.value)}
-                    className="w-24 rounded-lg border border-line px-2 py-1.5 text-right text-sm disabled:bg-panel"
-                  />
-                </td>
-                <td className="px-4 py-3 text-right font-mono font-semibold text-ink">{money(bonus)}</td>
-                <td className="px-4 py-3 text-right">
-                  {canEdit && <button type="button" disabled={saving === row.managerId} onClick={() => void save(row)} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
-                    {saving === row.managerId ? tr("Сохранение…", "Saxlanılır…", "Saving…") : tr("Сохранить", "Saxla", "Save")}
-                  </button>}
-                  {!canEdit && row.saved && <span className="text-xs text-ink/50">{tr("Сохранено", "Saxlanıb", "Saved")}</span>}
-                </td>
-              </tr>;
+              const deals = managerDeals[row.managerId] ?? [];
+              return <Fragment key={row.managerId}>
+                <tr className="border-t border-line">
+                  <td className="px-4 py-3 font-medium text-ink">
+                    <button type="button" onClick={() => void toggleManager(row)} className="flex items-center gap-1 text-left text-brand hover:underline">
+                      <span>{row.manager}</span>
+                      <span className="text-[10px] text-ink/50">{expanded === row.managerId ? "▴" : "▾"}</span>
+                    </button>
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono">{row.closedDeals}</td>
+                  <td className="px-4 py-3 text-right font-mono">{row.closedServices}</td>
+                  <td className="px-4 py-3 text-right font-mono">{money(row.marginBase)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.01}
+                      value={row.percent}
+                      disabled={!canEdit}
+                      onChange={(e) => setPercent(row.managerId, e.target.value)}
+                      className="w-24 rounded-lg border border-line px-2 py-1.5 text-right text-sm disabled:bg-panel"
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono font-semibold text-ink">{money(bonus)}</td>
+                  <td className="px-4 py-3 text-right">
+                    {canEdit && <button type="button" disabled={saving === row.managerId} onClick={() => void save(row)} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+                      {saving === row.managerId ? tr("Сохранение…", "Saxlanılır…", "Saving…") : tr("Сохранить", "Saxla", "Save")}
+                    </button>}
+                    {!canEdit && row.saved && <span className="text-xs text-ink/50">{tr("Сохранено", "Saxlanıb", "Saved")}</span>}
+                  </td>
+                </tr>
+                {expanded === row.managerId && <tr className="border-t border-line bg-panel/40">
+                  <td colSpan={7} className="px-4 py-3">
+                    {dealsLoading === row.managerId ? <div className="text-xs text-ink/60">{tr("Загрузка сделок…", "Sövdələr yüklənir…", "Loading deals…")}</div> : (
+                      <div className="overflow-x-auto rounded-lg border border-line bg-white">
+                        <table className="w-full text-left text-[11px]">
+                          <thead className="bg-panel text-[10px] uppercase tracking-wide text-ink/60"><tr>
+                            <th className="px-2 py-2">{tr("Сделка", "Sövdə", "Deal")}</th>
+                            <th className="px-2 py-2">{tr("Клиент", "Müştəri", "Customer")}</th>
+                            <th className="px-2 py-2">{tr("Статус", "Status", "Status")}</th>
+                            <th className="px-2 py-2 text-right">{tr("Услуг", "Xidmətlər", "Services")}</th>
+                            <th className="px-2 py-2 text-right">{tr("Маржа", "Marja", "Margin")}</th>
+                          </tr></thead>
+                          <tbody>{deals.map((deal) => <tr key={deal.sequence} className="border-t border-line">
+                            <td className="px-2 py-2 font-mono"><Link href={`/app/finance/deals/${deal.sequence}`} className="text-brand hover:underline">{deal.sequence}</Link></td>
+                            <td className="px-2 py-2">{deal.customerName ?? "—"}</td>
+                            <td className="px-2 py-2">{deal.status ?? "—"}</td>
+                            <td className="px-2 py-2 text-right font-mono">{(deal.services ?? []).length}</td>
+                            <td className="px-2 py-2 text-right font-mono">{money(Number(deal.grossMargin ?? 0))}</td>
+                          </tr>)}</tbody>
+                        </table>
+                        {deals.length === 0 && <div className="px-2 py-4 text-center text-xs text-ink/60">{tr("Сделок за выбранный период нет", "Seçilmiş dövr üçün sövdə yoxdur", "No deals for selected period")}</div>}
+                      </div>
+                    )}
+                  </td>
+                </tr>}
+              </Fragment>;
             })}
             {report && report.items.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-ink/60">{tr("Менеджеров нет", "Menecer yoxdur", "No managers")}</td></tr>}
           </tbody>
