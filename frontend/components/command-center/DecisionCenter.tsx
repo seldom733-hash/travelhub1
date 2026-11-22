@@ -146,7 +146,7 @@ const COPY: Record<Locale, Copy> = {
 const EXTRA: Record<Locale, Record<string, string>> = {
   ru: {
     approvals: "Согласования", pendingApprovals: "Ожидают решения", noApprovals: "Нет ожидающих согласований",
-    cancellationsBreakdown: "Отмены", cancelledRequests: "Отменённые заявки", cancelledOrders: "Отменённые заказы", cancelledBookings: "Отменённые брони",
+    cancellationsBreakdown: "Отмены", cancelledRequests: "Отменённые заявки", cancelledOrders: "Отменённые заказы", cancelledBookings: "Отменённые брони", cancelledCombinedBookings: "Отменённые комбинированные брони", combinedBookingsHint: "1 сделка = 1 комбинированная бронь, внутри может быть несколько броней.",
     bottlenecks: "Операционные узкие места", noFirstResponse: "Без первого ответа", overdueRequests: "Просроченные заявки",
     waitingCustomer: "Ожидают клиента", waitingSupplier: "Ожидают поставщика", awaitingConfirmation: "Брони без подтверждения",
     readyForBooking: "Готовы к брони, не отправлены", problemBookings: "Проблемные брони",
@@ -155,7 +155,7 @@ const EXTRA: Record<Locale, Record<string, string>> = {
   },
   az: {
     approvals: "Təsdiqlər", pendingApprovals: "Qərar gözləyir", noApprovals: "Gözləyən təsdiq yoxdur",
-    cancellationsBreakdown: "Ləğvlər", cancelledRequests: "Ləğv edilmiş müraciətlər", cancelledOrders: "Ləğv edilmiş sifarişlər", cancelledBookings: "Ləğv edilmiş rezervasiyalar",
+    cancellationsBreakdown: "Ləğvlər", cancelledRequests: "Ləğv edilmiş müraciətlər", cancelledOrders: "Ləğv edilmiş sifarişlər", cancelledBookings: "Ləğv edilmiş rezervasiyalar", cancelledCombinedBookings: "Ləğv edilmiş birləşmiş rezervasiyalar", combinedBookingsHint: "1 sövdə = 1 birləşmiş rezervasiya, içində bir neçə rezervasiya ola bilər.",
     bottlenecks: "Əməliyyat darboğazları", noFirstResponse: "İlk cavabsız", overdueRequests: "Gecikmiş müraciətlər",
     waitingCustomer: "Müştəri gözləyir", waitingSupplier: "Təchizatçı gözləyir", awaitingConfirmation: "Təsdiqsiz rezervasiyalar",
     readyForBooking: "Rezervasiyaya hazır, göndərilməyib", problemBookings: "Problemli rezervasiyalar",
@@ -164,7 +164,7 @@ const EXTRA: Record<Locale, Record<string, string>> = {
   },
   en: {
     approvals: "Approvals", pendingApprovals: "Pending decisions", noPending: "No pending approvals", noApprovals: "No pending approvals",
-    cancellationsBreakdown: "Cancellations", cancelledRequests: "Cancelled requests", cancelledOrders: "Cancelled orders", cancelledBookings: "Cancelled bookings",
+    cancellationsBreakdown: "Cancellations", cancelledRequests: "Cancelled requests", cancelledOrders: "Cancelled orders", cancelledBookings: "Cancelled bookings", cancelledCombinedBookings: "Cancelled combined bookings", combinedBookingsHint: "1 deal = 1 combined booking; it may contain several bookings.",
     bottlenecks: "Operational bottlenecks", noFirstResponse: "No first response", overdueRequests: "Overdue requests",
     waitingCustomer: "Waiting for customer", waitingSupplier: "Waiting for supplier", awaitingConfirmation: "Awaiting confirmation",
     readyForBooking: "Ready for booking, not sent", problemBookings: "Problem bookings",
@@ -223,6 +223,7 @@ export function DecisionCenter() {
     const overdue = num(k.overdueRequests?.value);
     const cancelledOrders = num(k.cancelledOrders?.value);
     const cancelledBookings = num(k.cancelledBookings?.value);
+    const cancelledCombinedBookings = num(context?.combinedBookings?.cancelled);
     const clientDebt = num(finance?.clientDebt);
     const supplierDebt = num(finance?.supplierDebt);
     const signalCount = overdue + lost + issues.length;
@@ -233,11 +234,11 @@ export function DecisionCenter() {
       { title: c.overdue, count: overdue, href: activityHref, tone: "amber" },
       { title: x.cancelledRequests, count: lost, href: `${activityBaseHref}&activityFilter=lost`, tone: "rose" },
       { title: x.cancelledOrders, count: cancelledOrders, href: "/app/finance/deals?stage=ORDER&statusGroup=cancelled", tone: "rose" },
-      { title: x.cancelledBookings, count: cancelledBookings, href: "/app/finance/deals?stage=BOOKING&statusGroup=cancelled", tone: "rose" },
+      { title: x.cancelledCombinedBookings, count: cancelledCombinedBookings, href: "/app/finance/deals?stage=BOOKING&statusGroup=cancelled", tone: "rose" },
       { title: c.reconciliation, count: issues.length, href: "#data-quality", tone: "rose" },
     ].filter((s) => s.count > 0);
-    return { k, issues, lost, overdue, cancelledOrders, cancelledBookings, clientDebt, supplierDebt, signalCount, money, signals, activityBaseHref, activityHref };
-  }, [data, finance, locale, c]);
+    return { k, issues, lost, overdue, cancelledOrders, cancelledBookings, cancelledCombinedBookings, clientDebt, supplierDebt, signalCount, money, signals, activityBaseHref, activityHref };
+  }, [data, finance, context, locale, c, x]);
 
   if (loading) {
     return (
@@ -286,12 +287,12 @@ export function DecisionCenter() {
       </div>
 
       <div className="mt-4 rounded-xl border border-[#e5e2da] bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-semibold">{x.cancellationsBreakdown}</h2>
+        <h2 className="text-sm font-semibold">{x.cancellationsBreakdown}</h2><p className="mb-3 text-[11px] text-ink/50">{x.combinedBookingsHint}</p>
         <div className="grid gap-2 sm:grid-cols-3">
           {[
             [x.cancelledRequests, view.lost],
             [x.cancelledOrders, view.cancelledOrders],
-            [x.cancelledBookings, view.cancelledBookings],
+            [x.cancelledCombinedBookings, view.cancelledCombinedBookings],
           ].map(([label, value]) => (
             <div key={String(label)} className="rounded-lg border border-[#ece9e2] p-3">
               <div className="text-[10px] uppercase tracking-wide text-ink/50">{label}</div>

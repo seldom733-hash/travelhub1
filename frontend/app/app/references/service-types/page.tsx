@@ -13,6 +13,7 @@ export default function ServiceTypesPage() {
   const canCreate = useCan("hotel_directory.create");
   const [rows, setRows] = useState<ServiceType[]>([]);
   const [name, setName] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const tr = (ru: string, az: string, en: string) => (locale === "az" ? az : locale === "en" ? en : ru);
@@ -30,8 +31,9 @@ export default function ServiceTypesPage() {
     setBusy(true); setError("");
     try {
       const lang = locale === "az" ? "az" : locale === "en" ? "en" : "ru";
-      await hotelDirectoryApi.createServiceType({ names: { ru: lang === "ru" ? name.trim() : "", en: lang === "en" ? name.trim() : "", az: lang === "az" ? name.trim() : "" } });
+      await hotelDirectoryApi.createServiceType({ code: code.trim() || undefined, names: { ru: lang === "ru" ? name.trim() : "", en: lang === "en" ? name.trim() : "", az: lang === "az" ? name.trim() : "" } });
       setName("");
+      setCode("");
       await load();
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
@@ -41,6 +43,7 @@ export default function ServiceTypesPage() {
     <div className="space-y-4 p-4 lg:p-6">
       {error && <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
       {canCreate && <div className="flex flex-wrap gap-2 rounded-xl border border-line bg-white p-3">
+        <input value={code} onChange={(e) => setCode(e.target.value)} placeholder={tr("Код", "Kod", "Code")} className="w-40 rounded-lg border px-3 py-2 font-mono text-sm uppercase" />
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder={tr("Название услуги", "Xidmətin adı", "Service name")} className="min-w-64 flex-1 rounded-lg border px-3 py-2 text-sm" />
         <button type="button" disabled={busy} onClick={() => void add()} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{tr("Добавить услугу", "Xidmət əlavə et", "Add service")}</button>
       </div>}

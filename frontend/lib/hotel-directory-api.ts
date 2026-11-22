@@ -54,7 +54,7 @@ export const hotelDirectoryApi = {
     suppliers: string[];
   }>(`${BASE}/hotels`, body),
   serviceTypes: () => api.get<Array<{ id: string; code: string; names: { ru: string; en: string; az: string }; sortOrder: number; status: string }>>(`${BASE}/service-types`),
-  createServiceType: (body: { names: { ru: string; en: string; az: string }; sortOrder?: number; status?: string }) =>
+  createServiceType: (body: { code?: string; names: { ru: string; en: string; az: string }; sortOrder?: number; status?: string }) =>
     api.post<{ id: string; code: string; names: { ru: string; en: string; az: string }; sortOrder: number; status: string }>(`${BASE}/service-types`, body),
   airports: () => api.get<Array<{ id: string; code: string; name: string; countryCode: string; countryName: string; cityName: string; countryNameRu: string; countryNameEn: string; cityNameRu: string; cityNameEn: string; status: string }>>(`${BASE}/airports`),
   createAirport: (body: { code: string; name?: string; countryCode?: string; countryName?: string; cityName?: string; countryNameRu?: string; countryNameEn?: string; cityNameRu?: string; cityNameEn?: string }) =>

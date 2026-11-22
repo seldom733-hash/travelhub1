@@ -228,6 +228,10 @@ export class DealsService {
     const missingCost = active.filter((r) => Number(r.costAmount) <= 0);
     return {
       approvals: { pending: pendingApprovals },
+      combinedBookings: {
+        total: rows.filter((r) => r.stage === "BOOKING").length,
+        cancelled: rows.filter((r) => r.stage === "BOOKING" && r.isCancelledDeal).length,
+      },
       bottlenecks: {
         noFirstResponse,
         overdueRequests,

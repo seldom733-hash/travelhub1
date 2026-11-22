@@ -7,6 +7,7 @@ import Link from "next/link";
 import { formatPrice, useLocale } from "@/lib/i18n";
 import { dealText, dealStatus } from "@/lib/deals-i18n";
 import { dealsApi, type DealList, type DealQuery, type DealRow } from "@/lib/deals-api";
+import { api } from "@/lib/api";
 import NotificationStrip from "@/components/NotificationStrip";
 
 function cancellationReasonRu(reason: string | null) { return reason ? ({ CUSTOMER_FAULT: "вина туриста", SUPPLIER_FAULT: "вина поставщика", NAVITRAVEL_FAULT: "вина Navitravel", FORCE_MAJEURE: "форс-мажор", MUTUAL_AGREEMENT: "взаимное соглашение" } as Record<string, string>)[reason] ?? reason : ""; }
@@ -26,6 +27,7 @@ function tone(s: string) { if (/CANCEL|REJECT|FAIL/.test(s)) return "border-rose
 export default function DealsPage() {
   const locale = useLocale();
   const [data, setData] = useState<DealList | null>(null);
+  const [serviceTypes, setServiceTypes] = useState<Array<{ code: string; names?: Record<string, string> }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -48,6 +50,12 @@ export default function DealsPage() {
   const apiQuery = useMemo<DealQuery>(() => ({ ...query, page, pageSize }), [query, page, pageSize]);
   const load = useCallback(async () => { setLoading(true); setError(""); try { const r = await dealsApi.list(apiQuery); setData(r); } catch (e) { setError((e as Error).message); } finally { setLoading(false); } }, [apiQuery]);
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    api.get<Array<{ code: string; names?: Record<string, string> }>>("/hotel-directory/service-types")
+      .then((rows) => setServiceTypes(Array.isArray(rows) ? rows : []))
+      .catch(() => setServiceTypes([]));
+  }, []);
   const setFilter = (patch: Partial<typeof query>) => { setPage(1); setQuery((q) => ({ ...q, ...patch })); };
   const sortBy = (key: string) => setFilter({ sortBy: key, sortDirection: query.sortBy === key && query.sortDirection === "asc" ? "desc" : "asc" });
   const dateOnly = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -103,7 +111,7 @@ export default function DealsPage() {
             <Sel label="Менеджер" value={query.manager} onChange={(v) => setFilter({ manager: v })}><option value="">Все менеджеры</option>{(data?.facets.managers ?? []).map((m) => <option key={m} value={m}>{m}</option>)}</Sel>
             <Sel label="Стадия" value={query.stage} onChange={(v) => setFilter({ stage: v })}><option value="">Все стадии</option><option value="REQUEST">{dealText(locale, "Заявка")}</option><option value="ORDER">{dealText(locale, "Заказ")}</option><option value="BOOKING">{dealText(locale, "Бронь")}</option></Sel>
             <Sel label="Статус сделки" value={query.status} onChange={(v) => setFilter({ status: v })}><option value="">Все статусы</option>{Object.keys(label).filter((s) => s !== "CONVERTED").map((s) => <option key={s} value={s}>{dealStatus(locale, s)}</option>)}</Sel><Sel label="Причина отмены" value={query.cancellationReason} onChange={(v) => setFilter({ cancellationReason: v })}><option value="">Все причины</option><option value="CUSTOMER_FAULT">Вина туриста</option><option value="SUPPLIER_FAULT">Вина поставщика</option><option value="NAVITRAVEL_FAULT">Вина Navitravel</option><option value="FORCE_MAJEURE">Форс-мажор</option><option value="MUTUAL_AGREEMENT">Взаимное соглашение</option></Sel>
-            <Sel label="Услуга" value={query.serviceType} onChange={(v) => setFilter({ serviceType: v })}><option value="">Все услуги</option><option value="TOUR">Тур</option><option value="HOTEL">Отель</option><option value="FLIGHT">Авиабилет</option><option value="CRUISE">Круиз</option><option value="TRANSFER">Трансфер</option><option value="INSURANCE">Страховка</option></Sel><Sel label="Оплата клиента" value={query.clientPayment} onChange={(v) => setFilter({ clientPayment: v })}><option value="">Все</option><option value="UNPAID">Не оплачено</option><option value="PARTIALLY_PAID">Частично</option><option value="PAID">Оплачено</option></Sel>
+            <Sel label="Услуга" value={query.serviceType} onChange={(v) => setFilter({ serviceType: v })}><option value="">Все услуги</option>{serviceTypes.map((st) => <option key={st.code} value={st.code === "TOUR" ? "TOUR_PACKAGE" : st.code}>{st.names?.[locale] ?? st.names?.ru ?? st.code}</option>)}</Sel><Sel label="Оплата клиента" value={query.clientPayment} onChange={(v) => setFilter({ clientPayment: v })}><option value="">Все</option><option value="UNPAID">Не оплачено</option><option value="PARTIALLY_PAID">Частично</option><option value="PAID">Оплачено</option></Sel>
             <Sel label="Оплата поставщику" value={query.supplierPayment} onChange={(v) => setFilter({ supplierPayment: v })}><option value="">Все</option><option value="UNPAID">Не оплачено</option><option value="PARTIALLY_PAID">Частично</option><option value="PAID">Оплачено</option></Sel>
 
           </div>
