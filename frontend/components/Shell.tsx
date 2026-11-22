@@ -84,7 +84,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/app/references/service-types", icon: "🧾", labelKey: "nav.service_types", permission: "hotel_directory.read" },
       { href: "/app/references/clients", icon: "👥", labelKey: "nav.clients", permission: "crm.customer.read" },
       { href: "/app/references/suppliers", icon: "🏭", labelKey: "nav.suppliers", permission: "crm.partner.read" },
-      { href: "/app/references/dictionaries", icon: "📚", labelKey: "nav.dictionaries", permission: "catalog.product.read_own" },
+      { href: "/app/references/airlines", icon: "✈️", labelKey: "nav.airlines", permission: "hotel_directory.read" },
     ],
   },
   {

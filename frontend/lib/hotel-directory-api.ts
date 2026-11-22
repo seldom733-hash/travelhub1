@@ -4,7 +4,8 @@ export type HotelDirectoryType =
   | "categories"
   | "room-types"
   | "placement-types"
-  | "meal-types";
+  | "meal-types"
+  | "view-types";
 
 export interface HotelDirectoryEntry {
   id: string;

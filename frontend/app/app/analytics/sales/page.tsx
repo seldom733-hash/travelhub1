@@ -58,8 +58,6 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
   const [endDate, setEndDate] = useState("");
   const [managerId, setManagerId] = useState("");
   const [serviceType, setServiceType] = useState("");
-  const [source, setSource] = useState("");
-  const [status, setStatus] = useState("");
   const [tab] = useState(initialTab);
   const [dealTab, setDealTab] = useState<"completed" | "closed">("completed");
   const [data, setData] = useState<any>(null);
@@ -83,8 +81,6 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
     if (q.get("endDate")) setEndDate(q.get("endDate")!);
     if (q.get("managerId")) setManagerId(q.get("managerId")!);
     if (q.get("serviceType")) setServiceType(q.get("serviceType")!);
-    if (q.get("source")) setSource(q.get("source")!);
-    if (q.get("status")) setStatus(q.get("status")!);
     if (q.get("dealTab") === "closed") setDealTab("closed");
   }, []);
 
@@ -127,10 +123,8 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
     if (preset === "CUSTOM") { qs.set("startDate", startDate); qs.set("endDate", endDate); }
     if (managerId) qs.set("managerId", managerId);
     if (serviceType) qs.set("serviceType", serviceType);
-    if (source) qs.set("source", source);
-    if (status) qs.set("status", status);
     return qs.toString();
-  }, [preset, startDate, endDate, managerId, serviceType, source, status]);
+  }, [preset, startDate, endDate, managerId, serviceType]);
 
   useEffect(() => {
     const period = data?.period;
@@ -168,6 +162,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
     if (activityFilter === "no_manager") return rows.filter((r: any) => !r.managerId);
     if (activityFilter === "no_response") return rows.filter((r: any) => !r.firstContactAt);
     if (activityFilter === "overdue") return rows.filter((r: any) => r.overdue);
+    if (activityFilter === "attention") return rows.filter((r: any) => r.overdue || ["REJECTED", "UNAVAILABLE", "EXPIRED", "CUSTOMER_PAYMENT_TIMEOUT", "CANCELLED_BY_CUSTOMER"].includes(r.status));
     if (activityFilter === "lost") return rows.filter((r: any) => ["REJECTED", "UNAVAILABLE", "EXPIRED", "CUSTOMER_PAYMENT_TIMEOUT", "CANCELLED_BY_CUSTOMER"].includes(r.status));
     if (activityFilter === "unprocessed") return rows.filter((r: any) => !r.processingStartedAt);
     if (activityFilter === "no_proposal") return rows.filter((r: any) => !r.proposalSent);
@@ -218,7 +213,6 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
               <option value="">{L("Все")}</option>{serviceTypes.map((x) => <option key={x.code} value={x.code === "TOUR" ? "TOUR_PACKAGE" : x.code}>{x.names?.[locale] ?? x.names?.ru ?? x.code}</option>)}
             </select>
           </label>
-          <label className="flex flex-col gap-1"><span className="text-ink/60">{L("Источник")}</span><input value={source} onChange={(e) => setSource(e.target.value)} placeholder={L("Все")} className="w-28 rounded-lg border bg-white px-2 py-1.5" /></label><label className="flex flex-col gap-1"><span className="text-ink/60">{L("Статус")}</span><select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-lg border bg-white px-2 py-1.5"><option value="">{L("Все")}</option><option value="NEW">{L("Новая")}</option><option value="CHECKING">{L("Проверка")}</option><option value="SUPPLIER_TIMEOUT">{L("Поставщик не ответил")}</option><option value="PRICE_CHANGED">{L("Цена изменилась")}</option><option value="CUSTOMER_ACCEPTED">{L("Клиент подтвердил")}</option><option value="CONFIRMED">{L("Подтверждена")}</option><option value="CONVERTED">{L("Сконвертирована")}</option><option value="REJECTED">{L("Отклонена")}</option><option value="UNAVAILABLE">{L("Недоступна")}</option><option value="EXPIRED">{L("Истекла")}</option><option value="CUSTOMER_PAYMENT_TIMEOUT">{L("Клиент не оплатил")}</option><option value="CANCELLED_BY_CUSTOMER">{L("Клиент отказался")}</option></select></label>
         </div>
       </div>
 
@@ -315,7 +309,7 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
           {selectedManager && <div className="border-t bg-emerald-50/40 p-3 text-xs"><div className="mb-1 flex justify-between"><b>{selectedManager.manager}</b><button onClick={() => setSelectedManager(null)} className="text-ink/60">×</button></div><div className="grid gap-2 sm:grid-cols-4"><div>Заявки: {selectedManager.requests}</div><div>Заказы: {selectedManager.orders}</div><div>Завершено: {selectedManager.completed}</div><div>Закрыто: {selectedManager.closed}</div><div>Продажи: {money(selectedManager.salesAmount)}</div><div>Выручка: {money(selectedManager.capturedRevenue)}</div><div>Прибыль: {money(selectedManager.grossProfit)}</div><div>Ср. ответ: {selectedManager.avgResponseHours ?? "—"} ч</div></div></div>}
         </div>}
 
-        {tab === "activity" && <div className="space-y-2"><div className="flex flex-wrap items-center gap-2 text-xs"><span className="text-ink/60">{L("Контроль:")}</span><select value={activityFilter} onChange={(e) => setActivityFilter(e.target.value)} className="rounded-lg border bg-white px-2 py-1.5"><option value="all">{L("Все заявки")}</option><option value="no_manager">{L("Без менеджера")}</option><option value="unprocessed">{L("Не приняты в работу")}</option><option value="no_response">{L("Без первого ответа")}</option><option value="overdue">{L("Просроченные")}</option><option value="no_proposal">{L("Без предложения")}</option><option value="waiting_customer">{L("Ожидают клиента")}</option><option value="waiting_supplier">{L("Ожидают поставщика")}</option></select><span className="text-ink/60">{L("Показано:")} {filteredActivity.length}</span></div><div className="overflow-x-auto rounded-xl border border-[#e5e2da] bg-white"><table className="w-full min-w-[1000px] text-left text-[11px]"><thead className="bg-panel text-ink/60"><tr>{["Заявка", "Создана", "Назначена", "Менеджер", "Клиент", "Телефон", "Услуга", "Направление", "Источник", "Статус", "Первый ответ, ч", "Просрочка"].map((h) => <th key={h} className="px-2 py-2 font-medium">{L(h)}</th>)}</tr></thead><tbody>{filteredActivity.map((r: any) => <tr key={r.requestId} className="border-t border-line"><td className="px-2 py-2 font-mono">{r.requestCode}</td><td className="px-2 py-2">{dt(r.createdAt)}</td><td className="px-2 py-2">{dt(r.assignedAt)}</td><td className="px-2 py-2">{r.manager}</td><td className="px-2 py-2">{r.customer}</td><td className="px-2 py-2">{r.phone ?? "—"}</td><td className="px-2 py-2">{r.requestType ?? "—"}</td><td className="px-2 py-2">{r.destination ?? "—"}</td><td className="px-2 py-2">{r.source ?? "—"}</td><td className="px-2 py-2">{saStatus(locale, r.status)}</td><td className="px-2 py-2">{r.responseHours ?? "—"}</td><td className={`px-2 py-2 ${r.overdue ? "font-semibold text-rose-600" : "text-ink/60"}`}>{r.overdue ? L("Да") : L("Нет")}</td></tr>)}</tbody></table></div></div>}
+        {tab === "activity" && <div className="space-y-2"><div className="flex flex-wrap items-center gap-2 text-xs"><span className="text-ink/60">{L("Контроль:")}</span><select value={activityFilter} onChange={(e) => setActivityFilter(e.target.value)} className="rounded-lg border bg-white px-2 py-1.5"><option value="all">{L("Все заявки")}</option><option value="no_manager">{L("Без менеджера")}</option><option value="unprocessed">{L("Не приняты в работу")}</option><option value="no_response">{L("Без первого ответа")}</option><option value="attention">{L("Требуют внимания")}</option><option value="overdue">{L("Просроченные")}</option><option value="no_proposal">{L("Без предложения")}</option><option value="waiting_customer">{L("Ожидают клиента")}</option><option value="waiting_supplier">{L("Ожидают поставщика")}</option></select><span className="text-ink/60">{L("Показано:")} {filteredActivity.length}</span></div><div className="overflow-x-auto rounded-xl border border-[#e5e2da] bg-white"><table className="w-full min-w-[1000px] text-left text-[11px]"><thead className="bg-panel text-ink/60"><tr>{["Заявка", "Создана", "Назначена", "Менеджер", "Клиент", "Телефон", "Услуга", "Направление", "Источник", "Статус", "Первый ответ, ч", "Просрочка"].map((h) => <th key={h} className="px-2 py-2 font-medium">{L(h)}</th>)}</tr></thead><tbody>{filteredActivity.map((r: any) => <tr key={r.requestId} className="border-t border-line"><td className="px-2 py-2 font-mono">{r.requestCode}</td><td className="px-2 py-2">{dt(r.createdAt)}</td><td className="px-2 py-2">{dt(r.assignedAt)}</td><td className="px-2 py-2">{r.manager}</td><td className="px-2 py-2">{r.customer}</td><td className="px-2 py-2">{r.phone ?? "—"}</td><td className="px-2 py-2">{r.requestType ?? "—"}</td><td className="px-2 py-2">{r.destination ?? "—"}</td><td className="px-2 py-2">{r.source ?? "—"}</td><td className="px-2 py-2">{saStatus(locale, r.status)}</td><td className="px-2 py-2">{r.responseHours ?? "—"}</td><td className={`px-2 py-2 ${r.overdue ? "font-semibold text-rose-600" : "text-ink/60"}`}>{r.overdue ? L("Да") : L("Нет")}</td></tr>)}</tbody></table></div></div>}
 
         {tab === "funnel" && <div className="space-y-3">
           <div className="space-y-2">{(data.funnel ?? []).map((s: any, i: number, arr: any[]) => <div key={s.stage} className="rounded-xl border border-[#e5e2da] bg-white p-3"><div className="mb-1 flex justify-between text-xs"><b>{L(s.label)}</b><span>{s.count} · {pct(s.conversion)}</span></div><div className="h-2 overflow-hidden rounded bg-panel"><div className="h-full rounded bg-[#0f6b5f]" style={{ width: `${Math.min(100, s.conversion)}%` }} /></div>{i < arr.length - 1 && <div className="mt-1 text-[10px] text-ink/60">{L("Не перешли дальше на дату отчёта:")} {Math.max(0, s.count - arr[i + 1].count)}</div>}</div>)}</div>

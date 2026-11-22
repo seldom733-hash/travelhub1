@@ -45,6 +45,7 @@ const TABS: { key: TabKey; labelKey: string; fallback: string }[] = [
   { key: "room-types", labelKey: "hd.tabs.room_types", fallback: "Типы номеров" },
   { key: "placement-types", labelKey: "hd.tabs.placement_types", fallback: "Типы размещения" },
   { key: "meal-types", labelKey: "hd.tabs.meal_types", fallback: "Типы питания" },
+ { key: "view-types", labelKey: "hd.tabs.view_types", fallback: "Вид из номера" },
 ];
 
 function HotelDirectoryContent() {
@@ -196,7 +197,7 @@ function HotelDirectoryContent() {
         actions={
           <button
             onClick={() => void load(tab, search, statusFilter)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+            className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 transition-colors hover:bg-panel"
           >
             {t("admin.table.refresh", locale)}
           </button>
@@ -204,7 +205,7 @@ function HotelDirectoryContent() {
       />
 
       <div className="space-y-4 p-6">
-        <div className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+        <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-white p-1 shadow-sm">
           {TABS.map((item) => (
             <button
               key={item.key}
@@ -212,8 +213,8 @@ function HotelDirectoryContent() {
               onClick={() => setTab(item.key)}
               className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
                 tab === item.key
-                  ? "bg-blue-600 text-white"
-                  : "text-slate-900 hover:bg-slate-100"
+                  ? "bg-brand text-white"
+                  : "text-ink hover:bg-panel"
               }`}
             >
               {t(item.labelKey, locale) ?? item.fallback}
@@ -229,7 +230,7 @@ function HotelDirectoryContent() {
             defaultValue={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder={t("geo.filter.search", locale) ?? "Поиск по коду или названию…"}
-            className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-900 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            className="w-64 rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink outline-none transition placeholder:text-ink focus:border-brand focus:ring-2 focus:ring-brand"
           />
           <select
             value={statusFilter}
@@ -237,7 +238,7 @@ function HotelDirectoryContent() {
               setStatusFilter(e.target.value);
               void load(tab, search, e.target.value);
             }}
-            className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-400"
+            className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm text-ink outline-none focus:border-brand"
           >
             <option value="">{t("admin.filter.all_statuses", locale)}</option>
             <option value="ACTIVE">ACTIVE</option>
@@ -247,12 +248,12 @@ function HotelDirectoryContent() {
             <button
               type="button"
               onClick={openCreate}
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+              className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-dark"
             >
               {t("geo.actions.create", locale) ?? "Создать"}
             </button>
           )}
-          {busy && <span className="text-xs text-slate-900">{t("admin.table.loading", locale)}</span>}
+          {busy && <span className="text-xs text-ink">{t("admin.table.loading", locale)}</span>}
         </div>
 
         {error && (
@@ -261,7 +262,7 @@ function HotelDirectoryContent() {
           </div>
         )}
 
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
           <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>
             <colgroup>
               <col style={{ width: "14%" }} />
@@ -271,7 +272,7 @@ function HotelDirectoryContent() {
               <col style={{ width: "12%" }} />
               <col style={{ width: "12%" }} />
             </colgroup>
-            <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-900">
+            <thead className="border-b border-line bg-panel text-xs uppercase tracking-wide text-ink">
               <tr>
                 <th className="px-4 py-2.5 font-medium">{t("geo.table.code", locale) ?? "Код"}</th>
                 <th className="px-4 py-2.5 font-medium">{t("geo.table.name", locale) ?? "Название"}</th>
@@ -283,15 +284,15 @@ function HotelDirectoryContent() {
             </thead>
             <tbody>
               {pageRows.map((row) => (
-                <tr key={row.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                  <td className="px-4 py-2.5 font-mono text-xs font-semibold text-slate-900">{row.code}</td>
-                  <td className="truncate px-4 py-2.5 font-medium text-slate-900">
+                <tr key={row.id} className="border-b border-line last:border-0 hover:bg-panel">
+                  <td className="px-4 py-2.5 font-mono text-xs font-semibold text-ink">{row.code}</td>
+                  <td className="truncate px-4 py-2.5 font-medium text-ink">
                     {hotelDirectoryDisplayName(row.names)}
                   </td>
-                  <td className="truncate px-4 py-2.5 text-xs text-slate-900">
+                  <td className="truncate px-4 py-2.5 text-xs text-ink">
                     {[row.names?.en, row.names?.az].filter(Boolean).join(" / ")}
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-slate-900">{row.sortOrder}</td>
+                  <td className="px-4 py-2.5 text-xs text-ink">{row.sortOrder}</td>
                   <td className="px-4 py-2.5">
                     <StatusBadge status={row.status ?? ""} />
                   </td>
@@ -301,7 +302,7 @@ function HotelDirectoryContent() {
                         <button
                           type="button"
                           onClick={() => openEdit(row)}
-                          className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                          className="text-xs font-medium text-brand hover:text-ink"
                         >
                           {t("geo.actions.edit", locale) ?? "Изм."}
                         </button>
@@ -321,7 +322,7 @@ function HotelDirectoryContent() {
               ))}
               {pageRows.length === 0 && !busy && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-900">
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-ink">
                     {t("ops.empty_no_data", locale)}
                   </td>
                 </tr>
@@ -344,41 +345,41 @@ function HotelDirectoryContent() {
         >
           <div className="space-y-3 p-4">
             {!editing && (
-              <label className="block text-xs font-medium text-slate-900">
+              <label className="block text-xs font-medium text-ink">
                 {t("geo.table.code", locale) ?? "Код"}
                 <input
                   value={form.code}
                   onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
                   placeholder="5*"
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-sm text-slate-900 outline-none placeholder:text-slate-900 focus:border-blue-400"
+                  className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 font-mono text-sm text-ink outline-none placeholder:text-ink focus:border-brand"
                 />
               </label>
             )}
             {(["ru", "en", "az"] as const).map((lng) => (
-              <label key={lng} className="block text-xs font-medium text-slate-900">
+              <label key={lng} className="block text-xs font-medium text-ink">
                 {t("geo.form.name", locale) ?? "Название"} ({lng.toUpperCase()})
                 <input
                   value={form[lng]}
                   onChange={(e) => setForm((f) => ({ ...f, [lng]: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-900 outline-none placeholder:text-slate-900 focus:border-blue-400"
+                  className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 text-sm text-ink outline-none placeholder:text-ink focus:border-brand"
                 />
               </label>
             ))}
-            <label className="block text-xs font-medium text-slate-900">
+            <label className="block text-xs font-medium text-ink">
               Sort
               <input
                 value={form.sortOrder}
                 onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))}
                 placeholder="0"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-900 outline-none placeholder:text-slate-900 focus:border-blue-400"
+                className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 text-sm text-ink outline-none placeholder:text-ink focus:border-brand"
               />
             </label>
-            <label className="block text-xs font-medium text-slate-900">
+            <label className="block text-xs font-medium text-ink">
               Status
               <select
                 value={form.status}
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-400"
+                className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink outline-none focus:border-brand"
               >
                 <option value="ACTIVE">ACTIVE</option>
                 <option value="INACTIVE">INACTIVE</option>
@@ -388,7 +389,7 @@ function HotelDirectoryContent() {
               type="button"
               disabled={saving}
               onClick={() => void handleSave()}
-              className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+              className="w-full rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:opacity-50"
             >
               {saving
                 ? (t("admin.table.loading", locale) ?? "…")

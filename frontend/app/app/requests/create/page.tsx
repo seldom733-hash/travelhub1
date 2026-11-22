@@ -584,7 +584,7 @@ export default function CreateRequestPage() {
     </section>
 
     <section className="rounded-xl border border-line bg-white p-4 shadow-sm">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">{tr("Услуги", "Xidmətlər", "Services")}</h2><label className="flex items-center gap-2 text-[11px] text-ink/60">{tr("Тип услуги", "Xidmətin növü", "Service type")}<select className="rounded-lg border px-2 py-1.5 text-xs" value={visibleServiceType} onChange={(e) => {
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">{tr("Услуги", "Xidmətlər", "Services")}</h2><label className="flex items-center gap-2 text-xs font-semibold text-ink">{tr("Тип услуги", "Xidmətin növü", "Service type")}<select className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs text-ink" value={visibleServiceType} onChange={(e) => {
         const code = e.target.value;
         const kind = SERVICE_TYPE_KIND[code] ?? "OTHER";
         setActivePackageKind(kind);

@@ -36,6 +36,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState(initialStatus);
   const [productType, setProductType] = useState("");
+  const [serviceTypeOptions, setServiceTypeOptions] = useState<Array<{ code: string; names?: Record<string, string> }>>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [unsold] = useState(initialUnsold);
@@ -103,6 +104,12 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    api.get<Array<{ code: string; names?: Record<string, string> }>>("/hotel-directory/service-types")
+      .then((rows) => setServiceTypeOptions(Array.isArray(rows) ? rows : []))
+      .catch(() => setServiceTypeOptions([]));
+  }, []);
 
   useEffect(() => {
     void load();
@@ -222,7 +229,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
               {/* Step 3.6B: Platform Create Product removed — Platform is marketplace operator, not seller */}
               <button
                 onClick={() => void load()}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 transition-colors hover:bg-panel"
               >
                 {t("admin.table.refresh", locale)}
               </button>
@@ -246,12 +253,12 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("admin.search.placeholder_catalog", locale)}
-              className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              className="w-64 rounded-lg border border-line bg-white px-3 py-1.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand"
             />
             <select
               value={status}
               onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 outline-none focus:border-blue-400"
+              className="rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink/60 outline-none focus:border-brand"
             >
               <option value="">{t("admin.filter.all_statuses", locale)}</option>
               <option value="DRAFT">Черновик</option>
@@ -263,29 +270,32 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
             <select
               value={productType}
               onChange={(e) => { setProductType(e.target.value); setPage(1); }}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 outline-none focus:border-blue-400"
+              className="rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink/60 outline-none focus:border-brand"
             >
               <option value="">{t("admin.filter.all_types", locale)}</option>
-              {PRODUCT_TYPES.map((t) => (
-                <option key={t.code} value={t.code}>{t.title}</option>
-              ))}
+              {(() => {
+                const typeMap: Record<string, string> = { TOUR: "TOUR", TOUR_PACKAGE: "TOUR", HOTEL: "HOTEL", FLIGHT: "FLIGHT", FLIGHT_BOOKING: "FLIGHT", TRANSFER: "TRANSFER", INSURANCE: "INSURANCE", CRUISE: "CRUISE", EXCURSION: "EXCURSION", GUIDE: "GUIDE" };
+                if (serviceTypeOptions.length === 0) return PRODUCT_TYPES.map((t) => <option key={t.code} value={t.code}>{t.title}</option>);
+                const seen = new Set<string>();
+                return serviceTypeOptions.filter((st) => typeMap[st.code] && !seen.has(typeMap[st.code]) && seen.add(typeMap[st.code])).map((st) => <option key={st.code} value={typeMap[st.code]}>{st.names?.[locale] ?? st.names?.ru ?? st.code}</option>);
+              })()}
             </select>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">С</span>
-              <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
-              <span className="text-xs text-slate-400">По</span>
-              <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
+              <span className="text-xs text-ink/60">С</span>
+              <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand" />
+              <span className="text-xs text-ink/60">По</span>
+              <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand" />
             </div>
             {activeFilters.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {activeFilters.map((f, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                  <span key={i} className="inline-flex items-center gap-1 rounded-full bg-brand/10 border border-brand/20 px-2.5 py-0.5 text-xs font-medium text-brand-dark">
                     {f}
                   </span>
                 ))}
               </div>
             )}
-            {busy && <span className="text-xs text-slate-400">{t("admin.table.loading", locale)}</span>}
+            {busy && <span className="text-xs text-ink/60">{t("admin.table.loading", locale)}</span>}
             <TableExportButton
               exportUrl="/api/v1/catalog/products/export"
               extraParams={{
@@ -303,7 +313,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
 
           {/* Table */}
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
             <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>
               <colgroup>
                 <col style={{ width: "12%" }} />
@@ -314,7 +324,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                 <col style={{ width: "14%" }} />
                 <col style={{ width: "12%" }} />
               </colgroup>
-              <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+              <thead className="border-b border-line bg-panel text-xs uppercase tracking-wide text-ink/60">
                 <tr>
                   <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("admin.table.col.code", locale)}</SortableHeader>
                   <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>{t("admin.table.col.name", locale)}</SortableHeader>
@@ -322,7 +332,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                   <th className="px-4 py-2.5 font-medium">{t("admin.table.col.tariffs", locale)}</th>
                   <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("admin.table.col.status", locale)}</SortableHeader>
                   <SortableHeader field="publishedAt" currentSort={sortState} onSort={handleSort}>{t("admin.table.col.published_at", locale)}</SortableHeader>
-                  {unsold === "true" && <th className="px-4 py-2.5 font-medium text-blue-600">Заказы</th>}
+                  {unsold === "true" && <th className="px-4 py-2.5 font-medium text-brand">Заказы</th>}
                   {availability === "missing" && <th className="px-4 py-2.5 font-medium text-amber-600">Доступность</th>}
                 </tr>
               </thead>
@@ -331,23 +341,23 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                   <tr
                     key={p.id}
                     onClick={() => void openDetail(p.id)}
-                    className={`cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50 ${
-                      selected?.id === p.id ? "bg-blue-50/60" : ""
+                    className={`cursor-pointer border-b border-line transition-colors hover:bg-brand/50 ${
+                      selected?.id === p.id ? "bg-brand/60" : ""
                     }`}
                   >
-                    <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{p.code}</td>
-                    <td className="px-4 py-2.5 font-medium text-slate-800">{p.title}</td>
-                    <td className="px-4 py-2.5 text-slate-500">{p.type}</td>
-                    <td className="px-4 py-2.5 text-slate-500">{p.tariffs?.length ?? 0}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-brand">{p.code}</td>
+                    <td className="px-4 py-2.5 font-medium text-ink">{p.title}</td>
+                    <td className="px-4 py-2.5 text-ink/60">{p.type}</td>
+                    <td className="px-4 py-2.5 text-ink/60">{p.tariffs?.length ?? 0}</td>
                     <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
-                    <td className="px-4 py-2.5 text-xs text-slate-500">{p.publishedAt ? new Date(p.publishedAt).toLocaleDateString("ru-RU") : "—"}</td>
+                    <td className="px-4 py-2.5 text-xs text-ink/60">{p.publishedAt ? new Date(p.publishedAt).toLocaleDateString("ru-RU") : "—"}</td>
                     {unsold === "true" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-xs font-medium text-green-700">0 заказов</span></td>}
                     {availability === "missing" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">Не настроена</span></td>}
                   </tr>
                 ))}
                 {(data?.items ?? []).length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-ink/60">
                       {t("admin.table.empty_catalog", locale)}
                     </td>
                   </tr>
@@ -370,11 +380,11 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
       {showCreate && (
         <PanelFrame title="Создать продукт" subtitle="Каталог услуг TravelHub" onClose={() => setShowCreate(false)}>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Тип *</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">Тип *</label>
               <select
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
               >
                 {PRODUCT_TYPES.map((t) => (
                   <option key={t.code} value={t.code}>
@@ -384,47 +394,47 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Название *</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">Название *</label>
               <input
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
                 placeholder="Тур «Золотое кольцо»"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Slug (URL)</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">Slug (URL)</label>
               <input
                 value={form.slug}
                 onChange={(e) => setForm({ ...form, slug: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
                 placeholder="golden-ring-tour"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Описание</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">Описание</label>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={3}
-                className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                className="w-full resize-none rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
                 placeholder="Краткое описание услуги…"
               />
             </div>
 
             {/* Примечание */}
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Примечание</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">Примечание</label>
               <textarea
                 value={initialNote}
                 onChange={(e) => setInitialNote(e.target.value)}
                 rows={3}
                 maxLength={5000}
                 aria-label="Примечание"
-                className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+                className="w-full resize-none rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
                 placeholder="Внутренняя заметка для сотрудников"
               />
-              <div className="mt-1 text-right text-xs text-slate-400">
+              <div className="mt-1 text-right text-xs text-ink/60">
                 {initialNote.length}/5000
               </div>
             </div>
@@ -435,12 +445,12 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
             <button
               onClick={() => void createProduct()}
               disabled={creating || !form.title.trim()}
-              className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
             >
               {creating ? "Создание…" : "Создать продукт"}
             </button>
 
-            <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-700">
+            <div className="rounded-lg border border-brand/15 bg-brand/10 px-3 py-2 text-xs leading-relaxed text-brand-dark">
               🔐 Требуется право <b>catalog.product.write</b> (матрица: ADMIN, MODERATOR). Публикация — отдельным шагом.
             </div>
         </PanelFrame>
@@ -448,38 +458,38 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
 
       {/* Side Panel: детали продукта */}
       {!showCreate && selected && (
-        <aside className="thin-scroll fade-in-up w-96 shrink-0 overflow-y-auto border-l border-slate-200 bg-white">
-          <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+        <aside className="thin-scroll fade-in-up w-96 shrink-0 overflow-y-auto border-l border-line bg-white">
+          <div className="flex items-start justify-between border-b border-line px-5 py-4">
             <div>
-              <div className="font-mono text-xs text-blue-600">{selected.code}</div>
-              <div className="text-lg font-bold text-slate-900">{selected.title}</div>
+              <div className="font-mono text-xs text-brand">{selected.code}</div>
+              <div className="text-lg font-bold text-ink">{selected.title}</div>
               <StatusBadge status={selected.status} />
             </div>
-            <button onClick={() => setSelected(null)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100">
+            <button onClick={() => setSelected(null)} className="rounded-md p-1 text-ink/60 hover:bg-panel">
               ✕
             </button>
           </div>
 
           {editing ? (
             <div className="space-y-4 p-5 text-sm">
-              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+              <div className="rounded-lg border border-brand/15 bg-brand/10 px-3 py-2 text-xs text-brand-dark">
                 ✏️ Редактирование: PATCH /products/:id — требуется право catalog.product.write
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Название *</label>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">Название *</label>
                 <input
                   value={editForm.title}
                   onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                  className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Описание</label>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">Описание</label>
                 <textarea
                   value={editForm.description}
                   onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                   rows={3}
-                  className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                  className="w-full resize-none rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
                 />
               </div>
               <TariffEditor value={tariffs} onChange={setTariffs} />
@@ -487,13 +497,13 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                 <button
                   onClick={() => void saveEdit()}
                   disabled={busy || !editForm.title.trim()}
-                  className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 rounded-lg bg-brand px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {busy ? "Сохранение…" : "💾 Сохранить"}
                 </button>
                 <button
                   onClick={() => setEditing(false)}
-                  className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                  className="flex-1 rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink/60 transition-colors hover:bg-panel"
                 >
                   Отмена
                 </button>
@@ -504,7 +514,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
               {canWrite && (
                 <button
                   onClick={openEdit}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:border-blue-300 hover:text-blue-600"
+                  className="w-full rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink/60 transition-colors hover:border-brand/25 hover:text-brand"
                 >
                   ✏️ Редактировать
                 </button>
@@ -516,28 +526,28 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
               )}
 
               <div>
-                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">О продукте</div>
-                <p className="text-slate-600">{selected.description ?? "Без описания"}</p>
+                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink/60">О продукте</div>
+                <p className="text-ink/60">{selected.description ?? "Без описания"}</p>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-lg bg-slate-50 px-3 py-2">
-                    <div className="text-slate-400">Тип</div>
-                    <div className="font-medium text-slate-700">{selected.type}</div>
+                  <div className="rounded-lg bg-panel px-3 py-2">
+                    <div className="text-ink/60">Тип</div>
+                    <div className="font-medium text-ink">{selected.type}</div>
                   </div>
-                  <div className="rounded-lg bg-slate-50 px-3 py-2">
-                    <div className="text-slate-400">Версия</div>
-                    <div className="font-medium text-slate-700">v{selected.version}</div>
+                  <div className="rounded-lg bg-panel px-3 py-2">
+                    <div className="text-ink/60">Версия</div>
+                    <div className="font-medium text-ink">v{selected.version}</div>
                   </div>
                 </div>
               </div>
 
               <div>
-                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Тарифы</div>
-                {(selected.tariffs ?? []).length === 0 && <div className="text-slate-400">Тарифы не заданы</div>}
+                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink/60">Тарифы</div>
+                {(selected.tariffs ?? []).length === 0 && <div className="text-ink/60">Тарифы не заданы</div>}
                 <div className="space-y-1.5">
                   {(selected.tariffs ?? []).map((t) => (
-                    <div key={t.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
-                      <span className="font-mono text-xs text-slate-500">{t.code}</span>
-                      <span className="font-medium text-slate-700">
+                    <div key={t.id} className="flex items-center justify-between rounded-lg border border-line px-3 py-2">
+                      <span className="font-mono text-xs text-ink/60">{t.code}</span>
+                      <span className="font-medium text-ink">
                         {formatPrice(t.price, t.currency, locale) ?? "—"}
                       </span>
                     </div>
@@ -546,14 +556,14 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
               </div>
 
               <div>
-                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">История (audit)</div>
+                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink/60">История (audit)</div>
                 <div className="space-y-1.5">
                   {(selected.history ?? []).slice(0, 6).map((h) => (
-                    <div key={h.id} className="rounded-lg bg-slate-50 px-3 py-2 text-xs">
-                      <div className="font-medium text-slate-600">
-                        {h.action} {h.to && <span className="text-slate-400">→ {h.to}</span>}
+                    <div key={h.id} className="rounded-lg bg-panel px-3 py-2 text-xs">
+                      <div className="font-medium text-ink/60">
+                        {h.action} {h.to && <span className="text-ink/60">→ {h.to}</span>}
                       </div>
-                      <div className="text-slate-400">{h.comment}</div>
+                      <div className="text-ink/60">{h.comment}</div>
                     </div>
                   ))}
                 </div>
@@ -563,7 +573,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                 {selected.status !== "PUBLISHED" && canPublish && (
                   <button
                     onClick={() => void publish(selected.id)}
-                    className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+                    className="flex-1 rounded-lg bg-brand px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-dark"
                   >
                     ✅ Опубликовать
                   </button>
@@ -571,13 +581,13 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                 {selected.status === "PUBLISHED" && canPublish && (
                   <button
                     onClick={() => void archive(selected.id)}
-                    className="flex-1 rounded-lg bg-slate-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-700"
+                    className="flex-1 rounded-lg bg-brand px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-dark"
                   >
                     🗄 В архив
                   </button>
                 )}
                 {!canPublish && !canWrite && (
-                  <div className="w-full rounded-lg bg-slate-50 px-3 py-2 text-center text-xs text-slate-400">
+                  <div className="w-full rounded-lg bg-panel px-3 py-2 text-center text-xs text-ink/60">
                     Изменение продукта недоступно для вашей роли
                   </div>
                 )}

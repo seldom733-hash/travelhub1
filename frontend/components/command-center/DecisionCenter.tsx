@@ -274,7 +274,7 @@ export function DecisionCenter() {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: c.attention, value: view.signalCount, tone: "border-amber-200 bg-amber-50 text-amber-800", href: view.activityHref },
+          { label: c.attention, value: view.signalCount, tone: "border-amber-200 bg-amber-50 text-amber-800", href: "#data-quality" },
           { label: c.overdue, value: view.overdue, tone: "border-rose-200 bg-rose-50 text-rose-800", href: `/app/analytics/sales/activity?${PRESET_QUERY}&activityFilter=overdue` },
           { label: c.reconciliation, value: view.issues.length, tone: "border-rose-200 bg-rose-50 text-rose-800", href: "#data-quality" },
           { label: c.receivable, value: view.money(view.clientDebt), tone: "border-[#e5e2da] bg-white text-ink", href: "/app/finance/deals?hasClientDebt=1" },
