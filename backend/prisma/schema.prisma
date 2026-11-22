@@ -5617,6 +5617,28 @@ model Payout {
 /// aznAmount/fxRate — замороженный снапшот на момент подтверждения (Gate:
 /// изменение текущего курса НЕ переписывает obligation). UNKNOWN (нет snapshot/
 /// курса) хранится как NULL, НИКОГДА как 0; payout в таком состоянии заблокирован.
+/// ManagerBonus — ручная ставка бонуса менеджера за закрытый период.
+/// База = сумма grossMargin по закрытым сделкам менеджера в периоде.
+model ManagerBonus {
+  id            String   @id @default(uuid())
+  managerId     String
+  managerName   String?
+  periodStart   DateTime @db.Date
+  periodEnd     DateTime @db.Date
+  /// Процент бонуса, введённый вручную (10 = 10%).
+  percent       Decimal  @default(0) @db.Decimal(5, 2)
+  closedDeals   Int      @default(0)
+  closedServices Int     @default(0)
+  marginBase    Decimal  @default(0) @db.Decimal(18, 2)
+  bonusAmount   Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([managerId, periodStart, periodEnd])
+  @@index([periodStart, periodEnd])
+  @@schema("finance")
+}
+
 model SupplierObligation {
   id              String    @id @default(uuid())
   code            String    @unique // SBO-########

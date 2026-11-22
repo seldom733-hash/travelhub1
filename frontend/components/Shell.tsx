@@ -67,6 +67,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/app/catalog", icon: "📚", labelKey: "nav.catalog", permission: "catalog.product.read" },
       { href: "/app/sales/assignment", icon: "🧭", labelKey: "nav.assignment", permission: "request.load.read" },
       { href: "/app/my-status", icon: "🟢", labelKey: "nav.my_status", permission: "request.load.read" },
+      { href: "/app/bonuses", icon: "🎁", labelKey: "nav.manager_bonuses", permission: "finance.overview.read" },
       { href: "/app/marketing", icon: "📣", labelKey: "nav.marketing", permission: "marketing.campaign.read" },
     ],
   },

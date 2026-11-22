@@ -72,6 +72,7 @@ type DealRow = {
   stageLabel: string;
   status: string;
   orderStatus: string | null;
+  closedAt: string | null;
   statusLabel: string;
   customerId: string | null;
   customerName: string;
@@ -317,6 +318,29 @@ export class DealsService {
     };
   }
 
+  async closedMarginsByManager(from: Date, to: Date): Promise<Array<{ managerId: string; manager: string; closedDeals: number; closedServices: number; marginBase: number }>> {
+    const rows = await this.loadRows();
+    const byManager = new Map<string, { managerId: string; manager: string; closedDeals: number; closedServices: number; marginBase: number }>();
+    for (const row of rows) {
+      if (!row.managerId || row.isCancelledDeal) continue;
+      if (!["CLOSED", "COMPLETED", "FULFILLED"].includes(row.orderStatus ?? row.status)) continue;
+      const closed = row.closedAt ? new Date(row.closedAt) : null;
+      if (!closed || closed < from || closed >= to) continue;
+      const current = byManager.get(row.managerId) ?? {
+        managerId: row.managerId,
+        manager: row.manager ?? "—",
+        closedDeals: 0,
+        closedServices: 0,
+        marginBase: 0,
+      };
+      current.closedDeals += 1;
+      current.closedServices += row.services.length || 1;
+      current.marginBase += Number(row.grossMargin ?? 0);
+      byManager.set(row.managerId, current);
+    }
+    return [...byManager.values()].map((row) => ({ ...row, marginBase: Math.round(row.marginBase * 100) / 100 }));
+  }
+
   async summary(query: DealQuery) {
     const all = await this.loadRows();
     return this.kpi(this.filter(all, query));
@@ -555,7 +579,7 @@ export class DealsService {
       requestServicesByRequest.set(service.requestId, list);
     }
     const orderIds = requests.map((r) => r.convertedOrderId).filter((id): id is string => Boolean(id));
-    const orders = await this.prisma.order.findMany({ where: { OR: [{ id: { in: orderIds } }, { commerceSequence: { in: requests.map((r) => r.commerceSequence) } }] }, select: { id: true, code: true, referenceNumber: true, commerceSequence: true, status: true, amount: true, currency: true, cancelledAt: true, returnedToRequestAt: true, cancellationReason: true, paidAmount: true, refundedAmount: true, customerId: true, createdBy: true, financialStatus: true, commercialSnapshot: true, items: { select: { id: true, title: true, type: true, serviceDate: true, amount: true, productId: true } } } });
+    const orders = await this.prisma.order.findMany({ where: { OR: [{ id: { in: orderIds } }, { commerceSequence: { in: requests.map((r) => r.commerceSequence) } }] }, select: { id: true, code: true, referenceNumber: true, commerceSequence: true, status: true, amount: true, currency: true, fulfilledAt: true, closedAt: true, cancelledAt: true, returnedToRequestAt: true, cancellationReason: true, paidAmount: true, refundedAmount: true, customerId: true, createdBy: true, financialStatus: true, commercialSnapshot: true, items: { select: { id: true, title: true, type: true, serviceDate: true, amount: true, productId: true } } } });
     const orderBySequence = new Map(orders.map((order) => [order.commerceSequence, order]));
     const resolvedOrderIds = [...new Set([...orderIds, ...orders.map((o) => o.id)])];
     const orderProductIds = [...new Set(orders.flatMap((o) => o.items.map((i) => i.productId)).filter((id): id is string => Boolean(id)))];
@@ -804,6 +828,11 @@ export class DealsService {
         stageLabel: stage === "BOOKING" ? "Бронь" : stage === "ORDER" ? "Заказ" : "Заявка",
         status,
         orderStatus: order?.status ?? null,
+        closedAt: dateOrNull(
+          order?.closedAt
+            ?? order?.fulfilledAt
+            ?? (["CLOSED", "COMPLETED", "FULFILLED"].includes(order?.status ?? "") ? request.requestedServiceDate ?? request.createdAt : null),
+        ),
         statusLabel: status,
         customerId: customer?.id ?? null,
         customerName: customer

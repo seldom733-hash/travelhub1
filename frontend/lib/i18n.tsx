@@ -1497,6 +1497,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "ops.period_aria": { ru: "Фильтр по периоду", az: "Dövr filtri", en: "Period filter" },
   "nav.crm": { ru: "CRM", az: "CRM", en: "CRM" },
   "nav.assignment": { ru: "Распределение заявок", az: "Sorğuların bölgüsü", en: "Request assignment" },
+  "nav.manager_bonuses": { ru: "Бонусы менеджерам", az: "Menecerlərə bonuslar", en: "Manager bonuses" },
   "nav.my_status": { ru: "Мой статус", az: "Mənim statusum", en: "My status" },
   "nav.marketing": { ru: "Маркетинг", az: "Marketinq", en: "Marketing" },
   "nav.partner_onboarding": { ru: "Партнёры (онбординг)", az: "Tərəfdaşlar (onboarding)", en: "Partners (onboarding)" },

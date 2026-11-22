@@ -26,6 +26,8 @@ import { DealsController } from "./deals.controller";
 import { DealsService } from "./deals.service";
 import { PaymentWebhookController } from "./payment-webhook.controller";
 import { S3ObjectStorageService } from "../catalog/media/storage/s3-storage.service";
+import { ManagerBonusController } from "./manager-bonus.controller";
+import { ManagerBonusService } from "./manager-bonus.service";
 
 /**
  * PHASE 2 STEP 2.10 — Finance Domain Foundation (новый bounded context, finance.*).
@@ -43,8 +45,8 @@ import { S3ObjectStorageService } from "../catalog/media/storage/s3-storage.serv
  */
 @Module({
   imports: [PaymentProviderModule],
-  controllers: [FinanceController, OrderFinancialSettlementController, DealsController, PaymentWebhookController],
-  providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService, CommissionPolicyService, CommissionService, CommissionAccrualConsumer, SupplierFxRateService, SupplierObligationService, SupplierPaymentService, SupplierPaymentEvidenceService, SupplierDebtReportService, SupplierPaymentTermsService, SupplierPaymentPlanService, { provide: "ObjectStorageService", useClass: S3ObjectStorageService }, SupplierObligationConsumer, FinanceOverviewService, LedgerPostingConsumer, OrderFinancialSettlementService, DealsService],
+  controllers: [FinanceController, OrderFinancialSettlementController, DealsController, ManagerBonusController, PaymentWebhookController],
+  providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService, CommissionPolicyService, CommissionService, CommissionAccrualConsumer, SupplierFxRateService, SupplierObligationService, SupplierPaymentService, SupplierPaymentEvidenceService, SupplierDebtReportService, SupplierPaymentTermsService, SupplierPaymentPlanService, { provide: "ObjectStorageService", useClass: S3ObjectStorageService }, SupplierObligationConsumer, FinanceOverviewService, LedgerPostingConsumer, OrderFinancialSettlementService, DealsService, ManagerBonusService],
   /** Step 2.12E: CommissionPolicyService экспортируется для Sales/Order
    *  freeze-time read (ADR-0013 D1: read by Sales/Order at freeze boundary,
    *  READ-only cross-domain). CommissionService/Consumer — Finance-internal.
