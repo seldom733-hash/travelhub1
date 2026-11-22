@@ -8,13 +8,13 @@ export class ManagerBonusController {
 
   @Get()
   @RequirePermissions("finance.overview.read")
-  list(@Query("period") period?: string, @Query("basis") basis?: string) {
-    return this.bonuses.list(period, basis);
+  list(@Query("periods") periods?: string, @Query("basis") basis?: string, @Query("period") period?: string) {
+    return this.bonuses.list(periods, basis, period);
   }
 
   @Post()
   @RequirePermissions("finance.deal.amounts.write")
-  save(@Body() body: { managerId?: string; period?: string; percent?: number | string; basis?: string }) {
+  save(@Body() body: { managerId?: string; period?: string; periods?: string[] | string; percent?: number | string; basis?: string }) {
     return this.bonuses.save(body);
   }
 }

@@ -21,6 +21,7 @@ type BonusBasis = "closed_at" | "service_completed";
 
 interface BonusReport {
   period: string;
+  periods: string[];
   basis: BonusBasis;
   start: string;
   end: string;
@@ -40,7 +41,8 @@ function monthOptions(): string[] {
 export default function ManagerBonusesPage() {
   const locale = useLocale();
   const canEdit = useCan("finance.deal.amounts.write");
-  const [period, setPeriod] = useState(() => new Date().toISOString().slice(0, 7));
+  const [selectedPeriods, setSelectedPeriods] = useState<string[]>(() => [new Date().toISOString().slice(0, 7)]);
+  const [monthsOpen, setMonthsOpen] = useState(false);
   const [basis, setBasis] = useState<BonusBasis>("closed_at");
   const [report, setReport] = useState<BonusReport | null>(null);
   const [error, setError] = useState("");
@@ -63,12 +65,12 @@ export default function ManagerBonusesPage() {
   const load = useCallback(async () => {
     setError("");
     try {
-      const data = await api.get<BonusReport>(`/finance/manager-bonuses?period=${period}&basis=${basis}`);
+      const data = await api.get<BonusReport>(`/finance/manager-bonuses?periods=${encodeURIComponent(selectedPeriods.join(","))}&basis=${basis}`);
       setReport(data);
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [period, basis]);
+  }, [selectedPeriods, basis]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -84,7 +86,7 @@ export default function ManagerBonusesPage() {
     setError("");
     setNotice("");
     try {
-      await api.post("/finance/manager-bonuses", { managerId: row.managerId, period, basis, percent: row.percent });
+      await api.post("/finance/manager-bonuses", { managerId: row.managerId, periods: selectedPeriods, basis, percent: row.percent });
       setNotice(tr("Процент сохранён", "Faiz saxlanıldı", "Percent saved"));
       await load();
     } catch (e) {
@@ -104,12 +106,33 @@ export default function ManagerBonusesPage() {
 
     <section className="rounded-xl border border-line bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-end gap-3">
-        <label className="text-sm">
+        <div className="relative text-sm">
           <span className="mb-1 block text-ink/60">{tr("Период", "Dövr", "Period")}</span>
-          <select value={period} onChange={(e) => setPeriod(e.target.value)} className="min-w-44 rounded-lg border border-line bg-white px-3 py-2 text-sm">
-            {months.map((value) => <option key={value} value={value}>{monthLabel(value)}</option>)}
-          </select>
-        </label>
+          <button type="button" onClick={() => setMonthsOpen((open) => !open)} className="min-w-52 rounded-lg border border-line bg-white px-3 py-2 text-left text-sm">
+            <span className="block truncate">{selectedPeriods.map(monthLabel).join(", ")}</span>
+            <span className="pointer-events-none absolute right-2 top-9 text-ink/50">▾</span>
+          </button>
+          {monthsOpen && <div className="absolute left-0 top-full z-30 mt-1 w-64 rounded-xl border border-line bg-white p-2 shadow-xl">
+            <div className="mb-1 flex items-center justify-between px-1 text-[11px] text-ink/60">
+              <span>{tr("Выбрано", "Seçilib", "Selected")}: {selectedPeriods.length}</span>
+              <button type="button" onClick={() => setSelectedPeriods([new Date().toISOString().slice(0, 7)])} className="text-brand hover:underline">{tr("Сбросить", "Sıfırla", "Reset")}</button>
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              {months.map((value) => <label key={value} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-panel">
+                <input
+                  type="checkbox"
+                  checked={selectedPeriods.includes(value)}
+                  onChange={() => setSelectedPeriods((current) => {
+                    if (current.includes(value)) return current.length > 1 ? current.filter((item) => item !== value) : current;
+                    return [...current, value].sort();
+                  })}
+                  className="size-4 accent-brand"
+                />
+                {monthLabel(value)}
+              </label>)}
+            </div>
+          </div>}
+        </div>
         <label className="text-sm">
           <span className="mb-1 block text-ink/60">{tr("Считать бонус", "Bonusu hesabla", "Calculate bonus")}</span>
           <select value={basis} onChange={(e) => setBasis(e.target.value as BonusBasis)} className="min-w-64 rounded-lg border border-line bg-white px-3 py-2 text-sm">
