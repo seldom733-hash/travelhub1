@@ -93,7 +93,12 @@ export default function ManagerBonusesPage() {
       const monthOf = (value: string | null | undefined) => value ? String(value).slice(0, 7) : "";
       const items = (data.items ?? []).filter((deal) => {
         if (basis === "closed_at") return months.has(monthOf(deal.closedAt));
-        return (deal.services ?? []).some((service: any) => months.has(monthOf(service.dateTo ?? service.serviceDate)));
+        const services = deal.services ?? [];
+        if (services.length === 0) return false;
+        const dates = services.map((service: any) => service.dateTo ?? service.serviceDate);
+        if (dates.some((date: string | null | undefined) => !date)) return false;
+        const latest = dates.reduce((max: string, date: string) => date > max ? date : max, "");
+        return months.has(monthOf(latest));
       });
       setManagerDeals((current) => ({ ...current, [row.managerId]: items }));
     } catch (e) {
@@ -180,9 +185,9 @@ export default function ManagerBonusesPage() {
       <p className="mt-3 text-xs text-ink/60">
         {basis === "service_completed"
           ? tr(
-            "Бонус = доход завершённых услуг за период × процент менеджера. Считаются услуги, завершённые в периоде, даже если сделка ещё не закрыта.",
-            "Bonus = dövrdə tamamlanmış xidmətlərin gəliri × menecerin faizi. Sövdə hələ bağlanmasa da, dövrdə tamamlanmış xidmətlər hesablanır.",
-            "Bonus = income of services completed in the period × manager percent. Services completed in the period count even if the deal is not closed yet.",
+            "Бонус = маржа по сделкам, все услуги которых завершены в периоде, × процент менеджера. Если в сделке 2+ услуги, она учитывается только после завершения всех услуг.",
+            "Bonus = bütün xidmətləri dövrdə tamamlanmış sövdələrin marjası × menecerin faizi. Sövdədə 2+ xidmət varsa, yalnız hamısı tamamlandıqdan sonra hesablanır.",
+            "Bonus = margin of deals whose services are all completed in the period × manager percent. A deal with 2+ services counts only after all services are completed.",
           )
           : tr(
             "Бонус = маржа закрытых сделок за период × процент менеджера. Процент задаётся вручную для каждого менеджера.",
@@ -202,7 +207,7 @@ export default function ManagerBonusesPage() {
             <tr>
               <th className="px-4 py-3">{tr("Менеджер", "Menecer", "Manager")}</th>
               <th className="px-4 py-3 text-right">{tr("Закрытых сделок", "Bağlanmış sövdələr", "Closed deals")}</th>
-              <th className="px-4 py-3 text-right">{tr("Закрытых услуг", "Bağlanmış xidmətlər", "Closed services")}</th>
+              <th className="px-4 py-3 text-right">{tr("Завершённых услуг", "Tamamlanmış xidmətlər", "Completed services")}</th>
               <th className="px-4 py-3 text-right">{basis === "service_completed" ? tr("Доход завершённых услуг", "Tamamlanmış xidmətlərin gəliri", "Completed services income") : tr("Маржа за период", "Dövr üzrə marja", "Period margin")}</th>
               <th className="px-4 py-3 text-right">{tr("Процент, %", "Faiz, %", "Percent, %")}</th>
               <th className="px-4 py-3 text-right">{tr("Бонус", "Bonus", "Bonus")}</th>

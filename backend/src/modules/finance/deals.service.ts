@@ -335,16 +335,18 @@ export class DealsService {
         marginBase: 0,
       };
       if (basis === "service_completed") {
-        const completed = row.services.filter((service) => {
-          const date = service.dateTo ?? service.serviceDate;
-          if (!date) return false;
-          const value = new Date(date);
-          return value >= from && value < to;
-        });
-        if (completed.length === 0) continue;
+        // Сделка считается завершённой только когда завершены ВСЕ её услуги.
+        // Дата завершения сделки — последняя дата окончания среди услуг.
+        const dates = row.services.map((service) => service.dateTo ?? service.serviceDate);
+        if (row.services.length === 0 || dates.some((date) => !date)) continue;
+        const completedAt = dates.reduce((latest, date) => {
+          const value = new Date(date as string);
+          return value > latest ? value : latest;
+        }, new Date(0));
+        if (completedAt < from || completedAt >= to) continue;
         current.closedDeals += 1;
-        current.closedServices += completed.length;
-        current.marginBase += completed.reduce((sum, service) => sum + Number(service.income ?? 0), 0);
+        current.closedServices += row.services.length;
+        current.marginBase += row.services.reduce((sum, service) => sum + Number(service.income ?? 0), 0);
       } else {
         if (!["CLOSED", "COMPLETED", "FULFILLED"].includes(row.orderStatus ?? row.status)) continue;
         const closed = row.closedAt ? new Date(row.closedAt) : null;
