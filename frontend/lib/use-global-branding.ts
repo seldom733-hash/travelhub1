@@ -39,7 +39,7 @@ async function fetchBranding(): Promise<BrandingData> {
       // Do NOT cache transient failures: the previous code pinned the legacy
       // "TravelHub" fallback for the whole session after one failed request,
       // so the old name reappeared on every page until a full reload.
-      return { brandName: "TravelHub", logo: null };
+      return { brandName: "Navitravel", logo: null };
     } finally {
       inflight = null;
     }
@@ -54,7 +54,7 @@ async function fetchBranding(): Promise<BrandingData> {
  * Subsequent instances return the cached result immediately.
  */
 export function useGlobalBranding(): BrandingData & { loading: boolean } {
-  const [data, setData] = useState<BrandingData>(() => cached ?? { brandName: "TravelHub", logo: null });
+  const [data, setData] = useState<BrandingData>(() => cached ?? { brandName: "Navitravel", logo: null });
   const [loading, setLoading] = useState(!cached);
   const mountedRef = useRef(true);
 

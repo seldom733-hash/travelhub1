@@ -7,6 +7,7 @@ import LatestOffers from "@/components/marketplace/LatestOffers";
 import HotTours from "@/components/marketplace/HotTours";
 import SpecialOffers from "@/components/marketplace/SpecialOffers";
 import Tours from "@/components/marketplace/Tours";
+import EarlyBooking from "@/components/marketplace/EarlyBooking";
 import Hotels from "@/components/marketplace/Hotels";
 import Flights from "@/components/marketplace/Flights";
 import Advertisement from "@/components/marketplace/Advertisement";
@@ -23,6 +24,7 @@ const BLOCK_COMPONENTS: Record<string, React.FC> = {
   "hot-tours": HotTours,
   "special-offers": SpecialOffers,
   "tours": Tours,
+  "early-booking": EarlyBooking,
   "hotels": Hotels,
   "flights": Flights,
   "advertisement": Advertisement,
@@ -51,9 +53,14 @@ export default function MarketplaceRenderer({ pageOverride }: { pageOverride?: P
     );
   }
 
-  // No published config at all → the same hardcoded default layout as before.
+  // No published config or a transient backend restart: never render the
+  // legacy TravelHub default banner/name. Keep a neutral brand-free shell.
   if (!page) {
-    return <DefaultMarketplaceLayout />;
+    return (
+      <div className="theme-grove min-h-screen bg-dark" aria-busy="true">
+        <div className="aspect-[16/6] min-h-[320px] bg-dark" />
+      </div>
+    );
   }
 
   const cfg = {
@@ -75,7 +82,11 @@ export default function MarketplaceRenderer({ pageOverride }: { pageOverride?: P
   const hasConfig = enabledSections.length > 0;
 
   if (!hasConfig) {
-    return <DefaultMarketplaceLayout />;
+    return (
+      <div className="theme-grove min-h-screen bg-dark" aria-busy="true">
+        <div className="aspect-[16/6] min-h-[320px] bg-dark" />
+      </div>
+    );
   }
 
   return (
@@ -113,25 +124,6 @@ export default function MarketplaceRenderer({ pageOverride }: { pageOverride?: P
         brandName={canonicalBrandName}
         headerConfig={cfg.headerConfig as never}
       />
-    </div>
-  );
-}
-
-function DefaultMarketplaceLayout() {
-  return (
-    <div className="theme-grove min-h-screen bg-dark">
-      <MarketplaceHeader />
-      <main>
-        <HeroSection />
-        <LatestOffers />
-        <HotTours />
-        <SpecialOffers />
-        <Tours />
-        <Hotels />
-        <Flights />
-        <Advertisement />
-      </main>
-      <MarketplaceFooter />
     </div>
   );
 }

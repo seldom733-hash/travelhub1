@@ -51,7 +51,7 @@ export default function MarketplaceFooter({
   const year = new Date().getFullYear();
 
   const cfg: MarketplaceFooterConfig = config ?? {};
-  const brandName = (brandNameProp ?? cfg.name?.[locale] ?? cfg.name?.ru ?? "").trim() || "TravelHub";
+  const brandName = (brandNameProp ?? cfg.name?.[locale] ?? cfg.name?.ru ?? "").trim() || "Navitravel";
   const description = (cfg.description?.[locale] || cfg.description?.ru || t("footer.brand_description", locale)).trim();
   // Company profile (Header tab) is the single source of truth for contacts.
   // Footer-specific values are only a fallback for legacy configs where the
@@ -74,9 +74,9 @@ export default function MarketplaceFooter({
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
-            <Link href="/" className="inline-flex items-center gap-2" aria-label={brandName || "TravelHub"}>
+            <Link href="/" className="inline-flex items-center gap-2" aria-label={brandName || "Navitravel"}>
               <Buildings className="h-7 w-7 text-gold" weight="fill" />
-              <span className="font-display text-xl font-semibold tracking-tight">{brandName || "TravelHub"}</span>
+              <span className="font-display text-xl font-semibold tracking-tight">{brandName || "Navitravel"}</span>
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-neutral-500">{description}</p>
           </div>

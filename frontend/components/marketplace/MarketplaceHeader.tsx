@@ -63,12 +63,12 @@ export function resolveBrandName(cfg: MarketplaceHeaderConfig | null | undefined
     const candidate = (legacy.ru ?? legacy.az ?? legacy.en ?? "").trim();
     if (candidate) return candidate;
   }
-  return "TravelHub";
+  return "Navitravel";
 }
 
 const DEFAULT_HEADER_CONFIG: MarketplaceHeaderConfig = {
   logo: null,
-  brandName: "TravelHub",
+  brandName: "Navitravel",
   phone: "+994 12 345 67 89",
   email: "info@travelhub.az",
   address: "Баку, Азербайджан",
@@ -176,7 +176,7 @@ export default function MarketplaceHeader({ config }: { config?: MarketplaceHead
       <nav className="border-b border-dark-border/60 bg-dark/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1400px] items-center gap-5 px-6 py-3">
           {/* Logo */}
-          <Link href="/" className="flex shrink-0 items-center gap-3" aria-label={companyName || "TravelHub"}>
+          <Link href="/" className="flex shrink-0 items-center gap-3" aria-label={companyName || "Navitravel"}>
             {cfg.logo ? (
               <span className="flex h-16 items-center justify-center sm:h-24">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -189,7 +189,7 @@ export default function MarketplaceHeader({ config }: { config?: MarketplaceHead
               </span>
             )}
             <span className="block">
-              <span className="block font-display text-[22px] font-semibold leading-none tracking-[0.005em] text-white sm:text-[28px] lg:text-[30px]">{companyName || "TravelHub"}</span>
+              <span className="block font-display text-[22px] font-semibold leading-none tracking-[0.005em] text-white sm:text-[28px] lg:text-[30px]">{companyName || "Navitravel"}</span>
               <span className="mt-1 hidden text-[10px] tracking-[0.04em] text-neutral-500 sm:block">Discover more together</span>
             </span>
           </Link>

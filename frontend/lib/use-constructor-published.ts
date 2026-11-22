@@ -15,29 +15,33 @@ export function useConstructorPublished(slug: string) {
   useEffect(() => {
     mountedRef.current = true;
     let cancelled = false;
+    let retryTimer: number | undefined;
     const fallbackTimer = window.setTimeout(() => {
       if (!cancelled && mountedRef.current) setLoading(false);
     }, 4000);
 
-    async function load() {
+    async function load(attempt = 0) {
       try {
         const published = await constructorApi.getPublished(slug);
         if (!cancelled && mountedRef.current) {
           setPage(published);
         }
       } catch {
-        // Published config may not exist yet — that's fine
-        // Fall back to default layout
+        // Backend may be restarting. Do not render the legacy default layout;
+        // retry silently while the neutral shell is visible.
+        if (!cancelled && attempt < 5) {
+          retryTimer = window.setTimeout(() => void load(attempt + 1), 1500);
+        }
       } finally {
-        window.clearTimeout(fallbackTimer);
-        if (!cancelled && mountedRef.current) {
+        if (attempt === 0) window.clearTimeout(fallbackTimer);
+        if (!cancelled && mountedRef.current && attempt === 0) {
           setLoading(false);
         }
       }
     }
 
-    load();
-    return () => { cancelled = true; mountedRef.current = false; window.clearTimeout(fallbackTimer); };
+    void load();
+    return () => { cancelled = true; mountedRef.current = false; window.clearTimeout(fallbackTimer); if (retryTimer) window.clearTimeout(retryTimer); };
   }, [slug]);
 
   return { page, loading };
