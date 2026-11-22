@@ -318,14 +318,15 @@ export class DealsService {
     };
   }
 
-  async closedMarginsByManager(from: Date, to: Date): Promise<Array<{ managerId: string; manager: string; closedDeals: number; closedServices: number; marginBase: number }>> {
+  async bonusMarginsByManager(
+    from: Date,
+    to: Date,
+    basis: "closed_at" | "service_completed" = "closed_at",
+  ): Promise<Array<{ managerId: string; manager: string; closedDeals: number; closedServices: number; marginBase: number }>> {
     const rows = await this.loadRows();
     const byManager = new Map<string, { managerId: string; manager: string; closedDeals: number; closedServices: number; marginBase: number }>();
     for (const row of rows) {
       if (!row.managerId || row.isCancelledDeal) continue;
-      if (!["CLOSED", "COMPLETED", "FULFILLED"].includes(row.orderStatus ?? row.status)) continue;
-      const closed = row.closedAt ? new Date(row.closedAt) : null;
-      if (!closed || closed < from || closed >= to) continue;
       const current = byManager.get(row.managerId) ?? {
         managerId: row.managerId,
         manager: row.manager ?? "—",
@@ -333,9 +334,25 @@ export class DealsService {
         closedServices: 0,
         marginBase: 0,
       };
-      current.closedDeals += 1;
-      current.closedServices += row.services.length || 1;
-      current.marginBase += Number(row.grossMargin ?? 0);
+      if (basis === "service_completed") {
+        const completed = row.services.filter((service) => {
+          const date = service.dateTo ?? service.serviceDate;
+          if (!date) return false;
+          const value = new Date(date);
+          return value >= from && value < to;
+        });
+        if (completed.length === 0) continue;
+        current.closedDeals += 1;
+        current.closedServices += completed.length;
+        current.marginBase += completed.reduce((sum, service) => sum + Number(service.income ?? 0), 0);
+      } else {
+        if (!["CLOSED", "COMPLETED", "FULFILLED"].includes(row.orderStatus ?? row.status)) continue;
+        const closed = row.closedAt ? new Date(row.closedAt) : null;
+        if (!closed || closed < from || closed >= to) continue;
+        current.closedDeals += 1;
+        current.closedServices += row.services.length || 1;
+        current.marginBase += Number(row.grossMargin ?? 0);
+      }
       byManager.set(row.managerId, current);
     }
     return [...byManager.values()].map((row) => ({ ...row, marginBase: Math.round(row.marginBase * 100) / 100 }));

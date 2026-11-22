@@ -5625,6 +5625,8 @@ model ManagerBonus {
   managerName   String?
   periodStart   DateTime @db.Date
   periodEnd     DateTime @db.Date
+  /// closed_at | service_completed
+  basis         String   @default("closed_at")
   /// Процент бонуса, введённый вручную (10 = 10%).
   percent       Decimal  @default(0) @db.Decimal(5, 2)
   closedDeals   Int      @default(0)
@@ -5634,7 +5636,7 @@ model ManagerBonus {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  @@unique([managerId, periodStart, periodEnd])
+  @@unique([managerId, periodStart, periodEnd, basis])
   @@index([periodStart, periodEnd])
   @@schema("finance")
 }

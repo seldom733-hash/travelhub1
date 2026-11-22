@@ -27,11 +27,18 @@ export class ManagerBonusService {
     private readonly deals: DealsService,
   ) {}
 
-  async list(rawPeriod?: string) {
+  private basis(raw?: string): "closed_at" | "service_completed" {
+    if (!raw || raw === "closed_at") return "closed_at";
+    if (raw === "service_completed") return "service_completed";
+    throw new BadRequestException("basis must be closed_at or service_completed");
+  }
+
+  async list(rawPeriod?: string, rawBasis?: string) {
     const bounds = periodBounds(rawPeriod);
+    const basis = this.basis(rawBasis);
     const [base, saved, managers] = await Promise.all([
-      this.deals.closedMarginsByManager(bounds.start, bounds.end),
-      this.prisma.managerBonus.findMany({ where: { periodStart: bounds.start, periodEnd: bounds.end } }),
+      this.deals.bonusMarginsByManager(bounds.start, bounds.end, basis),
+      this.prisma.managerBonus.findMany({ where: { periodStart: bounds.start, periodEnd: bounds.end, basis } }),
       this.prisma.user.findMany({ where: { status: "ACTIVE", role: { code: "SALES_MANAGER" } }, select: { id: true, fullName: true, username: true } }),
     ]);
     const baseById = new Map(base.map((row) => [row.managerId, row]));
@@ -57,6 +64,7 @@ export class ManagerBonusService {
 
     return {
       period: bounds.period,
+      basis,
       start: bounds.start.toISOString().slice(0, 10),
       end: new Date(bounds.end.getTime() - 1).toISOString().slice(0, 10),
       formula: "bonus = sum(grossMargin of closed deals in period) × percent / 100",
@@ -64,25 +72,27 @@ export class ManagerBonusService {
     };
   }
 
-  async save(input: { managerId?: string; period?: string; percent?: number | string }) {
+  async save(input: { managerId?: string; period?: string; percent?: number | string; basis?: string }) {
     const managerId = String(input.managerId ?? "").trim();
     if (!managerId) throw new BadRequestException("managerId is required");
     const percent = Number(input.percent ?? 0);
     if (!Number.isFinite(percent) || percent < 0 || percent > 100) throw new BadRequestException("percent must be between 0 and 100");
     const bounds = periodBounds(input.period);
+    const basis = this.basis(input.basis);
     const user = await this.prisma.user.findUnique({ where: { id: managerId }, select: { fullName: true, username: true } });
     if (!user) throw new BadRequestException("manager not found");
-    const base = (await this.deals.closedMarginsByManager(bounds.start, bounds.end)).find((row) => row.managerId === managerId);
+    const base = (await this.deals.bonusMarginsByManager(bounds.start, bounds.end, basis)).find((row) => row.managerId === managerId);
     const marginBase = base?.marginBase ?? 0;
     const bonusAmount = Math.round(marginBase * percent) / 100;
     const managerName = base?.manager ?? user.fullName ?? user.username;
     const row = await this.prisma.managerBonus.upsert({
-      where: { managerId_periodStart_periodEnd: { managerId, periodStart: bounds.start, periodEnd: bounds.end } },
+      where: { managerId_periodStart_periodEnd_basis: { managerId, periodStart: bounds.start, periodEnd: bounds.end, basis } },
       create: {
         managerId,
         managerName,
         periodStart: bounds.start,
         periodEnd: bounds.end,
+        basis,
         percent,
         closedDeals: base?.closedDeals ?? 0,
         closedServices: base?.closedServices ?? 0,
@@ -91,6 +101,7 @@ export class ManagerBonusService {
       },
       update: {
         managerName,
+        basis,
         percent,
         closedDeals: base?.closedDeals ?? 0,
         closedServices: base?.closedServices ?? 0,
@@ -100,6 +111,7 @@ export class ManagerBonusService {
     });
     return {
       managerId,
+      basis,
       manager: managerName,
       closedDeals: row.closedDeals,
       closedServices: row.closedServices,

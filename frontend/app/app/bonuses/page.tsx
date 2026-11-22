@@ -17,8 +17,11 @@ interface BonusRow {
   saved: boolean;
 }
 
+type BonusBasis = "closed_at" | "service_completed";
+
 interface BonusReport {
   period: string;
+  basis: BonusBasis;
   start: string;
   end: string;
   items: BonusRow[];
@@ -38,6 +41,7 @@ export default function ManagerBonusesPage() {
   const locale = useLocale();
   const canEdit = useCan("finance.deal.amounts.write");
   const [period, setPeriod] = useState(() => new Date().toISOString().slice(0, 7));
+  const [basis, setBasis] = useState<BonusBasis>("closed_at");
   const [report, setReport] = useState<BonusReport | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState<string | null>(null);
@@ -47,21 +51,24 @@ export default function ManagerBonusesPage() {
 
   const monthLabel = (value: string) => {
     const [year, month] = value.split("-").map(Number);
-    return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString(
-      locale === "az" ? "az-AZ" : locale === "en" ? "en-GB" : "ru-RU",
-      { month: "long", year: "numeric", timeZone: "UTC" },
-    );
+    const names: Record<string, string[]> = {
+      az: ["Yanvar", "Fevral", "Mart", "Aprel", "May", "İyun", "İyul", "Avqust", "Sentyabr", "Oktyabr", "Noyabr", "Dekabr"],
+      en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+      ru: ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"],
+    };
+    const key = locale === "az" ? "az" : locale === "en" ? "en" : "ru";
+    return `${names[key][month - 1]} ${year}`;
   };
 
   const load = useCallback(async () => {
     setError("");
     try {
-      const data = await api.get<BonusReport>(`/finance/manager-bonuses?period=${period}`);
+      const data = await api.get<BonusReport>(`/finance/manager-bonuses?period=${period}&basis=${basis}`);
       setReport(data);
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [period]);
+  }, [period, basis]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -77,7 +84,7 @@ export default function ManagerBonusesPage() {
     setError("");
     setNotice("");
     try {
-      await api.post("/finance/manager-bonuses", { managerId: row.managerId, period, percent: row.percent });
+      await api.post("/finance/manager-bonuses", { managerId: row.managerId, period, basis, percent: row.percent });
       setNotice(tr("Процент сохранён", "Faiz saxlanıldı", "Percent saved"));
       await load();
     } catch (e) {
@@ -103,6 +110,13 @@ export default function ManagerBonusesPage() {
             {months.map((value) => <option key={value} value={value}>{monthLabel(value)}</option>)}
           </select>
         </label>
+        <label className="text-sm">
+          <span className="mb-1 block text-ink/60">{tr("Считать бонус", "Bonusu hesabla", "Calculate bonus")}</span>
+          <select value={basis} onChange={(e) => setBasis(e.target.value as BonusBasis)} className="min-w-64 rounded-lg border border-line bg-white px-3 py-2 text-sm">
+            <option value="closed_at">{tr("По дате закрытия сделки", "Sövdənin bağlanma tarixinə görə", "By deal closing date")}</option>
+            <option value="service_completed">{tr("По дате завершения услуги", "Xidmətin tamamlanma tarixinə görə", "By service completion date")}</option>
+          </select>
+        </label>
         <button type="button" onClick={() => void load()} className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink hover:bg-panel">
           {tr("Обновить", "Yenilə", "Refresh")}
         </button>
@@ -111,11 +125,17 @@ export default function ManagerBonusesPage() {
         </div>
       </div>
       <p className="mt-3 text-xs text-ink/60">
-        {tr(
-          "Бонус = маржа закрытых сделок за период × процент менеджера. Процент задаётся вручную для каждого менеджера.",
-          "Bonus = dövr üzrə bağlanmış sövdələrin marjası × menecerin faizi. Faiz hər menecer üçün əl ilə təyin edilir.",
-          "Bonus = closed-deal margin for the period × manager percent. The percent is set manually per manager.",
-        )}
+        {basis === "service_completed"
+          ? tr(
+            "Бонус = доход завершённых услуг за период × процент менеджера. Считаются услуги, завершённые в периоде, даже если сделка ещё не закрыта.",
+            "Bonus = dövrdə tamamlanmış xidmətlərin gəliri × menecerin faizi. Sövdə hələ bağlanmasa da, dövrdə tamamlanmış xidmətlər hesablanır.",
+            "Bonus = income of services completed in the period × manager percent. Services completed in the period count even if the deal is not closed yet.",
+          )
+          : tr(
+            "Бонус = маржа закрытых сделок за период × процент менеджера. Процент задаётся вручную для каждого менеджера.",
+            "Bonus = dövr üzrə bağlanmış sövdələrin marjası × menecerin faizi. Faiz hər menecer üçün əl ilə təyin edilir.",
+            "Bonus = closed-deal margin for the period × manager percent. The percent is set manually per manager.",
+          )}
       </p>
     </section>
 
@@ -130,7 +150,7 @@ export default function ManagerBonusesPage() {
               <th className="px-4 py-3">{tr("Менеджер", "Menecer", "Manager")}</th>
               <th className="px-4 py-3 text-right">{tr("Закрытых сделок", "Bağlanmış sövdələr", "Closed deals")}</th>
               <th className="px-4 py-3 text-right">{tr("Закрытых услуг", "Bağlanmış xidmətlər", "Closed services")}</th>
-              <th className="px-4 py-3 text-right">{tr("Маржа за период", "Dövr üzrə marja", "Period margin")}</th>
+              <th className="px-4 py-3 text-right">{basis === "service_completed" ? tr("Доход завершённых услуг", "Tamamlanmış xidmətlərin gəliri", "Completed services income") : tr("Маржа за период", "Dövr üzrə marja", "Period margin")}</th>
               <th className="px-4 py-3 text-right">{tr("Процент, %", "Faiz, %", "Percent, %")}</th>
               <th className="px-4 py-3 text-right">{tr("Бонус", "Bonus", "Bonus")}</th>
               <th className="px-4 py-3 text-right">{tr("Действие", "Əməliyyat", "Action")}</th>
