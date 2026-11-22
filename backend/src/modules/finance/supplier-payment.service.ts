@@ -528,17 +528,40 @@ export class SupplierPaymentService {
   async delete(codeOrId: string, actor: Actor): Promise<{ deleted: true }> {
     const payment = await this.prisma.supplierPayout.findUnique({ where: { code: codeOrId }, include: { allocations: true } });
     if (!payment) throw new NotFoundError(`Supplier payment ${codeOrId} not found`);
-    if (payment.status !== "PENDING") throw new ConflictError(`Supplier payment ${codeOrId} is ${payment.status}; only PENDING can be deleted`);
-    if (payment.allocations.length > 0) throw new ConflictError(`Supplier payment ${codeOrId} has allocations; remove them first`);
+    if (payment.status === "CONFIRMED" && payment.direction === "OUTGOING") {
+      await this.prisma.$transaction(async (tx) => {
+        for (const allocation of payment.allocations) {
+          if (allocation.reversedAt) continue;
+          const obligation = await tx.supplierObligation.findUnique({ where: { id: allocation.obligationId } });
+          if (!obligation) continue;
+          const paid = Prisma.Decimal.max(new Prisma.Decimal(0), obligation.paidAmount.minus(allocation.aznAmount));
+          const remaining = (obligation.remainingAmount ?? new Prisma.Decimal(0)).plus(allocation.aznAmount);
+          await tx.supplierObligation.update({
+            where: { id: obligation.id },
+            data: {
+              paidAmount: paid,
+              remainingAmount: remaining,
+              status: paid.isZero() ? "OPEN" : remaining.isZero() ? "CLOSED" : "PARTIALLY_PAID",
+            },
+          });
+          await tx.supplierPayoutAllocation.update({ where: { id: allocation.id }, data: { reversedAt: new Date(), reversedById: actor.id } });
+        }
+        await tx.supplierPaymentEvidence.deleteMany({ where: { payoutId: payment.id } });
+        await tx.supplierPayout.delete({ where: { id: payment.id } });
+      });
+    } else if (payment.status === "PENDING") {
+      await this.prisma.supplierPayout.delete({ where: { id: payment.id } });
+    } else {
+      throw new ConflictError(`Supplier payment ${codeOrId} is ${payment.status}; cannot delete`);
+    }
     await this.security.audit(this.prisma as any, {
       userId: actor.id,
       username: actor.username,
       action: "finance.supplier_payment.deleted",
       resource: "SupplierPayout",
       resourceId: payment.id,
-      details: { code: payment.code, orderId: payment.orderId, amount: payment.amount.toString() },
+      details: { code: payment.code, orderId: payment.orderId, amount: payment.amount.toString(), status: payment.status },
     });
-    await this.prisma.supplierPayout.delete({ where: { id: payment.id } });
     return { deleted: true };
   }
 
