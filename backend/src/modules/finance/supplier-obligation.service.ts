@@ -189,8 +189,13 @@ export class SupplierObligationService {
 
     // Источник денег: snapshot.supplierPrice (immutable source fact), иначе
     // замороженная сумма брони.
+    const snapshotSupplierPrice = Number(
+      snap?.supplierPrice ?? snap?.netSupplierCost ?? 0,
+    );
     const sourceAmount = toMoney2(
-      snap && typeof snap.supplierPrice === "number" ? snap.supplierPrice : input.bookingAmount,
+      Number.isFinite(snapshotSupplierPrice) && snapshotSupplierPrice > 0
+        ? snapshotSupplierPrice
+        : input.bookingAmount,
       "sourceAmount",
     );
     const sourceCurrency = validateIsoCode(

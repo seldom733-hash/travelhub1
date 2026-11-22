@@ -668,11 +668,11 @@ export class DealsService {
       const supplierRefundDue = cancelled ? Math.max(0, supplierPaid - supplierRefunded) : 0;
       const clientNetRetained = Math.max(0, captured - refunded - Number(clientPenalty));
       const supplierNetRetained = Math.max(0, supplierPaid - supplierRefunded - Number(supplierPenalty));
-      const clientPaidInFull = sales <= 0 ? captured > 0 : captured >= sales;
-      const supplierPaidInFull = cost <= 0 ? supplierPaid >= 0 : supplierPaid >= cost;
+      const clientPaidExactly = Math.abs(captured - sales) <= 0.01;
+      const supplierPaidExactly = cost > 0 ? Math.abs(supplierPaid - cost) <= 0.01 : supplierPaid <= 0.01;
       const cancelledSettled = isCancelledDeal && clientRefundPending <= 0 && supplierRefundDue <= 0 && clientNetRetained <= 0 && supplierNetRetained <= 0
         && Number(settlement?.remainingToPay ?? 0) <= 0 && Number(settlement?.remainingToRefund ?? 0) <= 0;
-      const successfulClosed = !isCancelledDeal && completed && clientPaidInFull && supplierPaidInFull && tourEnded
+      const successfulClosed = !isCancelledDeal && completed && clientPaidExactly && supplierPaidExactly && tourEnded
         && clientRefundPending <= 0 && Number(settlement?.remainingToRefund ?? 0) <= 0;
       status = isCancelledDeal
         ? (cancelledSettled ? "CANCELLED_CLOSED" : "CANCELLED")
@@ -788,8 +788,8 @@ export class DealsService {
         lostIncome: fixed(lostIncome),
         currency: order?.currency ?? request.confirmedCurrency ?? request.displayedCurrency ?? "AZN",
         financialStatus: settlement?.status ?? order?.financialStatus ?? (["CANCELLED_BY_CUSTOMER", "REJECTED", "UNAVAILABLE", "EXPIRED"].includes(request.status) ? "CLOSED" : "OPEN"),
-        paymentStatus: captured <= 0 ? "UNPAID" : captured >= sales ? "PAID" : "PARTIALLY_PAID",
-        supplierPaymentStatus: supplierPaid <= 0 ? "UNPAID" : supplierPaid >= cost ? "PAID" : "PARTIALLY_PAID",
+        paymentStatus: captured <= 0 ? "UNPAID" : captured > sales + 0.01 ? "OVERPAID" : Math.abs(captured - sales) <= 0.01 ? "PAID" : "PARTIALLY_PAID",
+        supplierPaymentStatus: supplierPaid <= 0 ? "UNPAID" : supplierPaid > cost + 0.01 ? "OVERPAID" : Math.abs(supplierPaid - cost) <= 0.01 ? "PAID" : "PARTIALLY_PAID",
         cancellationReason: settlement?.cancellationReason ?? order?.cancellationReason ?? null,
         cancellationResult: String(settlement?.cancellationResult ?? 0),
         isCancelledDeal,
