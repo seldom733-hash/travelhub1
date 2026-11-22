@@ -362,8 +362,11 @@ export class SalesAnalyticsService {
 
     const customerIds = [...new Set([...requests.map((r) => r.customerId), ...orders.map((o) => o.customerId)].filter((x): x is string => !!x))];
     const customerById = new Map((await this.prisma.customer.findMany({ where: { id: { in: customerIds } }, select: { id: true, code: true, firstName: true, lastName: true, companyName: true, phone: true } })).map((c) => [c.id, c]));
-    const managerIds = [...new Set(requests.map((r) => r.assignedManagerId).filter((x): x is string => !!x))];
-    const managerById = new Map((await this.prisma.user.findMany({ where: { id: { in: managerIds } }, select: { id: true, fullName: true, username: true } })).map((u) => [u.id, u]));
+    const activeManagerUsers = !q.managerId
+      ? await this.prisma.user.findMany({ where: { status: "ACTIVE", role: { code: "SALES_MANAGER" } }, select: { id: true, fullName: true, username: true } })
+      : [];
+    const managerIds = [...new Set([...requests.map((r) => r.assignedManagerId).filter((x): x is string => !!x), ...activeManagerUsers.map((u) => u.id)])];
+    const managerById = new Map([...activeManagerUsers, ...(await this.prisma.user.findMany({ where: { id: { in: managerIds } }, select: { id: true, fullName: true, username: true } }))].map((u) => [u.id, u]));
     const productIds = [...new Set(requests.map((r) => r.productId).filter((x): x is string => !!x))];
     const productById = new Map((await this.prisma.product.findMany({
       where: { id: { in: productIds } },
@@ -592,6 +595,7 @@ export class SalesAnalyticsService {
         m.cancelledBookings += (bookingByOrder.get(o.id) ?? []).filter((b) => !!b.cancelledAt).length;
       }
     }
+    if (!q.managerId) for (const user of activeManagerUsers) ensureManager(user.id);
     const managers = [...managerRows.values()].map((m) => ({
       ...m,
       avgResponseHours: m.responseCount ? Math.round((m.responseSum / m.responseCount) * 100) / 100 : null,
