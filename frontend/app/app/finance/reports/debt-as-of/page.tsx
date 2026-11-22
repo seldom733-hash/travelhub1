@@ -59,6 +59,7 @@ export default function SupplierDebtAsOfPage() {
         search: search || undefined,
         page,
         pageSize: PAGE_SIZE,
+        excludeClosed: true,
       });
       setReport(data);
       setError("");
@@ -94,7 +95,7 @@ export default function SupplierDebtAsOfPage() {
         actions={
           <TableExportButton
             exportUrl="/api/v1/finance/reports/supplier-debt/export"
-            extraParams={{ asOf, supplierCode, search }}
+            extraParams={{ asOf, supplierCode, search, excludeClosed: "1" }}
           />
         }
       />

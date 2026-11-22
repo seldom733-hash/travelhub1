@@ -333,6 +333,7 @@ export class FinanceController {
     @Query("search") search?: string,
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
+    @Query("excludeClosed") excludeClosed?: string,
   ) {
     return this.supplierDebtReport.getReport({
       asOf,
@@ -340,6 +341,7 @@ export class FinanceController {
       search,
       page: page ? Number.parseInt(page, 10) : undefined,
       pageSize: pageSize ? Number.parseInt(pageSize, 10) : undefined,
+      excludeClosed: excludeClosed === "1" || excludeClosed === "true",
     });
   }
 
@@ -353,7 +355,7 @@ export class FinanceController {
     @CurrentUser() actor: AuthedRequest["user"],
     @Res() res: Response,
   ) {
-    const rows = await this.supplierDebtReport.exportRows({ asOf, supplierCode, search });
+    const rows = await this.supplierDebtReport.exportRows({ asOf, supplierCode, search, excludeClosed: true });
     const columns = [
       { header: "As of", key: "asOf", width: 12 },
       { header: "Obligation", key: "obligationCode", width: 18 },

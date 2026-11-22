@@ -72,6 +72,7 @@ export class SupplierDebtReportService {
     search?: string;
     page?: number;
     pageSize?: number;
+    excludeClosed?: boolean;
   }): Promise<{
     asOf: string;
     generatedAt: string;
@@ -211,9 +212,10 @@ export class SupplierDebtReportService {
       };
     });
 
+    const visibleRows = query.excludeClosed ? rows.filter((row) => row.status !== "CLOSED" && row.status !== "CANCELLED") : rows;
     const totals = new Map<string, DebtAsOfTotals & { azn: Prisma.Decimal; paid: Prisma.Decimal; remaining: Prisma.Decimal; source: Prisma.Decimal }>();
-    for (let i = 0; i < rows.length; i += 1) {
-      const row = rows[i];
+    for (let i = 0; i < visibleRows.length; i += 1) {
+      const row = visibleRows[i];
       // Отменённое обязательство — не долг: в итоги не попадает (строка в
       // отчёте остаётся для аудита состояния на дату).
       if (row.status === "CANCELLED") continue;
@@ -249,7 +251,7 @@ export class SupplierDebtReportService {
     }));
 
     const warnings: string[] = [];
-    const legacyCount = rows.filter((r) => r.precision === "LEGACY_CURRENT").length;
+    const legacyCount = visibleRows.filter((r) => r.precision === "LEGACY_CURRENT").length;
     if (legacyCount > 0) {
       warnings.push(
         `${legacyCount} obligation(s) have no historical amount events; their as-of amount is the CURRENT value (precision=LEGACY_CURRENT) — not a reconstructed history.`,
@@ -263,8 +265,8 @@ export class SupplierDebtReportService {
       asOf: asOfInput,
       generatedAt: new Date().toISOString(),
       totalsByCurrency,
-      items: rows.slice(start, start + pageSize),
-      total: rows.length,
+      items: visibleRows.slice(start, start + pageSize),
+      total: visibleRows.length,
       page,
       pageSize,
       warnings,
@@ -272,7 +274,7 @@ export class SupplierDebtReportService {
   }
 
   /** Плоские строки для CSV/XLSX (тот же расчёт; cap 5000). */
-  async exportRows(query: { asOf?: string; supplierCode?: string; search?: string }): Promise<Array<Record<string, string | null>>> {
+  async exportRows(query: { asOf?: string; supplierCode?: string; search?: string; excludeClosed?: boolean }): Promise<Array<Record<string, string | null>>> {
     const report = await this.getReport({ ...query, page: 1, pageSize: 200 });
     // Для экспорта нужны все строки, а не первая страница: переиспользуем расчёт.
     const all = report.total > report.items.length ? await this.getAllRows(query) : report.items;

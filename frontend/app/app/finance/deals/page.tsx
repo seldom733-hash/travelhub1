@@ -28,6 +28,7 @@ export default function DealsPage() {
   const locale = useLocale();
   const [data, setData] = useState<DealList | null>(null);
   const [serviceTypes, setServiceTypes] = useState<Array<{ code: string; names?: Record<string, string> }>>([]);
+  const [supplierOptions, setSupplierOptions] = useState<Array<{ id: string; code: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -107,7 +108,7 @@ export default function DealsPage() {
           </div>
           <div className="mt-2 grid gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
             <Sel label="Страна" value={query.country} onChange={(v) => setFilter({ country: v })}><option value="">Все страны</option>{(data?.facets.countries ?? []).map((c) => <option key={c} value={c}>{c}</option>)}</Sel>
-            <Sel label="Поставщик" value={query.supplierId} onChange={(v) => setFilter({ supplierId: v })}><option value="">Все поставщики</option>{(data?.facets.suppliers ?? []).map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</Sel>
+            <Sel label="Поставщик" value={query.supplierId} onChange={(v) => setFilter({ supplierId: v })}><option value="">Все поставщики</option>{(supplierOptions.length > 0 ? supplierOptions.map((s) => ({ value: s.id, label: s.name })) : (data?.facets.suppliers ?? [])).map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</Sel>
             <Sel label="Менеджер" value={query.manager} onChange={(v) => setFilter({ manager: v })}><option value="">Все менеджеры</option>{(data?.facets.managers ?? []).map((m) => <option key={m} value={m}>{m}</option>)}</Sel>
             <Sel label="Стадия" value={query.stage} onChange={(v) => setFilter({ stage: v })}><option value="">Все стадии</option><option value="REQUEST">{dealText(locale, "Заявка")}</option><option value="ORDER">{dealText(locale, "Заказ")}</option><option value="BOOKING">{dealText(locale, "Бронь")}</option></Sel>
             <Sel label="Статус сделки" value={query.status} onChange={(v) => setFilter({ status: v })}><option value="">Все статусы</option>{Object.keys(label).filter((s) => s !== "CONVERTED").map((s) => <option key={s} value={s}>{dealStatus(locale, s)}</option>)}</Sel><Sel label="Причина отмены" value={query.cancellationReason} onChange={(v) => setFilter({ cancellationReason: v })}><option value="">Все причины</option><option value="CUSTOMER_FAULT">Вина туриста</option><option value="SUPPLIER_FAULT">Вина поставщика</option><option value="NAVITRAVEL_FAULT">Вина Navitravel</option><option value="FORCE_MAJEURE">Форс-мажор</option><option value="MUTUAL_AGREEMENT">Взаимное соглашение</option></Sel>

@@ -158,6 +158,8 @@ const SERVICE_LABELS: Record<string, string> = {
   transfers: "Трансферы",
   insurance: "Страхование",
   excursions: "Экскурсии",
+  guides: "Гиды",
+  cruises: "Круизы",
 };
 
 const serviceLabel = (service: string, locale: string) => labelFor(locale, SERVICE_LABELS[service] ?? service);
@@ -196,6 +198,8 @@ export default function MarkupAdminPage() {
   const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
   const [allowedSuppliers, setAllowedSuppliers] = useState<Record<string, Set<string>>>({});
   const [countries, setCountries] = useState<CountryOption[]>([]);
+  const [partnerOptions, setPartnerOptions] = useState<SupplierOption[]>([]);
+  const [serviceTypeDirectory, setServiceTypeDirectory] = useState<Array<{ code: string; names: Record<string, string> }>>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -208,7 +212,7 @@ export default function MarkupAdminPage() {
     setLoading(true);
     setError("");
     try {
-      const [markup, commission, mr, cr, tourSuppliers, hotelSuppliers, flightSuppliers, geo] = await Promise.all([
+      const [markup, commission, mr, cr, tourSuppliers, hotelSuppliers, flightSuppliers, geo, partnerData, serviceTypesData] = await Promise.all([
         api.get<MarkupMatrix>("/pricing/markup-matrix"),
         api.get<CommissionMatrix>("/pricing/commission-matrix"),
         api.get<{ items: MarkupRule[] }>("/pricing/markup-rules?pageSize=100"),
@@ -217,6 +221,8 @@ export default function MarkupAdminPage() {
         api.get<SupplierOption[]>("/public/supplier/suppliers?service=hotels"),
         api.get<SupplierOption[]>("/public/supplier/suppliers?service=flights"),
         api.get<CountryOption[] | { value: CountryOption[] }>("/geo/directory").catch(() => []),
+        api.get<{ items?: SupplierOption[] }>("/partners?pageSize=300").catch(() => ({ items: [] })),
+        api.get<Array<{ code: string; names: Record<string, string> }>>("/hotel-directory/service-types").catch(() => []),
       ]);
       setMarkupMatrix(markup);
       setCommissionMatrix(commission);
@@ -228,6 +234,8 @@ export default function MarkupAdminPage() {
         flights: new Set(flightSuppliers.map((s) => s.code)),
       });
       setCountries(Array.isArray(geo) ? geo : (geo.value ?? []));
+      setPartnerOptions(partnerData.items ?? []);
+      setServiceTypeDirectory(serviceTypesData ?? []);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -240,11 +248,20 @@ export default function MarkupAdminPage() {
   }, [load]);
 
   const rows = useMemo<PricingRow[]>(() => {
+    const partnerName = new Map(partnerOptions.map((p) => [p.code, p.name]));
     const suppliers = new Map<string, string>();
     for (const supplier of [...(markupMatrix?.suppliers ?? []), ...(commissionMatrix?.suppliers ?? [])]) {
-      if (!suppliers.has(supplier.code)) suppliers.set(supplier.code, supplier.name);
+      if (!suppliers.has(supplier.code)) suppliers.set(supplier.code, partnerName.get(supplier.code) ?? supplier.name);
     }
-    const services = new Set<string>([...(markupMatrix?.services ?? []), ...(commissionMatrix?.services ?? [])]);
+    for (const rule of [...markupRules, ...commissionRules]) {
+      if (!suppliers.has(rule.supplierCode)) suppliers.set(rule.supplierCode, partnerName.get(rule.supplierCode) ?? rule.supplierCode);
+    }
+    const serviceToken: Record<string, string> = { TOUR: "tours", TOUR_PACKAGE: "tours", HOTEL: "hotels", FLIGHT: "flights", FLIGHT_BOOKING: "flights", TRANSFER: "transfers", INSURANCE: "insurance", VISA: "visas", CRUISE: "cruises", EXCURSION: "excursions", GUIDE: "guides" };
+    const services = new Set<string>([
+      ...(markupMatrix?.services ?? []),
+      ...(commissionMatrix?.services ?? []),
+      ...serviceTypeDirectory.map((t) => serviceToken[t.code]).filter((x): x is string => Boolean(x)),
+    ]);
     const countryKey = (codes?: string[]) => [...new Set(codes ?? [])].sort().join("|") || "*";
     const activeFor = <T extends { supplierCode: string; serviceType: string; status: string; countryCodes?: string[] }>(rules: T[], supplier: string, service: string, countryCodes: string[]) => {
       const key = countryKey(countryCodes);
@@ -258,8 +275,6 @@ export default function MarkupAdminPage() {
         // Aviation suppliers (AZAL/Aviasales) must not appear for tours/hotels,
         // and tour/hotel suppliers must not appear for flights. The registry
         // of enabled suppliers is authoritative per service.
-        const allowed = allowedSuppliers[serviceType];
-        if (allowed && !allowed.has(supplierCode)) continue;
         const scopes = new Map<string, string[]>();
         const addScope = (codes?: string[]) => scopes.set(countryKey(codes), [...new Set(codes ?? [])].sort());
         for (const r of markupRules) if (r.supplierCode === supplierCode && r.serviceType === serviceType && r.status !== "ARCHIVED") addScope(r.countryCodes);
@@ -283,7 +298,7 @@ export default function MarkupAdminPage() {
       }
     }
     return result.sort((a, b) => a.serviceType.localeCompare(b.serviceType) || a.supplierName.localeCompare(b.supplierName) || countryKey(a.countryCodes).localeCompare(countryKey(b.countryCodes)));
-  }, [markupMatrix, commissionMatrix, markupRules, commissionRules, allowedSuppliers]);
+  }, [markupMatrix, commissionMatrix, markupRules, commissionRules, allowedSuppliers, partnerOptions, serviceTypeDirectory]);
 
   const visibleRows = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -415,7 +430,7 @@ export default function MarkupAdminPage() {
             <span className="mb-1 block">{tr("Поставщик")}</span>
             <select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)} className="min-w-48 rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink">
               <option value="">{tr("Все поставщики")}</option>
-              {suppliers.map((supplier) => <option key={supplier.code} value={supplier.code}>{supplier.name}</option>)}
+              {(partnerOptions.length > 0 ? partnerOptions : suppliers).map((supplier) => <option key={supplier.code} value={supplier.code}>{supplier.name}</option>)}
             </select>
           </label>
           <label className="min-w-64 flex-1 text-xs font-medium text-ink/60">
@@ -523,14 +538,14 @@ export default function MarkupAdminPage() {
       </div>
 
       {form && (
-        <PanelFrame title={form.key ? tr("Изменить правило") : tr("Новое правило")} subtitle={form.key ? `${form.supplierCode} · ${serviceLabel(form.serviceType, locale)}` : undefined} onClose={() => setForm(null)}>
+        <PanelFrame overlay title={form.key ? tr("Изменить правило") : tr("Новое правило")} subtitle={form.key ? `${form.supplierCode} · ${serviceLabel(form.serviceType, locale)}` : undefined} onClose={() => setForm(null)}>
           <div className="space-y-4 p-5">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-medium text-ink/60">
                 <span className="mb-1 block">{tr("Поставщик")}</span>
                 <select value={form.supplierCode} disabled={Boolean(form.key)} onChange={(e) => setForm({ ...form, supplierCode: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink disabled:bg-panel">
                   <option value="">{tr("Выберите поставщика")}</option>
-                  {suppliers.map((supplier) => <option key={supplier.code} value={supplier.code}>{supplier.name}</option>)}
+                  {(partnerOptions.length > 0 ? partnerOptions : suppliers).map((supplier) => <option key={supplier.code} value={supplier.code}>{supplier.name}</option>)}
                 </select>
               </label>
               <label className="text-xs font-medium text-ink/60">

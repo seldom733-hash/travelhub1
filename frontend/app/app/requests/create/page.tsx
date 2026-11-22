@@ -313,17 +313,11 @@ export default function CreateRequestPage() {
     Promise.all([
       api.get<{ items?: Customer[] } | Customer[]>(`/customers?pageSize=20${customerSearch ? `&search=${encodeURIComponent(customerSearch)}` : ""}`).catch(() => ({ items: [] })),
       api.get<Manager[]>("/sales/assignment/load").catch(() => []),
-      api.get<{ value?: Supplier[] } | Supplier[]>(`/public/supplier/suppliers?service=tours`).catch(() => ({ value: [] })),
-      api.get<{ value?: Supplier[] } | Supplier[]>(`/public/supplier/suppliers?service=flights`).catch(() => ({ value: [] })),
-      api.get<{ value?: Supplier[] } | Supplier[]>(`/public/supplier/suppliers?service=hotels`).catch(() => ({ value: [] })),
-    ]).then(([customerData, managerData, supplierData, flightData, hotelData]) => {
+      api.get<{ items?: Array<{ id: string; code: string; name: string }> }>(`/partners?pageSize=300`).catch(() => ({ items: [] })),
+    ]).then(([customerData, managerData, partnerData]) => {
       setCustomers(Array.isArray(customerData) ? customerData : customerData.items ?? []);
       setManagers(Array.isArray(managerData) ? managerData : []);
-      const supplierRows = [
-        ...(Array.isArray(supplierData) ? supplierData : supplierData.value ?? []),
-        ...(Array.isArray(flightData) ? flightData : flightData.value ?? []),
-        ...(Array.isArray(hotelData) ? hotelData : hotelData.value ?? []),
-      ].filter((row, index, all) => all.findIndex((x) => x.code === row.code) === index);
+      const supplierRows: Supplier[] = (partnerData.items ?? []).map((p) => ({ code: p.code, name: p.name }));
       setSuppliers(supplierRows);
       if (!primarySupplierCode && supplierRows[0]) setPrimarySupplierCode(supplierRows[0].code);
     }).catch((e) => setError((e as Error).message));

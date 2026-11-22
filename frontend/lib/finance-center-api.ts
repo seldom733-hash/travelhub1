@@ -372,7 +372,7 @@ export interface ClientDebtAsOfReport {
   totalsByCurrency: Array<{ currency: string; count: number; amount: string; paid: string; debt: string }>;
 }
 
-function qs(params: Record<string, string | number | undefined>): string {
+function qs(params: Record<string, string | number | boolean | undefined>): string {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined && v !== "") sp.set(k, String(v));
@@ -582,8 +582,9 @@ export const financeCenterApi = {
     search?: string;
     page?: number;
     pageSize?: number;
+    excludeClosed?: boolean;
   } = {}): Promise<DebtAsOfReport> {
-    return api.get(`${BASE}/reports/supplier-debt${qs(query as Record<string, string | number | undefined>)}`);
+    return api.get(`${BASE}/reports/supplier-debt${qs(query as Record<string, string | number | boolean | undefined>)}`);
   },
 
   clientDebtAsOf(query: { asOf?: string; search?: string; page?: number; pageSize?: number } = {}): Promise<ClientDebtAsOfReport> {
@@ -595,16 +596,16 @@ export const financeCenterApi = {
 export function obligationStatusTone(status: string): string {
   switch (status) {
     case "OPEN":
-      return "border-blue-200 bg-blue-50 text-blue-700";
+      return "border-brand/20 bg-brand/10 text-brand-dark";
     case "PARTIALLY_PAID":
       return "border-amber-200 bg-amber-50 text-amber-700";
     case "CLOSED":
       return "border-emerald-200 bg-emerald-50 text-emerald-700";
     case "CANCELLED":
-      return "border-slate-200 bg-slate-100 text-slate-500";
+      return "border-line bg-panel text-ink/60";
     case "ADJUSTED":
       return "border-violet-200 bg-violet-50 text-violet-700";
     default:
-      return "border-slate-200 bg-slate-50 text-slate-600";
+      return "border-line bg-panel text-ink/60";
   }
 }

@@ -17,6 +17,7 @@ import PageHeader from "@/components/PageHeader";
 import NotificationStrip from "@/components/NotificationStrip";
 import { t, useLocale } from "@/lib/i18n";
 import { useCan } from "@/lib/use-can";
+import { api } from "@/lib/api";
 import { useCurrentUserStatus } from "@/lib/use-user";
 import { financeCenterApi, type SupplierPaymentPlanRow, type SupplierPaymentTerms } from "@/lib/finance-center-api";
 
@@ -57,6 +58,7 @@ export default function SupplierPaymentTermsPage() {
   const [tab, setTab] = useState<"rules" | "plans">("rules");
   const [items, setItems] = useState<SupplierPaymentTerms[] | null>(null);
   const [supplierCode, setSupplierCode] = useState("");
+  const [partners, setPartners] = useState<Array<{ code: string; name: string }>>([]);
   const [rule, setRule] = useState<"IMMEDIATE" | "NET_DAYS">("NET_DAYS");
   const [days, setDays] = useState(30);
   const [busy, setBusy] = useState(false);
@@ -92,6 +94,8 @@ export default function SupplierPaymentTermsPage() {
   useEffect(() => {
     void load();
     void loadPlans();
+    api.get<{ items?: Array<{ code: string; name: string }> }>("/partners?pageSize=300")
+      .then((data) => setPartners(data.items ?? [])).catch(() => setPartners([]));
   }, [load, loadPlans]);
 
   const save = async () => {
@@ -187,13 +191,13 @@ export default function SupplierPaymentTermsPage() {
   };
 
   if (!ready) {
-    return <div className="p-8 text-sm text-slate-500">{L("Загрузка…", "Yüklənir…", "Loading…")}</div>;
+    return <div className="p-8 text-sm text-ink/60">{L("Загрузка…", "Yüklənir…", "Loading…")}</div>;
   }
   if (!canView) {
     return (
       <div className="p-8">
-        <h1 className="text-lg font-semibold text-slate-900">{L("Доступ ограничен", "Giriş məhduddur", "Access restricted")}</h1>
-        <p className="mt-2 text-sm text-slate-600">
+        <h1 className="text-lg font-semibold text-ink">{L("Доступ ограничен", "Giriş məhduddur", "Access restricted")}</h1>
+        <p className="mt-2 text-sm text-ink/60">
           {L("Раздел доступен только FINANCE, ADMIN и DIRECTOR.", "Bölmə yalnız FINANCE, ADMIN və DIRECTOR üçündür.", "This section is available to FINANCE, ADMIN and DIRECTOR only.")}
         </p>
       </div>
@@ -213,14 +217,14 @@ export default function SupplierPaymentTermsPage() {
           <button
             type="button"
             onClick={() => setTab("rules")}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === "rules" ? "bg-brand text-white" : "text-slate-600 hover:bg-slate-50"}`}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === "rules" ? "bg-brand text-white" : "text-ink/60 hover:bg-panel"}`}
           >
             {L("Правила по поставщикам", "Təchizatçı qaydaları", "Supplier rules")}
           </button>
           <button
             type="button"
             onClick={() => setTab("plans")}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === "plans" ? "bg-brand text-white" : "text-slate-600 hover:bg-slate-50"}`}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === "plans" ? "bg-brand text-white" : "text-ink/60 hover:bg-panel"}`}
           >
             {L("График по бронированиям", "Bronlar üzrə cədvəl", "Payment plan by booking")}
           </button>
@@ -237,25 +241,27 @@ export default function SupplierPaymentTermsPage() {
 
         {tab === "rules" && (
           <>
-            <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-600">
+            <p className="rounded-lg border border-line bg-panel px-4 py-2 text-xs text-ink/60">
               {t("finance.payment_terms.hint", locale)}
             </p>
 
             {canWrite && (
               <section className="rounded-xl border border-line bg-white p-4">
-                <h2 className="text-sm font-semibold text-slate-800">{t("finance.payment_terms.set", locale)}</h2>
+                <h2 className="text-sm font-semibold text-ink">{t("finance.payment_terms.set", locale)}</h2>
                 <div className="mt-3 flex flex-wrap items-end gap-3">
                   <label className="text-sm">
-                    <span className="mb-1 block text-slate-600">{t("finance.payment_terms.supplier", locale)}</span>
-                    <input
+                    <span className="mb-1 block text-ink/60">{t("finance.payment_terms.supplier", locale)}</span>
+                    <select
                       value={supplierCode}
                       onChange={(e) => setSupplierCode(e.target.value)}
-                      placeholder="SUMMERTOUR"
-                      className="rounded-lg border border-line px-3 py-2 text-sm"
-                    />
+                      className="min-w-56 rounded-lg border border-line bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">{t("finance.payment_terms.supplier_placeholder", locale)}</option>
+                      {partners.map((partner) => <option key={partner.code} value={partner.code}>{partner.name}</option>)}
+                    </select>
                   </label>
                   <label className="text-sm">
-                    <span className="mb-1 block text-slate-600">{t("finance.payment_terms.rule", locale)}</span>
+                    <span className="mb-1 block text-ink/60">{t("finance.payment_terms.rule", locale)}</span>
                     <select
                       value={rule}
                       onChange={(e) => setRule(e.target.value as "IMMEDIATE" | "NET_DAYS")}
@@ -267,7 +273,7 @@ export default function SupplierPaymentTermsPage() {
                   </label>
                   {rule === "NET_DAYS" && (
                     <label className="text-sm">
-                      <span className="mb-1 block text-slate-600">{t("finance.payment_terms.days", locale)}</span>
+                      <span className="mb-1 block text-ink/60">{t("finance.payment_terms.days", locale)}</span>
                       <input
                         type="number"
                         min={0}
@@ -293,9 +299,9 @@ export default function SupplierPaymentTermsPage() {
             <section className="overflow-hidden rounded-xl border border-line bg-white">
               {items && items.length > 0 ? (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm text-slate-900">
+                  <table className="min-w-full text-sm text-ink">
                     <thead>
-                      <tr className="border-b border-line bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                      <tr className="border-b border-line bg-panel text-left text-xs uppercase tracking-wide text-ink/60">
                         <th className="px-3 py-2">{t("finance.payment_terms.supplier", locale)}</th>
                         <th className="px-3 py-2">{t("finance.payment_terms.rule", locale)}</th>
                         <th className="px-3 py-2">{t("finance.payment_terms.days", locale)}</th>
@@ -310,14 +316,14 @@ export default function SupplierPaymentTermsPage() {
                           <td className="px-3 py-2">{t(`finance.payment_terms.rule.${row.rule.toLowerCase()}`, locale)}</td>
                           <td className="px-3 py-2">{row.rule === "IMMEDIATE" ? "0" : row.days}</td>
                           <td className="px-3 py-2">{row.active ? "✓" : "—"}</td>
-                          <td className="px-3 py-2 text-xs text-slate-500">{row.updatedAt.slice(0, 19).replace("T", " ")}</td>
+                          <td className="px-3 py-2 text-xs text-ink/60">{row.updatedAt.slice(0, 19).replace("T", " ")}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               ) : (
-                <p className="py-10 text-center text-sm text-slate-500">{t("finance.payment_terms.empty", locale)}</p>
+                <p className="py-10 text-center text-sm text-ink/60">{t("finance.payment_terms.empty", locale)}</p>
               )}
             </section>
           </>
@@ -325,7 +331,7 @@ export default function SupplierPaymentTermsPage() {
 
         {tab === "plans" && (
           <>
-            <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-600">
+            <p className="rounded-lg border border-line bg-panel px-4 py-2 text-xs text-ink/60">
               {L(
                 "Для каждой брони финанс вводит суммы и даты вручную: полная оплата одной датой или первая и последняя оплаты. Напоминания приходят за 3 дня и далее ежедневно до оплаты.",
                 "Hər bron üçün maliyyə məbləğləri və tarixləri əl ilə daxil edir: tam ödəniş bir tarixlə və ya ilk və son ödəniş. Xatırlatmalar 3 gün əvvəl və ödənişə qədər hər gün gəlir.",
@@ -336,9 +342,9 @@ export default function SupplierPaymentTermsPage() {
             <section className="overflow-hidden rounded-xl border border-line bg-white">
               {plans && plans.length > 0 ? (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm text-slate-900">
+                  <table className="min-w-full text-sm text-ink">
                     <thead>
-                      <tr className="border-b border-line bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                      <tr className="border-b border-line bg-panel text-left text-xs uppercase tracking-wide text-ink/60">
                         <th className="px-3 py-2">{L("Бронь", "Bron", "Booking")}</th>
                         <th className="px-3 py-2">{L("Поставщик", "Təchizatçı", "Supplier")}</th>
                         <th className="px-3 py-2 text-right">{L("К оплате", "Ödəniləcək", "Remaining")}</th>
@@ -351,11 +357,11 @@ export default function SupplierPaymentTermsPage() {
                         <tr key={row.obligationId} className="border-b border-line/60 align-top">
                           <td className="px-3 py-2">
                             <div className="font-mono text-xs font-semibold">{row.bookingCode ?? row.obligationCode}</div>
-                            <div className="text-[10px] text-slate-400">{row.orderCode ?? "—"}</div>
+                            <div className="text-[10px] text-ink/60">{row.orderCode ?? "—"}</div>
                           </td>
                           <td className="px-3 py-2 font-mono text-xs">{row.supplierCode ?? "—"}</td>
                           <td className="px-3 py-2 text-right font-semibold">{money(locale, row.remainingAmount || row.amount)} AZN</td>
-                          <td className="px-3 py-2 text-xs text-slate-600">
+                          <td className="px-3 py-2 text-xs text-ink/60">
                             {row.plan ? (
                               <div className="space-y-0.5">
                                 {row.plan.installments.map((i) => (
@@ -367,16 +373,16 @@ export default function SupplierPaymentTermsPage() {
                                 ))}
                               </div>
                             ) : (
-                              <span className="text-slate-400">{L("не задан", "təyin edilməyib", "not set")}</span>
+                              <span className="text-ink/60">{L("не задан", "təyin edilməyib", "not set")}</span>
                             )}
                           </td>
                           <td className="px-3 py-2">
                             {canWrite ? (
-                              <button type="button" onClick={() => openPlan(row)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                              <button type="button" onClick={() => openPlan(row)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-ink hover:bg-panel">
                                 {row.plan ? L("Изменить", "Dəyişdir", "Edit") : L("Настроить", "Təyin et", "Set plan")}
                               </button>
                             ) : (
-                              <span className="text-xs text-slate-400">—</span>
+                              <span className="text-xs text-ink/60">—</span>
                             )}
                           </td>
                         </tr>
@@ -385,7 +391,7 @@ export default function SupplierPaymentTermsPage() {
                   </table>
                 </div>
               ) : (
-                <p className="py-10 text-center text-sm text-slate-500">
+                <p className="py-10 text-center text-sm text-ink/60">
                   {L("Открытых броней для оплаты поставщикам нет.", "Təchizatçılara ödəniş üçün açıq bron yoxdur.", "No open bookings for supplier payment.")}
                 </p>
               )}
@@ -395,15 +401,15 @@ export default function SupplierPaymentTermsPage() {
               <section className="rounded-xl border border-line bg-white p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <h2 className="text-sm font-semibold text-slate-800">
+                    <h2 className="text-sm font-semibold text-ink">
                       {L("График оплаты", "Ödəniş cədvəli", "Payment plan")}: {editing.bookingCode ?? editing.obligationCode}
                     </h2>
-                    <p className="mt-0.5 text-xs text-slate-500">
+                    <p className="mt-0.5 text-xs text-ink/60">
                       {editing.supplierCode ?? "—"} · {L("к оплате", "ödəniləcək", "remaining")}{" "}
                       {money(locale, editing.remainingAmount || editing.amount)} AZN
                     </p>
                   </div>
-                  <button type="button" onClick={() => { setEditing(null); setDraft(null); }} className="text-xs text-slate-500 hover:text-slate-800">
+                  <button type="button" onClick={() => { setEditing(null); setDraft(null); }} className="text-xs text-ink/60 hover:text-ink">
                     {L("Закрыть", "Bağla", "Close")}
                   </button>
                 </div>
@@ -412,14 +418,14 @@ export default function SupplierPaymentTermsPage() {
                   <button
                     type="button"
                     onClick={() => setDraft({ ...draft, mode: "FULL" })}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${draft.mode === "FULL" ? "border-brand bg-brand text-white" : "border-line text-slate-600"}`}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${draft.mode === "FULL" ? "border-brand bg-brand text-white" : "border-line text-ink/60"}`}
                   >
                     {L("Полная оплата", "Tam ödəniş", "Full payment")}
                   </button>
                   <button
                     type="button"
                     onClick={() => setDraft({ ...draft, mode: "PARTIAL" })}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${draft.mode === "PARTIAL" ? "border-brand bg-brand text-white" : "border-line text-slate-600"}`}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${draft.mode === "PARTIAL" ? "border-brand bg-brand text-white" : "border-line text-ink/60"}`}
                   >
                     {L("Частичная оплата", "Hissəli ödəniş", "Partial payment")}
                   </button>
@@ -428,35 +434,35 @@ export default function SupplierPaymentTermsPage() {
                 {draft.mode === "FULL" ? (
                   <div className="mt-3 flex flex-wrap items-end gap-3">
                     <label className="text-sm">
-                      <span className="mb-1 block text-slate-600">{L("Дата оплаты", "Ödəniş tarixi", "Payment date")}</span>
+                      <span className="mb-1 block text-ink/60">{L("Дата оплаты", "Ödəniş tarixi", "Payment date")}</span>
                       <input type="date" value={draft.fullDate} onChange={(e) => setDraft({ ...draft, fullDate: e.target.value })} className="rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
                     <label className="text-sm">
-                      <span className="mb-1 block text-slate-600">{L("Сумма, AZN", "Məbləğ, AZN", "Amount, AZN")}</span>
+                      <span className="mb-1 block text-ink/60">{L("Сумма, AZN", "Məbləğ, AZN", "Amount, AZN")}</span>
                       <input type="number" min={0.01} step={0.01} value={draft.fullAmount} onChange={(e) => setDraft({ ...draft, fullAmount: e.target.value })} className="w-40 rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
                   </div>
                 ) : (
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-lg border border-line/70 p-3">
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{L("Первая оплата", "İlk ödəniş", "First payment")}</p>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">{L("Первая оплата", "İlk ödəniş", "First payment")}</p>
                       <label className="text-sm">
-                        <span className="mb-1 block text-slate-600">{L("Дата", "Tarix", "Date")}</span>
+                        <span className="mb-1 block text-ink/60">{L("Дата", "Tarix", "Date")}</span>
                         <input type="date" value={draft.firstDate} onChange={(e) => setDraft({ ...draft, firstDate: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
                       </label>
                       <label className="mt-2 block text-sm">
-                        <span className="mb-1 block text-slate-600">{L("Сумма, AZN", "Məbləğ, AZN", "Amount, AZN")}</span>
+                        <span className="mb-1 block text-ink/60">{L("Сумма, AZN", "Məbləğ, AZN", "Amount, AZN")}</span>
                         <input type="number" min={0.01} step={0.01} value={draft.firstAmount} onChange={(e) => setDraft({ ...draft, firstAmount: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
                       </label>
                     </div>
                     <div className="rounded-lg border border-line/70 p-3">
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{L("Последняя оплата", "Son ödəniş", "Last payment")}</p>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">{L("Последняя оплата", "Son ödəniş", "Last payment")}</p>
                       <label className="text-sm">
-                        <span className="mb-1 block text-slate-600">{L("Дата", "Tarix", "Date")}</span>
+                        <span className="mb-1 block text-ink/60">{L("Дата", "Tarix", "Date")}</span>
                         <input type="date" value={draft.lastDate} onChange={(e) => setDraft({ ...draft, lastDate: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
                       </label>
                       <label className="mt-2 block text-sm">
-                        <span className="mb-1 block text-slate-600">{L("Сумма, AZN", "Məbləğ, AZN", "Amount, AZN")}</span>
+                        <span className="mb-1 block text-ink/60">{L("Сумма, AZN", "Məbləğ, AZN", "Amount, AZN")}</span>
                         <input type="number" min={0.01} step={0.01} value={draft.lastAmount} onChange={(e) => setDraft({ ...draft, lastAmount: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
                       </label>
                     </div>
@@ -468,7 +474,7 @@ export default function SupplierPaymentTermsPage() {
                   <button type="button" disabled={planBusy} onClick={() => void savePlan()} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50">
                     {planBusy ? L("Сохраняем…", "Saxlanılır…", "Saving…") : t("common.save", locale)}
                   </button>
-                  <button type="button" onClick={() => { setEditing(null); setDraft(null); }} className="rounded-lg border border-line px-4 py-2 text-sm text-slate-600">
+                  <button type="button" onClick={() => { setEditing(null); setDraft(null); }} className="rounded-lg border border-line px-4 py-2 text-sm text-ink/60">
                     {L("Отмена", "Ləğv et", "Cancel")}
                   </button>
                 </div>
