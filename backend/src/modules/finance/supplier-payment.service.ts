@@ -93,6 +93,7 @@ export interface SupplierPaymentDto {
   partnerCode: string | null;
   orderId: string | null;
   orderCode: string | null;
+  dealNumber?: string | null;
   bookingId: string | null;
   bookingCode: string | null;
   customerId: string | null;
@@ -1152,9 +1153,14 @@ export class SupplierPaymentService {
       ? await this.prisma.user.findMany({ where: { id: { in: confirmerIds } }, select: { id: true, username: true, fullName: true } })
       : [];
     const confirmerNames = new Map(confirmers.map((u) => [u.id, u.fullName || u.username]));
+    const orderIds = [...new Set(rows.map((r) => r.orderId).filter((id): id is string => !!id))];
+    const orders = orderIds.length
+      ? await this.prisma.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, referenceNumber: true, commerceSequence: true } })
+      : [];
+    const orderInfo = new Map(orders.map((o) => [o.id, o]));
 
     return rows.map((row) => {
-      return this.toDto(row, row.allocations, codes, obligationInfo, partnerCodes.get(row.partnerId ?? "") ?? null, confirmerNames.get(row.confirmedById ?? "") ?? null);
+      return this.toDto(row, row.allocations, codes, obligationInfo, partnerCodes.get(row.partnerId ?? "") ?? null, confirmerNames.get(row.confirmedById ?? "") ?? null, row.orderId ? orderInfo.get(row.orderId) : null);
     });
   }
 
@@ -1165,6 +1171,7 @@ export class SupplierPaymentService {
     obligationInfo: Map<string, { id: string; code: string; sourceCurrency: string; fxRate: Prisma.Decimal | null }>,
     partnerCode: string | null,
     confirmedBy: string | null,
+    orderInfo?: { id: string; referenceNumber: string | null; commerceSequence: string | null } | null,
   ): SupplierPaymentDto {
     const active = allocations.filter((a) => a.reversedAt == null);
     const allocated = active.reduce((sum, a) => sum.plus(a.aznAmount), new Prisma.Decimal(0));
@@ -1193,7 +1200,8 @@ export class SupplierPaymentService {
       partnerId: row.partnerId,
       partnerCode,
       orderId: row.orderId,
-      orderCode: row.orderCode,
+      orderCode: orderInfo?.referenceNumber ?? row.orderCode,
+      dealNumber: orderInfo?.commerceSequence ?? null,
       bookingId: row.bookingId,
       bookingCode: row.bookingCode,
       customerId: row.customerId,

@@ -14,6 +14,7 @@ interface ClientPayment {
   referenceNumber: string | null;
   orderId: string;
   orderReference: string | null;
+  dealNumber?: string | null;
   amount: string;
   currency: string;
   paymentMethod: string | null;
@@ -42,6 +43,7 @@ interface SupplierPayment {
   code: string;
   orderId: string | null;
   orderCode: string | null;
+  dealNumber?: string | null;
   direction: "OUTGOING" | "INCOMING";
   amount: string;
   currency: string;
@@ -202,7 +204,7 @@ export default function PaymentsAndRefundsPage() {
         if (!alive) return;
         const payRows: TableRow[] = (payments.items ?? []).map((p) => ({
           id: `pay-${p.id}`,
-          deal: p.orderReference ?? p.orderId,
+          deal: p.dealNumber ?? p.orderReference ?? p.orderId,
           code: p.referenceNumber ?? p.code,
           date: p.paidAt ?? p.createdAt,
           amount: p.amount,
@@ -214,7 +216,7 @@ export default function PaymentsAndRefundsPage() {
         }));
         const refundRows: TableRow[] = (refunds.items ?? []).map((r) => ({
           id: `ref-${r.id}`,
-          deal: r.orderCode ?? r.dealNumber ?? r.orderId,
+          deal: r.dealNumber ?? r.orderCode ?? r.orderId,
           code: r.referenceNumber ?? r.code,
           date: r.processedAt ?? r.createdAt,
           amount: r.amount,
@@ -230,7 +232,7 @@ export default function PaymentsAndRefundsPage() {
         if (!alive) return;
         const supplierRows: TableRow[] = supplierItems.map((p) => ({
           id: `sup-${p.id}`,
-          deal: p.orderCode ?? p.orderId ?? "—",
+          deal: p.dealNumber ?? p.orderCode ?? p.orderId ?? "—",
           code: p.code,
           date: p.occurredAt ?? p.createdAt,
           amount: p.amount,

@@ -652,7 +652,7 @@ export class PaymentService {
     const rowPaymentIds = items.map((p) => p.id);
     const [orders, allOrderPayments, createdHistories] = await Promise.all([
       rowOrderIds.length > 0
-        ? this.prisma.order.findMany({ where: { id: { in: rowOrderIds } }, select: { id: true, referenceNumber: true, amount: true } })
+        ? this.prisma.order.findMany({ where: { id: { in: rowOrderIds } }, select: { id: true, referenceNumber: true, commerceSequence: true, amount: true } })
         : Promise.resolve([]),
       rowOrderIds.length > 0
         ? this.prisma.payment.findMany({
@@ -670,6 +670,7 @@ export class PaymentService {
         : Promise.resolve([]),
     ]);
     const orderRefMap = new Map(orders.map((o) => [o.id, o.referenceNumber]));
+    const orderDealNumberMap = new Map(orders.map((o) => [o.id, o.commerceSequence]));
     const orderAmountMap = new Map(orders.map((o) => [o.id, o.amount.toString()]));
     const orderTotalMap = new Map(orders.map((o) => [o.id, new Prisma.Decimal(o.amount)]));
 
@@ -702,6 +703,7 @@ export class PaymentService {
       return {
         ...row,
         orderReference: orderRefMap.get(row.orderId as string) ?? null,
+        dealNumber: orderDealNumberMap.get(row.orderId as string) ?? null,
         orderAmount: orderAmountMap.get(row.orderId as string) ?? null,
         ordinal: stats?.ordinal ?? null,
         remainingAfter: stats?.remainingAfter ?? null,
