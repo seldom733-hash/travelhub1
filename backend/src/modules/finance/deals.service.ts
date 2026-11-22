@@ -185,7 +185,7 @@ export class DealsService {
     const supplierMap = new Map<string, string>();
     for (const row of facetRows) {
       const key = row.supplierId ?? row.supplierCode;
-      if (key) supplierMap.set(key, row.supplierCode ?? key);
+      if (key) supplierMap.set(key, row.supplierName ?? row.supplierCode ?? key);
     }
     return {
       items: sorted.slice(start, start + pageSize),
