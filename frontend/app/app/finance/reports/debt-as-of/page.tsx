@@ -15,9 +15,20 @@ import Pagination from "@/components/Pagination";
 import TableExportButton from "@/components/TableExportButton";
 import { t, useLocale, formatPrice } from "@/lib/i18n";
 import { financeCenterApi, type ClientDebtAsOfReport, type DebtAsOfReport } from "@/lib/finance-center-api";
+import { dealStatus } from "@/lib/deals-i18n";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 const today = () => new Date().toISOString().slice(0, 10);
+
+function paymentStatusLabel(locale: string, status: string): string {
+  const labels: Record<string, Record<string, string>> = {
+    UNPAID: { ru: "Не оплачено", az: "Ödənilməyib", en: "Unpaid" },
+    PARTIALLY_PAID: { ru: "Частично оплачено", az: "Qismən ödənilib", en: "Partially paid" },
+    PAID: { ru: "Оплачено", az: "Ödənilib", en: "Paid" },
+    REFUNDED: { ru: "Возвращено", az: "Qaytarılıb", en: "Refunded" },
+  };
+  return labels[status]?.[locale] ?? status;
+}
 
 export default function SupplierDebtAsOfPage() {
   const locale = useLocale();
@@ -25,6 +36,7 @@ export default function SupplierDebtAsOfPage() {
   const [supplierCode, setSupplierCode] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [clientPage, setClientPage] = useState(1);
   const [report, setReport] = useState<DebtAsOfReport | null>(null);
   const [clientReport, setClientReport] = useState<ClientDebtAsOfReport | null>(null);
   const [busy, setBusy] = useState(false);
@@ -32,11 +44,11 @@ export default function SupplierDebtAsOfPage() {
 
   const loadClientDebt = useCallback(async () => {
     try {
-      setClientReport(await financeCenterApi.clientDebtAsOf({ asOf: asOf || undefined, search: search || undefined, page: 1, pageSize: 100 }));
+      setClientReport(await financeCenterApi.clientDebtAsOf({ asOf: asOf || undefined, search: search || undefined, page: clientPage, pageSize: PAGE_SIZE }));
     } catch {
       setClientReport(null);
     }
-  }, [asOf, search]);
+  }, [asOf, search, clientPage]);
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -69,10 +81,10 @@ export default function SupplierDebtAsOfPage() {
       : status === "CLOSED"
         ? "border-emerald-200 bg-emerald-50 text-emerald-700"
         : status === "CANCELLED"
-          ? "border-slate-200 bg-slate-100 text-slate-500"
+          ? "border-line bg-panel text-ink/60"
           : status === "UNKNOWN"
             ? "border-violet-200 bg-violet-50 text-violet-700"
-            : "border-blue-200 bg-blue-50 text-blue-700";
+            : "border-brand/20 bg-brand/10 text-brand-dark";
 
   return (
     <div>
@@ -96,7 +108,7 @@ export default function SupplierDebtAsOfPage() {
 
         <div className="flex flex-wrap items-end gap-3">
           <label className="text-sm">
-            <span className="mb-1 block text-slate-600">{t("finance.debt_as_of.as_of", locale)}</span>
+            <span className="mb-1 block text-ink/60">{t("finance.debt_as_of.as_of", locale)}</span>
             <input
               type="date"
               value={asOf}
@@ -104,12 +116,13 @@ export default function SupplierDebtAsOfPage() {
               onChange={(e) => {
                 setAsOf(e.target.value);
                 setPage(1);
+                setClientPage(1);
               }}
               className="rounded-lg border border-line px-3 py-2 text-sm"
             />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-slate-600">{t("finance.debt_as_of.supplier", locale)}</span>
+            <span className="mb-1 block text-ink/60">{t("finance.debt_as_of.supplier", locale)}</span>
             <input
               value={supplierCode}
               onChange={(e) => {
@@ -121,12 +134,13 @@ export default function SupplierDebtAsOfPage() {
             />
           </label>
           <label className="min-w-56 flex-1 text-sm">
-            <span className="mb-1 block text-slate-600">{t("finance.debt_as_of.search", locale)}</span>
+            <span className="mb-1 block text-ink/60">{t("finance.debt_as_of.search", locale)}</span>
             <input
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setPage(1);
+                setClientPage(1);
               }}
               placeholder="SBO-… / INV-… / ORD-…"
               className="w-full rounded-lg border border-line px-3 py-2 text-sm"
@@ -151,13 +165,13 @@ export default function SupplierDebtAsOfPage() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {report.totalsByCurrency.map((total) => (
               <div key={total.currency} className="rounded-xl border border-line bg-white p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink/60">
                   {t("finance.debt_as_of.totals", locale)} · {total.currency}
                 </p>
-                <p className="mt-1 text-lg font-semibold text-slate-900">
+                <p className="mt-1 text-lg font-semibold text-ink">
                   {formatPrice(total.remainingAzn, "AZN", locale)}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-ink/60">
                   {t("finance.debt_as_of.paid", locale)}: {formatPrice(total.paidAzn, "AZN", locale)} ·{" "}
                   {total.count} {t("finance.supplier_payments.kpi.items", locale)}
                   {total.unknownCount > 0 ? ` · UNKNOWN: ${total.unknownCount}` : ""}
@@ -169,16 +183,16 @@ export default function SupplierDebtAsOfPage() {
 
         <section className="overflow-hidden rounded-xl border border-line bg-white">
           <div className="border-b border-line px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">{t("finance.debt_as_of.section_title", locale)}</h2>
-            <p className="mt-0.5 text-xs text-slate-500">{t("finance.debt_as_of.section_hint", locale)}</p>
+            <h2 className="text-sm font-semibold text-ink">{t("finance.debt_as_of.section_title", locale)}</h2>
+            <p className="mt-0.5 text-xs text-ink/60">{t("finance.debt_as_of.section_hint", locale)}</p>
           </div>
           {busy && !report ? (
-            <div className="h-40 animate-pulse bg-slate-100" />
+            <div className="h-40 animate-pulse bg-panel" />
           ) : report && report.items.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm text-slate-900">
+              <table className="min-w-full text-sm text-ink">
                 <thead>
-                  <tr className="border-b border-line bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-line bg-panel text-left text-xs uppercase tracking-wide text-ink/60">
                     <th className="px-3 py-2">{t("finance.debt_as_of.col.obligation", locale)}</th>
                     <th className="px-3 py-2">{t("finance.debt_as_of.col.invoice", locale)}</th>
                     <th className="px-3 py-2">{t("finance.debt_as_of.col.supplier", locale)}</th>
@@ -192,14 +206,14 @@ export default function SupplierDebtAsOfPage() {
                 </thead>
                 <tbody>
                   {report.items.map((row) => (
-                    <tr key={row.obligationCode} className="border-b border-line/60 hover:bg-slate-50">
+                    <tr key={row.obligationCode} className="border-b border-line/60 hover:bg-panel">
                       <td className="px-3 py-2 font-mono text-xs font-semibold">{row.obligationCode}</td>
                       <td className="px-3 py-2 text-xs">{row.invoiceNumber ?? "—"}</td>
                       <td className="px-3 py-2">{row.partnerCode ?? row.supplierCode ?? "—"}</td>
                       <td className="px-3 py-2 font-mono text-xs">{row.orderCode ?? row.bookingCode ?? "—"}</td>
                       <td className="px-3 py-2 text-right font-mono">
                         {row.sourceAmount} {row.sourceCurrency}
-                        <span className="ml-1 text-[10px] text-slate-400">{row.aznAmount ? `(${row.aznAmount} AZN)` : ""}</span>
+                        <span className="ml-1 text-[10px] text-ink/60">{row.aznAmount ? `(${row.aznAmount} AZN)` : ""}</span>
                       </td>
                       <td className="px-3 py-2 text-right font-mono">{row.paidAzn}</td>
                       <td className="px-3 py-2 text-right font-mono">{row.remainingAzn ?? "UNKNOWN"}</td>
@@ -215,7 +229,7 @@ export default function SupplierDebtAsOfPage() {
                       </td>
                       <td className="px-3 py-2">
                         <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${tone(row.status)}`}>
-                          {row.status}
+                          {dealStatus(locale, row.status)}
                         </span>
                         {row.precision === "LEGACY_CURRENT" && (
                           <span className="ml-1 text-[10px] text-amber-600">legacy</span>
@@ -227,7 +241,7 @@ export default function SupplierDebtAsOfPage() {
               </table>
             </div>
           ) : (
-            <p className="py-10 text-center text-sm text-slate-500">{t("finance.debt_as_of.empty", locale)}</p>
+            <p className="py-10 text-center text-sm text-ink/60">{t("finance.debt_as_of.empty", locale)}</p>
           )}
         </section>
 
@@ -237,25 +251,25 @@ export default function SupplierDebtAsOfPage() {
 
         <section className="overflow-hidden rounded-xl border border-line bg-white">
           <div className="border-b border-line px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">{t("finance.client_debt.title", locale)}</h2>
-            <p className="mt-0.5 text-xs text-slate-500">{t("finance.client_debt.hint", locale)}</p>
+            <h2 className="text-sm font-semibold text-ink">{t("finance.client_debt.title", locale)}</h2>
+            <p className="mt-0.5 text-xs text-ink/60">{t("finance.client_debt.hint", locale)}</p>
           </div>
           {clientReport && clientReport.totalsByCurrency.length > 0 && (
             <div className="grid gap-2 border-b border-line p-3 sm:grid-cols-3">
               {clientReport.totalsByCurrency.map((total) => (
-                <div key={total.currency} className="rounded-lg bg-slate-50 p-3">
-                  <div className="text-[10px] uppercase tracking-wide text-slate-500">{total.currency} · {total.count}</div>
-                  <div className="mt-1 font-mono text-lg font-semibold text-slate-900">{formatPrice(total.debt, total.currency, locale)}</div>
-                  <div className="text-[10px] text-slate-500">{t("finance.client_debt.paid_of", locale)} {formatPrice(total.amount, total.currency, locale)} {t("finance.debt_as_of.paid", locale).toLowerCase()} {formatPrice(total.paid, total.currency, locale)}</div>
+                <div key={total.currency} className="rounded-xl border border-line bg-white p-4">
+                  <div className="text-xs font-medium uppercase tracking-wide text-ink/60">{total.currency} · {total.count}</div>
+                  <div className="mt-1 text-lg font-semibold text-ink">{formatPrice(total.debt, total.currency, locale)}</div>
+                  <div className="text-xs text-ink/60">{t("finance.client_debt.paid_of", locale)} {formatPrice(total.amount, total.currency, locale)} {t("finance.debt_as_of.paid", locale).toLowerCase()} {formatPrice(total.paid, total.currency, locale)}</div>
                 </div>
               ))}
             </div>
           )}
           {clientReport && clientReport.items.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm text-slate-900">
+              <table className="min-w-full text-sm text-ink">
                 <thead>
-                  <tr className="border-b border-line bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-line bg-panel text-left text-xs uppercase tracking-wide text-ink/60">
                     <th className="px-3 py-2">{t("finance.client_debt.col.order", locale)}</th>
                     <th className="px-3 py-2">{t("finance.client_debt.col.customer", locale)}</th>
                     <th className="px-3 py-2 text-right">{t("finance.client_debt.col.amount", locale)}</th>
@@ -266,22 +280,29 @@ export default function SupplierDebtAsOfPage() {
                 </thead>
                 <tbody>
                   {clientReport.items.map((row) => (
-                    <tr key={row.orderCode} className="border-b border-line/60 hover:bg-slate-50">
+                    <tr key={row.orderCode} className="border-b border-line/60 hover:bg-panel">
                       <td className="px-3 py-2 font-mono text-xs font-semibold">{row.sequence ?? row.orderCode}</td>
-                      <td className="px-3 py-2"><div>{row.customerName}</div><div className="text-[10px] text-slate-400">{row.customerPhone ?? "—"}</div></td>
+                      <td className="px-3 py-2"><div>{row.customerName}</div><div className="text-[10px] text-ink/60">{row.customerPhone ?? "—"}</div></td>
                       <td className="px-3 py-2 text-right font-mono">{formatPrice(row.amount, row.currency, locale)}</td>
                       <td className="px-3 py-2 text-right font-mono text-emerald-700">{formatPrice(row.paid, row.currency, locale)}</td>
                       <td className="px-3 py-2 text-right font-mono font-semibold text-rose-700">{formatPrice(row.debt, row.currency, locale)}</td>
-                      <td className="px-3 py-2 text-xs">{row.status} · {row.paymentStatus}</td>
+                      <td className="px-3 py-2">
+                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${tone(row.status)}`}>{dealStatus(locale, row.status)}</span>
+                        <span className="ml-1 text-[10px] text-ink/60">{paymentStatusLabel(locale, row.paymentStatus)}</span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <p className="py-8 text-center text-sm text-slate-500">{t("finance.client_debt.empty", locale)}</p>
+            <p className="py-8 text-center text-sm text-ink/60">{t("finance.client_debt.empty", locale)}</p>
           )}
         </section>
+
+        {clientReport && clientReport.total > PAGE_SIZE && (
+          <Pagination page={clientPage} pageSize={PAGE_SIZE} total={clientReport.total} locale={locale} onPageChange={setClientPage} />
+        )}
       </div>
     </div>
   );

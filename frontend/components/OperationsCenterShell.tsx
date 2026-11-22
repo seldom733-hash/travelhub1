@@ -112,10 +112,10 @@ function OperationsCenterTabs({
             aria-selected={active}
             aria-controls={panelId}
             href={href}
-            className={`shrink-0 rounded-t-lg border-b-2 px-4 py-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-blue-400 ${
+            className={`shrink-0 rounded-t-lg border-b-2 px-4 py-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand ${
               active
-                ? "border-blue-600 bg-blue-50/60 text-blue-700"
-                : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800"
+                ? "border-brand bg-brand/60 text-brand-dark"
+                : "border-transparent text-ink/60 hover:border-line hover:text-ink"
             }`}
           >
             {label}
@@ -170,7 +170,7 @@ function HeaderPeriodControl() {
 
   return (
     <div className="flex items-center gap-2 text-sm" role="group" aria-label={t("ops.period_aria", locale)}>
-      <span className="text-xs font-medium text-slate-500">{t("ops.period", locale)}</span>
+      <span className="text-xs font-medium text-ink/60">{t("ops.period", locale)}</span>
       <div className="flex items-center gap-1">
         <label className="sr-only" htmlFor="ops-period-from">{t("ops.period_from", locale)}</label>
         <input
@@ -179,9 +179,9 @@ function HeaderPeriodControl() {
           value={dateFrom}
           onChange={(e) => updatePeriod("dateFrom", e.target.value)}
           aria-label={t("ops.period_from", locale)}
-          className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          className="w-32 rounded-lg border border-line bg-white px-2 py-1 text-xs outline-none transition focus:border-brand focus:ring-2 focus:ring-brand"
         />
-        <span className="text-xs text-slate-400">—</span>
+        <span className="text-xs text-ink/60">—</span>
         <label className="sr-only" htmlFor="ops-period-to">{t("ops.period_to", locale)}</label>
         <input
           id="ops-period-to"
@@ -189,7 +189,7 @@ function HeaderPeriodControl() {
           value={dateTo}
           onChange={(e) => updatePeriod("dateTo", e.target.value)}
           aria-label={t("ops.period_to", locale)}
-          className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          className="w-32 rounded-lg border border-line bg-white px-2 py-1 text-xs outline-none transition focus:border-brand focus:ring-2 focus:ring-brand"
         />
       </div>
       {hasPeriod && (
@@ -197,7 +197,7 @@ function HeaderPeriodControl() {
           type="button"
           onClick={clearPeriod}
           aria-label={t("ops.period_clear", locale)}
-          className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+          className="rounded-md p-1 text-ink/60 transition-colors hover:bg-panel hover:text-ink/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
           ✕
         </button>
@@ -210,11 +210,13 @@ export default function OperationsCenterShell({
   activeDomain,
   headerActions,
   visibleDomains,
+  showPeriod = true,
   children,
 }: {
   activeDomain: OperationsDomain;
   headerActions?: React.ReactNode;
   visibleDomains?: OperationsDomain[];
+  showPeriod?: boolean;
   children: React.ReactNode;
 }) {
   const locale = useLocale();
@@ -236,10 +238,10 @@ export default function OperationsCenterShell({
 
   return (
     <div className="flex h-full flex-col">
-      <header className="shrink-0 border-b border-slate-200 bg-white">
+      <header className="shrink-0 border-b border-line bg-white">
         <div className="mx-auto w-full max-w-[1440px] px-6 pt-5">
-          <nav aria-label={t("ops.breadcrumbs_aria", locale)} className="mb-2 text-xs text-slate-400">
-            <Link href="/app/dashboard" className="transition-colors hover:text-slate-600">
+          <nav aria-label={t("ops.breadcrumbs_aria", locale)} className="mb-2 text-xs text-ink/60">
+            <Link href="/app/dashboard" className="transition-colors hover:text-ink/60">
               {t("ops.home", locale)}
             </Link>
             <span aria-hidden="true" className="mx-1.5 select-none">
@@ -249,12 +251,12 @@ export default function OperationsCenterShell({
             <span aria-hidden="true" className="mx-1.5 select-none">
               /
             </span>
-            <span className="font-medium text-slate-600">{activeLabel}</span>
+            <span className="font-medium text-ink/60">{activeLabel}</span>
           </nav>
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("ops.title", locale)}</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-ink">{t("ops.title", locale)}</h1>
             <div className="flex items-center gap-4">
-              <HeaderPeriodControl />
+              {showPeriod && <HeaderPeriodControl />}
               {headerActions}
             </div>
           </div>
@@ -285,7 +287,7 @@ export function OperationsToolbarSlot({ children }: { children: React.ReactNode 
 
 /** Registry table frame — consistent border/radius/overflow across domains. */
 export function OperationsRegistrySlot({ children }: { children: React.ReactNode }) {
-  return <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">{children}</div>;
+  return <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">{children}</div>;
 }
 
 /** Shared error frame: user-safe message + retry, no backend detail leakage. */
@@ -316,7 +318,7 @@ export function OperationsLoadingState({ rows = 5 }: { rows?: number }) {
     <div role="status" aria-busy="true" className="space-y-2 p-4">
       <span className="sr-only">{t("ops.loading", locale)}</span>
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="h-10 animate-pulse rounded-lg bg-slate-100" />
+        <div key={i} className="h-10 animate-pulse rounded-lg bg-panel" />
       ))}
     </div>
   );
@@ -327,7 +329,7 @@ export function OperationsEmptyState({ colSpan, message }: { colSpan: number; me
   const locale = useLocale();
   return (
     <tr>
-      <td colSpan={colSpan} className="px-4 py-8 text-center text-sm text-slate-400">
+      <td colSpan={colSpan} className="px-4 py-8 text-center text-sm text-ink/60">
         {message ?? t("ops.empty_no_data", locale)}
       </td>
     </tr>

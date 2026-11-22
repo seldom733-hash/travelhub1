@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import OperationsCenterShell from "@/components/OperationsCenterShell";
+import Pagination from "@/components/Pagination";
 import { api } from "@/lib/api";
 import { useLocale, formatPrice, formatDate } from "@/lib/i18n";
 
@@ -153,31 +154,51 @@ export default function PaymentsAndRefundsPage() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
     setError("");
     const timer = window.setTimeout(() => {
-      const clientQ = new URLSearchParams({ pageSize: "100" });
+      const clientQ = new URLSearchParams();
       if (search.trim()) clientQ.set("search", search.trim());
       if (dateFrom) clientQ.set("dateFrom", dateFrom);
       if (dateTo) clientQ.set("dateTo", dateTo);
       if (dateFrom || dateTo) clientQ.set("dateField", "paidAt");
-      const refundQ = new URLSearchParams({ pageSize: "100" });
+      const refundQ = new URLSearchParams();
       if (search.trim()) refundQ.set("search", search.trim());
       if (dateFrom) refundQ.set("from", dateFrom);
       if (dateTo) refundQ.set("to", dateTo);
-      const supplierQ = new URLSearchParams({ pageSize: "100" });
+      const supplierQ = new URLSearchParams();
       if (search.trim()) supplierQ.set("search", search.trim());
       if (dateFrom) supplierQ.set("from", dateFrom);
       if (dateTo) supplierQ.set("to", dateTo);
+      async function fetchAll<T>(path: string, params: URLSearchParams, size: number): Promise<T[]> {
+        const rows: T[] = [];
+        let currentPage = 1;
+        let total = Infinity;
+        while (rows.length < total && currentPage <= 100) {
+          const q = new URLSearchParams(params);
+          q.set("page", String(currentPage));
+          q.set("pageSize", String(size));
+          const data = await api.get<{ items: T[]; total: number }>(`${path}?${q.toString()}`);
+          rows.push(...(data.items ?? []));
+          total = Number(data.total ?? rows.length);
+          if (!data.items?.length) break;
+          currentPage++;
+        }
+        return rows;
+      }
       const load = async () => {
       if (tab === "clients") {
-        const [payments, refunds] = await Promise.all([
-          api.get<{ items: ClientPayment[] }>(`/finance/payments?${clientQ.toString()}`),
-          api.get<{ items: ClientRefund[] }>(`/finance/refunds?${refundQ.toString()}`),
+        const [paymentItems, refundItems] = await Promise.all([
+          fetchAll<ClientPayment>("/finance/payments", clientQ, 100),
+          fetchAll<ClientRefund>("/finance/refunds", refundQ, 100),
         ]);
+        const payments = { items: paymentItems };
+        const refunds = { items: refundItems };
         if (!alive) return;
         const payRows: TableRow[] = (payments.items ?? []).map((p) => ({
           id: `pay-${p.id}`,
@@ -205,9 +226,9 @@ export default function PaymentsAndRefundsPage() {
         }));
         setClientRows([...payRows, ...refundRows].sort((a, b) => +new Date(b.date) - +new Date(a.date)));
       } else {
-        const data = await api.get<{ items: SupplierPayment[] }>(`/finance/supplier-payments?${supplierQ.toString()}`);
+        const supplierItems = await fetchAll<SupplierPayment>("/finance/supplier-payments", supplierQ, 200);
         if (!alive) return;
-        const supplierRows: TableRow[] = (data.items ?? []).map((p) => ({
+        const supplierRows: TableRow[] = supplierItems.map((p) => ({
           id: `sup-${p.id}`,
           deal: p.orderCode ?? p.orderId ?? "—",
           code: p.code,
@@ -229,10 +250,12 @@ export default function PaymentsAndRefundsPage() {
     return () => { alive = false; window.clearTimeout(timer); };
   }, [tab, search, dateFrom, dateTo]);
 
+  useEffect(() => { setPage(1); }, [tab, search, dateFrom, dateTo]);
   const rows = useMemo(() => (tab === "clients" ? clientRows : supplierRows), [tab, clientRows, supplierRows]);
+  const pagedRows = useMemo(() => rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [rows, page]);
 
   return (
-    <OperationsCenterShell activeDomain="payments" visibleDomains={["payments"]}>
+    <OperationsCenterShell activeDomain="payments" visibleDomains={["payments"]} showPeriod={false}>
       <div className="space-y-4">
         <div>
           <h2 className="text-xl font-bold text-ink">{tr("Платежи и возвраты")}</h2>
@@ -288,7 +311,7 @@ export default function PaymentsAndRefundsPage() {
                   <tr><td colSpan={7} className="px-4 py-10 text-center text-ink/60">{tr("Загрузка…")}</td></tr>
                 ) : rows.length === 0 ? (
                   <tr><td colSpan={7} className="px-4 py-10 text-center text-ink/60">{tr("Записей нет")}</td></tr>
-                ) : rows.map((row) => (
+                ) : pagedRows.map((row) => (
                   <tr key={row.id} className="border-b border-line last:border-0 hover:bg-panel/60">
                     <td className="px-4 py-2.5 font-medium text-ink">{row.deal}</td>
                     <td className="px-4 py-2.5">
@@ -309,6 +332,7 @@ export default function PaymentsAndRefundsPage() {
             </table>
           </div>
         </div>
+        <Pagination page={page} pageSize={PAGE_SIZE} total={rows.length} locale={locale as "ru" | "az" | "en"} onPageChange={setPage} />
       </div>
     </OperationsCenterShell>
   );
