@@ -375,7 +375,8 @@ export class DealsService {
         const phoneMatch = searchDigits.length > 0 && digits(row.customerPhone ?? "").includes(searchDigits);
         if (!haystack.includes(search) && !(phoneMatch && searchDigits.length >= 3)) return false;
       }
-      if (query.stage && row.stage !== query.stage) return false;
+      if (query.stage === "CANCELLED") { if (!row.isCancelledDeal) return false; }
+      else if (query.stage && row.stage !== query.stage) return false;
       if (query.status && row.status !== query.status) return false;
       if (query.cancellationReason && row.cancellationReason !== query.cancellationReason) return false;
       if (query.statusGroup === "cancelled" && !row.isCancelledDeal && !["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED", "REJECTED"].includes(row.status)) return false;
