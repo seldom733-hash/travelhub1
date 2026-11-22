@@ -17,6 +17,7 @@ import { type VariantFacets } from "@/lib/matrix-combine";
 import RoomTypesChecklist from "@/components/partner/RoomTypesChecklist";
 import MatrixBuilder from "@/components/partner/MatrixBuilder";
 import PriceCalendarEditor from "@/components/partner/PriceCalendarEditor";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 /**
  * Partner Tour Builder — полноэкранный конструктор пакетного тура
@@ -41,7 +42,7 @@ const KIND_LABEL: Record<ComponentKind, string> = {
 };
 
 const KIND_COLOR: Record<ComponentKind, string> = {
-  accommodation: "text-sky-300",
+  accommodation: "text-white",
   flight: "text-violet-300",
   transfer: "text-amber-300",
   insurance: "text-emerald-300",
@@ -705,7 +706,7 @@ export default function TourConstructor({ productId }: Props) {
               <Panel title="Тестовые параметры">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <Field label="Дата вылета">
-                    <input type="date" value={qParams.departureDate} onChange={(e) => setQParams({ ...qParams, departureDate: e.target.value })} className="w-full rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 font-mono text-sm outline-none focus:border-amber-500/60" />
+                    <DateTextInput value={qParams.departureDate} onChange={(v) => setQParams({ ...qParams, departureDate: v })} className="w-full rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 font-mono text-sm outline-none focus:border-amber-500/60" />
                   </Field>
                   <Field label="Ночей">
                     <input type="number" min={1} value={qParams.nights} onChange={(e) => setQParams({ ...qParams, nights: e.target.value })} className="w-full rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 font-mono text-sm outline-none focus:border-amber-500/60" />
@@ -986,12 +987,12 @@ function ComponentStep({
                     <div className="mt-0.5 flex gap-3 font-mono text-[11px] text-neutral-500">
                       <span>{c.unitCode}</span>
                       {kind === "accommodation" && (
-                        <span className="text-sky-400/80">
+                        <span className="text-brand/80">
                           {c.tariffs.length} вариант(ов) · {periods} период(ов)
                         </span>
                       )}
                       {t && kind !== "accommodation" && <span>база {t.price?.toFixed(2)} {t.currency}</span>}
-                      {t && t.periods.length > 0 && kind !== "accommodation" && <span className="text-sky-400/80">{t.periods.length} период(ов) цен</span>}
+                      {t && t.periods.length > 0 && kind !== "accommodation" && <span className="text-brand/80">{t.periods.length} период(ов) цен</span>}
                       {kind === "flight" && c.payload.departures && <span>{c.payload.departures.length} вылет(ов)</span>}
                       {kind === "transfer" && <span>{c.payload.unit === "per_vehicle" ? `за машину (до ${c.payload.capacity})` : "с человека"}</span>}
                       {kind === "insurance" && <span>{c.payload.durationBrackets?.length ?? 0} диапазон(ов)</span>}
@@ -1002,7 +1003,7 @@ function ComponentStep({
                       <>
                         <button
                           onClick={() => onOpenEditor(c.componentId, "calendar")}
-                          className="rounded border border-neutral-700 px-2 py-0.5 text-xs text-sky-300 transition-colors hover:border-sky-500/60"
+                          className="rounded border border-neutral-700 px-2 py-0.5 text-xs text-white transition-colors hover:border-brand/60"
                         >
                           Календарь
                         </button>
@@ -1050,7 +1051,7 @@ function ComponentStep({
               </Field>
               <Field label="Первый вылет: дата + вместимость блока">
                 <div className="flex gap-2">
-                  <input type="date" value={depDate} onChange={(e) => setDepDate(e.target.value)} className="flex-1 rounded border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 font-mono text-sm outline-none focus:border-amber-500/60" />
+                  <DateTextInput value={depDate} onChange={(v) => setDepDate(v)} className="flex-1 rounded border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 font-mono text-sm outline-none focus:border-amber-500/60" />
                   <input value={depCap} onChange={(e) => setDepCap(e.target.value)} inputMode="numeric" className="w-24 rounded border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 font-mono text-sm tabular-nums outline-none focus:border-amber-500/60" />
                 </div>
               </Field>

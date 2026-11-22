@@ -1,5 +1,6 @@
 "use client";
 
+import DateTextInput from "@/components/forms/DateTextInput";
 import { useEffect, useMemo, useState } from "react";
 import { createFlightRequest, type FlightFare, type FlightOffer, type FlightSegment } from "@/lib/flight-api";
 import { useCurrentUser } from "@/lib/use-user";
@@ -128,25 +129,25 @@ export default function FlightOfferModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose} role="dialog" aria-modal="true">
       <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-200 bg-white px-6 py-4">
+        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-line bg-white px-6 py-4">
           <div>
-            <h3 className="text-lg font-bold text-slate-900">Подать заявку</h3>
-            <div className="mt-0.5 text-sm font-semibold text-slate-700">{route}</div>
-            <div className="mt-1 text-xs text-slate-500">{dateTime(departureDate)} · {flight.source ?? "поставщик"} · {segments.length || 1} сегмент(ов)</div>
+            <h3 className="text-lg font-bold text-ink">Подать заявку</h3>
+            <div className="mt-0.5 text-sm font-semibold text-ink">{route}</div>
+            <div className="mt-1 text-xs text-ink/60">{dateTime(departureDate)} · {flight.source ?? "поставщик"} · {segments.length || 1} сегмент(ов)</div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Закрыть" className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600">✕</button>
+          <button type="button" onClick={onClose} aria-label="Закрыть" className="flex h-8 w-8 items-center justify-center rounded-full text-ink/60 hover:bg-panel hover:text-ink/60">✕</button>
         </div>
 
         <div className="space-y-5 p-6">
           <section>
-            <h4 className="mb-2 text-sm font-semibold text-slate-800">Варианты тарифа</h4>
-            <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
-              {fares.length === 0 && <p className="p-4 text-sm text-slate-500">Тарифы недоступны.</p>}
+            <h4 className="mb-2 text-sm font-semibold text-ink">Варианты тарифа</h4>
+            <div className="divide-y divide-line rounded-xl border border-line">
+              {fares.length === 0 && <p className="p-4 text-sm text-ink/60">Тарифы недоступны.</p>}
               {fares.map((f: any, index) => (
                 <label key={f.id ?? index} className={`flex cursor-pointer items-center justify-between gap-3 p-3 text-sm ${selectedFare === index ? "bg-emerald-50" : ""}`}>
                   <span className="flex items-center gap-2">
                     <input type="radio" name="flight-fare" checked={selectedFare === index} onChange={() => setSelectedFare(index)} />
-                    <span><b>{fareName(f)}</b><span className="ml-2 text-slate-500">{f.cabin ?? ""}{f.baggage ? ` · ${f.baggage}` : ""}</span></span>
+                    <span><b>{fareName(f)}</b><span className="ml-2 text-ink/60">{f.cabin ?? ""}{f.baggage ? ` · ${f.baggage}` : ""}</span></span>
                   </span>
                   <span className="font-semibold">{fareAmount(f).toLocaleString()} {fareCurrency(f)}</span>
                 </label>
@@ -155,8 +156,8 @@ export default function FlightOfferModal({
           </section>
 
           <section>
-            <h4 className="mb-1 text-sm font-semibold text-slate-800">{t("offer.customer_title", locale)}</h4>
-            <p className="mb-2 text-xs text-slate-500">Клиент — тот, кто оформляет и оплачивает заявку. Турист может быть другим человеком.</p>
+            <h4 className="mb-1 text-sm font-semibold text-ink">{t("offer.customer_title", locale)}</h4>
+            <p className="mb-2 text-xs text-ink/60">Клиент — тот, кто оформляет и оплачивает заявку. Турист может быть другим человеком.</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Имя *" value={firstName} onChange={setFirstName} autoComplete="given-name" />
               <Field label="Фамилия *" value={lastName} onChange={setLastName} autoComplete="family-name" />
@@ -167,8 +168,8 @@ export default function FlightOfferModal({
 
           <section>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h4 className="text-sm font-semibold text-slate-800">Турист 1</h4>
-              <label className="flex items-center gap-2 text-xs text-slate-600">
+              <h4 className="text-sm font-semibold text-ink">Турист 1</h4>
+              <label className="flex items-center gap-2 text-xs text-ink/60">
                 <input type="checkbox" checked={sameAsClient} onChange={(e) => setSameAsClient(e.target.checked)} />
                 Клиент является туристом
               </label>
@@ -186,7 +187,7 @@ export default function FlightOfferModal({
 
           <div className="flex flex-col items-stretch justify-end gap-2 sm:flex-row sm:items-center">
             {!valid && <span className="text-xs text-amber-600 sm:mr-auto">Заполните данные клиента и туриста, чтобы подать заявку.</span>}
-            <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600">Закрыть</button>
+            <button type="button" onClick={onClose} className="rounded-lg border border-line px-4 py-2 text-sm text-ink/60">Закрыть</button>
             <button type="button" onClick={() => void submit()} disabled={!valid || busy || !fare || !!created} className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
               {busy ? "Отправляем…" : "Подать заявку"}
             </button>
@@ -199,9 +200,13 @@ export default function FlightOfferModal({
 
 function Field({ label, value, onChange, autoComplete, placeholder, disabled, type }: { label: string; value: string; onChange: (v: string) => void; autoComplete: string; placeholder?: string; disabled?: boolean; type?: string }) {
   return (
-    <label className="block text-xs text-slate-600">
+    <label className="block text-xs text-ink/60">
       <span>{label}</span>
-      <input type={type ?? "text"} value={value} onChange={(e) => onChange(e.target.value)} autoComplete={autoComplete} placeholder={placeholder} disabled={disabled} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 disabled:text-slate-500" />
+      {type === "date" ? (
+        <DateTextInput value={value} onChange={onChange} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none focus:border-emerald-500 disabled:bg-panel disabled:text-ink/60" />
+      ) : (
+        <input type={type ?? "text"} value={value} onChange={(e) => onChange(e.target.value)} autoComplete={autoComplete} placeholder={placeholder} disabled={disabled} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none focus:border-emerald-500 disabled:bg-panel disabled:text-ink/60" />
+      )}
     </label>
   );
 }

@@ -17,6 +17,7 @@ import { t, useLocale, formatPrice } from "@/lib/i18n";
 import { financeCenterApi, type ClientDebtAsOfReport, type DebtAsOfReport } from "@/lib/finance-center-api";
 import { api } from "@/lib/api";
 import { dealStatus } from "@/lib/deals-i18n";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 const PAGE_SIZE = 25;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -137,12 +138,11 @@ export default function SupplierDebtAsOfPage() {
         <div className="flex flex-wrap items-end gap-3">
           <label className="text-sm">
             <span className="mb-1 block text-ink/60">{t("finance.debt_as_of.as_of", locale)}</span>
-            <input
-              type="date"
+            <DateTextInput
               value={asOf}
               max={today()}
-              onChange={(e) => {
-                setAsOf(e.target.value);
+              onChange={(v) => {
+                setAsOf(v);
                 setPage(1);
                 setClientPage(1);
               }}

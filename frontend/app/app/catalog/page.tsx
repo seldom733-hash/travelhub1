@@ -15,6 +15,7 @@ import { useCan } from "@/lib/use-can";
 import { useLocale, formatPrice } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import TableExportButton from "@/components/TableExportButton";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 const PRODUCT_TYPES = [
   { code: "TOUR", title: "Тур" },
@@ -282,9 +283,9 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
             </select>
             <div className="flex items-center gap-1">
               <span className="text-xs text-ink/60">С</span>
-              <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand" />
+              <DateTextInput value={dateFrom} onChange={(v) => { setDateFrom(v); setPage(1); }} className="w-32 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand" />
               <span className="text-xs text-ink/60">По</span>
-              <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand" />
+              <DateTextInput value={dateTo} onChange={(v) => { setDateTo(v); setPage(1); }} className="w-32 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand" />
             </div>
             {activeFilters.length > 0 && (
               <div className="flex flex-wrap gap-1.5">

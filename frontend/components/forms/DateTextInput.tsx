@@ -13,11 +13,25 @@ export default function DateTextInput({
   onChange,
   className,
   placeholder = "дд.мм.гггг",
+  id,
+  min,
+  max,
+  disabled = false,
+  name,
+  ariaLabel,
+  onBlur,
 }: {
   value: string;
   onChange: (iso: string) => void;
   className?: string;
   placeholder?: string;
+  id?: string;
+  min?: string;
+  max?: string;
+  disabled?: boolean;
+  name?: string;
+  ariaLabel?: string;
+  onBlur?: () => void;
 }) {
   const [text, setText] = useState(toDisplay(value));
   const pickerRef = useRef<HTMLInputElement>(null);
@@ -57,13 +71,18 @@ export default function DateTextInput({
   return (
     <span className="relative block">
       <input
+        id={id}
+        name={name}
         type="text"
         inputMode="numeric"
         autoComplete="off"
+        aria-label={ariaLabel}
+        disabled={disabled}
         className={`${className ?? ""} pr-9`}
         value={text}
         placeholder={placeholder}
         onChange={(e) => handleChange(e.target.value)}
+        onBlur={onBlur}
       />
       <button
         type="button"
@@ -81,6 +100,9 @@ export default function DateTextInput({
         type="date"
         tabIndex={-1}
         aria-hidden="true"
+        disabled={disabled}
+        min={min}
+        max={max}
         className="absolute bottom-0 right-6 h-px w-px opacity-0"
         value={value || ""}
         onChange={(e) => {

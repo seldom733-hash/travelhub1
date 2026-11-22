@@ -29,6 +29,7 @@ import {
   type SupplierObligation,
   type CreateSupplierPaymentInput,
 } from "@/lib/finance-center-api";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 const PAGE_SIZE = 20;
 const STATUSES = ["PENDING", "CONFIRMED", "CANCELLED"];
@@ -42,9 +43,9 @@ const statusTone = (status: string): string => {
     case "CONFIRMED":
       return "border-emerald-200 bg-emerald-50 text-emerald-700";
     case "CANCELLED":
-      return "border-slate-200 bg-slate-100 text-slate-500";
+      return "border-line bg-panel text-ink/60";
     default:
-      return "border-slate-200 bg-slate-50 text-slate-600";
+      return "border-line bg-panel text-ink/60";
   }
 };
 
@@ -325,7 +326,7 @@ export default function SupplierPaymentsPage() {
         actions={
           <div className="flex items-center gap-2">
             {canManage && (
-              <button type="button" onClick={() => setShowCreate(true)} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700">
+              <button type="button" onClick={() => setShowCreate(true)} className="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">
                 {t("finance.supplier_payments.create_button", locale)}
               </button>
             )}
@@ -351,30 +352,30 @@ export default function SupplierPaymentsPage() {
       {kpi && (
         <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl border border-line bg-white p-4">
-            <p className="text-xs text-slate-500">{t("finance.supplier_payments.kpi.overdue", locale)}</p>
+            <p className="text-xs text-ink/60">{t("finance.supplier_payments.kpi.overdue", locale)}</p>
             <p className="mt-1 text-lg font-semibold text-rose-600">{formatPrice(kpi.overdueAzn, "AZN", locale)}</p>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-ink/60">
               {kpi.overdueCount} {t("finance.supplier_payments.kpi.items", locale)}
             </p>
           </div>
           <div className="rounded-xl border border-line bg-white p-4">
-            <p className="text-xs text-slate-500">{t("finance.supplier_payments.kpi.due_soon", locale)}</p>
+            <p className="text-xs text-ink/60">{t("finance.supplier_payments.kpi.due_soon", locale)}</p>
             <p className="mt-1 text-lg font-semibold text-amber-600">{formatPrice(kpi.dueSoonAzn, "AZN", locale)}</p>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-ink/60">
               {kpi.dueSoonCount} {t("finance.supplier_payments.kpi.items", locale)}
             </p>
           </div>
           <div className="rounded-xl border border-line bg-white p-4">
-            <p className="text-xs text-slate-500">{t("finance.supplier_payments.kpi.pending", locale)}</p>
-            <p className="mt-1 text-lg font-semibold text-slate-800">{formatPrice(kpi.pendingPaymentsAzn, "AZN", locale)}</p>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-ink/60">{t("finance.supplier_payments.kpi.pending", locale)}</p>
+            <p className="mt-1 text-lg font-semibold text-ink">{formatPrice(kpi.pendingPaymentsAzn, "AZN", locale)}</p>
+            <p className="text-xs text-ink/60">
               {kpi.pendingPaymentsCount} {t("finance.supplier_payments.kpi.items", locale)}
             </p>
           </div>
           <div className="rounded-xl border border-line bg-white p-4">
-            <p className="text-xs text-slate-500">{t("finance.supplier_payments.kpi.unallocated", locale)}</p>
+            <p className="text-xs text-ink/60">{t("finance.supplier_payments.kpi.unallocated", locale)}</p>
             <p className="mt-1 text-lg font-semibold text-violet-600">{formatPrice(kpi.unallocatedAzn, "AZN", locale)}</p>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-ink/60">
               {kpi.unallocatedCount} {t("finance.supplier_payments.kpi.items", locale)}
             </p>
           </div>
@@ -388,7 +389,7 @@ export default function SupplierPaymentsPage() {
         >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <label className="text-sm">
-              <span className="mb-1 block text-slate-600">{t("finance.supplier_payments.field.direction", locale)}</span>
+              <span className="mb-1 block text-ink/60">{t("finance.supplier_payments.field.direction", locale)}</span>
               <select
                 value={form.direction ?? "OUTGOING"}
                 onChange={(e) => setForm({ ...form, direction: e.target.value as "OUTGOING" | "INCOMING" })}
@@ -400,7 +401,7 @@ export default function SupplierPaymentsPage() {
             </label>
             {form.direction === "INCOMING" && (
               <label className="text-sm">
-                <span className="mb-1 block text-slate-600">{t("finance.supplier_payments.field.order_id", locale)}</span>
+                <span className="mb-1 block text-ink/60">{t("finance.supplier_payments.field.order_id", locale)}</span>
                 <input
                   value={form.orderId ?? ""}
                   onChange={(e) => setForm({ ...form, orderId: e.target.value })}
@@ -410,7 +411,7 @@ export default function SupplierPaymentsPage() {
               </label>
             )}
             <label className="text-sm">
-              <span className="mb-1 block text-slate-600">{t("finance.supplier_payments.field.supplier", locale)}</span>
+              <span className="mb-1 block text-ink/60">{t("finance.supplier_payments.field.supplier", locale)}</span>
               <select
                 value={form.supplierCode}
                 onChange={(e) => setForm({ ...form, supplierCode: e.target.value })}
@@ -425,7 +426,7 @@ export default function SupplierPaymentsPage() {
               </select>
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-slate-600">{t("finance.supplier_payments.field.amount", locale)}</span>
+              <span className="mb-1 block text-ink/60">{t("finance.supplier_payments.field.amount", locale)}</span>
               <input
                 inputMode="decimal"
                 value={form.amount}
@@ -434,7 +435,7 @@ export default function SupplierPaymentsPage() {
               />
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-slate-600">{t("finance.supplier_payments.field.currency", locale)}</span>
+              <span className="mb-1 block text-ink/60">{t("finance.supplier_payments.field.currency", locale)}</span>
               <input
                 value={form.currency}
                 maxLength={3}
@@ -443,7 +444,7 @@ export default function SupplierPaymentsPage() {
               />
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-slate-600">{t("finance.supplier_payments.field.azn", locale)}</span>
+              <span className="mb-1 block text-ink/60">{t("finance.supplier_payments.field.azn", locale)}</span>
               <input
                 inputMode="decimal"
                 value={form.aznAmount ?? ""}
@@ -453,7 +454,7 @@ export default function SupplierPaymentsPage() {
               />
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-slate-600">{t("finance.supplier_payments.field.method", locale)}</span>
+              <span className="mb-1 block text-ink/60">{t("finance.supplier_payments.field.method", locale)}</span>
               <input
                 value={form.method ?? ""}
                 onChange={(e) => setForm({ ...form, method: e.target.value })}
@@ -461,7 +462,7 @@ export default function SupplierPaymentsPage() {
               />
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-slate-600">{t("finance.supplier_payments.field.provider_ref", locale)}</span>
+              <span className="mb-1 block text-ink/60">{t("finance.supplier_payments.field.provider_ref", locale)}</span>
               <input
                 value={form.providerRef ?? ""}
                 onChange={(e) => setForm({ ...form, providerRef: e.target.value })}
@@ -469,7 +470,7 @@ export default function SupplierPaymentsPage() {
               />
             </label>
             <label className="text-sm sm:col-span-2">
-              <span className="mb-1 block text-slate-600">{t("finance.supplier_payments.field.purpose", locale)}</span>
+              <span className="mb-1 block text-ink/60">{t("finance.supplier_payments.field.purpose", locale)}</span>
               <input
                 value={form.purpose ?? ""}
                 onChange={(e) => setForm({ ...form, purpose: e.target.value })}
@@ -477,7 +478,7 @@ export default function SupplierPaymentsPage() {
               />
             </label>
             <label className="text-sm sm:col-span-2 xl:col-span-3">
-              <span className="mb-1 block text-slate-600">{t("finance.supplier_payments.field.comment", locale)}</span>
+              <span className="mb-1 block text-ink/60">{t("finance.supplier_payments.field.comment", locale)}</span>
               <input
                 value={form.comment ?? ""}
                 onChange={(e) => setForm({ ...form, comment: e.target.value })}
@@ -487,11 +488,11 @@ export default function SupplierPaymentsPage() {
           </div>
 
           <div className="mt-4 rounded-lg border border-dashed border-line p-3">
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink/60">
               {t("finance.supplier_payments.allocate_now", locale)}
             </p>
             <div className="grid gap-2 sm:grid-cols-3">
-              <label className="text-xs text-slate-600 sm:col-span-3">
+              <label className="text-xs text-ink/60 sm:col-span-3">
                 <span className="mb-1 block font-medium">{t("finance.supplier_payments.field.order_booking", locale)}</span>
                 <select
                   value={allocationDraft.obligationCode}
@@ -505,7 +506,7 @@ export default function SupplierPaymentsPage() {
                     </option>
                   ))}
                 </select>
-                {obligationsLoading && <span className="mt-1 block text-[11px] text-slate-400">Загрузка заказов…</span>}
+                {obligationsLoading && <span className="mt-1 block text-[11px] text-ink/60">Загрузка заказов…</span>}
               </label>
               <input
                 value={allocationDraft.obligationCode}
@@ -541,7 +542,7 @@ export default function SupplierPaymentsPage() {
             <button
               type="button"
               onClick={() => setShowCreate(false)}
-              className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-slate-600"
+              className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink/60"
             >
               {t("common.close", locale)}
             </button>
@@ -566,7 +567,7 @@ export default function SupplierPaymentsPage() {
             </option>
           ))}
         </select>
-        <label className="flex items-center gap-2 text-sm text-slate-700">
+        <label className="flex items-center gap-2 text-sm text-ink">
           <input
             type="checkbox"
             checked={unallocatedOnly}
@@ -574,7 +575,7 @@ export default function SupplierPaymentsPage() {
               setUnallocatedOnly(e.target.checked);
               setPage(1);
             }}
-            className="size-4 rounded border-slate-300"
+            className="size-4 rounded border-line"
           />
           {t("finance.supplier_payments.only_unallocated", locale)}
         </label>
@@ -590,7 +591,7 @@ export default function SupplierPaymentsPage() {
         <button
           type="button"
           onClick={() => void load()}
-          className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-slate-600"
+          className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink/60"
         >
           {t("common.refresh", locale)}
         </button>
@@ -598,12 +599,12 @@ export default function SupplierPaymentsPage() {
 
       <section className="rounded-xl border border-line bg-white">
         {busy && !items ? (
-          <div className="h-40 animate-pulse rounded-lg bg-slate-100" />
+          <div className="h-40 animate-pulse rounded-lg bg-panel" />
         ) : items && items.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-ink/60">
                   <th className="px-2 py-2">{t("finance.supplier_payments.col.date", locale)}</th>
                   <th className="px-2 py-2">{t("finance.supplier_payments.col.code", locale)}</th>
                   <th className="px-2 py-2">{t("finance.supplier_payments.col.supplier", locale)}</th>
@@ -618,9 +619,9 @@ export default function SupplierPaymentsPage() {
               </thead>
               <tbody>
                 {items.map((p) => (
-                  <tr key={p.id} className="border-b border-line/60 hover:bg-slate-50">
+                  <tr key={p.id} className="border-b border-line/60 hover:bg-panel">
                     <td className="px-2 py-2 whitespace-nowrap">{formatDate(p.occurredAt, locale)}</td>
-                    <td className="px-2 py-2 font-medium text-slate-800">{p.code}</td>
+                    <td className="px-2 py-2 font-medium text-ink">{p.code}</td>
                     <td className="px-2 py-2">{supplierLabel.get(p.supplierCode ?? "") ?? p.partnerCode ?? p.supplierCode ?? "—"}</td>
                     <td className="px-2 py-2 text-right">{formatPrice(p.amount, p.currency, locale)}</td>
                     <td className="px-2 py-2 text-right">{formatPrice(p.aznAmount, "AZN", locale)}</td>
@@ -639,7 +640,7 @@ export default function SupplierPaymentsPage() {
                               ? "rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-violet-700"
                               : p.unallocatedReason === "NOT_ALLOCATED"
                                 ? "rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700"
-                                : "rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-600"
+                                : "rounded-full border border-line bg-panel px-2 py-0.5 text-ink/60"
                           }
                         >
                           {t(`finance.supplier_payments.reason.${p.unallocatedReason.toLowerCase()}`, locale)}
@@ -647,7 +648,7 @@ export default function SupplierPaymentsPage() {
                       )}
                     </td>
                     <td className="px-2 py-2">
-                      {canManage && p.status !== "CANCELLED" && <button type="button" onClick={() => setEditingPayout(p)} className="mr-2 text-xs font-medium text-slate-600 hover:underline">Редактировать</button>}
+                      {canManage && p.status !== "CANCELLED" && <button type="button" onClick={() => setEditingPayout(p)} className="mr-2 text-xs font-medium text-ink/60 hover:underline">Редактировать</button>}
                       <button
                         type="button"
                         onClick={() => void openDetail(p.code)}
@@ -662,7 +663,7 @@ export default function SupplierPaymentsPage() {
             </table>
           </div>
         ) : (
-          <p className="py-10 text-center text-sm text-slate-500">{t("finance.supplier_payments.empty", locale)}</p>
+          <p className="py-10 text-center text-sm text-ink/60">{t("finance.supplier_payments.empty", locale)}</p>
         )}
         {total > PAGE_SIZE && (
           <div className="mt-4">
@@ -679,19 +680,19 @@ export default function SupplierPaymentsPage() {
         >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div>
-              <p className="text-xs text-slate-500">{t("finance.supplier_payments.col.status", locale)}</p>
+              <p className="text-xs text-ink/60">{t("finance.supplier_payments.col.status", locale)}</p>
               <StatusBadge status={selected.status} />
             </div>
             <div>
-              <p className="text-xs text-slate-500">{t("finance.supplier_payments.col.amount", locale)}</p>
+              <p className="text-xs text-ink/60">{t("finance.supplier_payments.col.amount", locale)}</p>
               <p className="font-medium">{formatPrice(selected.amount, selected.currency, locale)}</p>
             </div>
             <div>
-              <p className="text-xs text-slate-500">{t("finance.supplier_payments.col.allocated", locale)}</p>
+              <p className="text-xs text-ink/60">{t("finance.supplier_payments.col.allocated", locale)}</p>
               <p className="font-medium">{formatPrice(selected.allocatedAzn, "AZN", locale)}</p>
             </div>
             <div>
-              <p className="text-xs text-slate-500">{t("finance.supplier_payments.col.unallocated", locale)}</p>
+              <p className="text-xs text-ink/60">{t("finance.supplier_payments.col.unallocated", locale)}</p>
               <p className="font-medium text-violet-700">{formatPrice(selected.unallocatedAzn, "AZN", locale)}</p>
             </div>
           </div>
@@ -705,7 +706,7 @@ export default function SupplierPaymentsPage() {
             </div>
           )}
 
-          <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
+          <div className="mt-4 grid gap-2 text-sm text-ink/60 sm:grid-cols-2">
             <p>
               {t("finance.supplier_payments.field.supplier", locale)}: <span className="font-medium">{selected.supplierCode ?? "—"}</span>
             </p>
@@ -719,10 +720,10 @@ export default function SupplierPaymentsPage() {
               {t("finance.supplier_payments.field.occurred", locale)}: <span className="font-medium">{formatDate(selected.occurredAt, locale)}</span>
             </p>
             {selected.purpose && <p className="sm:col-span-2">{selected.purpose}</p>}
-            {selected.comment && <p className="sm:col-span-2 text-slate-500">{selected.comment}</p>}
+            {selected.comment && <p className="sm:col-span-2 text-ink/60">{selected.comment}</p>}
           </div>
 
-          <h3 className="mt-5 text-sm font-semibold text-slate-700">{t("finance.supplier_payments.allocations", locale)}</h3>
+          <h3 className="mt-5 text-sm font-semibold text-ink">{t("finance.supplier_payments.allocations", locale)}</h3>
           {selected.allocations.length > 0 ? (
             <ul className="mt-2 divide-y divide-line rounded-lg border border-line">
               {selected.allocations.map((a) => (
@@ -736,20 +737,20 @@ export default function SupplierPaymentsPage() {
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-sm text-slate-500">{t("finance.supplier_payments.no_allocations", locale)}</p>
+            <p className="mt-2 text-sm text-ink/60">{t("finance.supplier_payments.no_allocations", locale)}</p>
           )}
 
           {canManage && (
             <div className="mt-5">
-              <h3 className="text-sm font-semibold text-slate-700">{t("finance.supplier_payments.documents", locale)}</h3>
-              <p className="mt-1 text-xs text-slate-500">{t("finance.supplier_payments.documents_hint", locale)}</p>
+              <h3 className="text-sm font-semibold text-ink">{t("finance.supplier_payments.documents", locale)}</h3>
+              <p className="mt-1 text-xs text-ink/60">{t("finance.supplier_payments.documents_hint", locale)}</p>
               {documents.length > 0 ? (
                 <ul className="mt-2 divide-y divide-line rounded-lg border border-line">
                   {documents.map((doc) => (
                     <li key={doc.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-slate-800">{doc.fileName}</p>
-                        <p className="text-xs text-slate-500">
+                        <p className="truncate font-medium text-ink">{doc.fileName}</p>
+                        <p className="text-xs text-ink/60">
                           {doc.mimeType} · {Math.max(1, Math.round(doc.size / 1024))} KB · {formatDate(doc.createdAt, locale)}
                         </p>
                       </div>
@@ -776,7 +777,7 @@ export default function SupplierPaymentsPage() {
                   ))}
                 </ul>
               ) : (
-                <p className="mt-2 text-sm text-slate-500">{t("finance.supplier_payments.documents_empty", locale)}</p>
+                <p className="mt-2 text-sm text-ink/60">{t("finance.supplier_payments.documents_empty", locale)}</p>
               )}
               {selected.status !== "CANCELLED" && (
                 <div className="mt-2">
@@ -787,9 +788,9 @@ export default function SupplierPaymentsPage() {
                     accept="application/pdf,image/jpeg,image/png,image/webp"
                     disabled={docBusy}
                     onChange={(e) => void uploadDocuments(e.target.files)}
-                    className="block w-full max-w-md text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-medium"
+                    className="block w-full max-w-md text-xs text-ink/60 file:mr-3 file:rounded-lg file:border-0 file:bg-panel file:px-3 file:py-1.5 file:text-xs file:font-medium"
                   />
-                  {docBusy && <span className="mt-1 inline-block text-xs text-slate-500">{t("common.loading", locale)}</span>}
+                  {docBusy && <span className="mt-1 inline-block text-xs text-ink/60">{t("common.loading", locale)}</span>}
                 </div>
               )}
               {docError && <p className="mt-2 text-xs text-rose-600">{docError}</p>}
@@ -798,7 +799,7 @@ export default function SupplierPaymentsPage() {
 
           {canManage && selected.status !== "CANCELLED" && (
             <div className="mt-4 rounded-lg border border-dashed border-line p-3">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink/60">
                 {t("finance.supplier_payments.allocate", locale)}
               </p>
               <div className="grid gap-2">
@@ -858,7 +859,7 @@ export default function SupplierPaymentsPage() {
             <button
               type="button"
               onClick={() => setSelected(null)}
-              className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-slate-600"
+              className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink/60"
             >
               {t("common.close", locale)}
             </button>
@@ -880,5 +881,5 @@ function SupplierPayoutEditModal({ payout, onClose, onSaved }: { payout: Supplie
     try { await api.patch(`/finance/supplier-payments/${payout.code}`, { amount, occurredAt }); onSaved(); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}><div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}><h3 className="mb-1 text-base font-semibold">Редактировать расчёт с поставщиком</h3><p className="mb-3 font-mono text-xs text-slate-500">{payout.code}</p><div className="grid gap-2"><label className="text-xs text-slate-500">Сумма<input value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" inputMode="decimal" /></label><label className="text-xs text-slate-500">Дата<input type="date" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" /></label>{error && <div className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700">{error}</div>}<div className="mt-2 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-3 py-2 text-xs">Отмена</button><button type="button" disabled={busy} onClick={() => void save()} className="rounded-lg bg-[#0f6b5f] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "Сохранение…" : "Сохранить"}</button></div></div></div></div>;
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}><div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}><h3 className="mb-1 text-base font-semibold">Редактировать расчёт с поставщиком</h3><p className="mb-3 font-mono text-xs text-ink/60">{payout.code}</p><div className="grid gap-2"><label className="text-xs text-ink/60">Сумма<input value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" inputMode="decimal" /></label><label className="text-xs text-ink/60">Дата<DateTextInput value={occurredAt} onChange={(v) => setOccurredAt(v)} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" /></label>{error && <div className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700">{error}</div>}<div className="mt-2 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-3 py-2 text-xs">Отмена</button><button type="button" disabled={busy} onClick={() => void save()} className="rounded-lg bg-[#0f6b5f] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "Сохранение…" : "Сохранить"}</button></div></div></div></div>;
 }

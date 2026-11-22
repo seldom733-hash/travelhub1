@@ -19,6 +19,7 @@ import {
   PICKER_SUBMIT,
   PICKER_W_TO,
 } from "./picker-styles";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 interface ExcursionSearchProps {
   onSearch: (ctx: SearchContext) => void;
@@ -51,7 +52,7 @@ export default function ExcursionSearch({ onSearch }: ExcursionSearchProps) {
           <label htmlFor="exc-date" className={PICKER_LABEL}>{t("search.date", locale)}</label>
           <div className="relative">
             <CalendarBlank size={14} weight="light" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-            <input id="exc-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className={PICKER_CONTROL_ICON} />
+            <DateTextInput id="exc-date" value={date} onChange={(v) => setDate(v)} className={PICKER_CONTROL_ICON} />
           </div>
         </div>
         <div style={{ maxWidth: digitPx + PICKER_DIGIT_WIDTH_EXTRA }}>

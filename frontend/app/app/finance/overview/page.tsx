@@ -15,6 +15,7 @@ import { MetricsPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import PageHeader from "@/components/PageHeader";
 import { useLocale, t, formatPrice } from "@/lib/i18n";
 import { financeCenterApi, type FinanceOverview, type AznMetric, type CurrencyAmount } from "@/lib/finance-center-api";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 /** Цвет availability-бейджа. */
 function availabilityTone(a: string): string {
@@ -24,11 +25,11 @@ function availabilityTone(a: string): string {
     case "PARTIAL":
       return "border-amber-200 bg-amber-50 text-amber-700";
     case "UNKNOWN":
-      return "border-slate-200 bg-slate-100 text-slate-600";
+      return "border-line bg-panel text-ink/60";
     case "UNAVAILABLE":
-      return "border-slate-200 bg-slate-100 text-slate-500";
+      return "border-line bg-panel text-ink/60";
     default:
-      return "border-slate-200 bg-slate-50 text-slate-600";
+      return "border-line bg-panel text-ink/60";
   }
 }
 
@@ -45,23 +46,23 @@ function AvailabilityBadge({ a }: { a: string }) {
 function AznCard({ titleKey, metric }: { titleKey: string; metric: AznMetric }) {
   const locale = useLocale();
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-line bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-slate-500">{t(titleKey, locale)}</h3>
+        <h3 className="text-xs font-medium uppercase tracking-wide text-ink/60">{t(titleKey, locale)}</h3>
         <AvailabilityBadge a={metric.availability} />
       </div>
       <div className="mt-3 flex items-baseline gap-1.5">
         {metric.amount !== null ? (
           <>
-            <span className="font-mono text-2xl font-semibold text-slate-900">{metric.amount}</span>
-            <span className="text-xs font-medium text-slate-500">AZN</span>
+            <span className="font-mono text-2xl font-semibold text-ink">{metric.amount}</span>
+            <span className="text-xs font-medium text-ink/60">AZN</span>
           </>
         ) : (
-          <span className="text-lg font-medium text-slate-500">{t("finance.overview.unknown_value", locale)}</span>
+          <span className="text-lg font-medium text-ink/60">{t("finance.overview.unknown_value", locale)}</span>
         )}
       </div>
       {metric.availability === "UNAVAILABLE" && metric.note && (
-        <p className="mt-2 text-[11px] leading-snug text-slate-500">{metric.note}</p>
+        <p className="mt-2 text-[11px] leading-snug text-ink/60">{metric.note}</p>
       )}
       {typeof metric.knownCount === "number" && typeof metric.unknownCount === "number" && metric.unknownCount > 0 && (
         <p className="mt-2 text-[11px] text-amber-600">
@@ -76,21 +77,21 @@ function AznCard({ titleKey, metric }: { titleKey: string; metric: AznMetric }) 
 function CurrencyBreakdown({ titleKey, rows, azn }: { titleKey: string; rows: CurrencyAmount[]; azn: AznMetric }) {
   const locale = useLocale();
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-line bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-slate-500">{t(titleKey, locale)}</h3>
+        <h3 className="text-xs font-medium uppercase tracking-wide text-ink/60">{t(titleKey, locale)}</h3>
         <AvailabilityBadge a={azn.availability} />
       </div>
       <div className="mt-3 space-y-1.5">
-        {rows.length === 0 && <span className="text-sm text-slate-500">{t("ops.empty_no_data", locale)}</span>}
+        {rows.length === 0 && <span className="text-sm text-ink/60">{t("ops.empty_no_data", locale)}</span>}
         {rows.map((r) => (
           <div key={r.currency} className="flex items-baseline justify-between">
-            <span className="font-mono text-sm font-semibold text-slate-900">{r.currency}</span>
-            <span className="font-mono text-sm text-slate-900">{r.amount}</span>
+            <span className="font-mono text-sm font-semibold text-ink">{r.currency}</span>
+            <span className="font-mono text-sm text-ink">{r.amount}</span>
           </div>
         ))}
       </div>
-      <p className="mt-3 text-[11px] leading-snug text-slate-500">{azn.note}</p>
+      <p className="mt-3 text-[11px] leading-snug text-ink/60">{azn.note}</p>
     </div>
   );
 }
@@ -100,24 +101,24 @@ function ObligationsCard({ data }: { data: FinanceOverview }) {
   const locale = useLocale();
   const o = data.obligations;
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("finance.overview.obligations", locale)}</h3>
+    <div className="rounded-xl border border-line bg-white p-4 shadow-sm">
+      <h3 className="text-xs font-medium uppercase tracking-wide text-ink/60">{t("finance.overview.obligations", locale)}</h3>
       <div className="mt-3 flex items-baseline gap-1.5">
-        <span className="font-mono text-2xl font-semibold text-slate-900">{o.totalAzn}</span>
-        <span className="text-xs font-medium text-slate-500">AZN</span>
+        <span className="font-mono text-2xl font-semibold text-ink">{o.totalAzn}</span>
+        <span className="text-xs font-medium text-ink/60">AZN</span>
       </div>
       <dl className="mt-3 space-y-1 text-sm">
         <div className="flex justify-between">
-          <dt className="text-slate-500">{t("finance.overview.paid", locale)}</dt>
-          <dd className="font-mono text-slate-900">{o.paidAzn}</dd>
+          <dt className="text-ink/60">{t("finance.overview.paid", locale)}</dt>
+          <dd className="font-mono text-ink">{o.paidAzn}</dd>
         </div>
         <div className="flex justify-between">
-          <dt className="text-slate-500">{t("finance.overview.remaining", locale)}</dt>
-          <dd className="font-mono text-slate-900">{o.remainingAzn}</dd>
+          <dt className="text-ink/60">{t("finance.overview.remaining", locale)}</dt>
+          <dd className="font-mono text-ink">{o.remainingAzn}</dd>
         </div>
         <div className="flex justify-between">
-          <dt className="text-slate-500">{t("finance.overview.count", locale)}</dt>
-          <dd className="font-mono text-slate-900">{o.count}</dd>
+          <dt className="text-ink/60">{t("finance.overview.count", locale)}</dt>
+          <dd className="font-mono text-ink">{o.count}</dd>
         </div>
       </dl>
       {o.unknownCount > 0 && (
@@ -161,23 +162,21 @@ function OverviewContent() {
         breadcrumbs={["TravelHub", t("nav.group.finance", locale), t("finance.overview.title", locale)]}
         actions={
           <div className="flex items-center gap-2">
-            <input
-              type="date"
+            <DateTextInput
               value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-blue-400"
+              onChange={(v) => setFrom(v)}
+              className="rounded-lg border border-line px-2 py-1.5 text-xs text-ink outline-none focus:border-brand"
             />
-            <span className="text-xs text-slate-400">—</span>
-            <input
-              type="date"
+            <span className="text-xs text-ink/60">—</span>
+            <DateTextInput
               value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-blue-400"
+              onChange={(v) => setTo(v)}
+              className="rounded-lg border border-line px-2 py-1.5 text-xs text-ink outline-none focus:border-brand"
             />
             <button
               type="button"
               onClick={() => void load()}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+              className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 transition-colors hover:bg-panel"
             >
               {t("admin.table.refresh", locale)}
             </button>
@@ -187,7 +186,7 @@ function OverviewContent() {
 
       <div className="space-y-6 p-6">
         {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
-        {busy && !data && <div className="text-sm text-slate-500">{t("admin.table.loading", locale)}</div>}
+        {busy && !data && <div className="text-sm text-ink/60">{t("admin.table.loading", locale)}</div>}
 
         {data && (
           <>
@@ -198,39 +197,39 @@ function OverviewContent() {
             </div>
             {/* Supplier payments registry KPI: derived from dueDate + allocations. */}
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <a href="/app/finance/supplier-payments" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-rose-200">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("finance.supplier_payments.kpi.overdue", locale)}</p>
+              <a href="/app/finance/supplier-payments" className="rounded-xl border border-line bg-white p-4 shadow-sm transition-colors hover:border-rose-200">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink/60">{t("finance.supplier_payments.kpi.overdue", locale)}</p>
                 <p className="mt-2 font-mono text-xl font-semibold text-rose-600">
                   {formatPrice(data.supplierPayables.overdueAzn, "AZN", locale)}
                 </p>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-ink/60">
                   {data.supplierPayables.overdueCount} {t("finance.supplier_payments.kpi.items", locale)}
                 </p>
               </a>
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("finance.supplier_payments.kpi.due_soon", locale)}</p>
+              <div className="rounded-xl border border-line bg-white p-4 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink/60">{t("finance.supplier_payments.kpi.due_soon", locale)}</p>
                 <p className="mt-2 font-mono text-xl font-semibold text-amber-600">
                   {formatPrice(data.supplierPayables.dueSoonAzn, "AZN", locale)}
                 </p>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-ink/60">
                   {data.supplierPayables.dueSoonCount} {t("finance.supplier_payments.kpi.items", locale)}
                 </p>
               </div>
-              <a href="/app/finance/supplier-payments" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-slate-300">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("finance.supplier_payments.kpi.pending", locale)}</p>
-                <p className="mt-2 font-mono text-xl font-semibold text-slate-800">
+              <a href="/app/finance/supplier-payments" className="rounded-xl border border-line bg-white p-4 shadow-sm transition-colors hover:border-line">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink/60">{t("finance.supplier_payments.kpi.pending", locale)}</p>
+                <p className="mt-2 font-mono text-xl font-semibold text-ink">
                   {formatPrice(data.supplierPayables.pendingPaymentsAzn, "AZN", locale)}
                 </p>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-ink/60">
                   {data.supplierPayables.pendingPaymentsCount} {t("finance.supplier_payments.kpi.items", locale)}
                 </p>
               </a>
-              <a href="/app/finance/supplier-payments?unallocated=true" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-violet-200">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("finance.supplier_payments.kpi.unallocated", locale)}</p>
+              <a href="/app/finance/supplier-payments?unallocated=true" className="rounded-xl border border-line bg-white p-4 shadow-sm transition-colors hover:border-violet-200">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink/60">{t("finance.supplier_payments.kpi.unallocated", locale)}</p>
                 <p className="mt-2 font-mono text-xl font-semibold text-violet-600">
                   {formatPrice(data.supplierPayables.unallocatedAzn, "AZN", locale)}
                 </p>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-ink/60">
                   {data.supplierPayables.unallocatedCount} {t("finance.supplier_payments.kpi.items", locale)}
                 </p>
               </a>

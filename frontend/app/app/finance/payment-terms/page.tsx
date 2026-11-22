@@ -20,6 +20,7 @@ import { useCan } from "@/lib/use-can";
 import { api } from "@/lib/api";
 import { useCurrentUserStatus } from "@/lib/use-user";
 import { financeCenterApi, type SupplierPaymentPlanRow, type SupplierPaymentTerms } from "@/lib/finance-center-api";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 const ALLOWED_VIEW = new Set(["FINANCE", "ADMIN", "DIRECTOR"]);
 const ALLOWED_WRITE = new Set(["FINANCE", "ADMIN"]);
@@ -435,7 +436,7 @@ export default function SupplierPaymentTermsPage() {
                   <div className="mt-3 flex flex-wrap items-end gap-3">
                     <label className="text-sm">
                       <span className="mb-1 block text-ink/60">{L("Дата оплаты", "Ödəniş tarixi", "Payment date")}</span>
-                      <input type="date" value={draft.fullDate} onChange={(e) => setDraft({ ...draft, fullDate: e.target.value })} className="rounded-lg border border-line px-3 py-2 text-sm" />
+                      <DateTextInput value={draft.fullDate} onChange={(v) => setDraft({ ...draft, fullDate: v })} className="rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
                     <label className="text-sm">
                       <span className="mb-1 block text-ink/60">{L("Сумма, AZN", "Məbləğ, AZN", "Amount, AZN")}</span>
@@ -448,7 +449,7 @@ export default function SupplierPaymentTermsPage() {
                       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">{L("Первая оплата", "İlk ödəniş", "First payment")}</p>
                       <label className="text-sm">
                         <span className="mb-1 block text-ink/60">{L("Дата", "Tarix", "Date")}</span>
-                        <input type="date" value={draft.firstDate} onChange={(e) => setDraft({ ...draft, firstDate: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                        <DateTextInput value={draft.firstDate} onChange={(v) => setDraft({ ...draft, firstDate: v })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
                       </label>
                       <label className="mt-2 block text-sm">
                         <span className="mb-1 block text-ink/60">{L("Сумма, AZN", "Məbləğ, AZN", "Amount, AZN")}</span>
@@ -459,7 +460,7 @@ export default function SupplierPaymentTermsPage() {
                       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">{L("Последняя оплата", "Son ödəniş", "Last payment")}</p>
                       <label className="text-sm">
                         <span className="mb-1 block text-ink/60">{L("Дата", "Tarix", "Date")}</span>
-                        <input type="date" value={draft.lastDate} onChange={(e) => setDraft({ ...draft, lastDate: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                        <DateTextInput value={draft.lastDate} onChange={(v) => setDraft({ ...draft, lastDate: v })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
                       </label>
                       <label className="mt-2 block text-sm">
                         <span className="mb-1 block text-ink/60">{L("Сумма, AZN", "Məbləğ, AZN", "Amount, AZN")}</span>

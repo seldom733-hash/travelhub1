@@ -13,6 +13,7 @@ import { formatNumber, t, useLocale } from "@/lib/i18n";
 import { categoryLabel } from "@/lib/category-label";
 import { fireMarketplaceFilter, fireMarketplaceSort, useMarketplaceCategoryViewed } from "@/lib/behavioral-events";
 import { publicApi, PublicNotFoundError, type PublicCategory, type PublicFilterMetadata, type PublicListResult } from "@/lib/public-api";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 /**
  * PHASE 1 STEP 1.7 §11 — Category page `/categories/:slug`.
@@ -138,16 +139,16 @@ function CategoryInner() {
         {category && (
           <>
             {/* Breadcrumb */}
-            <nav className="text-xs text-slate-400" aria-label="breadcrumb">
-              <Link href="/" className="hover:text-blue-600 hover:underline">
+            <nav className="text-xs text-ink/60" aria-label="breadcrumb">
+              <Link href="/" className="hover:text-brand hover:underline">
                 {t("pdp.breadcrumb_home", locale)}
               </Link>
               <span className="mx-1.5">/</span>
-              <span className="text-slate-600">{categoryLabel(category, locale)}</span>
+              <span className="text-ink/60">{categoryLabel(category, locale)}</span>
             </nav>
-            <h1 className="mt-2 text-2xl font-bold text-slate-900">{categoryLabel(category, locale)}</h1>
+            <h1 className="mt-2 text-2xl font-bold text-ink">{categoryLabel(category, locale)}</h1>
             {result && (
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-ink/60">
                 {formatNumber(result.total, locale)} {t("category.services_count", locale)}
               </p>
             )}
@@ -161,20 +162,19 @@ function CategoryInner() {
                 id="cat-sort"
                 value={sort}
                 onChange={(e) => onSort(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-slate-700 outline-none focus:border-blue-400"
+                className="rounded-lg border border-line bg-white px-2 py-1.5 text-ink outline-none focus:border-brand"
               >
                 <option value="newest">{t("sort.newest", locale)}</option>
                 <option value="price_asc">{t("sort.price_asc", locale)}</option>
                 <option value="price_desc">{t("sort.price_desc", locale)}</option>
               </select>
               {meta?.availability?.dateRequired && (
-                <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                <label className="flex items-center gap-1.5 text-xs text-ink/60">
                   {t("search.available_from", locale)}
-                  <input
-                    type="date"
+                  <DateTextInput
                     value={availableFrom}
-                    onChange={(e) => update({ available_from: e.target.value || undefined })}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-700 outline-none focus:border-blue-400"
+                    onChange={(v) => update({ available_from: v || undefined })}
+                    className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm text-ink outline-none focus:border-brand"
                   />
                 </label>
               )}
@@ -185,7 +185,7 @@ function CategoryInner() {
                 {meta && meta.filters.length > 0 ? (
                   <CategoryFilters meta={meta} applied={f} onChange={onFilters} />
                 ) : (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-400">
+                  <div className="rounded-2xl border border-line bg-white p-4 text-xs text-ink/60">
                     {t("filters.no_filters", locale)}
                   </div>
                 )}
@@ -208,7 +208,7 @@ function CategoryInner() {
             </div>
 
             <div className="mt-8">
-              <Link href="/search" className="text-sm text-blue-600 hover:underline">
+              <Link href="/search" className="text-sm text-brand hover:underline">
                 ← {t("category.back_all", locale)}
               </Link>
             </div>

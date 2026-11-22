@@ -19,6 +19,7 @@ import {
   PICKER_SUBMIT,
   PICKER_W_TO,
 } from "./picker-styles";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 interface SanatoriumSearchProps {
   onSearch: (ctx: SearchContext) => void;
@@ -76,11 +77,10 @@ export default function SanatoriumSearch({ onSearch }: SanatoriumSearchProps) {
           </label>
           <div className="relative">
             <CalendarBlank size={14} weight="light" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-            <input
+            <DateTextInput
               id="sanat-date"
-              type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(v) => setStartDate(v)}
               className={PICKER_CONTROL_ICON}
             />
           </div>

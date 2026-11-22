@@ -14,6 +14,7 @@ import {
   resolvePrice,
   upsertSpecialDay,
 } from "@/lib/price-period-resolver";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 /**
  * Редактор календаря проживания (шаг «Проживание»):
@@ -610,19 +611,17 @@ export default function PriceCalendarEditor({
             </label>
             <label className="block">
               <span className="mb-0.5 block text-[10px] uppercase text-neutral-500">От</span>
-              <input
-                type="date"
+              <DateTextInput
                 value={fillFrom}
-                onChange={(e) => setFillFrom(e.target.value)}
+                onChange={(v) => setFillFrom(v)}
                 className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 font-mono outline-none focus:border-amber-500/60"
               />
             </label>
             <label className="block">
               <span className="mb-0.5 block text-[10px] uppercase text-neutral-500">До (для диапазона)</span>
-              <input
-                type="date"
+              <DateTextInput
                 value={fillTo}
-                onChange={(e) => setFillTo(e.target.value)}
+                onChange={(v) => setFillTo(v)}
                 className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 font-mono outline-none focus:border-amber-500/60"
               />
             </label>
@@ -711,11 +710,11 @@ export default function PriceCalendarEditor({
           <div className="flex flex-wrap items-end gap-2 rounded border border-neutral-800 bg-neutral-900/40 px-3 py-2 text-xs">
             <label className="block">
               <span className="mb-0.5 block text-[10px] uppercase text-neutral-500">От</span>
-              <input type="date" value={fillFrom} onChange={(e) => setFillFrom(e.target.value)} className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 font-mono outline-none focus:border-amber-500/60" />
+              <DateTextInput value={fillFrom} onChange={(v) => setFillFrom(v)} className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 font-mono outline-none focus:border-amber-500/60" />
             </label>
             <label className="block">
               <span className="mb-0.5 block text-[10px] uppercase text-neutral-500">До</span>
-              <input type="date" value={fillTo} onChange={(e) => setFillTo(e.target.value)} className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 font-mono outline-none focus:border-amber-500/60" />
+              <DateTextInput value={fillTo} onChange={(v) => setFillTo(v)} className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 font-mono outline-none focus:border-amber-500/60" />
             </label>
             <label className="block">
               <span className="mb-0.5 block text-[10px] uppercase text-neutral-500">Номеров</span>
@@ -842,11 +841,11 @@ function BaseBlock({ layer, onChange }: { layer: PriceLayer | undefined; onChang
       <div className="flex items-end gap-2">
         <label className="block">
           <span className="mb-0.5 block text-[10px] uppercase text-neutral-500">С</span>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />
+          <DateTextInput value={from} onChange={(v) => setFrom(v)} className={inputCls} />
         </label>
         <label className="block">
           <span className="mb-0.5 block text-[10px] uppercase text-neutral-500">По</span>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />
+          <DateTextInput value={to} onChange={(v) => setTo(v)} className={inputCls} />
         </label>
         <label className="block">
           <span className="mb-0.5 block text-[10px] uppercase text-neutral-500">Цена</span>
@@ -914,8 +913,8 @@ function LayerList({
       {layers.map((l) => (
         <div key={l.id} className="space-y-1 rounded border border-neutral-800/70 p-2">
           <div className="flex items-center gap-2 text-xs">
-            <input type="date" value={l.startDate} onChange={(e) => onChange(l.id, { startDate: e.target.value })} className={inputCls} />
-            <input type="date" value={l.endDate} onChange={(e) => onChange(l.id, { endDate: e.target.value })} className={inputCls} />
+            <DateTextInput value={l.startDate} onChange={(v) => onChange(l.id, { startDate: v })} className={inputCls} />
+            <DateTextInput value={l.endDate} onChange={(v) => onChange(l.id, { endDate: v })} className={inputCls} />
             <input
               value={String(l.price)}
               onChange={(e) => {
@@ -954,11 +953,11 @@ function LayerList({
       <div className="flex flex-wrap items-end gap-2 border-t border-neutral-800/70 pt-2">
         <label className="block">
           <span className="mb-0.5 block text-[10px] uppercase text-neutral-500">С</span>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />
+          <DateTextInput value={from} onChange={(v) => setFrom(v)} className={inputCls} />
         </label>
         <label className="block">
           <span className="mb-0.5 block text-[10px] uppercase text-neutral-500">По</span>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />
+          <DateTextInput value={to} onChange={(v) => setTo(v)} className={inputCls} />
         </label>
         <label className="block">
           <span className="mb-0.5 block text-[10px] uppercase text-neutral-500">Цена</span>
@@ -1187,11 +1186,11 @@ function MaterializeModal({
         <div className="mt-3 flex items-end gap-2">
           <label className="block">
             <span className="mb-0.5 block text-[10px] uppercase text-neutral-500">Диапазон с</span>
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />
+            <DateTextInput value={from} onChange={(v) => setFrom(v)} className={inputCls} />
           </label>
           <label className="block">
             <span className="mb-0.5 block text-[10px] uppercase text-neutral-500">по</span>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />
+            <DateTextInput value={to} onChange={(v) => setTo(v)} className={inputCls} />
           </label>
         </div>
 

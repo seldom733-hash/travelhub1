@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useLocale } from "@/lib/i18n";
 import { pt } from "@/lib/partner-i18n";
 import type { PartnerSchemaAttribute } from "@/lib/partner-api";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 /** Код ошибки поля (локализация — на уровне компонента через pt). */
 export interface FieldError {
@@ -97,8 +98,8 @@ export default function DynamicSchemaForm({ attributes, value, onChange, disable
     `w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:ring-2 ${
       errors[def.key]
         ? "border-red-400 focus:border-red-400 focus:ring-red-100"
-        : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-100"
-    } disabled:cursor-not-allowed disabled:bg-slate-50`;
+        : "border-line focus:border-emerald-400 focus:ring-emerald-100"
+    } disabled:cursor-not-allowed disabled:bg-panel`;
 
   return (
     <div className="space-y-4">
@@ -109,7 +110,7 @@ export default function DynamicSchemaForm({ attributes, value, onChange, disable
         return (
           <div key={def.key}>
             <div className="mb-1 flex items-baseline justify-between gap-2">
-              <label htmlFor={def.type === "boolean" ? undefined : id} className="text-sm font-medium text-slate-700">
+              <label htmlFor={def.type === "boolean" ? undefined : id} className="text-sm font-medium text-ink">
                 {def.label ?? def.key}
                 {required && (
                   <span className="ml-1 text-rose-500" aria-hidden>
@@ -118,12 +119,12 @@ export default function DynamicSchemaForm({ attributes, value, onChange, disable
                 )}
               </label>
               {def.type === "boolean" && (
-                <span className="text-[11px] text-slate-400">{required ? pt("partner.form.required", locale) : ""}</span>
+                <span className="text-[11px] text-ink/60">{required ? pt("partner.form.required", locale) : ""}</span>
               )}
             </div>
 
             {def.type === "boolean" ? (
-              <label className="flex items-center gap-2 text-sm text-slate-700">
+              <label className="flex items-center gap-2 text-sm text-ink">
                 <input
                   type="checkbox"
                   checked={value[def.key] === true}
@@ -132,7 +133,7 @@ export default function DynamicSchemaForm({ attributes, value, onChange, disable
                   aria-label={def.label ?? def.key}
                   aria-invalid={!!err}
                   aria-describedby={err ? `${id}-error` : undefined}
-                  className="size-4 rounded border-slate-300 accent-emerald-600"
+                  className="size-4 rounded border-line accent-emerald-600"
                 />
                 {pt("attr.yes", locale)}
               </label>
@@ -165,11 +166,10 @@ export default function DynamicSchemaForm({ attributes, value, onChange, disable
                 ))}
               </select>
             ) : def.type === "date" ? (
-              <input
+              <DateTextInput
                 id={id}
-                type="date"
                 value={String(value[def.key] ?? "")}
-                onChange={(e) => set(def.key, e.target.value)}
+                onChange={(v) => set(def.key, v)}
                 disabled={disabled}
                 aria-invalid={!!err}
                 aria-describedby={err ? `${id}-error` : undefined}
@@ -217,7 +217,7 @@ export default function DynamicSchemaForm({ attributes, value, onChange, disable
               </p>
             )}
             {def.type === "enum" && def.options && (
-              <p className="mt-1 text-[11px] text-slate-400">{def.options.slice(0, 6).join(", ")}</p>
+              <p className="mt-1 text-[11px] text-ink/60">{def.options.slice(0, 6).join(", ")}</p>
             )}
           </div>
         );

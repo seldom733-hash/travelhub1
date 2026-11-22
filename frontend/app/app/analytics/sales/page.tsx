@@ -7,6 +7,7 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 import { api } from "@/lib/api";
 import { useLocale, type Locale } from "@/lib/i18n";
 import { saLossReason, saReconciliationKind, saStatus, saText } from "@/lib/sales-analytics-i18n";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 const PRESETS: Array<[string, string]> = [
   ["TODAY", "Сегодня"], ["YESTERDAY", "Вчера"], ["LAST_7_DAYS", "Последние 7 дней"],
@@ -212,8 +213,8 @@ export function SalesAnalyticsView({ initialTab = "overview" }: { initialTab?: s
             </select>
           </label>
           {preset === "CUSTOM" && <>
-            <label className="flex flex-col gap-1"><span className="text-ink/60">{L("С")}</span><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-lg border bg-white px-2 py-1.5" /></label>
-            <label className="flex flex-col gap-1"><span className="text-ink/60">{L("По")}</span><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-lg border bg-white px-2 py-1.5" /></label>
+            <label className="flex flex-col gap-1"><span className="text-ink/60">{L("С")}</span><DateTextInput value={startDate} onChange={(v) => setStartDate(v)} className="rounded-lg border bg-white px-2 py-1.5" /></label>
+            <label className="flex flex-col gap-1"><span className="text-ink/60">{L("По")}</span><DateTextInput value={endDate} onChange={(v) => setEndDate(v)} className="rounded-lg border bg-white px-2 py-1.5" /></label>
           </>}
           <label className="flex flex-col gap-1"><span className="text-ink/60">{L("Менеджер")}</span>
             <select value={managerId} onChange={(e) => setManagerId(e.target.value)} className="min-w-40 rounded-lg border bg-white px-2 py-1.5">

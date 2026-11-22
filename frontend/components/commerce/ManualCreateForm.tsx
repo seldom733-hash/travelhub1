@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api, type Page, type Product, type Customer } from "@/lib/api";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 /**
  * Ручное создание commerce-сущностей (заявка / заказ / бронирование).
@@ -42,8 +43,8 @@ const MODE_HINT: Record<ManualCreateMode, string> = {
 };
 
 const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100";
-const labelCls = "mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500";
+  "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand";
+const labelCls = "mb-1 block text-xs font-semibold uppercase tracking-wide text-ink/60";
 
 export default function ManualCreateForm({ mode }: { mode: ManualCreateMode }) {
   const needsTravelers = mode !== "request";
@@ -218,8 +219,8 @@ export default function ManualCreateForm({ mode }: { mode: ManualCreateMode }) {
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">{MODE_TITLE[mode]}</h1>
-        <p className="mt-1 text-sm text-slate-500">{MODE_HINT[mode]}</p>
+        <h1 className="text-xl font-bold text-ink">{MODE_TITLE[mode]}</h1>
+        <p className="mt-1 text-sm text-ink/60">{MODE_HINT[mode]}</p>
       </div>
 
       {loadError && (
@@ -264,7 +265,7 @@ export default function ManualCreateForm({ mode }: { mode: ManualCreateMode }) {
           </div>
         </div>
       ) : (
-        <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6">
+        <div className="space-y-4 rounded-xl border border-line bg-white p-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className={labelCls}>Услуга (необязательно)</label>
@@ -290,7 +291,7 @@ export default function ManualCreateForm({ mode }: { mode: ManualCreateMode }) {
             </div>
             <div>
               <label className={labelCls}>Дата услуги</label>
-              <input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} className={inputCls} />
+              <DateTextInput value={serviceDate} onChange={(v) => setServiceDate(v)} className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>Количество</label>
@@ -344,9 +345,9 @@ export default function ManualCreateForm({ mode }: { mode: ManualCreateMode }) {
 
           {needsTravelers && (
             <div className="space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Туристы</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-ink/60">Туристы</div>
               {travelers.map((tr, i) => (
-                <div key={i} className="grid grid-cols-1 gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3 sm:grid-cols-3">
+                <div key={i} className="grid grid-cols-1 gap-3 rounded-lg border border-line bg-panel p-3 sm:grid-cols-3">
                   <input
                     value={tr.firstName}
                     onChange={(e) => setTravelers((prev) => prev.map((x, j) => (j === i ? { ...x, firstName: e.target.value } : x)))}
@@ -379,11 +380,11 @@ export default function ManualCreateForm({ mode }: { mode: ManualCreateMode }) {
               type="button"
               onClick={() => void submit()}
               disabled={busy}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy ? "Создание…" : `Создать ${mode === "request" ? "заявку" : mode === "order" ? "заказ" : "бронирование"}`}
             </button>
-            {busy && step && <span className="text-sm text-slate-500">{step}</span>}
+            {busy && step && <span className="text-sm text-ink/60">{step}</span>}
           </div>
         </div>
       )}

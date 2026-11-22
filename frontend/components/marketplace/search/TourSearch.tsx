@@ -35,6 +35,7 @@ import {
   readTourDraft,
   writeTourDraft,
 } from "./tour-search-store";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 interface TourSearchProps {
   onSearch: (ctx: SearchContext) => void;
@@ -420,13 +421,12 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
           </label>
           <div className="relative">
             <CalendarBlank size={14} weight="light" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-            <input
+            <DateTextInput
               id="tour-date"
-              type="date"
-              aria-label={t("search.check_in", locale)}
+              ariaLabel={t("search.check_in", locale)}
               value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
+              onChange={(v) => {
+                setStartDate(v);
                 setSubmitError("");
               }}
               className={PICKER_CONTROL_ICON}

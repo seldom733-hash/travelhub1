@@ -19,6 +19,7 @@ import {
   PICKER_W_FROM,
   PICKER_W_TO,
 } from "./picker-styles";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 interface CarRentalSearchProps {
   onSearch: (ctx: SearchContext) => void;
@@ -53,14 +54,14 @@ export default function CarRentalSearch({ onSearch }: CarRentalSearchProps) {
           <label htmlFor="car-pickup-date" className={PICKER_LABEL}>{t("search.check_in", locale)}</label>
           <div className="relative">
             <CalendarBlank size={14} weight="light" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-            <input id="car-pickup-date" type="date" value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} className={PICKER_CONTROL_ICON} />
+            <DateTextInput id="car-pickup-date" value={pickupDate} onChange={(v) => setPickupDate(v)} className={PICKER_CONTROL_ICON} />
           </div>
         </div>
         <div style={{ minWidth: datePx + PICKER_DATE_WIDTH_EXTRA, maxWidth: datePx + PICKER_DATE_WIDTH_EXTRA }}>
           <label htmlFor="car-return-date" className={PICKER_LABEL}>{t("search.check_out", locale)}</label>
           <div className="relative">
             <CalendarBlank size={14} weight="light" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-            <input id="car-return-date" type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} min={pickupDate || undefined} className={PICKER_CONTROL_ICON} />
+            <DateTextInput id="car-return-date" value={returnDate} onChange={(v) => setReturnDate(v)} min={pickupDate || undefined} className={PICKER_CONTROL_ICON} />
           </div>
         </div>
         <div style={{ maxWidth: datePx + PICKER_DIGIT_WIDTH_EXTRA }}>

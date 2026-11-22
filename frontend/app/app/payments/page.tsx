@@ -5,6 +5,7 @@ import OperationsCenterShell from "@/components/OperationsCenterShell";
 import Pagination from "@/components/Pagination";
 import { api } from "@/lib/api";
 import { useLocale, formatPrice, formatDate } from "@/lib/i18n";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 type Tab = "clients" | "suppliers";
 
@@ -287,8 +288,8 @@ export default function PaymentsAndRefundsPage() {
 
         <div className="flex flex-wrap items-end gap-2 rounded-xl border border-line bg-white p-3">
           <label className="grid gap-1 text-[11px] font-medium text-ink">{tr("Поиск по номеру оплаты")}<input data-testid="payments-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="PAY-00019967 / RFD-... / SPO-..." className="w-64 rounded-lg border border-line bg-white px-3 py-2 text-sm" /></label>
-          <label className="grid gap-1 text-[11px] font-medium text-ink">{tr("Дата оплаты с")}<input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="rounded-lg border border-line bg-white px-3 py-2 text-sm" /></label>
-          <label className="grid gap-1 text-[11px] font-medium text-ink">{tr("Дата оплаты по")}<input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="rounded-lg border border-line bg-white px-3 py-2 text-sm" /></label>
+          <label className="grid gap-1 text-[11px] font-medium text-ink">{tr("Дата оплаты с")}<DateTextInput value={dateFrom} onChange={(v) => setDateFrom(v)} className="rounded-lg border border-line bg-white px-3 py-2 text-sm" /></label>
+          <label className="grid gap-1 text-[11px] font-medium text-ink">{tr("Дата оплаты по")}<DateTextInput value={dateTo} onChange={(v) => setDateTo(v)} className="rounded-lg border border-line bg-white px-3 py-2 text-sm" /></label>
           <button type="button" onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); }} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-medium text-ink/70 hover:bg-panel">{tr("Сбросить")}</button>
         </div>
 

@@ -29,6 +29,7 @@ import { useCallback, useRef } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useLocale, t } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 export type OperationsDomain = "requests" | "orders" | "bookings" | "payments" | "documents";
 
@@ -173,22 +174,20 @@ function HeaderPeriodControl() {
       <span className="text-xs font-medium text-ink/60">{t("ops.period", locale)}</span>
       <div className="flex items-center gap-1">
         <label className="sr-only" htmlFor="ops-period-from">{t("ops.period_from", locale)}</label>
-        <input
+        <DateTextInput
           id="ops-period-from"
-          type="date"
           value={dateFrom}
-          onChange={(e) => updatePeriod("dateFrom", e.target.value)}
-          aria-label={t("ops.period_from", locale)}
+          onChange={(v) => updatePeriod("dateFrom", v)}
+          ariaLabel={t("ops.period_from", locale)}
           className="w-32 rounded-lg border border-line bg-white px-2 py-1 text-xs outline-none transition focus:border-brand focus:ring-2 focus:ring-brand"
         />
         <span className="text-xs text-ink/60">—</span>
         <label className="sr-only" htmlFor="ops-period-to">{t("ops.period_to", locale)}</label>
-        <input
+        <DateTextInput
           id="ops-period-to"
-          type="date"
           value={dateTo}
-          onChange={(e) => updatePeriod("dateTo", e.target.value)}
-          aria-label={t("ops.period_to", locale)}
+          onChange={(v) => updatePeriod("dateTo", v)}
+          ariaLabel={t("ops.period_to", locale)}
           className="w-32 rounded-lg border border-line bg-white px-2 py-1 text-xs outline-none transition focus:border-brand focus:ring-2 focus:ring-brand"
         />
       </div>

@@ -14,6 +14,7 @@ import { useLocale, t } from "@/lib/i18n";
 import TableExportButton from "@/components/TableExportButton";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 import { permissionLabel } from "@/lib/permission-labels";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 const ROLES: { code: string; titleKey: string }[] = [
   { code: "ADMIN", titleKey: "user.role.ADMIN" },
@@ -285,13 +286,13 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
             <div className="flex items-center gap-2">
               <Link
                 href="/app/users/roles"
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 transition-colors hover:bg-panel"
               >
                 {t("rbac.title", locale)}
               </Link>
               <button
                 onClick={() => void load(page, search, sortBy, sortDirection, statusFilter, roleFilter, dateFrom, dateTo)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 transition-colors hover:bg-panel"
               >
                 {t("admin.table.refresh", locale)}
               </button>
@@ -315,12 +316,12 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               defaultValue={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder={t("admin.search.placeholder_users", locale)}
-              className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              className="w-64 rounded-lg border border-line bg-white px-3 py-1.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand"
             />
             <select
               value={statusFilter ?? ''}
               onChange={(e) => { setStatusFilter(e.target.value || undefined); setPage(1); }}
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+              className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-brand"
             >
               <option value="">{t("admin.filter.all_statuses", locale)}</option>
               <option value="ACTIVE">{t("user.status.ACTIVE", locale)}</option>
@@ -330,7 +331,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
             <select
               value={roleFilter ?? ''}
               onChange={(e) => { setRoleFilter(e.target.value || undefined); setPage(1); }}
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+              className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-brand"
             >
               <option value="">{t("admin.filter.all_roles", locale)}</option>
               <option value="ADMIN">{t("user.role.ADMIN", locale)}</option>
@@ -346,18 +347,18 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               <option value="MARKETER">{t("user.role.MARKETER", locale)}</option>
             </select>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">{t("admin.filter.date_from", locale)}</span>
-              <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
-              <span className="text-xs text-slate-400">{t("admin.filter.date_to", locale)}</span>
-              <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
+              <span className="text-xs text-ink/60">{t("admin.filter.date_from", locale)}</span>
+              <DateTextInput value={dateFrom} onChange={(v) => { setDateFrom(v); setPage(1); }} className="w-32 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand" />
+              <span className="text-xs text-ink/60">{t("admin.filter.date_to", locale)}</span>
+              <DateTextInput value={dateTo} onChange={(v) => { setDateTo(v); setPage(1); }} className="w-32 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand" />
             </div>
             <button
               type="button"
               onClick={() => setShowCreate((v) => !v)}
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+              className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-dark"
             >
               {t("admin.table.create_user", locale)}
-            </button>              {busy && <span className="text-xs text-slate-400">{t("admin.table.loading", locale)}</span>}
+            </button>              {busy && <span className="text-xs text-ink/60">{t("admin.table.loading", locale)}</span>}
               <TableExportButton exportUrl="/api/v1/users/export" extraParams={{
                 ...(statusFilter ? { status: statusFilter } : {}),
                 ...(roleFilter ? { role: roleFilter } : {}),
@@ -379,7 +380,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
             </div>
           )}
 
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
             <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>
               <colgroup>
                 <col style={{ width: "10%" }} />
@@ -389,7 +390,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
                 <col style={{ width: "16%" }} />
                 <col style={{ width: "12%" }} />
               </colgroup>
-              <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+              <thead className="border-b border-line bg-panel text-xs uppercase tracking-wide text-ink/60">
                 <tr>
                   <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.code", locale)}</SortableHeader>
                   <SortableHeader field="fullName" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.user", locale)}</SortableHeader>
@@ -401,11 +402,11 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               </thead>
               <tbody>
                 {users.map((u) => (
-                  <tr key={u.id} className="border-b border-slate-50 transition-colors hover:bg-blue-50/40">
-                    <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{u.code}</td>
+                  <tr key={u.id} className="border-b border-line transition-colors hover:bg-brand/40">
+                    <td className="px-4 py-2.5 font-mono text-xs text-brand">{u.code}</td>
                     <td className="px-4 py-2.5">
-                      <div className="font-medium text-slate-800">{u.fullName ?? u.username}</div>
-                      <div className="text-xs text-slate-400">
+                      <div className="font-medium text-ink">{u.fullName ?? u.username}</div>
+                      <div className="text-xs text-ink/60">
                         @{u.username}
                         {u.email ? ` · ${u.email}` : ""}
                       </div>
@@ -415,7 +416,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
                         <select
                           value={u.role.code}
                           onChange={(e) => void assignRole(u.id, e.target.value)}
-                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-blue-400"
+                          className="rounded-lg border border-line bg-white px-2 py-1 text-xs text-ink outline-none focus:border-brand"
                         >
                           {ROLES.map((r) => (
                             <option key={r.code} value={r.code}>
@@ -424,14 +425,14 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
                           ))}
                         </select>
                         {u.roleAssignments && u.roleAssignments.length > 0 && (
-                          <span className="rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                          <span className="rounded-full border border-brand/20 bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-dark">
                             +{u.roleAssignments.length}
                           </span>
                         )}
                         <button
                           type="button"
                           onClick={() => void openRoles(u)}
-                          className="rounded-md px-1.5 py-0.5 text-[11px] font-medium text-blue-600 hover:bg-blue-50"
+                          className="rounded-md px-1.5 py-0.5 text-[11px] font-medium text-brand hover:bg-brand/10"
                           title={t("rbac.manage_user", locale)}
                         >
                           {t("rbac.roles_short", locale)}
@@ -450,23 +451,23 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
                         <button
                           onClick={() => { setPwdUser(u); setPwdValue(""); setNotice(""); setError(""); }}
                           title={t("admin.table.reset_password", locale)}
-                          className="rounded-md px-1.5 py-0.5 text-xs text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                          className="rounded-md px-1.5 py-0.5 text-xs text-ink/60 transition-colors hover:bg-panel hover:text-ink/60"
                         >
                           🔑
                         </button>
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-slate-500">
+                    <td className="px-4 py-2.5 text-xs text-ink/60">
                       {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("ru") : "—"}
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-slate-500">
+                    <td className="px-4 py-2.5 text-xs text-ink/60">
                       {u.createdAt ? new Date(u.createdAt).toLocaleDateString("ru-RU") : "—"}
                     </td>
                   </tr>
                 ))}
                 {users.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-ink/60">
                       {t("admin.table.empty_users", locale)}
                     </td>
                   </tr>
@@ -488,50 +489,50 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
           onClose={() => setShowCreate(false)}
         >
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("admin.form.username_label", locale)}</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("admin.form.username_label", locale)}</label>
               <input
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
                 placeholder={t("admin.form.username_placeholder", locale)}
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("admin.form.password_label", locale)}</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("admin.form.password_label", locale)}</label>
               <input
                 type="password"
                 name="new-staff-password"
                 autoComplete="new-password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
                 placeholder="••••••••"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("admin.form.fullName_label", locale)}</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("admin.form.fullName_label", locale)}</label>
               <input
                 value={form.fullName}
                 onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
                 placeholder={t("admin.form.fullName_placeholder", locale)}
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("admin.form.email_label", locale)}</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("admin.form.email_label", locale)}</label>
               <input
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
                 placeholder={t("admin.form.email_placeholder", locale)}
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("admin.form.role_label", locale)}</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("admin.form.role_label", locale)}</label>
               <select
                 value={form.roleCode}
                 onChange={(e) => setForm({ ...form, roleCode: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
               >
                 {ROLES.map((r) => (
                   <option key={r.code} value={r.code}>
@@ -544,12 +545,12 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
             <button
               onClick={() => void createUser()}
               disabled={creating || form.username.length < 3 || form.password.length < 8}
-              className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
             >
               {creating ? t("admin.form.creating", locale) : t("admin.form.create", locale)}
             </button>
 
-            <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-700">
+            <div className="rounded-lg border border-brand/15 bg-brand/10 px-3 py-2 text-xs leading-relaxed text-brand-dark">
               {t("admin.form.audit_note", locale)}
             </div>
         </PanelFrame>
@@ -563,7 +564,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
           onClose={() => { setPwdUser(null); setPwdValue(""); }}
         >
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("admin.form.password_label", locale)}</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("admin.form.password_label", locale)}</label>
               <input
                 type="password"
                 name="new-user-password"
@@ -572,7 +573,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
                 value={pwdValue}
                 onChange={(e) => setPwdValue(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") void resetPassword(); }}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
                 placeholder="••••••••"
               />
               {pwdValue.length > 0 && pwdValue.length < 8 && (
@@ -584,12 +585,12 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               type="button"
               onClick={() => void resetPassword()}
               disabled={pwdBusy || pwdValue.length < 8}
-              className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
             >
               {pwdBusy ? t("admin.form.creating", locale) : t("admin.form.reset_submit", locale)}
             </button>
 
-            <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-700">
+            <div className="rounded-lg border border-brand/15 bg-brand/10 px-3 py-2 text-xs leading-relaxed text-brand-dark">
               {t("admin.form.reset_subtitle", locale)}
             </div>
         </PanelFrame>
@@ -602,36 +603,36 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
         >
           {rolesError && <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{rolesError}</div>}
           {!rolesData ? (
-            <div className="py-8 text-center text-sm text-slate-500">{t("common.loading", locale)}</div>
+            <div className="py-8 text-center text-sm text-ink/60">{t("common.loading", locale)}</div>
           ) : (
             <>
               <div className="rounded-lg border border-line p-3">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{t("rbac.primary", locale)}</div>
-                <div className="mt-1 text-sm font-semibold text-slate-800">
-                  {rolesData.primaryRole.title} <span className="font-mono text-xs text-slate-400">{rolesData.primaryRole.code}</span>
+                <div className="text-[11px] font-medium uppercase tracking-wide text-ink/60">{t("rbac.primary", locale)}</div>
+                <div className="mt-1 text-sm font-semibold text-ink">
+                  {rolesData.primaryRole.title} <span className="font-mono text-xs text-ink/60">{rolesData.primaryRole.code}</span>
                 </div>
               </div>
 
               <div>
-                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">{t("rbac.additional", locale)}</div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-ink/60">{t("rbac.additional", locale)}</div>
                 {rolesData.assignments.length === 0 ? (
-                  <p className="text-xs text-slate-500">{t("rbac.no_additional", locale)}</p>
+                  <p className="text-xs text-ink/60">{t("rbac.no_additional", locale)}</p>
                 ) : (
                   <ul className="space-y-2">
                     {rolesData.assignments.map((a) => (
                       <li key={a.id} className="rounded-lg border border-line p-2 text-xs">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <div className="font-semibold text-slate-800">
-                              {a.roleTitle} <span className="font-mono text-[10px] text-slate-400">{a.roleCode}</span>
+                            <div className="font-semibold text-ink">
+                              {a.roleTitle} <span className="font-mono text-[10px] text-ink/60">{a.roleCode}</span>
                             </div>
-                            <div className="text-slate-500">
+                            <div className="text-ink/60">
                               {a.startAt.slice(0, 10)} → {a.endAt ? a.endAt.slice(0, 10) : t("rbac.permanent", locale)}
                               {" · "}
                               <span className={a.status === "ACTIVE" ? "text-emerald-700" : "text-amber-700"}>{a.status}</span>
                             </div>
-                            {a.reason ? <div className="text-slate-500">{a.reason}</div> : null}
-                            {a.assignedByName ? <div className="text-slate-400">{t("rbac.assigned_by", locale)}: {a.assignedByName} · {a.assignedAt.slice(0, 10)}</div> : null}
+                            {a.reason ? <div className="text-ink/60">{a.reason}</div> : null}
+                            {a.assignedByName ? <div className="text-ink/60">{t("rbac.assigned_by", locale)}: {a.assignedByName} · {a.assignedAt.slice(0, 10)}</div> : null}
                           </div>
                           <button
                             type="button"
@@ -649,7 +650,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               </div>
 
               <div>
-                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">{t("rbac.add_role", locale)}</div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-ink/60">{t("rbac.add_role", locale)}</div>
                 <div className="grid gap-2">
                   <select
                     value={newRole.roleCode}
@@ -664,11 +665,11 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
                       ))}
                   </select>
                   <div className="grid grid-cols-2 gap-2">
-                    <label className="text-[11px] text-slate-500">
+                    <label className="text-[11px] text-ink/60">
                       {t("rbac.start", locale)}
                       <input type="datetime-local" value={newRole.startAt} onChange={(e) => setNewRole({ ...newRole, startAt: e.target.value })} className="mt-1 w-full rounded border border-line px-2 py-1 text-xs" />
                     </label>
-                    <label className="text-[11px] text-slate-500">
+                    <label className="text-[11px] text-ink/60">
                       {t("rbac.end", locale)}
                       <input type="datetime-local" value={newRole.endAt} onChange={(e) => setNewRole({ ...newRole, endAt: e.target.value })} className="mt-1 w-full rounded border border-line px-2 py-1 text-xs" />
                     </label>
@@ -691,12 +692,12 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               </div>
 
               <div>
-                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-ink/60">
                   {t("rbac.effective", locale)} ({rolesData.effectivePermissions.length})
                 </div>
                 <div className="flex max-h-40 flex-wrap gap-1 overflow-auto">
                   {rolesData.effectivePermissions.sort().map((p) => (
-                    <span key={p} className="rounded border border-line bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-600">
+                    <span key={p} className="rounded border border-line bg-panel px-1.5 py-0.5 text-[10px] text-ink/60">
                       {permissionLabel(p, locale)}
                     </span>
                   ))}

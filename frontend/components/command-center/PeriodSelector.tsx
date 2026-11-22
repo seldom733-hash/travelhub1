@@ -2,6 +2,7 @@
 
 import { type PeriodPreset } from "@/lib/dashboard-api";
 import { t, type Locale } from "@/lib/i18n";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 const PRESETS: { value: PeriodPreset; labelKey: string }[] = [
   { value: "TODAY", labelKey: "cc.period.TODAY" },
@@ -43,7 +44,7 @@ export function PeriodSelector({
       <select
         value={preset}
         onChange={(e) => onPresetChange(e.target.value as PeriodPreset)}
-        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+        className="rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
         aria-label={t("cc.period", locale)}
       >
         {PRESETS.map((p) => (
@@ -55,36 +56,34 @@ export function PeriodSelector({
 
       {preset === "CUSTOM" && (
         <div className="flex items-center gap-1">
-          <input
-            type="date"
+          <DateTextInput
             value={customStart}
-            onChange={(e) => onCustomStartChange(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
-            aria-label={t("cc.period.start", locale)}
+            onChange={(v) => onCustomStartChange(v)}
+            className="rounded-lg border border-line bg-white px-2 py-2 text-sm text-ink focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+            ariaLabel={t("cc.period.start", locale)}
           />
-          <span className="text-slate-400">—</span>
-          <input
-            type="date"
+          <span className="text-ink/60">—</span>
+          <DateTextInput
             value={customEnd}
-            onChange={(e) => onCustomEndChange(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
-            aria-label={t("cc.period.end", locale)}
+            onChange={(v) => onCustomEndChange(v)}
+            className="rounded-lg border border-line bg-white px-2 py-2 text-sm text-ink focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+            ariaLabel={t("cc.period.end", locale)}
           />
         </div>
       )}
 
-      <label className="flex items-center gap-1.5 text-sm text-slate-600">
+      <label className="flex items-center gap-1.5 text-sm text-ink/60">
         <input
           type="checkbox"
           checked={comparison}
           onChange={(e) => onComparisonChange(e.target.checked)}
-          className="h-4 w-4 rounded border-slate-300 text-blue-500 focus:ring-blue-400"
+          className="h-4 w-4 rounded border-line text-brand focus:ring-brand"
         />
         {t("cc.comparison", locale)}
       </label>
 
       {/* Fixed UTC indicator */}
-      <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-500">UTC</span>
+      <span className="rounded bg-panel px-2 py-1 text-xs text-ink/60">UTC</span>
     </div>
   );
 }

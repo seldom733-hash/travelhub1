@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { activityApi, type ActivityItem } from "@/lib/api";
 import { useLocale, t } from "@/lib/i18n";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 const SOURCE_TYPES = [
   "OPERATIONAL_NOTE", "ORDER", "BOOKING", "PAYMENT", "REFUND",
@@ -82,7 +83,7 @@ export default function CustomerActivity({ customerId }: { customerId: string })
 
   if (loading) {
     return (
-      <div className="py-8 text-center text-xs text-slate-400">
+      <div className="py-8 text-center text-xs text-ink/60">
         {t("activity.loading", locale)}
       </div>
     );
@@ -103,7 +104,7 @@ export default function CustomerActivity({ customerId }: { customerId: string })
         <select
           value={sourceFilter}
           onChange={(e) => handleFilterChange(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400"
+          className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand"
         >
           <option value="">{t("activity.all_sources", locale)}</option>
           {SOURCE_TYPES.map((src) => (
@@ -113,26 +114,24 @@ export default function CustomerActivity({ customerId }: { customerId: string })
           ))}
         </select>
         <div className="flex items-center gap-1">
-          <span className="text-xs text-slate-400">{t("admin.filter.date_from", locale)}</span>
-          <input
-            type="date"
+          <span className="text-xs text-ink/60">{t("admin.filter.date_from", locale)}</span>
+          <DateTextInput
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400"
+            onChange={(v) => setDateFrom(v)}
+            className="w-32 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand"
           />
-          <span className="text-xs text-slate-400">{t("admin.filter.date_to", locale)}</span>
-          <input
-            type="date"
+          <span className="text-xs text-ink/60">{t("admin.filter.date_to", locale)}</span>
+          <DateTextInput
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400"
+            onChange={(v) => setDateTo(v)}
+            className="w-32 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand"
           />
         </div>
       </div>
 
       {/* Timeline */}
       {items.length === 0 ? (
-        <div className="py-8 text-center text-xs text-slate-400">
+        <div className="py-8 text-center text-xs text-ink/60">
           {t("activity.empty", locale)}
         </div>
       ) : (
@@ -146,19 +145,19 @@ export default function CustomerActivity({ customerId }: { customerId: string })
             const timeStr = ts.toLocaleTimeString(locale === "az" ? "az-AZ" : locale === "en" ? "en-US" : "ru-RU", { hour: "2-digit", minute: "2-digit" });
 
             const inner = (
-              <div className="flex items-start gap-3 rounded-lg border border-slate-100 bg-white px-4 py-3 text-xs transition-colors hover:bg-blue-50/30">
+              <div className="flex items-start gap-3 rounded-lg border border-line bg-white px-4 py-3 text-xs transition-colors hover:bg-brand/30">
                 <div className="mt-0.5 text-base">{icon}</div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+                    <span className="inline-block rounded bg-panel px-1.5 py-0.5 text-[10px] font-medium text-ink/60">
                       {sourceLabel}
                     </span>
-                    <span className="font-medium text-slate-700">{eventLabel}</span>
+                    <span className="font-medium text-ink">{eventLabel}</span>
                   </div>
                   {item.summary && (
-                    <div className="mt-0.5 truncate text-slate-400">{item.summary}</div>
+                    <div className="mt-0.5 truncate text-ink/60">{item.summary}</div>
                   )}
-                  <div className="mt-1 flex items-center gap-2 text-slate-400">
+                  <div className="mt-1 flex items-center gap-2 text-ink/60">
                     <span>{dateStr} {timeStr}</span>
                     {item.actor?.name && (
                       <span>{t("activity.by", locale)} {item.actor.name}</span>
@@ -185,7 +184,7 @@ export default function CustomerActivity({ customerId }: { customerId: string })
           <button
             onClick={handleLoadMore}
             disabled={loadingMore}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-lg border border-line bg-white px-4 py-2 text-xs font-medium text-ink/60 transition-colors hover:bg-panel disabled:opacity-50"
           >
             {loadingMore ? t("activity.loading", locale) : t("activity.load_more", locale)}
           </button>

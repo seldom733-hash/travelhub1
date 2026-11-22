@@ -24,6 +24,7 @@ import {
   type SupplierObligation,
   type CreatePayoutInput,
 } from "@/lib/finance-center-api";
+import DateTextInput from "@/components/forms/DateTextInput";
 
 const PAGE_SIZE = 20;
 const STATUSES = ["OPEN", "PARTIALLY_PAID", "CLOSED", "CANCELLED", "ADJUSTED"];
@@ -357,11 +358,10 @@ function ObligationsContent() {
                 </label>
                 <label className="text-xs font-medium text-ink">
                   {t("finance.obligations.terms.due", locale)}
-                  <input
-                    type="date"
+                  <DateTextInput
                     value={terms.dueDate}
                     disabled={!canManage || detail.status === "CLOSED" || detail.status === "CANCELLED"}
-                    onChange={(e) => setTerms((v) => ({ ...v, dueDate: e.target.value }))}
+                    onChange={(value) => setTerms((prev) => ({ ...prev, dueDate: value }))}
                     className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 text-sm text-ink disabled:bg-panel"
                   />
                 </label>
