@@ -16,10 +16,12 @@ type RequestType =
   | "VISA"
   | "FLIGHT_BOOKING"
   | "CRUISE"
+  | "GUIDE"
+  | "EXCURSION"
   | "CUSTOM_PACKAGE"
   | "OTHER";
 
-type ServiceKind = "HOTEL" | "FLIGHT" | "TRANSFER" | "INSURANCE" | "VISA" | "CRUISE" | "TOUR_PACKAGE" | "OTHER";
+type ServiceKind = "HOTEL" | "FLIGHT" | "TRANSFER" | "INSURANCE" | "VISA" | "CRUISE" | "GUIDE" | "EXCURSION" | "TOUR_PACKAGE" | "OTHER";
 
 interface Customer {
   id: string;
@@ -115,11 +117,13 @@ const TYPES: Array<{ value: RequestType; ru: string; az: string; en: string }> =
   { value: "VISA", ru: "Виза", az: "Viza", en: "Visa" },
   { value: "FLIGHT_BOOKING", ru: "Бронь авиабилета", az: "Aviabilet bronu", en: "Flight booking" },
   { value: "CRUISE", ru: "Круиз", az: "Kruiz", en: "Cruise" },
+  { value: "GUIDE", ru: "Гиды", az: "Bələdçilər", en: "Guides" },
+  { value: "EXCURSION", ru: "Экскурсии", az: "Ekskursiyalar", en: "Excursions" },
   { value: "CUSTOM_PACKAGE", ru: "Собрать турпакет", az: "Tur paketini yığ", en: "Build tour package" },
   { value: "OTHER", ru: "Другое", az: "Digər", en: "Other" },
 ];
 
-const PACKAGE_KINDS: ServiceKind[] = ["HOTEL", "FLIGHT", "TRANSFER", "INSURANCE", "VISA"];
+const PACKAGE_KINDS: ServiceKind[] = ["HOTEL", "FLIGHT", "TRANSFER", "INSURANCE", "VISA", "GUIDE", "EXCURSION"];
 const SERVICE_TYPE_KIND: Record<string, ServiceKind> = {
   TOUR: "TOUR_PACKAGE",
   TOUR_PACKAGE: "TOUR_PACKAGE",
@@ -128,6 +132,8 @@ const SERVICE_TYPE_KIND: Record<string, ServiceKind> = {
   FLIGHT: "FLIGHT",
   FLIGHT_BOOKING: "FLIGHT",
   CRUISE: "CRUISE",
+  GUIDE: "GUIDE",
+  EXCURSION: "EXCURSION",
   TRANSFER: "TRANSFER",
   INSURANCE: "INSURANCE",
   VISA: "VISA",
@@ -139,6 +145,8 @@ const KIND_TO_SERVICE_TYPE: Partial<Record<ServiceKind, string>> = {
   HOTEL: "HOTEL",
   FLIGHT: "FLIGHT",
   CRUISE: "CRUISE",
+  GUIDE: "GUIDE",
+  EXCURSION: "EXCURSION",
   TRANSFER: "TRANSFER",
   INSURANCE: "INSURANCE",
   VISA: "VISA",
@@ -851,6 +859,29 @@ function ServiceFields({ service, locale, suppliers, primarySupplierCode, hotelQ
   if (service.kind === "VISA") return <div className="grid gap-3 sm:grid-cols-2">{supplier}{servicePriceFields}<label className={label}>{tr("Страна назначения", "Təyinat ölkəsi", "Destination country")}<select className={input} value={d.country ?? ""} onChange={(e) => { const row = countries.find((c) => c.code === e.target.value || c.id === e.target.value); onData("country", row?.code ?? e.target.value); }}><option value="">{tr("Выберите страну", "Ölkə seçin", "Select country")}</option>{countries.map((c) => <option key={c.id} value={c.code}>{c.names[locale] ?? c.names.ru ?? c.code}</option>)}</select></label><label className={label}>{tr("Тип визы", "Viza növü", "Visa type")}<input className={input} value={d.visaType ?? ""} onChange={(e) => onData("visaType", e.target.value)} /></label><label className={label}>{tr("Заявителей", "Müraciət edənlər", "Applicants")}<input type="number" className={input} value={d.applicants ?? "1"} onChange={(e) => onData("applicants", e.target.value)} /></label><label className={label}>{tr("Дата поездки", "Səfər tarixi", "Travel date")}<DateTextInput className={input} value={d.travelDate ?? ""} onChange={(v) => onData("travelDate", v)} /></label></div>;
 
   if (service.kind === "CRUISE") return <div className="grid gap-3 sm:grid-cols-2">{supplier}{servicePriceFields}<label className={label}>{tr("Название круиза", "Kruiz adı", "Cruise name")}<input className={input} value={d.cruiseName ?? ""} onChange={(e) => onData("cruiseName", e.target.value)} /></label><label className={label}>{tr("Судно", "Gəmi", "Ship")}<input className={input} value={d.ship ?? ""} onChange={(e) => onData("ship", e.target.value)} /></label><label className={label}>{tr("Маршрут", "Marşrut", "Route")}<input className={input} value={d.route ?? ""} onChange={(e) => onData("route", e.target.value)} /></label><label className={label}>{tr("Начало", "Başlanğıc", "Start")}<DateTextInput className={input} value={d.startDate ?? ""} onChange={(v) => onData("startDate", v)} /></label><label className={label}>{tr("Окончание", "Son", "End")}<DateTextInput className={input} value={d.endDate ?? ""} onChange={(v) => onData("endDate", v)} /></label><label className={label}>{tr("Каюта", "Kabina", "Cabin")}<input className={input} value={d.cabin ?? ""} onChange={(e) => onData("cabin", e.target.value)} /></label></div>;
+
+  if (service.kind === "GUIDE") return <div className="grid gap-3 sm:grid-cols-2">{supplier}{servicePriceFields}
+    <label className={label}>{tr("ФИО гида", "Bələdçinin adı", "Guide name")}<input className={input} value={d.guideName ?? ""} onChange={(e) => { onData("guideName", e.target.value); onChange({ title: e.target.value }); }} /></label>
+    <label className={label}>{tr("Язык", "Dil", "Language")}<select className={input} value={d.language ?? ""} onChange={(e) => onData("language", e.target.value)}><option value="">{tr("Выберите", "Seçin", "Select")}</option><option value="AZ">{tr("Азербайджанский", "Azərbaycan dili", "Azerbaijani")}</option><option value="RU">{tr("Русский", "Rus dili", "Russian")}</option><option value="EN">{tr("Английский", "İngilis dili", "English")}</option><option value="OTHER">{tr("Другой", "Digər", "Other")}</option></select></label>
+    <label className={label}>{tr("Дата начала", "Başlanğıc tarixi", "Start date")}<DateTextInput className={input} value={d.startDate ?? ""} onChange={(v) => onData("startDate", v)} /></label>
+    <label className={label}>{tr("Дата окончания", "Son tarix", "End date")}<DateTextInput className={input} value={d.endDate ?? ""} onChange={(v) => onData("endDate", v)} /></label>
+    <label className={label}>{tr("Место встречи", "Görüş yeri", "Meeting point")}<input className={input} value={d.meetingPoint ?? ""} onChange={(e) => onData("meetingPoint", e.target.value)} /></label>
+    <label className={label}>{tr("Длительность, ч", "Müddət, saat", "Duration, h")}<input type="number" min="0" step="0.5" className={input} value={d.durationHours ?? ""} onChange={(e) => onData("durationHours", e.target.value)} /></label>
+    <label className={label}>{tr("Количество туристов", "Turist sayı", "Tourists")}<input type="number" min="1" className={input} value={d.touristsCount ?? "1"} onChange={(e) => onData("touristsCount", e.target.value)} /></label>
+    <label className={`${label} sm:col-span-2`}>{tr("Примечание", "Qeyd", "Note")}<input className={input} value={d.description ?? ""} onChange={(e) => onData("description", e.target.value)} /></label>
+  </div>;
+
+  if (service.kind === "EXCURSION") return <div className="grid gap-3 sm:grid-cols-2">{supplier}{servicePriceFields}
+    <label className={label}>{tr("Название экскурсии", "Ekskursiyanın adı", "Excursion name")}<input className={input} value={d.excursionName ?? ""} onChange={(e) => { onData("excursionName", e.target.value); onChange({ title: e.target.value }); }} /></label>
+    <label className={label}>{tr("Страна", "Ölkə", "Country")}<select className={input} value={d.country ?? ""} onChange={(e) => onData("country", e.target.value)}><option value="">{tr("Выберите страну", "Ölkə seçin", "Select country")}</option>{countries.map((c) => <option key={c.id} value={c.code}>{c.names[locale] ?? c.names.ru ?? c.code}</option>)}</select></label>
+    <label className={label}>{tr("Город", "Şəhər", "City")}<input className={input} value={d.city ?? ""} onChange={(e) => onData("city", e.target.value)} /></label>
+    <label className={label}>{tr("Дата", "Tarix", "Date")}<DateTextInput className={input} value={d.startDate ?? ""} onChange={(v) => onData("startDate", v)} /></label>
+    <label className={label}>{tr("Место встречи", "Görüş yeri", "Meeting point")}<input className={input} value={d.meetingPoint ?? ""} onChange={(e) => onData("meetingPoint", e.target.value)} /></label>
+    <label className={label}>{tr("Длительность, ч", "Müddət, saat", "Duration, h")}<input type="number" min="0" step="0.5" className={input} value={d.durationHours ?? ""} onChange={(e) => onData("durationHours", e.target.value)} /></label>
+    <label className={label}>{tr("Количество туристов", "Turist sayı", "Tourists")}<input type="number" min="1" className={input} value={d.touristsCount ?? "1"} onChange={(e) => onData("touristsCount", e.target.value)} /></label>
+    <label className={label}>{tr("Билеты включены", "Biletlər daxildir", "Tickets included")}<select className={input} value={d.ticketsIncluded ?? ""} onChange={(e) => onData("ticketsIncluded", e.target.value)}><option value="">{tr("Не указано", "Göstərilməyib", "Not specified")}</option><option value="YES">{tr("Да", "Bəli", "Yes")}</option><option value="NO">{tr("Нет", "Xeyr", "No")}</option></select></label>
+    <label className={`${label} sm:col-span-2`}>{tr("Описание", "Təsvir", "Description")}<input className={input} value={d.description ?? ""} onChange={(e) => onData("description", e.target.value)} /></label>
+  </div>;
 
   return <div className="grid gap-3 sm:grid-cols-2">{supplier}{servicePriceFields}<label className={label}>{tr("Название услуги", "Xidmətin adı", "Service name")}<input className={input} value={service.title} onChange={(e) => onChange({ title: e.target.value })} /></label><label className={label}>{tr("Описание", "Təsvir", "Description")}<input className={input} value={d.description ?? ""} onChange={(e) => onData("description", e.target.value)} /></label><label className={label}>{tr("Дата оказания", "Göstərilmə tarixi", "Service date")}<DateTextInput className={input} value={d.travelDate ?? ""} onChange={(v) => onData("travelDate", v)} /></label></div>;
 }
