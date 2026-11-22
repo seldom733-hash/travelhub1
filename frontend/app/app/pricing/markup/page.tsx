@@ -143,6 +143,8 @@ const LABELS: Record<string, { az: string; en: string }> = {
   "Трансферы": { az: "Transferlər", en: "Transfers" },
   "Страхование": { az: "Sığorta", en: "Insurance" },
   "Экскурсии": { az: "Ekskursiyalar", en: "Excursions" },
+  "Гиды": { az: "Bələdçilər", en: "Guides" },
+  "Круизы": { az: "Kruizlər", en: "Cruises" },
 };
 function labelFor(locale: string, ru: string): string {
   if (locale === "az") return LABELS[ru]?.az ?? ru;

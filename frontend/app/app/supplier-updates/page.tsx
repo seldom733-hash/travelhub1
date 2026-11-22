@@ -74,6 +74,20 @@ export default function SupplierUpdatesPage() {
       : service === "hotels" ? tr("Отели", "Otellər", "Hotels")
         : service === "all" ? tr("Все услуги", "Bütün xidmətlər", "All services")
           : service;
+  const runStatusLabel = (status: string) =>
+    status === "COMPLETED" ? tr("Завершён", "Tamamlanıb", "Completed")
+      : status === "PARTIAL" ? tr("Частично", "Qismən", "Partial")
+        : status === "FAILED" ? tr("Ошибка", "Xəta", "Failed")
+          : status === "CANCELLED" ? tr("Отменён", "Ləğv edilib", "Cancelled")
+            : status === "PREVIEWING" ? tr("Предпросмотр", "Önbaxış", "Previewing")
+              : status === "PREVIEW_READY" ? tr("Готов к применению", "Tətbiqə hazır", "Ready to apply")
+                : status === "APPLYING" ? tr("Применяется", "Tətbiq olunur", "Applying")
+                  : status;
+  const coverageLabel = (coverage: string) =>
+    coverage === "COMPLETE" ? tr("Полное", "Tam", "Complete")
+      : coverage === "PARTIAL" ? tr("Частичное", "Qismən", "Partial")
+        : coverage === "FAILED" ? tr("Ошибка", "Xəta", "Failed")
+          : coverage;
   const actionLabel = (action: string) =>
     action === "CREATE" ? tr("Новые", "Yeni", "New")
       : action === "UPDATE" ? tr("Обновления", "Yeniləmələr", "Updates")
@@ -332,7 +346,7 @@ export default function SupplierUpdatesPage() {
   const archiveBlocked = Boolean((counts.ARCHIVE ?? 0) > 0 && run?.coverage !== "COMPLETE");
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-panel">
       <PageHeader title={tr("Обновление услуг — Поставщики", "Xidmətlərin yenilənməsi — Təchizatçılar", "Service updates — Suppliers")} breadcrumbs={["TravelHub", tr("Обновление услуг", "Xidmətlərin yenilənməsi", "Service updates"), tr("Поставщики", "Təchizatçılar", "Suppliers")]} />
       <main className="mx-auto max-w-6xl space-y-5 p-6">
         {!canManage && (
@@ -345,7 +359,7 @@ export default function SupplierUpdatesPage() {
 
         {discoveryReport && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 p-4"
             role="presentation"
             onClick={() => setDiscoveryReport(null)}
           >
@@ -353,13 +367,13 @@ export default function SupplierUpdatesPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="discovery-report-title"
-              className="max-h-[85vh] w-full max-w-xl overflow-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl"
+              className="max-h-[85vh] w-full max-w-xl overflow-auto rounded-2xl border border-line bg-white p-5 shadow-2xl"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 id="discovery-report-title" className="text-lg font-semibold text-slate-900">{tr("Отчёт об обновлении списка стран", "Ölkə siyahısının yenilənmə hesabatı", "Country list update report")}</h2>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <h2 id="discovery-report-title" className="text-lg font-semibold text-ink">{tr("Отчёт об обновлении списка стран", "Ölkə siyahısının yenilənmə hesabatı", "Country list update report")}</h2>
+                  <p className="mt-1 text-xs text-ink/60">
                     {discoveryReport.supplierCode} · {serviceLabel(discoveryReport.serviceType)} · {formatDate(discoveryReport.at, locale)}
                   </p>
                 </div>
@@ -367,7 +381,7 @@ export default function SupplierUpdatesPage() {
                   type="button"
                   autoFocus
                   onClick={() => setDiscoveryReport(null)}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel"
                 >
                   {tr("Закрыть", "Bağla", "Close")}
                 </button>
@@ -378,9 +392,9 @@ export default function SupplierUpdatesPage() {
                   <div className="text-[10px] uppercase tracking-wide text-emerald-700">{tr("Новых", "Yeni", "New")}</div>
                   <div className="text-xl font-semibold text-emerald-800">{discoveryReport.discovered}</div>
                 </div>
-                <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-slate-500">{tr("Распознано", "Tanınan", "Recognized")}</div>
-                  <div className="text-xl font-semibold text-slate-900">{discoveryReport.countries.length}</div>
+                <div className="rounded-lg border border-line bg-panel px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-ink/60">{tr("Распознано", "Tanınan", "Recognized")}</div>
+                  <div className="text-xl font-semibold text-ink">{discoveryReport.countries.length}</div>
                 </div>
                 <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
                   <div className="text-[10px] uppercase tracking-wide text-amber-700">{tr("Пропущено", "Buraxılan", "Skipped")}</div>
@@ -406,9 +420,9 @@ export default function SupplierUpdatesPage() {
                   {tr("Поставщик не вернул ни одной страны. Список не изменён.", "Təchizatçı heç bir ölkə qaytarmadı. Siyahı dəyişdirilmədi.", "The supplier returned no countries. The list was not changed.")}
                 </div>
               ) : (
-                <div className="mt-4 max-h-72 overflow-auto rounded-lg border border-slate-100">
+                <div className="mt-4 max-h-72 overflow-auto rounded-lg border border-line">
                   <table className="w-full text-left text-xs">
-                    <thead className="sticky top-0 bg-slate-50 text-slate-500">
+                    <thead className="sticky top-0 bg-panel text-ink/60">
                       <tr>
                         <th className="px-3 py-2">{tr("Код", "Kod", "Code")}</th>
                         <th className="px-3 py-2">{tr("Страна", "Ölkə", "Country")}</th>
@@ -419,11 +433,11 @@ export default function SupplierUpdatesPage() {
                       {discoveryReport.countries.map((country) => {
                         const isNew = discoveryReport.added.includes(country.key);
                         return (
-                          <tr key={country.key} className="border-t border-slate-100">
-                            <td className="px-3 py-2 font-mono text-[11px] text-slate-600">{country.key}</td>
-                            <td className="px-3 py-2 text-slate-700">{country.label || "—"}</td>
+                          <tr key={country.key} className="border-t border-line">
+                            <td className="px-3 py-2 font-mono text-[11px] text-ink/60">{country.key}</td>
+                            <td className="px-3 py-2 text-ink">{country.label || "—"}</td>
                             <td className="px-3 py-2">
-                              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${isNew ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${isNew ? "bg-emerald-50 text-emerald-700" : "bg-panel text-ink/60"}`}>
                                 {isNew ? tr("добавлена", "əlavə edilib", "added") : tr("уже была", "artıq var idi", "already existed")}
                               </span>
                             </td>
@@ -435,58 +449,58 @@ export default function SupplierUpdatesPage() {
                 </div>
               )}
 
-              <p className="mt-3 text-[11px] text-slate-500">
+              <p className="mt-3 text-[11px] text-ink/60">
                 {tr("Отчёт только по справочнику стран. Цены и карточки услуг он не меняет — для этого нужен preview и подтверждение.", "Hesabat yalnız ölkə məlumat kitabı haqqındadır. Qiymətləri və xidmət kartlarını dəyişmir — bunun üçün preview və təsdiq lazımdır.", "This report covers the country directory only. It does not change prices or service cards — use preview and confirmation for that.")}
               </p>
             </div>
           </div>
         )}
 
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <span className="rounded-full bg-slate-100 px-2 py-1">{tr("1. Поставщик", "1. Təchizatçı", "1. Supplier")}</span>
+        <section className="rounded-xl border border-line bg-white p-5">
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-ink/60">
+            <span className="rounded-full bg-panel px-2 py-1">{tr("1. Поставщик", "1. Təchizatçı", "1. Supplier")}</span>
             <span>→</span>
-            <span className="rounded-full bg-slate-100 px-2 py-1">{tr("2. Страна", "2. Ölkə", "2. Country")}</span>
+            <span className="rounded-full bg-panel px-2 py-1">{tr("2. Страна", "2. Ölkə", "2. Country")}</span>
             <span>→</span>
-            <span className="rounded-full bg-slate-100 px-2 py-1">{tr("3. Категория", "3. Kateqoriya", "3. Category")}</span>
+            <span className="rounded-full bg-panel px-2 py-1">{tr("3. Категория", "3. Kateqoriya", "3. Category")}</span>
             <span>→</span>
-            <span className="rounded-full bg-slate-100 px-2 py-1">{tr("4. Проверить", "4. Yoxla", "4. Check")}</span>
+            <span className="rounded-full bg-panel px-2 py-1">{tr("4. Проверить", "4. Yoxla", "4. Check")}</span>
             <span>→</span>
-            <span className="rounded-full bg-slate-100 px-2 py-1">{tr("5. Отчёт", "5. Hesabat", "5. Report")}</span>
+            <span className="rounded-full bg-panel px-2 py-1">{tr("5. Отчёт", "5. Hesabat", "5. Report")}</span>
             <span>→</span>
-            <span className="rounded-full bg-slate-100 px-2 py-1">{tr("6. Подтвердить", "6. Təsdiqlə", "6. Confirm")}</span>
+            <span className="rounded-full bg-panel px-2 py-1">{tr("6. Подтвердить", "6. Təsdiqlə", "6. Confirm")}</span>
           </div>
 
           {loadingCaps ? (
-            <div className="h-20 animate-pulse rounded-lg bg-slate-100" />
+            <div className="h-20 animate-pulse rounded-lg bg-panel" />
           ) : (
             <div className="grid gap-3 md:grid-cols-3">
-              <label className="text-xs font-medium text-slate-600">
+              <label className="text-xs font-medium text-ink/60">
                 {tr("Поставщик", "Təchizatçı", "Supplier")}
                 <select
                   value={supplierCode}
                   onChange={(e) => setSupplierCode(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm"
                 >
                   {suppliers.map((supplier) => <option key={supplier.code} value={supplier.code}>{supplier.name}</option>)}
                 </select>
               </label>
-              <label className="text-xs font-medium text-slate-600">
+              <label className="text-xs font-medium text-ink/60">
                 {tr("Категория услуги", "Xidmət kateqoriyası", "Service category")}
                 <select
                   value={serviceType}
                   onChange={(e) => setServiceType(e.target.value as SupplierCatalogRunServiceType)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm"
                 >
                   {services.map((service) => <option key={service} value={service}>{serviceLabel(service)}</option>)}
                 </select>
               </label>
-              <label className="text-xs font-medium text-slate-600">
+              <label className="text-xs font-medium text-ink/60">
                 {tr("Страна", "Ölkə", "Country")}
                 <select
                   value={countryKey}
                   onChange={(e) => setCountryKey(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm"
                 >
                   {countries.map((country) => <option key={country.key} value={country.key}>{country.key === "ALL" ? tr("Все страны", "Bütün ölkələr", "All countries") : country.key}</option>)}
                 </select>
@@ -504,7 +518,7 @@ export default function SupplierUpdatesPage() {
               type="button"
               onClick={() => void preview()}
               disabled={!canManage || busy || !supplierCode || !countryKey}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
               {tr("Проверить услуги", "Xidmətləri yoxla", "Check services")}
             </button>
@@ -512,7 +526,7 @@ export default function SupplierUpdatesPage() {
               type="button"
               onClick={() => void discoverCountries()}
               disabled={!canManage || busy || !supplierCode || serviceType === "all"}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50"
+              className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink disabled:opacity-50"
               title={tr("Найти новые страны в справочнике поставщика и добавить их в список", "Təchizatçı məlumat kitabında yeni ölkələri tap və siyahıya əlavə et", "Find new countries in the supplier directory and add them to the list")}
             >
               {tr("Обновить список стран", "Ölkə siyahısını yenilə", "Update country list")}
@@ -529,29 +543,29 @@ export default function SupplierUpdatesPage() {
               <button
                 type="button"
                 onClick={() => void supplierCatalogApi.cancel(run.id).then(setRun).catch((e) => setError((e as Error).message))}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600"
+                className="rounded-lg border border-line px-4 py-2 text-sm text-ink/60"
               >
                 {tr("Отменить", "Ləğv et", "Cancel")}
               </button>
             )}
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-ink/60">
               {tr("Preview не меняет каталог. Изменения применяются только после подтверждения.", "Preview kataloqu dəyişmir. Dəyişikliklər yalnız təsdiqdən sonra tətbiq olunur.", "Preview does not change the catalog. Changes apply only after confirmation.")}
             </span>
           </div>
 
           {unavailable.length > 0 && (
-            <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+            <div className="mt-3 rounded-lg bg-panel px-3 py-2 text-[11px] text-ink/60">
               {unavailable.map((item) => <div key={item}>{item}</div>)}
             </div>
           )}
         </section>
 
         {run && (
-          <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <section className="rounded-xl border border-line bg-white p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h2 className="text-base font-semibold text-slate-900">{tr("Предварительный отчёт", "İlkin hesabat", "Preview report")}</h2>
-                <div className="mt-1 text-xs text-slate-400">
+                <h2 className="text-base font-semibold text-ink">{tr("Предварительный отчёт", "İlkin hesabat", "Preview report")}</h2>
+                <div className="mt-1 text-xs text-ink/60">
                   {run.supplierCode} · {serviceLabel(run.serviceType)} · {runCountryLabel(run, tr("Все страны", "Bütün ölkələr", "All countries"))} · {formatDate(run.createdAt, locale)}
                 </div>
               </div>
@@ -582,9 +596,9 @@ export default function SupplierUpdatesPage() {
 
             <div className="mt-4 grid gap-2 sm:grid-cols-4 lg:grid-cols-7">
               {["CREATE", "UPDATE", "RESTORE", "ARCHIVE", "AMBIGUOUS", "LEGACY_ARCHIVED", "ERROR"].map((action) => (
-                <div key={action} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-slate-400">{actionLabel(action)}</div>
-                  <div className="text-lg font-semibold text-slate-900">{counts[action] ?? 0}</div>
+                <div key={action} className="rounded-lg border border-line bg-panel px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-ink/60">{actionLabel(action)}</div>
+                  <div className="text-lg font-semibold text-ink">{counts[action] ?? 0}</div>
                 </div>
               ))}
             </div>
@@ -596,9 +610,9 @@ export default function SupplierUpdatesPage() {
             )}
 
             {run.items && run.items.length > 0 && (
-              <div className="mt-4 max-h-[460px] overflow-auto rounded-lg border border-slate-100">
+              <div className="mt-4 max-h-[460px] overflow-auto rounded-lg border border-line">
                 <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-slate-50 text-slate-500">
+                  <thead className="sticky top-0 bg-panel text-ink/60">
                     <tr>
                       <th className="px-3 py-2">{tr("Действие", "Əməliyyat", "Action")}</th>
                       <th className="px-3 py-2">{tr("Название услуги", "Xidmətin adı", "Service name")}</th>
@@ -611,16 +625,16 @@ export default function SupplierUpdatesPage() {
                   </thead>
                   <tbody>
                     {run.items.map((item) => (
-                      <tr key={item.id} className="border-t border-slate-100">
-                        <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-700">{actionLabel(item.action)}</td>
-                        <td className="px-3 py-2 text-slate-700">{itemServiceName(item)}</td>
+                      <tr key={item.id} className="border-t border-line">
+                        <td className="whitespace-nowrap px-3 py-2 font-medium text-ink">{actionLabel(item.action)}</td>
+                        <td className="px-3 py-2 text-ink">{itemServiceName(item)}</td>
                         <td className="px-3 py-2">
                           <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${item.photo === "YES" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
                             {item.photo === "YES" ? tr("Да", "Bəli", "Yes") : tr("Нет", "Xeyr", "No")}
                           </span>
                         </td>
-                        <td className="px-3 py-2 font-mono text-[11px] text-slate-500">{item.supplierRef ?? item.externalKey}</td>
-                        <td className="px-3 py-2 text-slate-500">{item.error ?? item.reason ?? "—"}</td>
+                        <td className="px-3 py-2 font-mono text-[11px] text-ink/60">{item.supplierRef ?? item.externalKey}</td>
+                        <td className="px-3 py-2 text-ink/60">{item.error ?? item.reason ?? "—"}</td>
                         <td className="px-3 py-2">{item.applied ? tr("да", "bəli", "yes") : tr("нет", "xeyr", "no")}</td>
                         <td className="px-3 py-2">
                           {item.action === "LEGACY_ARCHIVED" && !item.applied && (
@@ -643,23 +657,23 @@ export default function SupplierUpdatesPage() {
           </section>
         )}
 
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <section className="rounded-xl border border-line bg-white p-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="text-base font-semibold text-slate-900">{tr("Фото на проверку имени", "Ad yoxlaması üçün foto", "Photos for name review")}</h2>
-              <p className="mt-1 text-xs text-slate-500">
+              <h2 className="text-base font-semibold text-ink">{tr("Фото на проверку имени", "Ad yoxlaması üçün foto", "Photos for name review")}</h2>
+              <p className="mt-1 text-xs text-ink/60">
                 {tr("Найдено частичное совпадение с отелем — подтвердите, что фото относится к нужной услуге.", "Otel ilə qismən uyğunluq tapıldı — fotonun lazımi xidmətə aid olduğunu təsdiqləyin.", "A partial hotel match was found — confirm that the photo belongs to the right service.")}
               </p>
             </div>
-            <button type="button" onClick={() => void loadPhotoReviews()} className="text-xs text-slate-500 hover:text-slate-900">{tr("Обновить", "Yenilə", "Refresh")}</button>
+            <button type="button" onClick={() => void loadPhotoReviews()} className="text-xs text-ink/60 hover:text-ink">{tr("Обновить", "Yenilə", "Refresh")}</button>
           </div>
           {photoReviews.length === 0 ? (
-            <div className="py-4 text-sm text-slate-400">{tr("Нет фото-кандидатов, требующих проверки.", "Yoxlama tələb edən foto namizədi yoxdur.", "No photo candidates need review.")}</div>
+            <div className="py-4 text-sm text-ink/60">{tr("Нет фото-кандидатов, требующих проверки.", "Yoxlama tələb edən foto namizədi yoxdur.", "No photo candidates need review.")}</div>
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {photoReviews.map((review) => (
                 <div key={review.id} className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50/40 p-3">
-                  <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                  <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-panel">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={review.candidateUrl}
@@ -669,9 +683,9 @@ export default function SupplierUpdatesPage() {
                     />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs font-semibold text-slate-900">{review.name}</div>
-                    <div className="text-[11px] text-slate-500">{review.cityName} · {review.countryName}</div>
-                    <div className="mt-2 text-[11px] text-slate-600">
+                    <div className="text-xs font-semibold text-ink">{review.name}</div>
+                    <div className="text-[11px] text-ink/60">{review.cityName} · {review.countryName}</div>
+                    <div className="mt-2 text-[11px] text-ink/60">
                       {tr("Найдено:", "Tapıldı:", "Found:")} <span className="font-medium">{review.candidateTitle || tr("без названия", "adsız", "untitled")}</span>
                       {review.score > 0 ? ` · ${tr("совпадение", "uyğunluq", "match")} ${review.score}` : ""}
                     </div>
@@ -688,7 +702,7 @@ export default function SupplierUpdatesPage() {
                         type="button"
                         disabled={photoReviewBusy === review.id}
                         onClick={() => void resolvePhotoReview(review.id, "reject")}
-                        className="rounded border border-slate-200 px-2 py-1 text-[11px] text-slate-600 disabled:opacity-50"
+                        className="rounded border border-line px-2 py-1 text-[11px] text-ink/60 disabled:opacity-50"
                       >
                         {tr("Отклонить", "Rədd et", "Reject")}
                       </button>
@@ -700,38 +714,38 @@ export default function SupplierUpdatesPage() {
           )}
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <section className="rounded-xl border border-line bg-white p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-900">{tr("Последние запуски", "Son işə salmalar", "Recent runs")}</h2>
-            <button type="button" onClick={() => void loadRuns()} className="text-xs text-slate-500 hover:text-slate-900">{tr("Обновить", "Yenilə", "Refresh")}</button>
+            <h2 className="text-base font-semibold text-ink">{tr("Последние запуски", "Son işə salmalar", "Recent runs")}</h2>
+            <button type="button" onClick={() => void loadRuns()} className="text-xs text-ink/60 hover:text-ink">{tr("Обновить", "Yenilə", "Refresh")}</button>
           </div>
           {runs.length === 0 ? (
-            <div className="py-6 text-center text-sm text-slate-400">{tr("Запусков пока нет.", "Hələ işə salma yoxdur.", "No runs yet.")}</div>
+            <div className="py-6 text-center text-sm text-ink/60">{tr("Запусков пока нет.", "Hələ işə salma yoxdur.", "No runs yet.")}</div>
           ) : (
             <div className="overflow-auto">
               <table className="w-full text-left text-xs">
-                <thead className="text-slate-500">
+                <thead className="text-ink/60">
                   <tr>
                     <th className="px-2 py-2">{tr("Дата", "Tarix", "Date")}</th>
                     <th className="px-2 py-2">{tr("Поставщик", "Təchizatçı", "Supplier")}</th>
                     <th className="px-2 py-2">{tr("Категория", "Kateqoriya", "Category")}</th>
                     <th className="px-2 py-2">{tr("Страна", "Ölkə", "Country")}</th>
                     <th className="px-2 py-2">{tr("Статус", "Status", "Status")}</th>
-                    <th className="px-2 py-2">{tr("Coverage", "Əhatə", "Coverage")}</th>
+                    <th className="px-2 py-2">{tr("Покрытие", "Əhatə", "Coverage")}</th>
                     <th className="px-2 py-2">{tr("Автор", "Müəllif", "Author")}</th>
                     <th className="px-2 py-2"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {runs.map((item) => (
-                    <tr key={item.id} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => openRun(item.id)}>
-                      <td className="px-2 py-2 text-slate-500">{formatDate(item.createdAt, locale)}</td>
+                    <tr key={item.id} className="cursor-pointer border-t border-line hover:bg-panel" onClick={() => openRun(item.id)}>
+                      <td className="px-2 py-2 text-ink/60">{formatDate(item.createdAt, locale)}</td>
                       <td className="px-2 py-2 font-medium">{item.supplierCode}</td>
                       <td className="px-2 py-2">{serviceLabel(item.serviceType)}</td>
                       <td className="px-2 py-2">{runCountryLabel(item, tr("Все страны", "Bütün ölkələr", "All countries"))}</td>
-                      <td className="px-2 py-2"><span className={`rounded-full border px-2 py-0.5 font-semibold ${item.status === "COMPLETED" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : item.status === "FAILED" || item.status === "PARTIAL" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>{item.status}</span></td>
-                      <td className="px-2 py-2">{item.coverage}</td>
-                      <td className="px-2 py-2 text-slate-500">{item.createdByName ?? "—"}</td>
+                      <td className="px-2 py-2"><span className={`rounded-full border px-2 py-0.5 font-semibold ${item.status === "COMPLETED" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : item.status === "FAILED" || item.status === "PARTIAL" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>{runStatusLabel(item.status)}</span></td>
+                      <td className="px-2 py-2">{coverageLabel(item.coverage)}</td>
+                      <td className="px-2 py-2 text-ink/60">{item.createdByName ?? "—"}</td>
                       <td className="px-2 py-2">{["PREVIEWING", "APPLYING"].includes(item.status) && <button type="button" onClick={(e) => { e.stopPropagation(); void supplierCatalogApi.cancel(item.id).then(() => loadRuns()).catch((err) => setError((err as Error).message)); }} className="rounded border border-rose-200 px-2 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50">{tr("Остановить", "Dayandır", "Stop")}</button>}</td>
                     </tr>
                   ))}

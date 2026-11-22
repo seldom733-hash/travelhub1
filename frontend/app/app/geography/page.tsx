@@ -83,12 +83,12 @@ function GeographyContent() {
         if (forTab === "cities") {
           const list = await geoApi.countries.list();
           setParents(
-            list.map((c) => ({ id: c.id, label: `${c.code} — ${geoDisplayName(c.names)}` })),
+            list.map((c) => ({ id: c.id, label: `${c.code} — ${geoDisplayName(c.names, c.code, locale as never)}` })),
           );
         } else if (forTab === "resorts" || forTab === "airports") {
           const list = await geoApi.cities.list();
           setParents(
-            list.map((c) => ({ id: c.id, label: `${c.code} — ${geoDisplayName(c.names)}` })),
+            list.map((c) => ({ id: c.id, label: `${c.code} — ${geoDisplayName(c.names, c.code, locale as never)}` })),
           );
         } else {
           setParents([]);
@@ -97,7 +97,7 @@ function GeographyContent() {
         setParents([]);
       }
     },
-    [],
+    [locale],
   );
 
   const load = useCallback(
@@ -310,7 +310,7 @@ function GeographyContent() {
   };
 
   const handleDelete = async (row: Row) => {
-    const name = geoDisplayName((row as unknown as { names: { ru: string; en: string; az: string } }).names, row.id);
+    const name = geoDisplayName((row as unknown as { names: { ru: string; en: string; az: string } }).names, row.id, locale as never);
     if (!window.confirm(`${t("geo.delete.confirm", locale) ?? "Удалить"} ${name}?`)) return;
     setError("");
     try {
@@ -379,8 +379,8 @@ function GeographyContent() {
             className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-brand"
           >
             <option value="">{t("admin.filter.all_statuses", locale)}</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="INACTIVE">INACTIVE</option>
+            <option value="ACTIVE">{t("geo.status.active", locale) ?? "Активный"}</option>
+            <option value="INACTIVE">{t("geo.status.inactive", locale) ?? "Неактивный"}</option>
           </select>
           {tab !== "countries" && (
             <select

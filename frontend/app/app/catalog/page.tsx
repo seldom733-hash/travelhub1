@@ -31,6 +31,25 @@ const PRODUCT_TYPES = [
 
 function CatalogContent({ initialStatus, initialUnsold, initialAvailability, initialSortBy, initialSortDirection }: { initialStatus: string; initialUnsold?: string; initialAvailability?: string; initialSortBy?: string; initialSortDirection?: SortDirection }) {
   const locale = useLocale();
+  const tr = (ru: string, az: string, en: string) => (locale === "az" ? az : locale === "en" ? en : ru);
+  const productTypeText = (value: string) => ({
+    TOUR: tr("Тур", "Tur", "Tour"),
+    HOTEL: tr("Отель", "Otel", "Hotel"),
+    SANATORIUM: tr("Санаторий", "Sanatoriya", "Sanatorium"),
+    FLIGHT: tr("Авиаперелёт", "Aviabilet", "Flight"),
+    TRAIN: tr("Ж/д", "Qatar yolu", "Train"),
+    EXCURSION: tr("Экскурсия", "Ekskursiya", "Excursion"),
+    GUIDE: tr("Гид", "Bələdçi", "Guide"),
+    TRANSFER: tr("Трансфер", "Transfer", "Transfer"),
+    PHOTOGRAPHER: tr("Фотограф", "Fotoqraf", "Photographer"),
+  }[value] ?? value);
+  const statusText = (value: string) => ({
+    DRAFT: tr("Черновик", "Qaralama", "Draft"),
+    COMPLETE: tr("Заполнен", "Doldurulub", "Complete"),
+    REVIEWED: tr("Проверен", "Yoxlanılıb", "Reviewed"),
+    PUBLISHED: tr("Опубликован", "Dərc edilib", "Published"),
+    ARCHIVED: tr("Архивирован", "Arxivlənib", "Archived"),
+  }[value] ?? value);
   const [data, setData] = useState<Page<Product> | null>(null);
   const [selected, setSelected] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
@@ -262,11 +281,11 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
               className="rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink/60 outline-none focus:border-brand"
             >
               <option value="">{t("admin.filter.all_statuses", locale)}</option>
-              <option value="DRAFT">Черновик</option>
-              <option value="COMPLETE">Заполнен</option>
-              <option value="REVIEWED">Проверен</option>
-              <option value="PUBLISHED">Опубликован</option>
-              <option value="ARCHIVED">Архивирован</option>
+              <option value="DRAFT">{statusText("DRAFT")}</option>
+              <option value="COMPLETE">{statusText("COMPLETE")}</option>
+              <option value="REVIEWED">{statusText("REVIEWED")}</option>
+              <option value="PUBLISHED">{statusText("PUBLISHED")}</option>
+              <option value="ARCHIVED">{statusText("ARCHIVED")}</option>
             </select>
             <select
               value={productType}
@@ -348,7 +367,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                   >
                     <td className="px-4 py-2.5 font-mono text-xs text-brand">{p.code}</td>
                     <td className="px-4 py-2.5 font-medium text-ink">{p.title}</td>
-                    <td className="px-4 py-2.5 text-ink/60">{p.type}</td>
+                    <td className="px-4 py-2.5 text-ink/60">{productTypeText(p.type)}</td>
                     <td className="px-4 py-2.5 text-ink/60">{p.tariffs?.length ?? 0}</td>
                     <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
                     <td className="px-4 py-2.5 text-xs text-ink/60">{p.publishedAt ? new Date(p.publishedAt).toLocaleDateString("ru-RU") : "—"}</td>
@@ -395,7 +414,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">Название *</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60"> {tr("Название *", "Ad *", "Name *")}</label>
               <input
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
@@ -413,7 +432,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">Описание</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60"> {tr("Описание", "Təsvir", "Description")}</label>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -474,10 +493,10 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
           {editing ? (
             <div className="space-y-4 p-5 text-sm">
               <div className="rounded-lg border border-brand/15 bg-brand/10 px-3 py-2 text-xs text-brand-dark">
-                ✏️ Редактирование: PATCH /products/:id — требуется право catalog.product.write
+                {tr("✏️ Редактирование: PATCH /products/:id — требуется право catalog.product.write", "✏️ Redaktə: PATCH /products/:id — catalog.product.write tələb olunur", "✏️ Editing: PATCH /products/:id — catalog.product.write permission required")}
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">Название *</label>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{tr("Название *", "Ad *", "Name *")}</label>
                 <input
                   value={editForm.title}
                   onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
@@ -485,7 +504,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">Описание</label>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{tr("Описание", "Təsvir", "Description")}</label>
                 <textarea
                   value={editForm.description}
                   onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
@@ -500,13 +519,13 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                   disabled={busy || !editForm.title.trim()}
                   className="flex-1 rounded-lg bg-brand px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {busy ? "Сохранение…" : "💾 Сохранить"}
+                  {busy ? tr("Сохранение…", "Saxlanılır…", "Saving…") : tr("💾 Сохранить", "💾 Saxla", "💾 Save")}
                 </button>
                 <button
                   onClick={() => setEditing(false)}
                   className="flex-1 rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink/60 transition-colors hover:bg-panel"
                 >
-                  Отмена
+                  {tr("Отмена", "Ləğv et", "Cancel")}
                 </button>
               </div>
             </div>
@@ -517,33 +536,33 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                   onClick={openEdit}
                   className="w-full rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink/60 transition-colors hover:border-brand/25 hover:text-brand"
                 >
-                  ✏️ Редактировать
+                   {tr("✏️ Редактировать", "✏️ Redaktə et", "✏️ Edit")}
                 </button>
               )}
               {selected.status === "PUBLISHED" && (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                  ✅ Опубликован — доступен для заказов
+                   {tr("✅ Опубликован — доступен для заказов", "✅ Dərc edilib — sifarişlər üçün əlçatandır", "✅ Published — available for orders")}
                 </div>
               )}
 
               <div>
-                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink/60">О продукте</div>
-                <p className="text-ink/60">{selected.description ?? "Без описания"}</p>
+                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink/60"> {tr("О продукте", "Məhsul haqqında", "About product")}</div>
+                <p className="text-ink/60">{selected.description ?? tr("Без описания", "Təsvir yoxdur", "No description")}</p>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-lg bg-panel px-3 py-2">
-                    <div className="text-ink/60">Тип</div>
-                    <div className="font-medium text-ink">{selected.type}</div>
+                    <div className="text-ink/60"> {tr("Тип", "Növ", "Type")}</div>
+                    <div className="font-medium text-ink">{productTypeText(selected.type)}</div>
                   </div>
                   <div className="rounded-lg bg-panel px-3 py-2">
-                    <div className="text-ink/60">Версия</div>
+                    <div className="text-ink/60"> {tr("Версия", "Versiya", "Version")}</div>
                     <div className="font-medium text-ink">v{selected.version}</div>
                   </div>
                 </div>
               </div>
 
               <div>
-                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink/60">Тарифы</div>
-                {(selected.tariffs ?? []).length === 0 && <div className="text-ink/60">Тарифы не заданы</div>}
+                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink/60"> {tr("Тарифы", "Tariflər", "Tariffs")}</div>
+                {(selected.tariffs ?? []).length === 0 && <div className="text-ink/60">{tr("Тарифы не заданы", "Tariflər təyin edilməyib", "No tariffs configured")}</div>}
                 <div className="space-y-1.5">
                   {(selected.tariffs ?? []).map((t) => (
                     <div key={t.id} className="flex items-center justify-between rounded-lg border border-line px-3 py-2">
@@ -557,7 +576,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
               </div>
 
               <div>
-                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink/60">История (audit)</div>
+                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink/60"> {tr("История (audit)", "Tarixçə (audit)", "History (audit)")}</div>
                 <div className="space-y-1.5">
                   {(selected.history ?? []).slice(0, 6).map((h) => (
                     <div key={h.id} className="rounded-lg bg-panel px-3 py-2 text-xs">
@@ -576,7 +595,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                     onClick={() => void publish(selected.id)}
                     className="flex-1 rounded-lg bg-brand px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-dark"
                   >
-                    ✅ Опубликовать
+                     {tr("✅ Опубликовать", "✅ Dərc et", "✅ Publish")}
                   </button>
                 )}
                 {selected.status === "PUBLISHED" && canPublish && (
@@ -584,12 +603,12 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                     onClick={() => void archive(selected.id)}
                     className="flex-1 rounded-lg bg-brand px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-dark"
                   >
-                    🗄 В архив
+                     {tr("🗄 В архив", "🗄 Arxivə", "🗄 Archive")}
                   </button>
                 )}
                 {!canPublish && !canWrite && (
                   <div className="w-full rounded-lg bg-panel px-3 py-2 text-center text-xs text-ink/60">
-                    Изменение продукта недоступно для вашей роли
+                    {tr("Изменение продукта недоступно для вашей роли", "Məhsulu dəyişmək rolunuz üçün mümkün deyil", "Product editing is unavailable for your role")}
                   </div>
                 )}
               </div>

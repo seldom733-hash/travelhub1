@@ -33,6 +33,29 @@ export const BLOCK_FIELD_LABELS: Record<string, string> = {
   imagesText: "Изображения (по одной ссылке на строку)",
 };
 
+const FIELD_LABELS_I18N: Record<string, { az: string; en: string }> = {
+  heading: { az: "Başlıq", en: "Heading" },
+  subheading: { az: "Alt başlıq", en: "Subheading" },
+  body: { az: "Mətn", en: "Text" },
+  text: { az: "Mətn", en: "Text" },
+  ctaLabel: { az: "Düymə mətni", en: "Button text" },
+  ctaHref: { az: "Düymə linki", en: "Button link" },
+  label: { az: "Düymə mətni", en: "Button text" },
+  href: { az: "Link", en: "Link" },
+  successMessage: { az: "Göndərmədən sonra mesaj", en: "Message after submit" },
+  pageSize: { az: "Məhsulların sayı", en: "Number of products" },
+  itemsText: { az: "Suallar və cavablar (hər sətirdə: sual | cavab)", en: "Questions and answers (one per line: question | answer)" },
+  imagesText: { az: "Şəkillər (hər sətirdə bir link)", en: "Images (one link per line)" },
+};
+const FIELD_PLACEHOLDERS_I18N: Record<string, { az: string; en: string }> = {
+  heading: { az: "Məsələn: Yadda qalan səyahətlər", en: "For example: Journeys to remember" },
+  subheading: { az: "Müştəriyə faydanızı qısa izah edin", en: "Briefly explain your value to the customer" },
+  body: { az: "Şirkət, təcrübə və istiqamətlər haqqında danışın", en: "Tell about the company, experience and destinations" },
+  text: { az: "Sayt altlığının mətni", en: "Website footer text" },
+  ctaLabel: { az: "Kataloqa bax", en: "View catalogue" },
+  label: { az: "Əlaqə saxla", en: "Contact us" },
+  successMessage: { az: "Təşəkkür edirik! Müraciət göndərildi.", en: "Thank you! Your request has been sent." },
+};
 const MULTILINE = new Set(["body", "text", "itemsText", "imagesText"]);
 const NUMERIC = new Set(["pageSize"]);
 const FIELD_PLACEHOLDERS: Record<string, string> = {
@@ -81,6 +104,8 @@ export function BlockSettingsFields({
   className?: string;
 }) {
   const locale = useLocale();
+  const fieldLabel = (key: string) => locale === "az" ? (FIELD_LABELS_I18N[key]?.az ?? BLOCK_FIELD_LABELS[key]) : locale === "en" ? (FIELD_LABELS_I18N[key]?.en ?? BLOCK_FIELD_LABELS[key]) : BLOCK_FIELD_LABELS[key];
+  const fieldPlaceholder = (key: string) => locale === "az" ? (FIELD_PLACEHOLDERS_I18N[key]?.az ?? FIELD_PLACEHOLDERS[key]) : locale === "en" ? (FIELD_PLACEHOLDERS_I18N[key]?.en ?? FIELD_PLACEHOLDERS[key]) : FIELD_PLACEHOLDERS[key];
   const entries = Object.entries(settings).filter(([key]) => key in BLOCK_FIELD_LABELS);
   const missingContent = contentBlockNeedsAttention(blockType ?? "", settings);
   return (
@@ -104,15 +129,15 @@ export function BlockSettingsFields({
         </div>
       )}
       {entries.map(([key, value]) => (
-        <label key={key} className="block text-xs font-medium text-slate-600">
-          {BLOCK_FIELD_LABELS[key]}
+        <label key={key} className="block text-xs font-medium text-ink/60">
+          {fieldLabel(key)}
           {MULTILINE.has(key) ? (
             <textarea
               value={String(value ?? "")}
               onChange={(e) => onChange(key, e.target.value)}
-              placeholder={FIELD_PLACEHOLDERS[key]}
+              placeholder={fieldPlaceholder(key)}
               rows={key === "body" || key === "text" ? 5 : 4}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal text-slate-800 outline-none focus:border-emerald-400"
+              className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm font-normal text-ink outline-none focus:border-emerald-400"
             />
           ) : NUMERIC.has(key) ? (
             <input
@@ -121,21 +146,21 @@ export function BlockSettingsFields({
               max={24}
               value={Number(value ?? 0)}
               onChange={(e) => onChange(key, Number(e.target.value))}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal text-slate-800 outline-none focus:border-emerald-400"
+              className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm font-normal text-ink outline-none focus:border-emerald-400"
             />
           ) : (
             <input
               value={String(value ?? "")}
               onChange={(e) => onChange(key, e.target.value)}
-              placeholder={FIELD_PLACEHOLDERS[key]}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal text-slate-800 outline-none focus:border-emerald-400"
+              placeholder={fieldPlaceholder(key)}
+              className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm font-normal text-ink outline-none focus:border-emerald-400"
             />
           )}
         </label>
       ))}
       {blockType === "content-gallery" && galleryMedia && galleryMedia.length > 0 && (
         <div>
-          <div className="mb-1 text-[11px] font-medium text-slate-500">Медиатека</div>
+          <div className="mb-1 text-[11px] font-medium text-ink/60">Медиатека</div>
           <div className="grid grid-cols-4 gap-2">
             {galleryMedia.map((m) => {
               const ref = `media:${m.id}`;
@@ -149,7 +174,7 @@ export function BlockSettingsFields({
                     const next = selected ? current.filter((s) => s !== ref) : [...current, ref];
                     onChange("imagesText", next.join("\n"));
                   }}
-                  className={`overflow-hidden rounded-lg border-2 ${selected ? "border-emerald-500" : "border-transparent hover:border-slate-300"}`}
+                  className={`overflow-hidden rounded-lg border-2 ${selected ? "border-emerald-500" : "border-transparent hover:border-line"}`}
                   title={m.altText ?? "Добавить в галерею"}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -160,7 +185,7 @@ export function BlockSettingsFields({
           </div>
         </div>
       )}
-      {entries.length === 0 && <p className="text-xs text-slate-400">{t("constructor.no_settings", locale)}</p>}
+      {entries.length === 0 && <p className="text-xs text-ink/60">{t("constructor.no_settings", locale)}</p>}
     </div>
   );
 }
@@ -202,15 +227,15 @@ function SortableSectionRow({
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={(e) => { if (e.key === "Enter") onSelect(); }}
-      className={`cursor-pointer rounded-xl border bg-white p-3 transition ${selected ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200"} ${section.enabled ? "" : "opacity-60"} ${isDragging ? "opacity-70" : ""}`}
+      className={`cursor-pointer rounded-xl border bg-white p-3 transition ${selected ? "border-emerald-400 ring-2 ring-emerald-100" : "border-line"} ${section.enabled ? "" : "opacity-60"} ${isDragging ? "opacity-70" : ""}`}
     >
       <div className="flex items-center gap-2">
-        <button type="button" className="cursor-grab text-slate-400 hover:text-slate-600" {...attributes} {...listeners} aria-label="Переместить блок">
+        <button type="button" className="cursor-grab text-ink/60 hover:text-ink/60" {...attributes} {...listeners} aria-label="Переместить блок">
           <DotsSixVertical className="h-5 w-5" />
         </button>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-slate-800">{displayName(def, section.blockType, locale)}</div>
-          <div className="truncate text-[11px] text-slate-400">
+          <div className="text-sm font-semibold text-ink">{displayName(def, section.blockType, locale)}</div>
+          <div className="truncate text-[11px] text-ink/60">
             {String(section.settings.heading ?? section.settings.body ?? section.settings.text ?? "Без текста")}
           </div>
           {needsContent(section) && (
@@ -220,9 +245,9 @@ function SortableSectionRow({
           )}
         </div>
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          <button type="button" title="Выше" disabled={index === 0} onClick={() => onMove(section.blockInstanceId, -1)} className="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowUp className="h-4 w-4" /></button>
-          <button type="button" title="Ниже" disabled={index === total - 1} onClick={() => onMove(section.blockInstanceId, 1)} className="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowDown className="h-4 w-4" /></button>
-          <button type="button" title={section.enabled ? "Скрыть" : "Показать"} onClick={onToggle} className="rounded p-1 text-slate-400 hover:bg-slate-100"><Eye className="h-4 w-4" /></button>
+          <button type="button" title="Выше" disabled={index === 0} onClick={() => onMove(section.blockInstanceId, -1)} className="rounded p-1 text-ink/60 hover:bg-panel disabled:opacity-30"><ArrowUp className="h-4 w-4" /></button>
+          <button type="button" title="Ниже" disabled={index === total - 1} onClick={() => onMove(section.blockInstanceId, 1)} className="rounded p-1 text-ink/60 hover:bg-panel disabled:opacity-30"><ArrowDown className="h-4 w-4" /></button>
+          <button type="button" title={section.enabled ? "Скрыть" : "Показать"} onClick={onToggle} className="rounded p-1 text-ink/60 hover:bg-panel"><Eye className="h-4 w-4" /></button>
           {def?.removable !== false && (
             <button type="button" title="Удалить" onClick={onRemove} className="rounded p-1 text-rose-400 hover:bg-rose-50"><Trash className="h-4 w-4" /></button>
           )}
@@ -367,16 +392,16 @@ export default function BuilderWorkspace({
     <div className="space-y-0">
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
+          <h2 className="text-lg font-semibold text-ink">{title}</h2>
+          {description && <p className="mt-1 text-sm text-ink/60">{description}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => setCanvasMode((v) => !v)} className={`rounded-lg border px-3 py-2 text-sm ${canvasMode ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>
+          <button type="button" onClick={() => setCanvasMode((v) => !v)} className={`rounded-lg border px-3 py-2 text-sm ${canvasMode ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-line bg-white text-ink hover:bg-panel"}`}>
             {canvasMode ? "Структура" : "Canvas"}
           </button>
           {templates && templates.length > 0 && onApplyTemplate && (
-            <button type="button" onClick={() => setTemplatesOpen(true)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
-              Шаблоны
+            <button type="button" onClick={() => setTemplatesOpen(true)} className="rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink hover:bg-panel">
+              {locale === "az" ? "Şablonlar" : locale === "en" ? "Templates" : "Шаблоны"}
             </button>
           )}
           {onSaveSeo && (
@@ -387,7 +412,7 @@ export default function BuilderWorkspace({
                 setSeoDescription(seoText(seo?.description));
                 setSeoOpen(true);
               }}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink hover:bg-panel"
             >
               SEO
             </button>
@@ -400,24 +425,24 @@ export default function BuilderWorkspace({
                 setFontFamily(typeof design?.fontFamily === "string" ? design.fontFamily : "Inter, system-ui, sans-serif");
                 setBrandOpen(true);
               }}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink hover:bg-panel"
             >
               Бренд
             </button>
           )}
-          <button type="button" onClick={undo} disabled={undoStack.current.length === 0 || !onReplaceSections} title="Отменить" className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30">
+          <button type="button" onClick={undo} disabled={undoStack.current.length === 0 || !onReplaceSections} title="Отменить" className="rounded-lg border border-line bg-white p-2 text-ink/60 hover:bg-panel disabled:opacity-30">
             <ArrowCounterClockwise className="h-4 w-4" />
           </button>
-          <button type="button" onClick={redo} disabled={redoStack.current.length === 0 || !onReplaceSections} title="Повторить" className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30">
+          <button type="button" onClick={redo} disabled={redoStack.current.length === 0 || !onReplaceSections} title="Повторить" className="rounded-lg border border-line bg-white p-2 text-ink/60 hover:bg-panel disabled:opacity-30">
             <ArrowClockwise className="h-4 w-4" />
           </button>
           <span className={`rounded-full px-3 py-1 text-xs font-medium ${published ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
             {published ? t("constructor.published_status", locale) : t("constructor.draft_status", locale)}
           </span>
-          <a href={previewHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+          <a href={previewHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink hover:bg-panel">
             <Eye className="h-4 w-4" /> {t("constructor.preview", locale)}
           </a>
-          <button type="button" onClick={onSave} disabled={saving} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+          <button type="button" onClick={onSave} disabled={saving} className="rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink hover:bg-panel disabled:opacity-50">
             {saving ? savingLabel : t("constructor.save_draft", locale)}
           </button>
           <button type="button" onClick={onPublish} disabled={saving || publishDisabled} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
@@ -428,13 +453,13 @@ export default function BuilderWorkspace({
 
       {error && <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">{error}</div>}
 
-      <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
+      <div className="flex gap-1 overflow-x-auto border-b border-line">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => onTabChange(tab.id)}
-            className={`whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === tab.id ? "border-b-2 border-emerald-600 text-emerald-700" : "text-slate-500 hover:text-slate-700"}`}
+            className={`whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === tab.id ? "border-b-2 border-emerald-600 text-emerald-700" : "text-ink/60 hover:text-ink"}`}
           >
             {tab.label}
           </button>
@@ -443,12 +468,12 @@ export default function BuilderWorkspace({
 
       <div className="pt-6">
         {canvasMode ? (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
+          <div className="overflow-hidden rounded-xl border border-line bg-panel">
+            <div className="flex items-center justify-between border-b border-line bg-white px-3 py-2 text-xs text-ink/60">
               <span>Live preview</span>
               <div className="flex gap-2">
-                <button type="button" onClick={() => setPreviewKey((k) => k + 1)} className="rounded border border-slate-200 px-2 py-1 text-[11px] hover:bg-slate-50">Обновить</button>
-                <a href={livePreviewHref ?? previewHref} target="_blank" rel="noopener noreferrer" className="rounded border border-slate-200 px-2 py-1 text-[11px] hover:bg-slate-50">Открыть</a>
+                <button type="button" onClick={() => setPreviewKey((k) => k + 1)} className="rounded border border-line px-2 py-1 text-[11px] hover:bg-panel">Обновить</button>
+                <a href={livePreviewHref ?? previewHref} target="_blank" rel="noopener noreferrer" className="rounded border border-line px-2 py-1 text-[11px] hover:bg-panel">Открыть</a>
               </div>
             </div>
             <iframe
@@ -460,8 +485,8 @@ export default function BuilderWorkspace({
           </div>
         ) : activeTab === "structure" ? (
           <div className="grid gap-4 lg:grid-cols-[230px_minmax(0,1fr)_300px]">
-            <aside className="rounded-xl border border-slate-200 bg-white p-3">
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t("constructor.add_block", locale)}</h3>
+            <aside className="rounded-xl border border-line bg-white p-3">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">{t("constructor.add_block", locale)}</h3>
               <div className="space-y-1.5">
                 {registry.map((def) => {
                   const disabled = def.singleton && used.has(def.type);
@@ -471,12 +496,12 @@ export default function BuilderWorkspace({
                       type="button"
                       disabled={disabled}
                       onClick={() => act(() => onAdd(def.type))}
-                      className="flex w-full items-start gap-2 rounded-lg border border-dashed border-slate-200 px-2.5 py-2 text-left hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex w-full items-start gap-2 rounded-lg border border-dashed border-line px-2.5 py-2 text-left hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      <Plus className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                      <Plus className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink/60" />
                       <span>
-                        <span className="block text-xs font-medium text-slate-700">{displayName(def, def.type, locale)}</span>
-                        <span className="block text-[10px] leading-snug text-slate-400">{def.description?.[locale] ?? ""}</span>
+                        <span className="block text-xs font-medium text-ink">{displayName(def, def.type, locale)}</span>
+                        <span className="block text-[10px] leading-snug text-ink/60">{def.description?.[locale] ?? ""}</span>
                       </span>
                     </button>
                   );
@@ -486,11 +511,11 @@ export default function BuilderWorkspace({
 
             <main className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-700">{t("constructor.canvas_title", locale)} ({sections.length})</h3>
-                <span className="text-[11px] text-slate-400">{t("constructor.structure_hint", locale)}</span>
+                <h3 className="text-sm font-semibold text-ink">{t("constructor.canvas_title", locale)} ({sections.length})</h3>
+                <span className="text-[11px] text-ink/60">{t("constructor.structure_hint", locale)}</span>
               </div>
               {sections.length === 0 && (
-                <div className="rounded-xl border-2 border-dashed border-slate-200 bg-white px-6 py-16 text-center text-sm text-slate-400">
+                <div className="rounded-xl border-2 border-dashed border-line bg-white px-6 py-16 text-center text-sm text-ink/60">
                   {t("constructor.empty_canvas", locale)}
                 </div>
               )}
@@ -517,15 +542,15 @@ export default function BuilderWorkspace({
               </DndContext>
             </main>
 
-            <aside className="rounded-xl border border-slate-200 bg-white p-4">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{t("constructor.settings_title", locale)}</h3>
+            <aside className="rounded-xl border border-line bg-white p-4">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink/60">{t("constructor.settings_title", locale)}</h3>
               {!selected ? (
-                <p className="text-xs text-slate-400">{t("constructor.select_block", locale)}</p>
+                <p className="text-xs text-ink/60">{t("constructor.select_block", locale)}</p>
               ) : (
                 <div className="space-y-3">
                   <div>
-                    <div className="text-sm font-semibold text-slate-800">{displayName(selectedDef, selected.blockType, locale)}</div>
-                    <div className="text-[11px] text-slate-400">{selectedDef?.description?.[locale]}</div>
+                    <div className="text-sm font-semibold text-ink">{displayName(selectedDef, selected.blockType, locale)}</div>
+                    <div className="text-[11px] text-ink/60">{selectedDef?.description?.[locale]}</div>
                   </div>
                   <BlockSettingsFields
                     settings={selected.settings}
@@ -543,22 +568,22 @@ export default function BuilderWorkspace({
       </div>
 
       {brandOpen && onSaveDesign && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setBrandOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={() => setBrandOpen(false)}>
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Brand kit</h3>
-              <button type="button" onClick={() => setBrandOpen(false)} className="rounded p-1 text-slate-400 hover:bg-slate-100">✕</button>
+              <h3 className="text-lg font-semibold text-ink">Brand kit</h3>
+              <button type="button" onClick={() => setBrandOpen(false)} className="rounded p-1 text-ink/60 hover:bg-panel">✕</button>
             </div>
-            <label className="mt-4 block text-xs font-medium text-slate-600">
+            <label className="mt-4 block text-xs font-medium text-ink/60">
               Акцентный цвет
               <div className="mt-1 flex gap-2">
-                <input type="color" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} className="h-9 w-12 rounded border border-slate-200" />
-                <input value={accentColor} onChange={(e) => setAccentColor(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                <input type="color" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} className="h-9 w-12 rounded border border-line" />
+                <input value={accentColor} onChange={(e) => setAccentColor(e.target.value)} className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
               </div>
             </label>
-            <label className="mt-3 block text-xs font-medium text-slate-600">
+            <label className="mt-3 block text-xs font-medium text-ink/60">
               Шрифт
-              <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+              <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm">
                 <option value="Inter, system-ui, sans-serif">Inter</option>
                 <option value="Georgia, serif">Georgia</option>
                 <option value="'Times New Roman', serif">Times New Roman</option>
@@ -566,7 +591,7 @@ export default function BuilderWorkspace({
               </select>
             </label>
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setBrandOpen(false)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600">Отмена</button>
+              <button type="button" onClick={() => setBrandOpen(false)} className="rounded-lg border border-line px-3 py-2 text-sm text-ink/60">Отмена</button>
               <button
                 type="button"
                 onClick={() => {
@@ -582,22 +607,22 @@ export default function BuilderWorkspace({
       )}
 
       {seoOpen && onSaveSeo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setSeoOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={() => setSeoOpen(false)}>
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">SEO страницы</h3>
-              <button type="button" onClick={() => setSeoOpen(false)} className="rounded p-1 text-slate-400 hover:bg-slate-100">✕</button>
+              <h3 className="text-lg font-semibold text-ink">SEO страницы</h3>
+              <button type="button" onClick={() => setSeoOpen(false)} className="rounded p-1 text-ink/60 hover:bg-panel">✕</button>
             </div>
-            <label className="mt-4 block text-xs font-medium text-slate-600">
+            <label className="mt-4 block text-xs font-medium text-ink/60">
               Title
-              <input value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} maxLength={70} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              <input value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} maxLength={70} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
             </label>
-            <label className="mt-3 block text-xs font-medium text-slate-600">
+            <label className="mt-3 block text-xs font-medium text-ink/60">
               Description
-              <textarea value={seoDescription} onChange={(e) => setSeoDescription(e.target.value)} maxLength={180} rows={4} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              <textarea value={seoDescription} onChange={(e) => setSeoDescription(e.target.value)} maxLength={180} rows={4} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
             </label>
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setSeoOpen(false)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600">Отмена</button>
+              <button type="button" onClick={() => setSeoOpen(false)} className="rounded-lg border border-line px-3 py-2 text-sm text-ink/60">Отмена</button>
               <button
                 type="button"
                 onClick={() => {
@@ -613,13 +638,13 @@ export default function BuilderWorkspace({
       )}
 
       {templatesOpen && templates && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setTemplatesOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={() => setTemplatesOpen(false)}>
           <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Шаблоны сайта</h3>
-              <button type="button" onClick={() => setTemplatesOpen(false)} className="rounded p-1 text-slate-400 hover:bg-slate-100">✕</button>
+              <h3 className="text-lg font-semibold text-ink">{locale === "az" ? "Sayt şablonları" : locale === "en" ? "Site templates" : "Шаблоны сайта"}</h3>
+              <button type="button" onClick={() => setTemplatesOpen(false)} className="rounded p-1 text-ink/60 hover:bg-panel">✕</button>
             </div>
-            <p className="mt-1 text-xs text-slate-500">Шаблон заменит текущую структуру. Черновик можно будет отредактировать и сохранить.</p>
+            <p className="mt-1 text-xs text-ink/60">{locale === "az" ? "Şablon mövcud strukturu əvəz edəcək. Qaralamanı redaktə edib saxlaya bilərsiniz." : locale === "en" ? "The template will replace the current structure. You can edit and save the draft afterwards." : "Шаблон заменит текущую структуру. Черновик можно будет отредактировать и сохранить."}</p>
             <div className="mt-4 space-y-2">
               {templates.map((template) => (
                 <button
@@ -629,10 +654,10 @@ export default function BuilderWorkspace({
                     act(() => onApplyTemplate?.(template));
                     setTemplatesOpen(false);
                   }}
-                  className="w-full rounded-xl border border-slate-200 p-3 text-left hover:border-emerald-300 hover:bg-emerald-50"
+                  className="w-full rounded-xl border border-line p-3 text-left hover:border-emerald-300 hover:bg-emerald-50"
                 >
-                  <div className="text-sm font-semibold text-slate-800">{template.title}</div>
-                  <div className="text-xs text-slate-500">{template.description}</div>
+                  <div className="text-sm font-semibold text-ink">{template.title}</div>
+                  <div className="text-xs text-ink/60">{template.description}</div>
                 </button>
               ))}
             </div>

@@ -1459,6 +1459,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "geo.tabs.airports": { ru: "Аэропорты", az: "Hava limanları", en: "Airports" },
   "geo.filter.search": { ru: "Поиск по коду или названию…", az: "Kod və ya ad üzrə axtarış…", en: "Search by code or name…" },
   "geo.filter.all_countries": { ru: "Все страны", az: "Bütün ölkələr", en: "All countries" },
+  "geo.status.active": { ru: "Активный", az: "Aktiv", en: "Active" },
+  "geo.status.inactive": { ru: "Неактивный", az: "Qeyri-aktiv", en: "Inactive" },
   "geo.filter.all_cities": { ru: "Все города", az: "Bütün şəhərlər", en: "All cities" },
   "geo.table.code": { ru: "Код", az: "Kod", en: "Code" },
   "geo.table.name": { ru: "Название", az: "Ad", en: "Name" },

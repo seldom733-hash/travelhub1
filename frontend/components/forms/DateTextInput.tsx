@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLocale } from "@/lib/i18n";
 
 /**
  * Date input with BOTH:
@@ -12,7 +13,7 @@ export default function DateTextInput({
   value,
   onChange,
   className,
-  placeholder = "дд.мм.гггг",
+  placeholder,
   id,
   min,
   max,
@@ -33,6 +34,8 @@ export default function DateTextInput({
   ariaLabel?: string;
   onBlur?: () => void;
 }) {
+  const locale = useLocale();
+  const resolvedPlaceholder = placeholder ?? (locale === "az" ? "gg.aa.yyyy" : locale === "en" ? "dd.mm.yyyy" : "дд.мм.гггг");
   const [text, setText] = useState(toDisplay(value));
   const pickerRef = useRef<HTMLInputElement>(null);
 
@@ -80,7 +83,7 @@ export default function DateTextInput({
         disabled={disabled}
         className={`${className ?? ""} pr-9`}
         value={text}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         onChange={(e) => handleChange(e.target.value)}
         onBlur={onBlur}
       />
