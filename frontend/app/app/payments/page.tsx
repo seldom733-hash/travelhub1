@@ -89,6 +89,10 @@ const TEXT: Record<string, { az: string; en: string }> = {
   "Платежи и возвраты клиентов и расчёты с поставщиками.": { az: "Müştəri ödənişləri, qaytarmalar və təchizatçı hesablaşmaları.", en: "Client payments and refunds, supplier settlements." },
   "Платежи и возвраты (клиенты)": { az: "Ödənişlər və qaytarmalar (müştərilər)", en: "Payments and refunds (clients)" },
   "Платежи и возвраты (поставщики)": { az: "Ödənişlər və qaytarmalar (təchizatçılar)", en: "Payments and refunds (suppliers)" },
+  "Поиск по номеру оплаты": { az: "Ödəniş nömrəsi ilə axtarış", en: "Search by payment number" },
+  "Дата оплаты с": { az: "Ödəniş tarixi (başlanğıc)", en: "Payment date from" },
+  "Дата оплаты по": { az: "Ödəniş tarixi (son)", en: "Payment date to" },
+  "Сбросить": { az: "Sıfırla", en: "Reset" },
   "Номер сделки": { az: "Sövdə nömrəsi", en: "Deal number" },
   "Код": { az: "Kod", en: "Code" },
   "Дата": { az: "Tarix", en: "Date" },
@@ -146,16 +150,33 @@ export default function PaymentsAndRefundsPage() {
   const [supplierRows, setSupplierRows] = useState<TableRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
     setError("");
-    const load = async () => {
+    const timer = window.setTimeout(() => {
+      const clientQ = new URLSearchParams({ pageSize: "100" });
+      if (search.trim()) clientQ.set("search", search.trim());
+      if (dateFrom) clientQ.set("dateFrom", dateFrom);
+      if (dateTo) clientQ.set("dateTo", dateTo);
+      if (dateFrom || dateTo) clientQ.set("dateField", "paidAt");
+      const refundQ = new URLSearchParams({ pageSize: "100" });
+      if (search.trim()) refundQ.set("search", search.trim());
+      if (dateFrom) refundQ.set("from", dateFrom);
+      if (dateTo) refundQ.set("to", dateTo);
+      const supplierQ = new URLSearchParams({ pageSize: "100" });
+      if (search.trim()) supplierQ.set("search", search.trim());
+      if (dateFrom) supplierQ.set("from", dateFrom);
+      if (dateTo) supplierQ.set("to", dateTo);
+      const load = async () => {
       if (tab === "clients") {
         const [payments, refunds] = await Promise.all([
-          api.get<{ items: ClientPayment[] }>("/finance/payments?pageSize=100"),
-          api.get<{ items: ClientRefund[] }>("/finance/refunds?pageSize=100"),
+          api.get<{ items: ClientPayment[] }>(`/finance/payments?${clientQ.toString()}`),
+          api.get<{ items: ClientRefund[] }>(`/finance/refunds?${refundQ.toString()}`),
         ]);
         if (!alive) return;
         const payRows: TableRow[] = (payments.items ?? []).map((p) => ({
@@ -184,7 +205,7 @@ export default function PaymentsAndRefundsPage() {
         }));
         setClientRows([...payRows, ...refundRows].sort((a, b) => +new Date(b.date) - +new Date(a.date)));
       } else {
-        const data = await api.get<{ items: SupplierPayment[] }>("/finance/supplier-payments?pageSize=100");
+        const data = await api.get<{ items: SupplierPayment[] }>(`/finance/supplier-payments?${supplierQ.toString()}`);
         if (!alive) return;
         const supplierRows: TableRow[] = (data.items ?? []).map((p) => ({
           id: `sup-${p.id}`,
@@ -204,8 +225,9 @@ export default function PaymentsAndRefundsPage() {
     void load()
       .catch((e: Error) => { if (alive) setError(e.message); })
       .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, [tab]);
+    }, 250);
+    return () => { alive = false; window.clearTimeout(timer); };
+  }, [tab, search, dateFrom, dateTo]);
 
   const rows = useMemo(() => (tab === "clients" ? clientRows : supplierRows), [tab, clientRows, supplierRows]);
 
@@ -213,18 +235,18 @@ export default function PaymentsAndRefundsPage() {
     <OperationsCenterShell activeDomain="payments" visibleDomains={["payments"]}>
       <div className="space-y-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">{tr("Платежи и возвраты")}</h2>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <h2 className="text-xl font-bold text-ink">{tr("Платежи и возвраты")}</h2>
+          <p className="mt-0.5 text-sm text-ink/60">
             {tr("Платежи и возвраты клиентов и расчёты с поставщиками.")}
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1">
+        <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-white p-1">
           <button
             type="button"
             data-testid="payments-tab-clients"
             onClick={() => setTab("clients")}
-            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${tab === "clients" ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-50"}`}
+            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${tab === "clients" ? "bg-brand/10 text-brand-dark" : "text-ink/60 hover:bg-panel"}`}
           >
             {tr("Платежи и возвраты (клиенты)")}
           </button>
@@ -232,18 +254,25 @@ export default function PaymentsAndRefundsPage() {
             type="button"
             data-testid="payments-tab-suppliers"
             onClick={() => setTab("suppliers")}
-            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${tab === "suppliers" ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-50"}`}
+            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${tab === "suppliers" ? "bg-brand/10 text-brand-dark" : "text-ink/60 hover:bg-panel"}`}
           >
             {tr("Платежи и возвраты (поставщики)")}
           </button>
         </div>
 
+        <div className="flex flex-wrap items-end gap-2 rounded-xl border border-line bg-white p-3">
+          <label className="grid gap-1 text-[11px] font-medium text-ink">{tr("Поиск по номеру оплаты")}<input data-testid="payments-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="PAY-00019967 / RFD-... / SPO-..." className="w-64 rounded-lg border border-line bg-white px-3 py-2 text-sm" /></label>
+          <label className="grid gap-1 text-[11px] font-medium text-ink">{tr("Дата оплаты с")}<input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="rounded-lg border border-line bg-white px-3 py-2 text-sm" /></label>
+          <label className="grid gap-1 text-[11px] font-medium text-ink">{tr("Дата оплаты по")}<input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="rounded-lg border border-line bg-white px-3 py-2 text-sm" /></label>
+          <button type="button" onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); }} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-medium text-ink/70 hover:bg-panel">{tr("Сбросить")}</button>
+        </div>
+
         {error && <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
 
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-xs">
-              <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+              <thead className="border-b border-line bg-panel text-[10px] uppercase tracking-wide text-ink/60">
                 <tr>
                   <th className="px-4 py-2.5 font-medium">{tr("Номер сделки")}</th>
                   <th className="px-4 py-2.5 font-medium">{tr("Код")}</th>
@@ -256,24 +285,24 @@ export default function PaymentsAndRefundsPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">{tr("Загрузка…")}</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-10 text-center text-ink/60">{tr("Загрузка…")}</td></tr>
                 ) : rows.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">{tr("Записей нет")}</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-10 text-center text-ink/60">{tr("Записей нет")}</td></tr>
                 ) : rows.map((row) => (
-                  <tr key={row.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
-                    <td className="px-4 py-2.5 font-medium text-slate-700">{row.deal}</td>
+                  <tr key={row.id} className="border-b border-line last:border-0 hover:bg-panel/60">
+                    <td className="px-4 py-2.5 font-medium text-ink">{row.deal}</td>
                     <td className="px-4 py-2.5">
                       <span className={`rounded px-1.5 py-0.5 font-mono text-[11px] ${row.kind === "refund" ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>
                         {row.code}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-slate-500">{dateLabel(row.date)}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-slate-800">{formatPrice(row.amount, row.currency, locale) ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-slate-600">{row.method}</td>
+                    <td className="px-4 py-2.5 text-ink/60">{dateLabel(row.date)}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-ink">{formatPrice(row.amount, row.currency, locale) ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-ink/60">{row.method}</td>
                     <td className="px-4 py-2.5">
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">{row.status}</span>
+                      <span className="rounded-full bg-panel px-2 py-0.5 text-[10px] font-medium text-ink">{row.status}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-slate-600">{row.acceptedBy}</td>
+                    <td className="px-4 py-2.5 text-ink/60">{row.acceptedBy}</td>
                   </tr>
                 ))}
               </tbody>

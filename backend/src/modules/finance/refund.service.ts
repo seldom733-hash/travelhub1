@@ -386,7 +386,7 @@ export class RefundService {
 
   // ── Read (Finance Center) ───────────────────────────────────────────────────
 
-  async list(query: { paymentId?: string; orderId?: string; status?: string; page?: number; pageSize?: number }) {
+  async list(query: { paymentId?: string; orderId?: string; status?: string; search?: string; from?: string; to?: string; page?: number; pageSize?: number }) {
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? 50, 100);
     const where: Prisma.RefundWhereInput = {
@@ -394,6 +394,18 @@ export class RefundService {
       ...(query.orderId ? { orderId: query.orderId } : {}),
       ...(query.status ? { status: query.status as RefundStatus } : {}),
     };
+    const search = query.search?.trim();
+    if (search) {
+      where.OR = [
+        { code: { contains: search, mode: "insensitive" } },
+        { referenceNumber: { contains: search, mode: "insensitive" } },
+      ];
+    }
+    if (query.from || query.to) {
+      where.processedAt = {};
+      if (query.from) where.processedAt.gte = new Date(query.from.length <= 10 ? `${query.from}T00:00:00.000Z` : query.from);
+      if (query.to) where.processedAt.lte = new Date(query.to.length <= 10 ? `${query.to}T23:59:59.999Z` : query.to);
+    }
     const [items, total] = await Promise.all([
       this.prisma.refund.findMany({
         where,

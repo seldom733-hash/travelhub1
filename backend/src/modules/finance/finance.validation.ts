@@ -1268,6 +1268,19 @@ export class RefundListQueryDto {
   status?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  search?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  from?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  to?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
