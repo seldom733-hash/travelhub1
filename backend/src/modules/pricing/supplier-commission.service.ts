@@ -17,6 +17,7 @@ export interface CommissionInput {
   fixedAmount?: string;
   fixedCurrency?: string;
   calculationBase?: "SUPPLIER_BASE" | "STOREFRONT";
+  countryCodes?: string[];
   effectiveFrom?: string;
   effectiveTo?: string;
 }
@@ -49,12 +50,13 @@ export class SupplierCommissionService {
     const commissionType = input.commissionType === "FIXED" ? "FIXED" : "PERCENT";
     const rate = commissionType === "PERCENT" ? validateMarkupRate(input.rate ?? "0") : null;
     const fixedAmount = commissionType === "FIXED" ? this.money(input.fixedAmount ?? "0", "fixedAmount") : null;
+    const countryCodes = this.normalizeCountries(input.countryCodes);
     const from = input.effectiveFrom ? new Date(input.effectiveFrom) : new Date();
     const to = input.effectiveTo ? new Date(input.effectiveTo) : null;
     if (to && to <= from) throw new ValidationDomainError("effectiveTo must be after effectiveFrom");
     return this.prisma.$transaction(async (tx) => {
       const code = await this.ids.nextCode(tx, "CMR");
-      const row = await tx.supplierCommissionRule.create({ data: { code, supplierCode, serviceType, commissionType, rate: rate ? new Prisma.Decimal(rate) : null, fixedAmount, fixedCurrency: input.fixedCurrency?.toUpperCase() ?? null, calculationBase: input.calculationBase === "STOREFRONT" ? "STOREFRONT" : "SUPPLIER_BASE", status: MarkupRuleStatus.DRAFT, effectiveFrom: from, effectiveTo: to } });
+      const row = await tx.supplierCommissionRule.create({ data: { code, supplierCode, serviceType, commissionType, rate: rate ? new Prisma.Decimal(rate) : null, fixedAmount, fixedCurrency: input.fixedCurrency?.toUpperCase() ?? null, calculationBase: input.calculationBase === "STOREFRONT" ? "STOREFRONT" : "SUPPLIER_BASE", countryCodes, status: MarkupRuleStatus.DRAFT, effectiveFrom: from, effectiveTo: to } });
       await this.writeHistory(tx, row, actor, "Commission rule created (DRAFT)");
       await this.security.audit(tx, { action: "pricing.commission_rule.created", resource: "SupplierCommissionRule", resourceId: row.id, details: { code, supplierCode, serviceType } });
       return this.dto(row);
@@ -70,7 +72,8 @@ export class SupplierCommissionService {
       const type = input.commissionType ?? (row.commissionType as "PERCENT" | "FIXED");
       const rate = type === "PERCENT" ? validateMarkupRate(input.rate ?? row.rate?.toString() ?? "0") : null;
       const fixedAmount = type === "FIXED" ? this.money(input.fixedAmount ?? row.fixedAmount?.toString() ?? "0", "fixedAmount") : null;
-      const updated = await tx.supplierCommissionRule.update({ where: { id: row.id }, data: { commissionType: type, rate: rate ? new Prisma.Decimal(rate) : null, fixedAmount, fixedCurrency: input.fixedCurrency?.toUpperCase() ?? row.fixedCurrency, calculationBase: input.calculationBase ?? row.calculationBase, effectiveFrom: input.effectiveFrom ? new Date(input.effectiveFrom) : row.effectiveFrom, effectiveTo: input.effectiveTo ? new Date(input.effectiveTo) : row.effectiveTo, version: { increment: 1 } } });
+      const countryCodes = input.countryCodes !== undefined ? this.normalizeCountries(input.countryCodes) : undefined;
+      const updated = await tx.supplierCommissionRule.update({ where: { id: row.id }, data: { commissionType: type, rate: rate ? new Prisma.Decimal(rate) : null, fixedAmount, fixedCurrency: input.fixedCurrency?.toUpperCase() ?? row.fixedCurrency, calculationBase: input.calculationBase ?? row.calculationBase, ...(countryCodes !== undefined ? { countryCodes } : {}), effectiveFrom: input.effectiveFrom ? new Date(input.effectiveFrom) : row.effectiveFrom, effectiveTo: input.effectiveTo ? new Date(input.effectiveTo) : row.effectiveTo, version: { increment: 1 } } });
       await this.writeHistory(tx, updated, actor, "Commission rule updated");
       await this.security.audit(tx, { action: "pricing.commission_rule.updated", resource: "SupplierCommissionRule", resourceId: row.id, details: { code, version: updated.version } });
       return this.dto(updated);
@@ -83,8 +86,9 @@ export class SupplierCommissionService {
       if (!row) throw new NotFoundError(`Commission rule ${code} not found`);
       if (row.status === MarkupRuleStatus.ACTIVE) return this.dto(row);
       if (row.status !== MarkupRuleStatus.DRAFT) throw new ValidationDomainError("Only DRAFT commission rules can be activated");
-      const conflict = await tx.supplierCommissionRule.count({ where: { id: { not: row.id }, supplierCode: row.supplierCode, serviceType: row.serviceType, status: MarkupRuleStatus.ACTIVE, effectiveFrom: { lt: row.effectiveTo ?? new Date("2999-01-01") }, OR: [{ effectiveTo: null }, { effectiveTo: { gt: row.effectiveFrom } }] } });
-      if (conflict > 0) throw new ConflictError("Another active commission rule overlaps this period");
+      const activeRows = await tx.supplierCommissionRule.findMany({ where: { id: { not: row.id }, supplierCode: row.supplierCode, serviceType: row.serviceType, status: MarkupRuleStatus.ACTIVE, effectiveFrom: { lt: row.effectiveTo ?? new Date("2999-01-01") }, OR: [{ effectiveTo: null }, { effectiveTo: { gt: row.effectiveFrom } }] } });
+      const conflict = activeRows.some((other) => this.countriesOverlap(row.countryCodes ?? [], other.countryCodes ?? []));
+      if (conflict) throw new ConflictError("Another active commission rule overlaps this period for the selected countries");
       const updated = await tx.supplierCommissionRule.update({ where: { id: row.id }, data: { status: MarkupRuleStatus.ACTIVE } });
       await this.writeHistory(tx, updated, actor, "Commission rule activated");
       await this.security.audit(tx, { action: "pricing.commission_rule.activated", resource: "SupplierCommissionRule", resourceId: row.id, details: { code } });
@@ -110,7 +114,7 @@ export class SupplierCommissionService {
     return this.prisma.supplierCommissionRuleHistory.findMany({ where: { ruleId: row.id }, orderBy: { createdAt: "desc" } });
   }
 
-  async resolveActive(supplierCode: string, serviceType: string, at: Date = new Date()) {
+  async resolveActive(supplierCode: string, serviceType: string, at: Date = new Date(), countryCode?: string) {
     const rows = await this.prisma.supplierCommissionRule.findMany({
       where: {
         supplierCode: validateSupplierCode(supplierCode),
@@ -122,8 +126,15 @@ export class SupplierCommissionService {
       orderBy: { effectiveFrom: "desc" },
       take: 2,
     });
-    if (rows.length > 1) throw new ConflictError(`Multiple active commission rules for ${supplierCode}/${serviceType}`);
-    const row = rows[0];
+    const country = countryCode?.toUpperCase();
+    const applicable = rows.filter((r) => {
+      const codes = r.countryCodes ?? [];
+      return codes.length === 0 || (country ? codes.includes(country) : false);
+    });
+    const specific = country ? applicable.filter((r) => (r.countryCodes ?? []).includes(country)) : applicable;
+    const selected = specific.length > 0 ? specific : applicable;
+    if (selected.length > 1) throw new ConflictError(`Multiple active commission rules for ${supplierCode}/${serviceType}`);
+    const row = selected[0];
     if (!row) return null;
     return {
       commissionType: row.commissionType as "PERCENT" | "FIXED",
@@ -133,6 +144,15 @@ export class SupplierCommissionService {
       ruleCode: row.code,
       ruleVersion: row.version,
     };
+  }
+
+  private normalizeCountries(codes: string[] | undefined): string[] {
+    return [...new Set((codes ?? []).map((c) => String(c).trim().toUpperCase()).filter((c) => /^[A-Z]{2}$/.test(c)))].sort();
+  }
+
+  private countriesOverlap(a: string[], b: string[]): boolean {
+    if (a.length === 0 || b.length === 0) return true;
+    return a.some((c) => b.includes(c));
   }
 
   private money(value: string, field: string): Prisma.Decimal {
@@ -145,8 +165,8 @@ export class SupplierCommissionService {
     await tx.supplierCommissionRuleHistory.create({ data: { ruleId: row.id, action: comment.startsWith("created") ? "created" : "changed", version: row.version, fields: { code: row.code, supplierCode: row.supplierCode, serviceType: row.serviceType, commissionType: row.commissionType, rate: row.rate?.toString() ?? null, fixedAmount: row.fixedAmount?.toString() ?? null, calculationBase: row.calculationBase, status: row.status }, actorId: actor.id, actorName: actor.username, comment } });
   }
 
-  private dto(row: { id: string; code: string; supplierCode: string; serviceType: string; commissionType: string; rate: Prisma.Decimal | null; fixedAmount: Prisma.Decimal | null; fixedCurrency: string | null; calculationBase: string; status: string; version: number; effectiveFrom: Date; effectiveTo: Date | null; updatedAt: Date }) {
-    return { id: row.id, code: row.code, supplierCode: row.supplierCode, serviceType: row.serviceType, commissionType: row.commissionType, rate: row.rate?.toString() ?? null, fixedAmount: row.fixedAmount?.toString() ?? null, fixedCurrency: row.fixedCurrency, calculationBase: row.calculationBase, status: row.status, version: row.version, effectiveFrom: row.effectiveFrom.toISOString(), effectiveTo: row.effectiveTo?.toISOString() ?? null, updatedAt: row.updatedAt.toISOString() };
+  private dto(row: { id: string; code: string; supplierCode: string; serviceType: string; commissionType: string; rate: Prisma.Decimal | null; fixedAmount: Prisma.Decimal | null; fixedCurrency: string | null; calculationBase: string; countryCodes?: string[]; status: string; version: number; effectiveFrom: Date; effectiveTo: Date | null; updatedAt: Date }) {
+    return { id: row.id, code: row.code, supplierCode: row.supplierCode, serviceType: row.serviceType, commissionType: row.commissionType, rate: row.rate?.toString() ?? null, fixedAmount: row.fixedAmount?.toString() ?? null, fixedCurrency: row.fixedCurrency, calculationBase: row.calculationBase, countryCodes: row.countryCodes ?? [], status: row.status, version: row.version, effectiveFrom: row.effectiveFrom.toISOString(), effectiveTo: row.effectiveTo?.toISOString() ?? null, updatedAt: row.updatedAt.toISOString() };
   }
 }
 

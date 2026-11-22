@@ -49,6 +49,7 @@ type MarkupRuleRow = {
   supplierCode: string;
   serviceType: string;
   rate: Prisma.Decimal;
+  countryCodes: string[];
   status: MarkupRuleStatus;
   version: number;
   effectiveFrom: Date;
@@ -75,12 +76,13 @@ export class MarkupRuleService {
    * (инвариант — на activate).
    */
   async create(
-    input: { supplierCode: string; serviceType: string; rate: string; effectiveFrom?: string; effectiveTo?: string },
+    input: { supplierCode: string; serviceType: string; rate: string; countryCodes?: string[]; effectiveFrom?: string; effectiveTo?: string },
     actor: Actor,
   ): Promise<Record<string, unknown>> {
     const supplierCode = validateSupplierCode(input.supplierCode);
     const serviceType = validateServiceType(input.serviceType);
     const rate = validateMarkupRate(input.rate);
+    const countryCodes = this.normalizeCountries(input.countryCodes);
     const effectiveFrom = input.effectiveFrom ? new Date(input.effectiveFrom) : new Date();
     const effectiveTo = input.effectiveTo ? new Date(input.effectiveTo) : null;
     if (Number.isNaN(effectiveFrom.getTime()) || (effectiveTo !== null && Number.isNaN(effectiveTo.getTime()))) {
@@ -99,6 +101,7 @@ export class MarkupRuleService {
             supplierCode,
             serviceType,
             rate: new Prisma.Decimal(rate),
+            countryCodes,
             status: MarkupRuleStatus.DRAFT,
             version: 1,
             effectiveFrom,
@@ -119,7 +122,7 @@ export class MarkupRuleService {
 
   async update(
     code: string,
-    input: { rate?: string; effectiveFrom?: string; effectiveTo?: string | null; expectedVersion?: number },
+    input: { rate?: string; countryCodes?: string[]; effectiveFrom?: string; effectiveTo?: string | null; expectedVersion?: number },
     actor: Actor,
   ): Promise<Record<string, unknown>> {
     return this.prisma.$transaction(async (tx) => {
@@ -135,6 +138,7 @@ export class MarkupRuleService {
       }
 
       const rate = input.rate !== undefined ? validateMarkupRate(input.rate) : undefined;
+      const countryCodes = input.countryCodes !== undefined ? this.normalizeCountries(input.countryCodes) : undefined;
       const effectiveFrom = input.effectiveFrom !== undefined ? new Date(input.effectiveFrom) : undefined;
       const effectiveTo = input.effectiveTo !== undefined ? (input.effectiveTo ? new Date(input.effectiveTo) : null) : undefined;
       const from = effectiveFrom ?? fresh.effectiveFrom;
@@ -147,6 +151,7 @@ export class MarkupRuleService {
         where: { id: fresh.id },
         data: {
           ...(rate !== undefined ? { rate: new Prisma.Decimal(rate) } : {}),
+          ...(countryCodes !== undefined ? { countryCodes } : {}),
           ...(effectiveFrom !== undefined ? { effectiveFrom } : {}),
           ...(effectiveTo !== undefined ? { effectiveTo } : {}),
           version: { increment: 1 },
@@ -245,7 +250,7 @@ export class MarkupRuleService {
    * 0 активных в окне → NOT_CONFIGURED (runtime 0%, design §3); >1 — backstop
    * fail-closed (overlap исключён lock-инвариантом activate).
    */
-  async resolve(supplierCode: string, serviceType: string, at: Date = new Date()): Promise<MarkupRuleResolution> {
+  async resolve(supplierCode: string, serviceType: string, at: Date = new Date(), countryCode?: string): Promise<MarkupRuleResolution> {
     const key = validateSupplierCode(supplierCode);
     const svc = validateServiceType(serviceType);
     const rows = await this.prisma.markupRule.findMany({
@@ -258,24 +263,40 @@ export class MarkupRuleService {
       },
       orderBy: { effectiveFrom: "asc" },
     });
-    if (rows.length === 0) return { found: false };
-    if (rows.length > 1) {
-      this.logger.warn(`MarkupRule AMBIGUOUS for ${key}+${svc} at ${at.toISOString()} — fail-closed NOT_CONFIGURED (${rows.length} overlapping ACTIVE rules)`);
+    const country = countryCode?.toUpperCase();
+    const applicable = rows.filter((r) => {
+      const codes = r.countryCodes ?? [];
+      return codes.length === 0 || (country ? codes.includes(country) : false);
+    });
+    const specific = country ? applicable.filter((r) => (r.countryCodes ?? []).includes(country)) : applicable;
+    const selected = specific.length > 0 ? specific : applicable;
+    if (selected.length === 0) return { found: false };
+    if (selected.length > 1) {
+      this.logger.warn(`MarkupRule AMBIGUOUS for ${key}+${svc} at ${at.toISOString()} — fail-closed NOT_CONFIGURED (${selected.length} overlapping ACTIVE rules)`);
       return { found: false };
     }
-    return { found: true, rate: rows[0].rate, ruleCode: rows[0].code, ruleVersion: rows[0].version };
+    return { found: true, rate: selected[0].rate, ruleCode: selected[0].code, ruleVersion: selected[0].version };
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+
+  private normalizeCountries(codes: string[] | undefined): string[] {
+    return [...new Set((codes ?? []).map((c) => String(c).trim().toUpperCase()).filter((c) => /^[A-Z]{2}$/.test(c)))].sort();
+  }
+
+  private countriesOverlap(a: string[], b: string[]): boolean {
+    if (a.length === 0 || b.length === 0) return true;
+    return a.some((c) => b.includes(c));
+  }
 
   private async lockKey(tx: Prisma.TransactionClient, supplierCode: string, serviceType: string): Promise<void> {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`markup-rule:${supplierCode}:${serviceType}`}))`;
   }
 
   /** Overlap-инвариант: пересечение [aFrom, aTo) с [bFrom, bTo) ⇔ aFrom < bTo AND bFrom < aTo. */
-  private async assertNoOverlap(tx: Prisma.TransactionClient, rule: { id: string; supplierCode: string; serviceType: string; effectiveFrom: Date; effectiveTo: Date | null }): Promise<void> {
+  private async assertNoOverlap(tx: Prisma.TransactionClient, rule: { id: string; supplierCode: string; serviceType: string; countryCodes: string[]; effectiveFrom: Date; effectiveTo: Date | null }): Promise<void> {
     const to = rule.effectiveTo ?? new Date("9999-12-31T23:59:59.999Z");
-    const conflicting = await tx.markupRule.findFirst({
+    const rows = await tx.markupRule.findMany({
       where: {
         id: { not: rule.id },
         supplierCode: rule.supplierCode,
@@ -285,6 +306,7 @@ export class MarkupRuleService {
         OR: [{ effectiveTo: null }, { effectiveTo: { gt: rule.effectiveFrom } }],
       },
     });
+    const conflicting = rows.find((row) => this.countriesOverlap(rule.countryCodes, row.countryCodes ?? []));
     if (conflicting) {
       throw new ConflictError(`ACTIVE MarkupRule ${conflicting.code} already covers ${rule.supplierCode} + ${rule.serviceType} at this effective period — archive it first or choose a non-overlapping period`);
     }
@@ -307,6 +329,7 @@ export class MarkupRuleService {
           supplierCode: rule.supplierCode,
           serviceType: rule.serviceType,
           rate: rule.rate.toString(),
+          countryCodes: rule.countryCodes ?? [],
           status: rule.status,
           effectiveFrom: rule.effectiveFrom.toISOString(),
           effectiveTo: rule.effectiveTo ? rule.effectiveTo.toISOString() : null,
@@ -325,6 +348,7 @@ export class MarkupRuleService {
       supplierCode: p.supplierCode,
       serviceType: p.serviceType,
       rate: p.rate.toString(),
+      countryCodes: p.countryCodes ?? [],
       status: p.status,
       version: p.version,
       effectiveFrom: p.effectiveFrom.toISOString(),

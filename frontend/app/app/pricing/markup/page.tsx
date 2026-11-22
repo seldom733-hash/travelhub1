@@ -44,6 +44,7 @@ interface MarkupRule {
   supplierCode: string;
   serviceType: string;
   rate: string;
+  countryCodes?: string[];
   status: "DRAFT" | "ACTIVE" | "ARCHIVED";
   version: number;
 }
@@ -57,6 +58,7 @@ interface CommissionRule {
   fixedAmount: string | null;
   fixedCurrency: string | null;
   calculationBase: string;
+  countryCodes?: string[];
   status: "DRAFT" | "ACTIVE" | "ARCHIVED";
   version: number;
 }
@@ -65,6 +67,7 @@ interface PricingRow {
   supplierCode: string;
   supplierName: string;
   serviceType: string;
+  countryCodes: string[];
   markup: MarkupCell | undefined;
   commission: CommissionCell | undefined;
   markupRule: MarkupRule | undefined;
@@ -80,9 +83,16 @@ interface FormState {
   serviceType: string;
   markupPercent: string;
   commissionPercent: string;
+  countryCodes: string[];
 }
 
-const EMPTY: FormState = { supplierCode: "", serviceType: "", markupPercent: "0", commissionPercent: "0" };
+interface CountryOption {
+  id: string;
+  code: string;
+  names: Record<string, string>;
+}
+
+const EMPTY: FormState = { supplierCode: "", serviceType: "", markupPercent: "0", commissionPercent: "0", countryCodes: [] };
 const LABELS: Record<string, { az: string; en: string }> = {
   "Наценки и комиссионные": { az: "Marjalar və komissiyalar", en: "Markups and commissions" },
   "Цены и правила": { az: "Qiymətlər və qaydalar", en: "Prices and rules" },
@@ -101,6 +111,9 @@ const LABELS: Record<string, { az: string; en: string }> = {
   "Итоговое правило": { az: "Yekun qayda", en: "Final rule" },
   "Статус": { az: "Status", en: "Status" },
   "Все страны": { az: "Bütün ölkələr", en: "All countries" },
+  "Страны / группы стран": { az: "Ölkələr / ölkə qrupları", en: "Countries / country groups" },
+  "Выберите страны": { az: "Ölkələri seçin", en: "Select countries" },
+  "Если ничего не выбрано — правило действует для всех стран.": { az: "Heç nə seçilməyibsə, qayda bütün ölkələr üçün keçərlidir.", en: "If nothing is selected, the rule applies to all countries." },
   "Активно": { az: "Aktiv", en: "Active" },
   "Черновик": { az: "Qaralama", en: "Draft" },
   "Не настроено": { az: "Qurulmayıb", en: "Not configured" },
@@ -162,6 +175,11 @@ const rateToInput = (rate: string | null | undefined) =>
   String(Number((num(rate) * 100).toFixed(2)));
 const decimalRate = (value: string) => String(percentValue(value) / 100);
 
+function countryLabel(codes: string[] | undefined, countries: CountryOption[], locale: string, allLabel: string): string {
+  if (!codes || codes.length === 0) return allLabel;
+  return codes.map((code) => countries.find((c) => c.code === code)?.names?.[locale] ?? countries.find((c) => c.code === code)?.names?.ru ?? code).join(", ");
+}
+
 function statusOf(row: PricingRow): "ACTIVE" | "DRAFT" | "EMPTY" {
   if (row.markupRule?.status === "ACTIVE" || row.commissionRule?.status === "ACTIVE") return "ACTIVE";
   if (row.markupRule?.status === "DRAFT" || row.commissionRule?.status === "DRAFT") return "DRAFT";
@@ -177,6 +195,7 @@ export default function MarkupAdminPage() {
   const [markupRules, setMarkupRules] = useState<MarkupRule[]>([]);
   const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
   const [allowedSuppliers, setAllowedSuppliers] = useState<Record<string, Set<string>>>({});
+  const [countries, setCountries] = useState<CountryOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -189,7 +208,7 @@ export default function MarkupAdminPage() {
     setLoading(true);
     setError("");
     try {
-      const [markup, commission, mr, cr, tourSuppliers, hotelSuppliers, flightSuppliers] = await Promise.all([
+      const [markup, commission, mr, cr, tourSuppliers, hotelSuppliers, flightSuppliers, geo] = await Promise.all([
         api.get<MarkupMatrix>("/pricing/markup-matrix"),
         api.get<CommissionMatrix>("/pricing/commission-matrix"),
         api.get<{ items: MarkupRule[] }>("/pricing/markup-rules?pageSize=100"),
@@ -197,6 +216,7 @@ export default function MarkupAdminPage() {
         api.get<SupplierOption[]>("/public/supplier/suppliers?service=tours"),
         api.get<SupplierOption[]>("/public/supplier/suppliers?service=hotels"),
         api.get<SupplierOption[]>("/public/supplier/suppliers?service=flights"),
+        api.get<CountryOption[] | { value: CountryOption[] }>("/geo/directory").catch(() => []),
       ]);
       setMarkupMatrix(markup);
       setCommissionMatrix(commission);
@@ -207,6 +227,7 @@ export default function MarkupAdminPage() {
         hotels: new Set(hotelSuppliers.map((s) => s.code)),
         flights: new Set(flightSuppliers.map((s) => s.code)),
       });
+      setCountries(Array.isArray(geo) ? geo : (geo.value ?? []));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -224,9 +245,12 @@ export default function MarkupAdminPage() {
       if (!suppliers.has(supplier.code)) suppliers.set(supplier.code, supplier.name);
     }
     const services = new Set<string>([...(markupMatrix?.services ?? []), ...(commissionMatrix?.services ?? [])]);
-    const activeFor = <T extends { supplierCode: string; serviceType: string; status: string }>(rules: T[], supplier: string, service: string) =>
-      rules.find((r) => r.supplierCode === supplier && r.serviceType === service && r.status === "ACTIVE") ??
-      rules.find((r) => r.supplierCode === supplier && r.serviceType === service && r.status === "DRAFT");
+    const countryKey = (codes?: string[]) => [...new Set(codes ?? [])].sort().join("|") || "*";
+    const activeFor = <T extends { supplierCode: string; serviceType: string; status: string; countryCodes?: string[] }>(rules: T[], supplier: string, service: string, countryCodes: string[]) => {
+      const key = countryKey(countryCodes);
+      return rules.find((r) => r.supplierCode === supplier && r.serviceType === service && countryKey(r.countryCodes) === key && r.status === "ACTIVE")
+        ?? rules.find((r) => r.supplierCode === supplier && r.serviceType === service && countryKey(r.countryCodes) === key && r.status === "DRAFT");
+    };
 
     const result: PricingRow[] = [];
     for (const [supplierCode, supplierName] of suppliers) {
@@ -236,21 +260,29 @@ export default function MarkupAdminPage() {
         // of enabled suppliers is authoritative per service.
         const allowed = allowedSuppliers[serviceType];
         if (allowed && !allowed.has(supplierCode)) continue;
-        const markup = markupMatrix?.cells.find((c) => c.supplierCode === supplierCode && c.serviceType === serviceType);
-        const commission = commissionMatrix?.cells.find((c) => c.supplierCode === supplierCode && c.serviceType === serviceType);
-        result.push({
-          key: `${supplierCode}:${serviceType}`,
-          supplierCode,
-          supplierName,
-          serviceType,
-          markup,
-          commission,
-          markupRule: activeFor(markupRules, supplierCode, serviceType),
-          commissionRule: activeFor(commissionRules, supplierCode, serviceType),
-        });
+        const scopes = new Map<string, string[]>();
+        const addScope = (codes?: string[]) => scopes.set(countryKey(codes), [...new Set(codes ?? [])].sort());
+        for (const r of markupRules) if (r.supplierCode === supplierCode && r.serviceType === serviceType && r.status !== "ARCHIVED") addScope(r.countryCodes);
+        for (const r of commissionRules) if (r.supplierCode === supplierCode && r.serviceType === serviceType && r.status !== "ARCHIVED") addScope(r.countryCodes);
+        if (scopes.size === 0) scopes.set("*", []);
+        for (const countryCodes of scopes.values()) {
+          const markup = markupMatrix?.cells.find((c) => c.supplierCode === supplierCode && c.serviceType === serviceType);
+          const commission = commissionMatrix?.cells.find((c) => c.supplierCode === supplierCode && c.serviceType === serviceType);
+          result.push({
+            key: `${supplierCode}:${serviceType}:${countryKey(countryCodes)}`,
+            supplierCode,
+            supplierName,
+            serviceType,
+            countryCodes,
+            markup,
+            commission,
+            markupRule: activeFor(markupRules, supplierCode, serviceType, countryCodes),
+            commissionRule: activeFor(commissionRules, supplierCode, serviceType, countryCodes),
+          });
+        }
       }
     }
-    return result.sort((a, b) => a.serviceType.localeCompare(b.serviceType) || a.supplierName.localeCompare(b.supplierName));
+    return result.sort((a, b) => a.serviceType.localeCompare(b.serviceType) || a.supplierName.localeCompare(b.supplierName) || countryKey(a.countryCodes).localeCompare(countryKey(b.countryCodes)));
   }, [markupMatrix, commissionMatrix, markupRules, commissionRules, allowedSuppliers]);
 
   const visibleRows = useMemo(() => {
@@ -259,9 +291,9 @@ export default function MarkupAdminPage() {
       if (serviceFilter && row.serviceType !== serviceFilter) return false;
       if (supplierFilter && row.supplierCode !== supplierFilter) return false;
       if (!needle) return true;
-      return `${row.supplierCode} ${row.supplierName} ${row.serviceType} ${serviceLabel(row.serviceType, locale)}`.toLowerCase().includes(needle);
+      return `${row.supplierCode} ${row.supplierName} ${row.serviceType} ${serviceLabel(row.serviceType, locale)} ${countryLabel(row.countryCodes, countries, locale, tr("Все страны"))}`.toLowerCase().includes(needle);
     });
-  }, [rows, serviceFilter, supplierFilter, search]);
+  }, [rows, serviceFilter, supplierFilter, search, countries, locale]);
 
   const openRow = (row: PricingRow) => {
     if (!canManage) return;
@@ -270,8 +302,9 @@ export default function MarkupAdminPage() {
       key: row.key,
       supplierCode: row.supplierCode,
       serviceType: row.serviceType,
-      markupPercent: rateToInput(row.markup?.rate),
-      commissionPercent: rateToInput(row.commission?.rate),
+      markupPercent: rateToInput(row.markupRule?.rate ?? row.markup?.rate),
+      commissionPercent: rateToInput(row.commissionRule?.rate ?? row.commission?.rate),
+      countryCodes: row.countryCodes,
     });
   };
 
@@ -290,8 +323,8 @@ export default function MarkupAdminPage() {
     setSaving(true);
     setError("");
     try {
-      await saveMarkupRule(form.supplierCode, form.serviceType, markupPercent);
-      await saveCommissionRule(form.supplierCode, form.serviceType, commissionPercent);
+      await saveMarkupRule(form.supplierCode, form.serviceType, markupPercent, form.countryCodes);
+      await saveCommissionRule(form.supplierCode, form.serviceType, commissionPercent, form.countryCodes);
       setForm(null);
       await load();
     } catch (e) {
@@ -301,8 +334,9 @@ export default function MarkupAdminPage() {
     }
   };
 
-  const saveMarkupRule = async (supplierCode: string, serviceType: string, markupPercent: number) => {
-    const existing = markupRules.filter((r) => r.supplierCode === supplierCode && r.serviceType === serviceType && r.status !== "ARCHIVED");
+  const saveMarkupRule = async (supplierCode: string, serviceType: string, markupPercent: number, countryCodes: string[]) => {
+    const scope = [...new Set(countryCodes)].sort().join("|");
+    const existing = markupRules.filter((r) => r.supplierCode === supplierCode && r.serviceType === serviceType && [...new Set(r.countryCodes ?? [])].sort().join("|") === scope && r.status !== "ARCHIVED");
     const targetRate = decimalRate(String(markupPercent));
     if (markupPercent <= 0) {
       for (const rule of existing) await api.post(`/pricing/markup-rules/${rule.code}/archive`, {});
@@ -311,12 +345,13 @@ export default function MarkupAdminPage() {
     // Archive every non-archived version first. Keeping a DRAFT beside an
     // ACTIVE rule causes activate() to fail with an overlap conflict.
     for (const rule of existing) await api.post(`/pricing/markup-rules/${rule.code}/archive`, {});
-    const created = await api.post<MarkupRule>("/pricing/markup-rules", { supplierCode, serviceType, rate: targetRate });
+    const created = await api.post<MarkupRule>("/pricing/markup-rules", { supplierCode, serviceType, rate: targetRate, countryCodes });
     await api.post(`/pricing/markup-rules/${created.code}/activate`, {});
   };
 
-  const saveCommissionRule = async (supplierCode: string, serviceType: string, commissionPercent: number) => {
-    const existing = commissionRules.filter((r) => r.supplierCode === supplierCode && r.serviceType === serviceType && r.status !== "ARCHIVED");
+  const saveCommissionRule = async (supplierCode: string, serviceType: string, commissionPercent: number, countryCodes: string[]) => {
+    const scope = [...new Set(countryCodes)].sort().join("|");
+    const existing = commissionRules.filter((r) => r.supplierCode === supplierCode && r.serviceType === serviceType && [...new Set(r.countryCodes ?? [])].sort().join("|") === scope && r.status !== "ARCHIVED");
     const targetRate = decimalRate(String(commissionPercent));
     if (commissionPercent <= 0) {
       for (const rule of existing) await api.post(`/pricing/commission-rules/${rule.code}/archive`, {});
@@ -332,6 +367,7 @@ export default function MarkupAdminPage() {
       commissionType: "PERCENT",
       rate: targetRate,
       calculationBase: "SUPPLIER_BASE",
+      countryCodes,
     });
     await api.post(`/pricing/commission-rules/${created.code}/activate`, {});
   };
@@ -352,11 +388,11 @@ export default function MarkupAdminPage() {
         breadcrumbs={["TravelHub", tr("Цены и правила"), tr("Наценки и комиссионные")]}
         actions={
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => void load()} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <button type="button" onClick={() => void load()} className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink hover:bg-panel">
               {tr("Обновить")}
             </button>
             {canManage && (
-              <button type="button" onClick={() => setForm({ ...EMPTY })} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+              <button type="button" onClick={() => setForm({ ...EMPTY })} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
                 + {tr("Добавить правило")}
               </button>
             )}
@@ -367,32 +403,32 @@ export default function MarkupAdminPage() {
       <div className="space-y-4 p-6">
         {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
 
-        <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <label className="text-xs font-medium text-slate-600">
+        <div className="flex flex-wrap items-end gap-3 rounded-xl border border-line bg-white p-4 shadow-sm">
+          <label className="text-xs font-medium text-ink/60">
             <span className="mb-1 block">{tr("Услуга")}</span>
-            <select value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} className="min-w-44 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900">
+            <select value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} className="min-w-44 rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink">
               <option value="">{tr("Все услуги")}</option>
               {services.map((service) => <option key={service} value={service}>{serviceLabel(service, locale)}</option>)}
             </select>
           </label>
-          <label className="text-xs font-medium text-slate-600">
+          <label className="text-xs font-medium text-ink/60">
             <span className="mb-1 block">{tr("Поставщик")}</span>
-            <select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)} className="min-w-48 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900">
+            <select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)} className="min-w-48 rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink">
               <option value="">{tr("Все поставщики")}</option>
               {suppliers.map((supplier) => <option key={supplier.code} value={supplier.code}>{supplier.name}</option>)}
             </select>
           </label>
-          <label className="min-w-64 flex-1 text-xs font-medium text-slate-600">
+          <label className="min-w-64 flex-1 text-xs font-medium text-ink/60">
             <span className="mb-1 block">{tr("Поиск")}</span>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tr("Поиск по поставщику / услуге / стране")} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tr("Поиск по поставщику / услуге / стране")} className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none focus:border-brand" />
           </label>
-          <span className="ml-auto text-xs text-slate-500">{tr("Всего правил")}: {visibleRows.length}</span>
+          <span className="ml-auto text-xs text-ink/60">{tr("Всего правил")}: {visibleRows.length}</span>
         </div>
 
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <section className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-700">
+              <thead className="border-b border-line bg-panel text-xs text-ink">
                 <tr>
                   <th className="px-4 py-3 font-semibold">№</th>
                   <th className="px-4 py-3 font-semibold">{tr("Услуга")}</th>
@@ -408,39 +444,41 @@ export default function MarkupAdminPage() {
               <tbody>
                 {visibleRows.map((row, index) => {
                   const status = statusOf(row);
-                  const markup = num(row.markup?.rate) > 0 ? percent(row.markup?.rate) : "0,00 %";
-                  const commission = num(row.commission?.rate) > 0 ? percent(row.commission?.rate) : "0,00 %";
-                  const finalRule = num(row.markup?.rate) > 0 && num(row.commission?.rate) > 0
+                  const markupRate = row.markupRule?.rate ?? row.markup?.rate;
+                  const commissionRate = row.commissionRule?.rate ?? row.commission?.rate;
+                  const markup = num(markupRate) > 0 ? percent(markupRate) : "0,00 %";
+                  const commission = num(commissionRate) > 0 ? percent(commissionRate) : "0,00 %";
+                  const finalRule = num(markupRate) > 0 && num(commissionRate) > 0
                     ? `${tr("Наценка")} ${markup} + ${tr("Комиссия")} ${commission}`
-                    : num(row.markup?.rate) > 0
+                    : num(markupRate) > 0
                       ? `${tr("Наценка")} ${markup}`
-                      : num(row.commission?.rate) > 0
+                      : num(commissionRate) > 0
                         ? `${tr("Комиссия")} ${commission}`
                         : tr("Не настроено");
                   return (
-                    <tr key={row.key} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/80">
-                      <td className="px-4 py-3 text-slate-500">{index + 1}</td>
-                      <td className="px-4 py-3 font-medium text-slate-900">{serviceLabel(row.serviceType, locale)}</td>
+                    <tr key={row.key} className="border-b border-line last:border-0 hover:bg-panel/80">
+                      <td className="px-4 py-3 text-ink/60">{index + 1}</td>
+                      <td className="px-4 py-3 font-medium text-ink">{serviceLabel(row.serviceType, locale)}</td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-slate-900">{row.supplierName}</div>
-                        <div className="font-mono text-[11px] text-slate-400">{row.supplierCode}</div>
+                        <div className="font-medium text-ink">{row.supplierName}</div>
+                        <div className="font-mono text-[11px] text-ink/60">{row.supplierCode}</div>
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{tr("Все страны")}</td>
+                      <td className="px-4 py-3 text-ink/60">{countryLabel(row.countryCodes, countries, locale, tr("Все страны"))}</td>
                       <td className="px-4 py-3 text-right">
-                        <button type="button" onClick={() => openRow(row)} disabled={!canManage} className="rounded-lg px-2 py-1 font-semibold text-slate-900 enabled:hover:bg-blue-50 disabled:cursor-default">
+                        <button type="button" onClick={() => openRow(row)} disabled={!canManage} className="rounded-lg px-2 py-1 font-semibold text-ink enabled:hover:bg-brand/10 disabled:cursor-default">
                           {markup}
                         </button>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button type="button" onClick={() => openRow(row)} disabled={!canManage} className="rounded-lg px-2 py-1 font-semibold text-slate-900 enabled:hover:bg-blue-50 disabled:cursor-default">
+                        <button type="button" onClick={() => openRow(row)} disabled={!canManage} className="rounded-lg px-2 py-1 font-semibold text-ink enabled:hover:bg-brand/10 disabled:cursor-default">
                           {commission}
                         </button>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                          num(row.markup?.rate) > 0 || num(row.commission?.rate) > 0
+                          num(markupRate) > 0 || num(commissionRate) > 0
                             ? "bg-amber-50 text-amber-800"
-                            : "bg-slate-100 text-slate-500"
+                            : "bg-panel text-ink/60"
                         }`}>{finalRule}</span>
                       </td>
                       <td className="px-4 py-3">
@@ -449,15 +487,15 @@ export default function MarkupAdminPage() {
                             ? "bg-emerald-50 text-emerald-700"
                             : status === "DRAFT"
                               ? "bg-amber-50 text-amber-700"
-                              : "bg-slate-100 text-slate-500"
+                              : "bg-panel text-ink/60"
                         }`}>
-                          <span className={`size-1.5 rounded-full ${status === "ACTIVE" ? "bg-emerald-500" : status === "DRAFT" ? "bg-amber-500" : "bg-slate-400"}`} />
+                          <span className={`size-1.5 rounded-full ${status === "ACTIVE" ? "bg-emerald-500" : status === "DRAFT" ? "bg-amber-500" : "bg-panel"}`} />
                           {status === "ACTIVE" ? tr("Активно") : status === "DRAFT" ? tr("Черновик") : tr("Не настроено")}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         {canManage && (
-                          <button type="button" onClick={() => openRow(row)} className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                          <button type="button" onClick={() => openRow(row)} className="rounded-lg border border-line px-2 py-1 text-xs font-medium text-ink/60 hover:bg-panel">
                             {tr("Изменить")}
                           </button>
                         )}
@@ -466,19 +504,19 @@ export default function MarkupAdminPage() {
                   );
                 })}
                 {visibleRows.length === 0 && (
-                  <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-slate-500">{tr("Правил не найдено")}</td></tr>
+                  <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-ink/60">{tr("Правил не найдено")}</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </section>
 
-        <section className="rounded-xl border border-blue-100 bg-blue-50/60 px-5 py-4 text-sm text-slate-700">
-          <div className="font-semibold text-slate-900">{tr("Как работает правило")}</div>
+        <section className="rounded-xl border border-brand/15 bg-brand/60 px-5 py-4 text-sm text-ink">
+          <div className="font-semibold text-ink">{tr("Как работает правило")}</div>
           <p className="mt-1 leading-6">
             {tr("Итоговая цена = цена поставщика × (1 + наценка). Комиссия — доход платформы, она не увеличивает цену для клиента.")}
           </p>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-ink/60">
             {tr("Пример: поставщик 1 000 AZN, наценка 2,50% → клиент 1 025 AZN; комиссия 7% → доход платформы 70 AZN.")}
           </p>
         </section>
@@ -488,39 +526,58 @@ export default function MarkupAdminPage() {
         <PanelFrame title={form.key ? tr("Изменить правило") : tr("Новое правило")} subtitle={form.key ? `${form.supplierCode} · ${serviceLabel(form.serviceType, locale)}` : undefined} onClose={() => setForm(null)}>
           <div className="space-y-4 p-5">
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-xs font-medium text-slate-600">
+              <label className="text-xs font-medium text-ink/60">
                 <span className="mb-1 block">{tr("Поставщик")}</span>
-                <select value={form.supplierCode} disabled={Boolean(form.key)} onChange={(e) => setForm({ ...form, supplierCode: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 disabled:bg-slate-50">
+                <select value={form.supplierCode} disabled={Boolean(form.key)} onChange={(e) => setForm({ ...form, supplierCode: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink disabled:bg-panel">
                   <option value="">{tr("Выберите поставщика")}</option>
                   {suppliers.map((supplier) => <option key={supplier.code} value={supplier.code}>{supplier.name}</option>)}
                 </select>
               </label>
-              <label className="text-xs font-medium text-slate-600">
+              <label className="text-xs font-medium text-ink/60">
                 <span className="mb-1 block">{tr("Услуга")}</span>
-                <select value={form.serviceType} disabled={Boolean(form.key)} onChange={(e) => setForm({ ...form, serviceType: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 disabled:bg-slate-50">
+                <select value={form.serviceType} disabled={Boolean(form.key)} onChange={(e) => setForm({ ...form, serviceType: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink disabled:bg-panel">
                   <option value="">{tr("Выберите услугу")}</option>
                   {services.map((service) => <option key={service} value={service}>{serviceLabel(service, locale)}</option>)}
                 </select>
               </label>
             </div>
+            <div className="rounded-lg border border-line p-3">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-medium text-ink/60">{tr("Страны / группы стран")}</span>
+                <button type="button" onClick={() => setForm({ ...form, countryCodes: [] })} className="rounded-lg border border-line px-2 py-1 text-[11px] font-medium text-ink/60 hover:bg-panel">{tr("Все страны")}</button>
+              </div>
+              <div className="grid max-h-40 gap-1 overflow-y-auto sm:grid-cols-2">
+                {countries.map((country) => (
+                  <label key={country.code} className="flex items-center gap-2 rounded px-1 py-0.5 text-xs text-ink hover:bg-panel">
+                    <input
+                      type="checkbox"
+                      checked={form.countryCodes.includes(country.code)}
+                      onChange={(e) => setForm({ ...form, countryCodes: e.target.checked ? [...form.countryCodes, country.code] : form.countryCodes.filter((c) => c !== country.code) })}
+                    />
+                    <span>{country.names?.[locale] ?? country.names?.ru ?? country.code}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] text-ink/50">{tr("Если ничего не выбрано — правило действует для всех стран.")}</p>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-xs font-medium text-slate-600">
+              <label className="text-xs font-medium text-ink/60">
                 <span className="mb-1 block">{tr("Наценка (Markup), %")}</span>
-                <input type="number" min="0" max="100" step="0.01" value={form.markupPercent} onChange={(e) => setForm({ ...form, markupPercent: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400" />
-                <span className="mt-1 block text-[11px] text-slate-400">{tr("Увеличивает цену для клиента.")}</span>
+                <input type="number" min="0" max="100" step="0.01" value={form.markupPercent} onChange={(e) => setForm({ ...form, markupPercent: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none focus:border-brand" />
+                <span className="mt-1 block text-[11px] text-ink/60">{tr("Увеличивает цену для клиента.")}</span>
               </label>
-              <label className="text-xs font-medium text-slate-600">
+              <label className="text-xs font-medium text-ink/60">
                 <span className="mb-1 block">{tr("Комиссия (Commission), %")}</span>
-                <input type="number" min="0" max="100" step="0.01" value={form.commissionPercent} onChange={(e) => setForm({ ...form, commissionPercent: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400" />
-                <span className="mt-1 block text-[11px] text-slate-400">{tr("Доход платформы, не увеличивает цену.")}</span>
+                <input type="number" min="0" max="100" step="0.01" value={form.commissionPercent} onChange={(e) => setForm({ ...form, commissionPercent: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none focus:border-brand" />
+                <span className="mt-1 block text-[11px] text-ink/60">{tr("Доход платформы, не увеличивает цену.")}</span>
               </label>
             </div>
-            <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+            <div className="rounded-lg bg-panel px-3 py-2 text-xs text-ink/60">
               {tr("Итоговое правило")}: {tr("Наценка")} {percentValue(form.markupPercent).toLocaleString("ru-RU")}% + {tr("Комиссия")} {percentValue(form.commissionPercent).toLocaleString("ru-RU")}%
             </div>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setForm(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600">{tr("Отмена")}</button>
-              <button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+              <button type="button" onClick={() => setForm(null)} className="rounded-lg border border-line px-4 py-2 text-sm text-ink/60">{tr("Отмена")}</button>
+              <button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                 {saving ? tr("Сохраняем…") : tr("Сохранить")}
               </button>
             </div>

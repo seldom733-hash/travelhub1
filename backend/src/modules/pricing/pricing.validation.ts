@@ -11,7 +11,7 @@
  * миграции (Gate A), поэтому никаких enum/хардкода vocabulary здесь.
  */
 import { Type } from "class-transformer";
-import { IsInt, IsISO8601, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateIf } from "class-validator";
+import { ArrayMaxSize, IsArray, IsInt, IsISO8601, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateIf } from "class-validator";
 import { ValidationDomainError } from "../../shared/errors";
 
 /** Каноническая форма: «0» либо «0.d…» (1–6 знаков). */
@@ -58,6 +58,13 @@ export class CreateMarkupRuleDto {
   @MaxLength(32)
   rate!: string;
 
+  /** ISO-2 страны, к которым применяется правило. Пусто = все страны. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsString({ each: true })
+  countryCodes?: string[];
+
   /** default = now (server-owned, не клиентский произвол). */
   @IsOptional()
   @IsISO8601()
@@ -75,6 +82,12 @@ export class UpdateMarkupRuleDto {
   @MinLength(1)
   @MaxLength(32)
   rate?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsString({ each: true })
+  countryCodes?: string[];
 
   @IsOptional()
   @IsISO8601()

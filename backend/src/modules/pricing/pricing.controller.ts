@@ -73,7 +73,7 @@ export class PricingController {
   async createMarkupRule(@Req() req: Request, @CurrentUser() actor: AuthedRequest["user"], @Body() dto: CreateMarkupRuleDto) {
     assertNoForbiddenKeys(req.body, MARKUP_RULE_FORBIDDEN_KEYS);
     return this.markupRules.create(
-      { supplierCode: dto.supplierCode, serviceType: dto.serviceType, rate: dto.rate, effectiveFrom: dto.effectiveFrom, effectiveTo: dto.effectiveTo },
+      { supplierCode: dto.supplierCode, serviceType: dto.serviceType, rate: dto.rate, countryCodes: dto.countryCodes, effectiveFrom: dto.effectiveFrom, effectiveTo: dto.effectiveTo },
       { id: actor.id, username: actor.username },
     );
   }
@@ -84,7 +84,7 @@ export class PricingController {
     assertNoForbiddenKeys(req.body, MARKUP_RULE_FORBIDDEN_KEYS);
     return this.markupRules.update(
       code,
-      { rate: dto.rate, effectiveFrom: dto.effectiveFrom, effectiveTo: dto.effectiveTo, expectedVersion: dto.expectedVersion },
+      { rate: dto.rate, countryCodes: dto.countryCodes, effectiveFrom: dto.effectiveFrom, effectiveTo: dto.effectiveTo, expectedVersion: dto.expectedVersion },
       { id: actor.id, username: actor.username },
     );
   }

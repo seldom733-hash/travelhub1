@@ -5243,6 +5243,8 @@ model MarkupRule {
   serviceType   String
   /// Десятичная доля 0 ≤ rate < 1 (0.05 = 5%), ≤ 6 знаков.
   rate          Decimal         @db.Decimal(18, 6)
+  /// ISO-2 страны, к которым применяется правило. Пустой массив = все страны.
+  countryCodes  String[]        @default([])
   status        MarkupRuleStatus @default(DRAFT)
   /// Server-owned; +1 на draft-итерацию; expectedVersion → stale-update 409.
   version       Int             @default(1)
@@ -5301,6 +5303,8 @@ model SupplierCommissionRule {
   fixedCurrency String?
   /// SUPPLIER_BASE | STOREFRONT
   calculationBase String                @default("SUPPLIER_BASE")
+  /// ISO-2 страны, к которым применяется комиссия. Пустой массив = все страны.
+  countryCodes  String[]                @default([])
   status        MarkupRuleStatus        @default(DRAFT)
   version       Int                     @default(1)
   effectiveFrom DateTime
