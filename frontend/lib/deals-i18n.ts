@@ -123,6 +123,10 @@ const AZ: Record<string, string> = {
   "История изменений": "Dəyişikliklər tarixi",
   "Общий номер": "Ümumi nömrə",
   "Статус": "Status",
+  "Расчёты": "Hesablaşmalar",
+  "Расчёты закрыты": "Hesablaşmalar bağlanıb",
+  "Расчёты открыты": "Hesablaşmalar açıqdır",
+  "Расчёты не начаты": "Hesablaşmalar başlamayıb",
   "Дата услуги": "Xidmət tarixi",
   "Окончание услуги": "Xidmətin bitməsi",
   "Финансовый результат": "Maliyyə nəticəsi",
@@ -478,6 +482,10 @@ const EN: Record<string, string> = {
   "Коммуникации": "Communications",
   "История изменений": "Change history",
   "Общий номер": "Common number",
+  "Расчёты": "Settlements",
+  "Расчёты закрыты": "Settlements closed",
+  "Расчёты открыты": "Settlements open",
+  "Расчёты не начаты": "Settlements not started",
   "Статус": "Status",
   "Дата услуги": "Service date",
   "Окончание услуги": "Service end",
@@ -747,6 +755,7 @@ export const DEAL_STATUS: Record<string, { az: string; en: string }> = {
   READY_TO_CLOSE: { az: "Bağlanmağa hazırdır", en: "Ready to close" },
   CLOSED: { az: "Bağlanıb", en: "Closed" },
   CANCELLED: { az: "Ləğv edilib", en: "Cancelled" },
+  CANCELLED_CLOSED: { az: "Ləğv edilib və bağlanıb", en: "Cancelled and closed" },
   CANCELLATION_REQUESTED: { az: "Ləğv sorğusu verilib", en: "Cancellation requested" },
   CANCELLATION_APPROVED: { az: "Ləğv təsdiqlənib", en: "Cancellation approved" },
   PROBLEM: { az: "Problem", en: "Problem" },
@@ -781,7 +790,7 @@ export function dealStatus(locale: Locale, code: string): string {
     CHANGE_REQUESTED: "Запрошено изменение", SUPPLIER_REJECTED: "Поставщик отклонил",
     FULFILLED: "Завершён", READY_TO_CLOSE: "Готов к закрытию", CLOSED: "Закрыт", CANCELLED: "Отменён",
     CANCELLATION_REQUESTED: "Отмена запрошена", CANCELLATION_APPROVED: "Отмена согласована", PROBLEM: "Проблема",
-    SUSPENDED: "Приостановлен", COMPLETED: "Завершён (бронь)",
+    SUSPENDED: "Приостановлен", COMPLETED: "Завершён (бронь)", CANCELLED_CLOSED: "Отменён и закрыт",
   } as Record<string, string>)[code] ?? code : code;
   const row = DEAL_STATUS[code];
   return row ? row[locale] : code;

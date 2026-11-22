@@ -11,6 +11,7 @@ type DealQuery = {
   viewerId?: string;
   cancellationReason?: string;
   settlementStatus?: string;
+  settlementState?: string;
   status?: string;
   statusGroup?: string;
   supplierId?: string;
@@ -67,7 +68,7 @@ type DealRow = {
   bookingStatus: string | null;
   bookingCompletedAt: string | null;
   bookings: Array<{ id: string; code: string; status: string; serviceDate: string | null; completedAt: string | null }>;
-  stage: "REQUEST" | "ORDER" | "BOOKING" | "COMPLETED" | "CLOSED" | "CANCELLED";
+  stage: "REQUEST" | "ORDER" | "BOOKING";
   stageLabel: string;
   status: string;
   orderStatus: string | null;
@@ -91,6 +92,7 @@ type DealRow = {
   costAmount: string;
   grossMargin: string;
   settlementStatus: string | null;
+  settlementState: "NOT_STARTED" | "OPEN" | "CLOSED";
   supplierBasePrice: string;
   supplierBaseCurrency: string;
   supplierBasePriceAzn: string;
@@ -390,6 +392,7 @@ export class DealsService {
       if (query.hasClientDebt === "1" && Number(row.clientDebt) <= 0) return false;
       if (query.supplierPayment && row.supplierPaymentStatus !== query.supplierPayment) return false;
       if (query.settlementStatus && row.settlementStatus !== query.settlementStatus) return false;
+      if (query.settlementState && row.settlementState !== query.settlementState) return false;
       if (query.financialStatus && row.financialStatus !== query.financialStatus) return false;
       if (query.serviceType && row.productType !== query.serviceType) return false;
       if (from || to) {
@@ -598,8 +601,8 @@ export class DealsService {
       const activeBooking = booking && !["CANCELLED", "COMPLETED", "SUPPLIER_REJECTED"].includes(booking.status) ? booking : null;
       // Stage is the deepest existing entity in the commerce chain. A completed
       // booking must still read as BOOKING until the deal's finances are closed.
-      let stage: "REQUEST" | "ORDER" | "BOOKING" | "COMPLETED" | "CLOSED" | "CANCELLED" = returnedToRequest ? "REQUEST" : booking ? "BOOKING" : order ? "ORDER" : "REQUEST";
-      let status = returnedToRequest ? request.status : booking?.status ?? order?.status ?? request.status;
+      let stage: "REQUEST" | "ORDER" | "BOOKING" = returnedToRequest ? "REQUEST" : booking ? "BOOKING" : order ? "ORDER" : "REQUEST";
+      let status: string = returnedToRequest ? request.status : booking?.status ?? order?.status ?? request.status;
       const cancelled = ["CANCELLED", "CANCELLED_BY_CUSTOMER", "SUPPLIER_REJECTED"].includes(status);
       const cancelledForDebt = order?.status === "CANCELLED" || Boolean(order?.cancelledAt && !order?.returnedToRequestAt);
       const rawSupplierDebt = cancelledForDebt
@@ -622,10 +625,6 @@ export class DealsService {
         ? money(settlement?.supplierPenaltyShare)
         : 0;
       const isCancelledDeal = cancelled || Boolean(order?.cancelledAt && !order?.returnedToRequestAt);
-      // A cancelled deal has one canonical status: CANCELLED. Underlying
-      // order/booking statuses stay in history, but registry filters must not
-      // mix a cancelled row into CLOSED/BOOKING status cohorts.
-      if (isCancelledDeal) status = "CANCELLED";
       const completed = ["FULFILLED", "CLOSED"].includes(order?.status ?? "") || status === "COMPLETED";
       const income = computeDealIncome({
         isCancelledDeal,
@@ -662,11 +661,20 @@ export class DealsService {
         return !Number.isNaN(end.getTime()) && end < new Date();
       })());
       const bookingFinished = booking?.status === "COMPLETED";
-      if (!isCancelledDeal && bookingFinished && clientDebt <= 0 && supplierDebt <= 0) {
-        stage = tourEnded ? "CLOSED" : "COMPLETED";
-      }
-      if (order?.status === "CLOSED") stage = "CLOSED";
-      if (isCancelledDeal) stage = "CANCELLED";
+      // Stage is only the deepest commercial entity reached. Completion,
+      // cancellation and closure are statuses/actions, never stages.
+      const clientRefundPending = clientRefundRows.filter((r) => ["REQUESTED", "APPROVED"].includes(r.status)).reduce((sum, r) => sum + money(r.amount), 0);
+      const supplierRefundDue = cancelled ? Math.max(0, supplierPaid - supplierRefunded) : 0;
+      const hasFinancialActivity = captured > 0 || supplierPaid > 0 || refundedTotal > 0 || clientDebt > 0 || supplierDebt > 0 || Boolean(settlement);
+      const clientNetRetained = Math.max(0, captured - refunded - Number(clientPenalty));
+      const supplierNetRetained = Math.max(0, supplierPaid - supplierRefunded - Number(supplierPenalty));
+      const settlementOpen = isCancelledDeal
+        ? clientRefundPending > 0 || supplierRefundDue > 0 || clientNetRetained > 0 || supplierNetRetained > 0 || (Number(settlement?.remainingToPay ?? 0) > 0) || (Number(settlement?.remainingToRefund ?? 0) > 0)
+        : clientDebt > 0 || supplierDebt > 0 || clientRefundPending > 0 || (Number(settlement?.remainingToPay ?? 0) > 0) || (Number(settlement?.remainingToRefund ?? 0) > 0);
+      const settlementState = !hasFinancialActivity ? "NOT_STARTED" : settlementOpen ? "OPEN" : "CLOSED";
+      status = isCancelledDeal
+        ? (settlementOpen ? "CANCELLED" : "CANCELLED_CLOSED")
+        : (completed ? (settlementOpen ? "COMPLETED" : "CLOSED") : status);
       const adults = Number(attrs.adults ?? 0) || null;
       const children = Number(attrs.children ?? 0) || null;
       const channel = request.sourceChannel ?? (commercial.priceSource === "PUBLIC" ? "Сайт (универсальный поиск)" : String(commercial.priceSource ?? "Ручное создание"));
@@ -721,7 +729,7 @@ export class DealsService {
           completedAt: b.completedAt ? b.completedAt.toISOString() : null,
         })),
         stage,
-        stageLabel: stage === "CANCELLED" ? "Отменена" : stage === "CLOSED" ? "Закрыта" : stage === "COMPLETED" ? "Завершена" : stage === "BOOKING" ? "Бронь" : stage === "ORDER" ? "Заказ" : "Заявка",
+        stageLabel: stage === "BOOKING" ? "Бронь" : stage === "ORDER" ? "Заказ" : "Заявка",
         status,
         orderStatus: order?.status ?? null,
         statusLabel: status,
@@ -753,6 +761,7 @@ export class DealsService {
         costAmount: fixed(cost),
         grossMargin: fixed(sales - cost),
         settlementStatus: settlement?.status ?? null,
+        settlementState,
         supplierBasePrice: fixed(money(commercial.supplierPrice as number | string | undefined) || cost),
         supplierBaseCurrency: String(commercial.supplierCurrency ?? order?.currency ?? request.confirmedCurrency ?? "AZN"),
         supplierBasePriceAzn: fixed(money(fx?.aznAmount as number | string | undefined) || cost),
@@ -764,12 +773,12 @@ export class DealsService {
         clientReceived: fixed(captured),
         clientDebt: fixed(clientDebt),
         clientRefunded: fixed(refunded),
-        clientRefundPending: fixed(clientRefundRows.filter((r) => ["REQUESTED", "APPROVED"].includes(r.status)).reduce((sum, r) => sum + money(r.amount), 0)),
+        clientRefundPending: fixed(clientRefundPending),
         clientRefundTotal: fixed(refundedTotal),
         supplierPaid: fixed(supplierPaid),
         supplierDebt: fixed(supplierDebt),
         supplierRefunded: fixed(supplierRefunded),
-        supplierRefundDue: fixed(cancelled ? Math.max(0, supplierPaid - supplierRefunded) : 0),
+        supplierRefundDue: fixed(supplierRefundDue),
         clientPenalty: fixed(Number(clientPenalty)),
         supplierPenalty: fixed(Number(supplierPenalty)),
         expectedIncome: fixed(expectedIncome),

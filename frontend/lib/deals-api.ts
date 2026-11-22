@@ -11,7 +11,7 @@ export interface DealRow {
   bookingStatus?: string | null;
   bookingCompletedAt?: string | null;
   bookings?: Array<{ id: string; code: string; status: string; serviceDate: string | null; completedAt: string | null }>;
-  stage: "REQUEST" | "ORDER" | "BOOKING" | "COMPLETED" | "CLOSED" | "CANCELLED";
+  stage: "REQUEST" | "ORDER" | "BOOKING";
   stageLabel: string;
   status: string;
   orderStatus: string | null;
@@ -30,6 +30,7 @@ export interface DealRow {
   isCancelledDeal: boolean;
   cancellationResult: string;
   settlementStatus: string | null;
+  settlementState: "NOT_STARTED" | "OPEN" | "CLOSED";
   manager: string | null;
   managerId: string | null;
   travelerCount: number | null;
