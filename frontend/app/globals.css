@@ -448,3 +448,12 @@ input[type="date"]::-webkit-datetime-edit-year-field {
   color: #98a2b3;
   opacity: 1;
 }
+
+
+/* Field and filter labels must be black and clearly readable. */
+label {
+  color: var(--color-ink) !important;
+}
+label > span:first-child {
+  color: var(--color-ink) !important;
+}

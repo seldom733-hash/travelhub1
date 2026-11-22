@@ -111,7 +111,7 @@ export default function TableHeaderFilter({
   return (
     <div ref={containerRef} className="relative inline-flex items-center gap-1" onKeyDown={handleKeyDown}>
       {/* Label — visible, not a button */}
-      <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+      <span className="text-xs font-medium uppercase tracking-wide text-ink">
         {label}
       </span>
 
@@ -125,10 +125,10 @@ export default function TableHeaderFilter({
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-label={ariaLabel ?? `${label} filter`}
-        className={`inline-flex items-center rounded p-0.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+        className={`inline-flex items-center rounded p-0.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
           isActive
-            ? "bg-blue-100 text-blue-600"
-            : "text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            ? "bg-brand/15 text-brand"
+            : "text-ink/70 hover:bg-panel hover:text-ink"
         } ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
       >
         {/* Filter funnel icon */}
@@ -155,7 +155,7 @@ export default function TableHeaderFilter({
         <div
           role="listbox"
           aria-label={`${label} options`}
-          className="absolute left-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+          className="absolute left-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border border-line bg-white py-1 shadow-lg"
         >
           {/* "All" option */}
           <button
@@ -163,8 +163,8 @@ export default function TableHeaderFilter({
             role="option"
             aria-selected={!value}
             onClick={() => handleSelect("")}
-            className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-slate-50 ${
-              !value ? "bg-blue-50 font-medium text-blue-700" : "text-slate-700"
+            className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-panel ${
+              !value ? "bg-brand/10 font-medium text-brand-dark" : "text-ink"
             }`}
           >
             Все
@@ -177,10 +177,10 @@ export default function TableHeaderFilter({
               role="option"
               aria-selected={value === opt.value}
               onClick={() => handleSelect(opt.value)}
-              className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-slate-50 ${
+              className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-panel ${
                 value === opt.value
-                  ? "bg-blue-50 font-medium text-blue-700"
-                  : "text-slate-700"
+                  ? "bg-brand/10 font-medium text-brand-dark"
+                  : "text-ink"
               }`}
             >
               {opt.label}
