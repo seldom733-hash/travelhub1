@@ -1131,6 +1131,10 @@ export const DICT: Record<string, Record<Locale, string>> = {
   // Workspace Home cards
   "workspace.card.catalog": { ru: "Каталог", az: "Kataloq", en: "Catalog" },
   "workspace.card.catalog.desc": { ru: "Управление товарами, тарифами и availability", az: "Məhsullar, tariflər və availability idarəsi", en: "Manage products, tariffs and availability" },
+  "workspace.card.registry": { ru: "Реестр", az: "Reyestr", en: "Registry" },
+  "workspace.card.registry.desc": { ru: "Единый реестр сделок, платежей и расчётов", az: "Sövdələr, ödənişlər və hesablaşmaların vahid reyestri", en: "Unified registry of deals, payments and settlements" },
+  "workspace.card.references": { ru: "Справочники", az: "Lüğətlər", en: "References" },
+  "workspace.card.references.desc": { ru: "География, отели, услуги, поставщики и авиабилеты", az: "Coğrafiya, otellər, xidmətlər, təchizatçılar və aviabiletlər", en: "Geography, hotels, services, suppliers and airline tickets" },
   "workspace.card.orders": { ru: "Заказы", az: "Sifarişlər", en: "Orders" },
   "workspace.card.orders.desc": { ru: "Обработка и исполнение заказов", az: "Sifarişlərin emalı və icrası", en: "Order processing and fulfillment" },
   "workspace.card.bookings": { ru: "Бронирования", az: "Bronlar", en: "Bookings" },
