@@ -43,6 +43,7 @@ export default function ManagerBonusesPage() {
   const locale = useLocale();
   const canEdit = useCan("finance.deal.amounts.write");
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>(() => [new Date().toISOString().slice(0, 7)]);
+  const [appliedPeriods, setAppliedPeriods] = useState<string[]>(() => [new Date().toISOString().slice(0, 7)]);
   const [monthsOpen, setMonthsOpen] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [managerDeals, setManagerDeals] = useState<Record<string, any[]>>({});
@@ -69,18 +70,18 @@ export default function ManagerBonusesPage() {
   const load = useCallback(async () => {
     setError("");
     try {
-      const data = await api.get<BonusReport>(`/finance/manager-bonuses?periods=${encodeURIComponent(selectedPeriods.join(","))}&basis=${basis}`);
+      const data = await api.get<BonusReport>(`/finance/manager-bonuses?periods=${encodeURIComponent(appliedPeriods.join(","))}&basis=${basis}`);
       setReport(data);
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [selectedPeriods, basis]);
+  }, [appliedPeriods, basis]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     setExpanded(null);
     setManagerDeals({});
-  }, [selectedPeriods, basis]);
+  }, [appliedPeriods, basis]);
 
   const toggleManager = async (row: BonusRow) => {
     if (expanded === row.managerId) { setExpanded(null); return; }
@@ -89,7 +90,7 @@ export default function ManagerBonusesPage() {
     setDealsLoading(row.managerId);
     try {
       const data = await api.get<{ items: any[] }>(`/finance/deals?manager=${encodeURIComponent(row.manager)}&pageSize=100`);
-      const months = new Set(selectedPeriods);
+      const months = new Set(appliedPeriods);
       const monthOf = (value: string | null | undefined) => value ? String(value).slice(0, 7) : "";
       const items = (data.items ?? []).filter((deal) => {
         if (basis === "closed_at") return months.has(monthOf(deal.closedAt));
@@ -120,7 +121,7 @@ export default function ManagerBonusesPage() {
     setError("");
     setNotice("");
     try {
-      await api.post("/finance/manager-bonuses", { managerId: row.managerId, periods: selectedPeriods, basis, percent: row.percent });
+      await api.post("/finance/manager-bonuses", { managerId: row.managerId, periods: appliedPeriods, basis, percent: row.percent });
       setNotice(tr("Процент сохранён", "Faiz saxlanıldı", "Percent saved"));
       await load();
     } catch (e) {
@@ -165,7 +166,7 @@ export default function ManagerBonusesPage() {
                 {monthLabel(value)}
               </label>)}
             </div>
-            <button type="button" onClick={() => setMonthsOpen(false)} className="mt-2 w-full rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white">{tr("Готово", "Hazırdır", "Done")}</button>
+            <button type="button" onClick={() => { setAppliedPeriods(selectedPeriods); setMonthsOpen(false); }} className="mt-2 w-full rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white">{tr("Готово", "Hazırdır", "Done")}</button>
           </div>}
         </div>
         <label className="text-sm">
@@ -175,7 +176,7 @@ export default function ManagerBonusesPage() {
             <option value="service_completed">{tr("По дате завершения услуги", "Xidmətin tamamlanma tarixinə görə", "By service completion date")}</option>
           </select>
         </label>
-        <button type="button" onClick={() => void load()} className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink hover:bg-panel">
+        <button type="button" onClick={() => { if (selectedPeriods.join(",") === appliedPeriods.join(",")) void load(); else setAppliedPeriods(selectedPeriods); setMonthsOpen(false); }} className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink hover:bg-panel">
           {tr("Обновить", "Yenilə", "Refresh")}
         </button>
         <div className="text-xs text-ink/60">

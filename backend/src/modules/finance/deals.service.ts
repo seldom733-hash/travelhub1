@@ -318,12 +318,29 @@ export class DealsService {
     };
   }
 
+  async bonusMarginsByPeriods(
+    periods: Array<{ from: Date; to: Date }>,
+    basis: "closed_at" | "service_completed" = "closed_at",
+  ): Promise<Array<Array<{ managerId: string; manager: string; closedDeals: number; closedServices: number; marginBase: number }>>> {
+    const rows = await this.loadRows();
+    return periods.map(({ from, to }) => this.computeBonusMargins(rows, from, to, basis));
+  }
+
   async bonusMarginsByManager(
     from: Date,
     to: Date,
     basis: "closed_at" | "service_completed" = "closed_at",
   ): Promise<Array<{ managerId: string; manager: string; closedDeals: number; closedServices: number; marginBase: number }>> {
-    const rows = await this.loadRows();
+    const [result] = await this.bonusMarginsByPeriods([{ from, to }], basis);
+    return result ?? [];
+  }
+
+  private computeBonusMargins(
+    rows: DealRow[],
+    from: Date,
+    to: Date,
+    basis: "closed_at" | "service_completed",
+  ): Array<{ managerId: string; manager: string; closedDeals: number; closedServices: number; marginBase: number }> {
     const byManager = new Map<string, { managerId: string; manager: string; closedDeals: number; closedServices: number; marginBase: number }>();
     for (const row of rows) {
       if (!row.managerId || row.isCancelledDeal) continue;

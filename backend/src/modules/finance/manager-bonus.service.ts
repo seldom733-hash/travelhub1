@@ -49,7 +49,7 @@ export class ManagerBonusService {
   async list(rawPeriods?: string | string[], rawBasis?: string, rawPeriod?: string) {
     const periods = parsePeriods(rawPeriods, rawPeriod);
     const basis = this.basis(rawBasis);
-    const bases = await Promise.all(periods.map((period) => this.deals.bonusMarginsByManager(period.start, period.end, basis)));
+    const bases = await this.deals.bonusMarginsByPeriods(periods.map((period) => ({ from: period.start, to: period.end })), basis);
     const merged = new Map<string, { managerId: string; manager: string; closedDeals: number; closedServices: number; marginBase: number }>();
     for (const rows of bases) {
       for (const row of rows) {
@@ -111,8 +111,10 @@ export class ManagerBonusService {
     let totalServices = 0;
     let totalMargin = 0;
     let managerName = user.fullName ?? user.username;
-    for (const period of periods) {
-      const base = (await this.deals.bonusMarginsByManager(period.start, period.end, basis)).find((row) => row.managerId === managerId);
+    const basesByPeriod = await this.deals.bonusMarginsByPeriods(periods.map((period) => ({ from: period.start, to: period.end })), basis);
+    for (let index = 0; index < periods.length; index += 1) {
+      const period = periods[index];
+      const base = basesByPeriod[index]?.find((row) => row.managerId === managerId);
       const marginBase = base?.marginBase ?? 0;
       managerName = base?.manager ?? managerName;
       totalDeals += base?.closedDeals ?? 0;
