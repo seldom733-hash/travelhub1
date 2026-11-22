@@ -43,6 +43,17 @@ export class DealsController {
     return this.deals.list({ ...queryFrom(query), viewerId: user.id });
   }
 
+  @Patch(":sequence/services/:serviceId/amounts")
+  @RequirePermissions("finance.deal.amounts.write")
+  updateServiceAmounts(
+    @Param("sequence") sequence: string,
+    @Param("serviceId") serviceId: string,
+    @Body() body: { salePrice?: number; costPrice?: number },
+    @CurrentUser() user: AuthedRequest["user"],
+  ) {
+    return this.deals.updateServiceAmounts(sequence, serviceId, body, user);
+  }
+
   @Get("decision-context")
   @RequirePermissions("finance.overview.read")
   decisionContext() {

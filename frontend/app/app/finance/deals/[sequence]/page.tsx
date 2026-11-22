@@ -62,6 +62,7 @@ export default function DealDetailPage() {
   const canExecuteRefunds = Boolean(user?.permissions.includes("finance.refund.execute"));
   const canDeletePayments = Boolean(user?.permissions.includes("finance.payment.delete"));
   const canDeleteRefunds = Boolean(user?.permissions.includes("finance.refund.delete"));
+  const canEditServiceAmounts = Boolean(user?.permissions.includes("finance.deal.amounts.write"));
   const params = useParams<{ sequence: string }>();
   const sequence = params.sequence;
   const [deal, setDeal] = useState<DealRow | null>(null);
@@ -79,6 +80,7 @@ export default function DealDetailPage() {
   const [reload, setReload] = useState(0);
   const [editOpen, setEditOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [amountEdit, setAmountEdit] = useState<DealRow["services"][number] | null>(null);
   const [writeOffOpen, setWriteOffOpen] = useState(false);
   const [debtWriteOffOpen, setDebtWriteOffOpen] = useState(false);
   const [cancelRequestOpen, setCancelRequestOpen] = useState(false);
@@ -382,6 +384,7 @@ export default function DealDetailPage() {
                     <div className="grid h-12 w-16 shrink-0 place-items-center overflow-hidden rounded-md bg-gradient-to-br from-[#dcebe4] to-[#b9d8ce] text-lg">{["TOUR", "HOTEL"].includes(service.type) && service.mediaId ? <img src={`/api/v1/public/media/${service.mediaId}/thumb`} alt={service.title} className="h-full w-full object-cover" /> : service.type === "FLIGHT" ? "✈️" : "🏨"}</div>
                     <div className="min-w-[220px] flex-1"><div className="text-xs font-semibold text-[#101828]">{dealText(locale, ({ TOUR: "Тур", HOTEL: "Отель", FLIGHT: "Авиабилет", TRANSFER: "Трансфер", INSURANCE: "Страховка", CRUISE: "Круиз", EXCURSION: "Экскурсия" } as Record<string, string>)[service.type] ?? service.type)} · {service.title}</div><div className="text-[10px] text-[#667085]">{deal.trip.country ?? "—"}{deal.trip.dateFrom ? ` · ${dateFrom} — ${dateTo}` : ""} · {deal.travelerCount ?? "—"} {dealText(locale, "чел.")}</div></div>
                     <div className={`grid ${multiService ? "grid-cols-1" : "grid-cols-3"} gap-4 text-right text-[10px]`}>{!multiService && <div><div className="text-[#98a2b3]">{dealText(locale, "Цена продажи")}</div><div className="font-mono text-xs font-semibold text-[#101828]">{money(service.clientPrice, deal.currency)}</div></div>}<div><div className="text-[#98a2b3]">{dealText(locale, "Себестоимость")}</div><div className="font-mono text-xs font-semibold text-[#344054]">{money(service.cost, deal.currency)}</div></div>{!multiService && <div><div className="text-[#98a2b3]">{dealText(locale, "Доход")}</div><div className="font-mono text-xs font-semibold text-emerald-700">{money(service.income, deal.currency)}</div></div>}</div>
+                    {canEditServiceAmounts && <button type="button" onClick={() => setAmountEdit(service)} title={dealText(locale, "Редактировать сумму продажи и себестоимость")} className="rounded-lg border border-[#e5e2da] bg-white px-2 py-1 text-[11px] text-[#475467]">✎</button>}
                   </div>
                 ))}
               </div>
@@ -435,6 +438,7 @@ export default function DealDetailPage() {
       {cancelRequestOpen && deal.orderId && <RequestCancellationModal orderId={deal.orderId} onClose={() => setCancelRequestOpen(false)} onSaved={() => { setCancelRequestOpen(false); setReload((v) => v + 1); }} />}
       {debtWriteOffOpen && <SupplierDebtWriteOffModal deal={deal} onClose={() => setDebtWriteOffOpen(false)} onSaved={() => { setDebtWriteOffOpen(false); setReload((v) => v + 1); }} />}
       {writeOffOpen && <WriteOffModal deal={deal} onClose={() => setWriteOffOpen(false)} onSaved={() => { setWriteOffOpen(false); setReload((v) => v + 1); }} />}
+      {amountEdit && <ServiceAmountsModal deal={deal} service={amountEdit} onClose={() => setAmountEdit(null)} onSaved={() => { setAmountEdit(null); setReload((v) => v + 1); }} />}
       {addOpen && <AddServiceModal deal={deal} onClose={() => setAddOpen(false)} onSaved={() => { setAddOpen(false); setReload((v) => v + 1); }} />}
     </div>
   );
@@ -511,6 +515,31 @@ function DealEditModal({ deal, onClose, onSaved }: { deal: DealRow; onClose: () 
     {err && <div className="rounded bg-rose-50 px-2 py-1 text-rose-700">{err}</div>}
     <button type="button" disabled={busy} onClick={() => void save()} className="rounded-lg bg-[#0f6b5f] px-3 py-2 font-semibold text-white disabled:opacity-50">{busy ? "Сохранение…" : "Сохранить"}</button>
   </div></Modal>;
+}
+
+function ServiceAmountsModal({ deal, service, onClose, onSaved }: { deal: DealRow; service: DealRow["services"][number]; onClose: () => void; onSaved: () => void }) {
+  const locale = useLocale();
+  const [salePrice, setSalePrice] = React.useState(String(service.clientPrice ?? ""));
+  const [costPrice, setCostPrice] = React.useState(String(service.cost ?? ""));
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState("");
+  async function save() {
+    setBusy(true); setError("");
+    try {
+      await api.patch(`/finance/deals/${encodeURIComponent(deal.sequence)}/services/${encodeURIComponent(service.id)}/amounts`, {
+        salePrice: Number(salePrice), costPrice: Number(costPrice),
+      });
+      onSaved();
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onClose}><div className="w-full max-w-md rounded-xl bg-white p-5" onClick={(e) => e.stopPropagation()}>
+    <div className="mb-3 flex justify-between"><b className="text-sm">{dealText(locale, "Сумма продажи и себестоимость")}</b><button type="button" onClick={onClose}>✕</button></div>
+    <div className="mb-2 text-[11px] text-ink/60">{service.title}</div>
+    <label className="mb-2 grid gap-1 text-xs">{dealText(locale, "Цена продажи")}<input type="number" min="0" step="0.01" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" /></label>
+    <label className="mb-3 grid gap-1 text-xs">{dealText(locale, "Себестоимость")}<input type="number" min="0" step="0.01" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} className="rounded-lg border border-[#e5e2da] px-2 py-1.5" /></label>
+    {error && <div className="mb-2 rounded bg-rose-50 px-2 py-1 text-[11px] text-rose-700">{error}</div>}
+    <div className="flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-3 py-1.5 text-xs">{dealText(locale, "Отмена")}</button><button type="button" disabled={busy} onClick={() => void save()} className="rounded-lg bg-[#0f6b5f] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{dealText(locale, "Сохранить")}</button></div>
+  </div></div>;
 }
 
 function AddServiceModal({ deal, onClose, onSaved }: { deal: DealRow; onClose: () => void; onSaved: () => void }) {

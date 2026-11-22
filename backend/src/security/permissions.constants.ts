@@ -174,6 +174,7 @@ export const PERMISSIONS = {
   // read-only агрегаты обязательств/выплат/маржи/поступлений/долгов. Отдельный
   // least-privilege: payment-read НЕ даёт overview; overview НЕ даёт payout-write.
   "finance.overview.read": "Чтение сводных финансовых KPI (Finance Overview)",
+  "finance.deal.amounts.write": "Редактирование суммы продажи и себестоимости услуги в сделке",
   // Step 2.10A: LedgerTransaction read (Finance Center ledger view). Write —
   // только внутренний LedgerService (нет публичного write-эндпоинта).
   "finance.ledger.read": "Чтение LedgerTransaction (Finance Center)",
@@ -472,6 +473,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.dispute.write",
     "finance.invoice.read",
     "finance.invoice.write",
+    "finance.deal.amounts.write",
     "finance.commission.read",
     "finance.commission.write",
     "finance.commission.manage",

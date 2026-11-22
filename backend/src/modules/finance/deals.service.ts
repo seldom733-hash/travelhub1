@@ -202,6 +202,67 @@ export class DealsService {
     };
   }
 
+  async updateServiceAmounts(
+    sequence: string,
+    serviceId: string,
+    input: { salePrice?: number; costPrice?: number },
+    actor?: { id?: string; username?: string } | null,
+  ) {
+    const salePrice = Number(input.salePrice);
+    const costPrice = Number(input.costPrice);
+    if (!Number.isFinite(salePrice) || salePrice < 0) throw new BadRequestException("salePrice must be a non-negative number");
+    if (!Number.isFinite(costPrice) || costPrice < 0) throw new BadRequestException("costPrice must be a non-negative number");
+    const request = await this.prisma.request.findFirst({
+      where: { OR: [{ commerceSequence: sequence }, { referenceNumber: sequence }] },
+      select: { id: true, convertedOrderId: true, commercialSnapshot: true },
+    });
+    if (!request) throw new NotFoundException(`Deal ${sequence} not found`);
+    const service = await this.prisma.requestService.findUnique({ where: { id: serviceId } });
+    if (!service || service.requestId !== request.id) throw new NotFoundException(`Service ${serviceId} not found in deal ${sequence}`);
+
+    return this.prisma.$transaction(async (tx) => {
+      const data = { ...((service.data ?? {}) as Record<string, unknown>), salePrice: salePrice.toFixed(2), costPrice: costPrice.toFixed(2) };
+      await tx.requestService.update({ where: { id: serviceId }, data: { data: data as Prisma.InputJsonValue } });
+      const services = await tx.requestService.findMany({ where: { requestId: request.id }, select: { data: true } });
+      const totalSale = services.reduce((sum, item) => sum + Number((item.data as Record<string, unknown> | null)?.salePrice ?? 0), 0);
+      const totalCost = services.reduce((sum, item) => sum + Number((item.data as Record<string, unknown> | null)?.costPrice ?? 0), 0);
+      const requestSnapshot = {
+        ...((request.commercialSnapshot ?? {}) as Record<string, unknown>),
+        supplierPrice: totalCost,
+        netSupplierCost: totalCost,
+      };
+      await tx.request.update({
+        where: { id: request.id },
+        data: {
+          confirmedPrice: totalSale.toFixed(2),
+          displayedPrice: totalSale.toFixed(2),
+          commercialSnapshot: requestSnapshot as Prisma.InputJsonValue,
+        },
+      });
+      if (request.convertedOrderId) {
+        const order = await tx.order.findUnique({ where: { id: request.convertedOrderId }, select: { commercialSnapshot: true } });
+        const snapshot = { ...((order?.commercialSnapshot ?? request.commercialSnapshot ?? {}) as Record<string, unknown>), supplierPrice: totalCost, netSupplierCost: totalCost };
+        await tx.order.update({
+          where: { id: request.convertedOrderId },
+          data: { amount: totalSale.toFixed(2), subtotal: totalSale.toFixed(2), commercialSnapshot: snapshot as Prisma.InputJsonValue },
+        });
+      }
+      if (actor?.id) {
+        await tx.auditLog.create({
+          data: {
+            userId: actor.id,
+            username: actor.username ?? null,
+            action: "finance.deal.amounts.updated",
+            resource: "RequestService",
+            resourceId: serviceId,
+            details: { sequence, serviceId, salePrice, costPrice },
+          },
+        });
+      }
+      return { sequence, serviceId, salePrice: salePrice.toFixed(2), costPrice: costPrice.toFixed(2) };
+    });
+  }
+
   async decisionContext() {
     const now = new Date();
     const terminal = ["REJECTED", "UNAVAILABLE", "EXPIRED", "CUSTOMER_PAYMENT_TIMEOUT", "CANCELLED_BY_CUSTOMER", "CONVERTED"];
