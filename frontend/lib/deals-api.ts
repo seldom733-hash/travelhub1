@@ -30,7 +30,6 @@ export interface DealRow {
   isCancelledDeal: boolean;
   cancellationResult: string;
   settlementStatus: string | null;
-  settlementState: "NOT_STARTED" | "OPEN" | "CLOSED";
   manager: string | null;
   managerId: string | null;
   travelerCount: number | null;

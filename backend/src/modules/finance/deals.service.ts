@@ -11,7 +11,6 @@ type DealQuery = {
   viewerId?: string;
   cancellationReason?: string;
   settlementStatus?: string;
-  settlementState?: string;
   status?: string;
   statusGroup?: string;
   supplierId?: string;
@@ -92,7 +91,6 @@ type DealRow = {
   costAmount: string;
   grossMargin: string;
   settlementStatus: string | null;
-  settlementState: "NOT_STARTED" | "OPEN" | "CLOSED";
   supplierBasePrice: string;
   supplierBaseCurrency: string;
   supplierBasePriceAzn: string;
@@ -392,7 +390,6 @@ export class DealsService {
       if (query.hasClientDebt === "1" && Number(row.clientDebt) <= 0) return false;
       if (query.supplierPayment && row.supplierPaymentStatus !== query.supplierPayment) return false;
       if (query.settlementStatus && row.settlementStatus !== query.settlementStatus) return false;
-      if (query.settlementState && row.settlementState !== query.settlementState) return false;
       if (query.financialStatus && row.financialStatus !== query.financialStatus) return false;
       if (query.serviceType && row.productType !== query.serviceType) return false;
       if (from || to) {
@@ -665,16 +662,17 @@ export class DealsService {
       // cancellation and closure are statuses/actions, never stages.
       const clientRefundPending = clientRefundRows.filter((r) => ["REQUESTED", "APPROVED"].includes(r.status)).reduce((sum, r) => sum + money(r.amount), 0);
       const supplierRefundDue = cancelled ? Math.max(0, supplierPaid - supplierRefunded) : 0;
-      const hasFinancialActivity = captured > 0 || supplierPaid > 0 || refundedTotal > 0 || clientDebt > 0 || supplierDebt > 0 || Boolean(settlement);
       const clientNetRetained = Math.max(0, captured - refunded - Number(clientPenalty));
       const supplierNetRetained = Math.max(0, supplierPaid - supplierRefunded - Number(supplierPenalty));
-      const settlementOpen = isCancelledDeal
-        ? clientRefundPending > 0 || supplierRefundDue > 0 || clientNetRetained > 0 || supplierNetRetained > 0 || (Number(settlement?.remainingToPay ?? 0) > 0) || (Number(settlement?.remainingToRefund ?? 0) > 0)
-        : clientDebt > 0 || supplierDebt > 0 || clientRefundPending > 0 || (Number(settlement?.remainingToPay ?? 0) > 0) || (Number(settlement?.remainingToRefund ?? 0) > 0);
-      const settlementState = !hasFinancialActivity ? "NOT_STARTED" : settlementOpen ? "OPEN" : "CLOSED";
+      const clientPaidInFull = sales <= 0 ? captured > 0 : captured >= sales;
+      const supplierPaidInFull = cost <= 0 ? supplierPaid >= 0 : supplierPaid >= cost;
+      const cancelledSettled = isCancelledDeal && clientRefundPending <= 0 && supplierRefundDue <= 0 && clientNetRetained <= 0 && supplierNetRetained <= 0
+        && Number(settlement?.remainingToPay ?? 0) <= 0 && Number(settlement?.remainingToRefund ?? 0) <= 0;
+      const successfulClosed = !isCancelledDeal && completed && clientPaidInFull && supplierPaidInFull && tourEnded
+        && clientRefundPending <= 0 && Number(settlement?.remainingToRefund ?? 0) <= 0;
       status = isCancelledDeal
-        ? (settlementOpen ? "CANCELLED" : "CANCELLED_CLOSED")
-        : (completed ? (settlementOpen ? "COMPLETED" : "CLOSED") : status);
+        ? (cancelledSettled ? "CANCELLED_CLOSED" : "CANCELLED")
+        : (successfulClosed ? "CLOSED" : completed ? "COMPLETED" : status);
       const adults = Number(attrs.adults ?? 0) || null;
       const children = Number(attrs.children ?? 0) || null;
       const channel = request.sourceChannel ?? (commercial.priceSource === "PUBLIC" ? "Сайт (универсальный поиск)" : String(commercial.priceSource ?? "Ручное создание"));
@@ -761,7 +759,6 @@ export class DealsService {
         costAmount: fixed(cost),
         grossMargin: fixed(sales - cost),
         settlementStatus: settlement?.status ?? null,
-        settlementState,
         supplierBasePrice: fixed(money(commercial.supplierPrice as number | string | undefined) || cost),
         supplierBaseCurrency: String(commercial.supplierCurrency ?? order?.currency ?? request.confirmedCurrency ?? "AZN"),
         supplierBasePriceAzn: fixed(money(fx?.aznAmount as number | string | undefined) || cost),

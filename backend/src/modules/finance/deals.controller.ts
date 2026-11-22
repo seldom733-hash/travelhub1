@@ -14,7 +14,6 @@ function queryFrom(raw: Record<string, string | undefined>) {
     status: raw.status,
     statusGroup: raw.statusGroup,
     settlementStatus: raw.settlementStatus,
-    settlementState: raw.settlementState,
     cancellationReason: raw.cancellationReason,
     supplierId: raw.supplierId,
     country: raw.country,
