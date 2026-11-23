@@ -85,6 +85,46 @@ confirmPrice → customerAccept → convert
 Ошибка возникает при создании нового fixture, а не при самом lifecycle-action.
 Нужно отдельно проверить backend-лог/БД в момент создания request.
 
+## Найденная и исправленная причина POST /requests → 500
+
+`nextCommerceSequence()` передавал в `allocate()` уже префиксованный ключ
+`REFSEQ:COMMERCE:ROOT`, а `allocate()` добавлял ещё один `REFSEQ:`. В результате
+счётчик жил под ключом:
+
+```text
+REFSEQ:REFSEQ:COMMERCE:ROOT
+```
+
+со значением около `101`, тогда как импортированные заявки уже занимали
+`MKT-REQ-00019970`. Новые заявки получали `00000101` и падали на unique
+constraint.
+
+Исправлено:
+
+- ключ приведён к `COMMERCE:ROOT` (один префикс `REFSEQ:`);
+- перед выдачей номера `nextCommerceSequence()` поднимает счётчик выше
+  максимального существующего `commerceSequence` в Request/Order.
+
+Повторный discovery после исправления:
+
+```text
+actions discovered: 8
+actions executed:   8
+fixtures created:   14
+scenarios:           8
+successful:          8
+failed:              0
+```
+
+То есть `POST /requests → 500` больше не воспроизводится.
+
+## Полный прогон
+
+`SCENARIO_MAX_SCENARIOS=40, SCENARIO_MAX_DEPTH=12` запускался, но обход
+разветвлений занимает слишком много времени (десятки минут) и был остановлен.
+Для полного lifecycle нужен отдельный линейный happy-path сценарий, а не
+полный discovery-обход.
+
 ## Что пока НЕ покрыто
 
 `scenario-runner.js` проверяет state machine заявки/заказа/брони, но не выполняет:

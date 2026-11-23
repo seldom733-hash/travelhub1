@@ -91,7 +91,30 @@ export class ReferenceNumberService {
   async nextCommerceSequence(
     tx: Prisma.TransactionClient | null,
   ): Promise<string> {
-    const value = await this.allocate(tx, "REFSEQ:COMMERCE:ROOT");
+    // Allocate under the canonical single-prefixed key. The previous code
+    // passed "REFSEQ:COMMERCE:ROOT" while allocate() already adds "REFSEQ:",
+    // producing REFSEQ:REFSEQ:COMMERCE:ROOT and a counter that could collide
+    // with imported MKT-REQ references (e.g. 00000101).
+    const key = "COMMERCE:ROOT";
+    let value = await this.allocate(tx, key);
+
+    // Imported/historical rows may sit above the counter. Never issue a
+    // commerceSequence that already exists in Request/Order.
+    const client = (tx && typeof (tx as { businessSequence?: unknown }).businessSequence !== "undefined"
+      ? tx
+      : this.prisma) as unknown as Prisma.TransactionClient;
+    const [lastRequest, lastOrder] = await Promise.all([
+      client.request.findFirst({ where: { commerceSequence: { not: "" } }, orderBy: { commerceSequence: "desc" }, select: { commerceSequence: true } }),
+      client.order.findFirst({ orderBy: { commerceSequence: "desc" }, select: { commerceSequence: true } }),
+    ]);
+    const floor = Math.max(
+      Number(lastRequest?.commerceSequence ?? 0),
+      Number(lastOrder?.commerceSequence ?? 0),
+    ) + 1;
+    if (Number.isFinite(floor) && floor > value) {
+      await client.businessSequence.update({ where: { prefix: `REFSEQ:${key}` }, data: { value: floor } });
+      value = floor;
+    }
     return String(value).padStart(8, "0");
   }
 
