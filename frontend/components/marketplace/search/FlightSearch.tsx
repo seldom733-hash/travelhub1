@@ -87,7 +87,7 @@ export default function FlightSearch({ onSearch, resetSignal = 0 }: FlightSearch
       const infantAgesParam = sp.get("infantAges");
       if (infantAgesParam) {
         setInfantAges(
-          infantAgesParam.split(",").map(Number).filter((n) => !Number.isNaN(n)).map((n) => Math.min(1, Math.max(0, n))),
+          infantAgesParam.split(",").map(Number).filter((n) => !Number.isNaN(n)).map((n) => Math.min(2, Math.max(0, n))),
         );
       }
 
@@ -391,11 +391,11 @@ export default function FlightSearch({ onSearch, resetSignal = 0 }: FlightSearch
                 {children > 0 && (
                   <>
                     <p className="text-xs text-neutral-400">{t("search.flight_ages_hint", locale)}</p>
-                    <ChildAges count={children} ages={childAges} onChange={setChildAges} minAge={2} maxAge={11} />
+                    <ChildAges count={children} ages={childAges} onChange={setChildAges} minAge={2} maxAge={12} />
                   </>
                 )}
                 {infants > 0 && (
-                  <ChildAges count={infants} ages={infantAges} onChange={setInfantAges} minAge={0} maxAge={1} labelKey="search.infant_n" ageAriaKey="search.infant_age_aria" />
+                  <ChildAges count={infants} ages={infantAges} onChange={setInfantAges} minAge={0} maxAge={2} labelKey="search.infant_n" ageAriaKey="search.infant_age_aria" />
                 )}
               </div>
             )}

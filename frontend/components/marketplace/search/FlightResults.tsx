@@ -167,7 +167,7 @@ export default function FlightResults({
         <table className="w-full text-left text-[11px]">
           <thead className="bg-white/5 text-neutral-400">
             <tr>
-              {Array.from({ length: 12 }, (_, c) => (
+              {Array.from({ length: 13 }, (_, c) => (
                 <th key={c} className="px-2 py-2">
                   <div className="h-3 w-16 animate-pulse rounded bg-white/10" />
                 </th>
@@ -177,7 +177,7 @@ export default function FlightResults({
           <tbody className="divide-y divide-white/5">
             {Array.from({ length: 8 }, (_, r) => (
               <tr key={r}>
-                {Array.from({ length: 12 }, (_, c) => (
+                {Array.from({ length: 13 }, (_, c) => (
                   <td key={c} className="px-2 py-2">
                     <div className="h-3 w-full animate-pulse rounded bg-white/10" />
                   </td>
@@ -273,6 +273,7 @@ export default function FlightResults({
       else if (sortCol === "inPrice") { av = a.inFare ? fareAmount(a.inFare) || 999999 : 999999; bv = b.inFare ? fareAmount(b.inFare) || 999999 : 999999; }
       else if (sortCol === "adults") { av = a.out.requested?.passengers?.adults ?? 0; bv = b.out.requested?.passengers?.adults ?? 0; }
       else if (sortCol === "children") { av = a.out.requested?.passengers?.children ?? 0; bv = b.out.requested?.passengers?.children ?? 0; }
+      else if (sortCol === "infants") { av = a.out.requested?.passengers?.infants ?? 0; bv = b.out.requested?.passengers?.infants ?? 0; }
       else return 0;
       if (typeof av === "number" && typeof bv === "number") return sortDir === "asc" ? av - bv : bv - av;
       return sortDir === "asc" ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
@@ -319,6 +320,7 @@ export default function FlightResults({
               {showSupplier && <th className="px-2 py-2">Поставщик</th>}
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("adults")}>Взрослые {arrow("adults")}</th>
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("children")}>Дети {arrow("children")}</th>
+              <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("infants")}>Младенцы {arrow("infants")}</th>
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("price")}>{hasInbound ? "Общая цена" : "Цена"} {arrow("price")}</th>
               <th className="px-2 py-2">Места</th>
             </tr>
@@ -352,6 +354,7 @@ export default function FlightResults({
                   {showSupplier && <td className="px-2 py-2 text-neutral-300">{supplierOf(r.out, supplierLabels)}</td>}
                   <td className="px-2 py-2 text-white text-center">{r.out.requested?.passengers?.adults ?? 1}</td>
                   <td className="px-2 py-2 text-white text-center">{r.out.requested?.passengers?.children ?? 0}</td>
+                  <td className="px-2 py-2 text-white text-center">{r.out.requested?.passengers?.infants ?? 0}</td>
                   <td className="px-2 py-2 font-bold text-white">{r.total} {r.currency}</td>
                   <td className="px-2 py-2">
                     <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${seatsAvailable ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}>

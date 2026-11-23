@@ -218,7 +218,7 @@ function SearchResultsInner() {
         ? params.childAges.split(",").map(Number).filter((n) => !Number.isNaN(n))
         : undefined;
       const infantAges = params.infantAges
-        ? params.infantAges.split(",").map(Number).filter((n) => !Number.isNaN(n))
+        ? params.infantAges.split(",").map(Number).filter((n) => !Number.isNaN(n)).map((n) => Math.min(2, Math.max(0, n)))
         : undefined;
       const returnDate = params.returnDate || params.return || undefined;
       const tariff = params.tariff || "ALL";
