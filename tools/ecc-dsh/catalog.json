@@ -1,0 +1,79 @@
+{
+  "name": "navitravel-ecc-dsh",
+  "version": "1.0.0",
+  "description": "Curated DSH skill bridge inspired by selected ECC engineering practices. Skills-only: no upstream hooks, scripts, MCP servers, or installers are executed.",
+  "mode": "curated-skills",
+  "upstream": {
+    "repo": "affaan-m/ECC",
+    "url": "https://github.com/affaan-m/ECC",
+    "commit": "4adeee6732a12d1540f49a4d50a38ce8c97f9a53",
+    "license": "MIT",
+    "reviewedAt": "2026-11-23"
+  },
+  "principles": [
+    "plan before implementation",
+    "tests and verification before completion",
+    "review from a fresh perspective",
+    "security is part of correctness",
+    "keep changes scoped and evidence-based"
+  ],
+  "skills": [
+    {
+      "local": "navitravel-backend",
+      "path": ".agents/skills/navitravel-backend/SKILL.md",
+      "upstream": [
+        "skills/nestjs-patterns",
+        "skills/prisma-patterns",
+        "skills/postgres-patterns",
+        "skills/api-design",
+        "skills/backend-patterns"
+      ]
+    },
+    {
+      "local": "navitravel-frontend",
+      "path": ".agents/skills/navitravel-frontend/SKILL.md",
+      "upstream": [
+        "skills/nextjs-turbopack",
+        "skills/react-patterns",
+        "skills/frontend-patterns",
+        "skills/typescript-patterns",
+        "skills/i18n-sync"
+      ]
+    },
+    {
+      "local": "navitravel-verify",
+      "path": ".agents/skills/navitravel-verify/SKILL.md",
+      "upstream": [
+        "skills/verification-loop",
+        "skills/tdd-workflow",
+        "skills/e2e-testing"
+      ]
+    },
+    {
+      "local": "navitravel-security",
+      "path": ".agents/skills/navitravel-security/SKILL.md",
+      "upstream": [
+        "skills/security-review",
+        "skills/agent-security-hardening",
+        "skills/web-perimeter-owasp-2025-audit"
+      ]
+    },
+    {
+      "local": "navitravel-review",
+      "path": ".agents/skills/navitravel-review/SKILL.md",
+      "upstream": [
+        "skills/ecc-contribution-review",
+        "skills/architecture-decision-records",
+        "skills/verification-loop"
+      ]
+    }
+  ],
+  "notPorted": [
+    "Claude Code hooks and hook runtime",
+    "AgentShield scanning binary",
+    "MCP server configuration",
+    "install.sh / install.ps1",
+    "automatic memory injection",
+    "marketplace lifecycle"
+  ]
+}
