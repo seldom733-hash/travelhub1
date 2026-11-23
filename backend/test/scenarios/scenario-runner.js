@@ -55,9 +55,13 @@ class Api {
   }
 
   async call(method, url, data, extraHeaders) {
+    const timeoutMs = Number(process.env.SCENARIO_REQUEST_TIMEOUT_MS || 30000);
+    if (process.env.SCENARIO_DEBUG === "1") console.log(`[scenario] API ${method} ${url}`);
     const response = await this.context.fetch(`${BASE}${url}`, {
       method,
       data,
+      timeout: timeoutMs,
+      signal: AbortSignal.timeout(timeoutMs),
       headers: { "Content-Type": "application/json", ...(extraHeaders || {}) },
     });
     const text = await response.text();
@@ -563,9 +567,11 @@ async function main() {
       cyclesDetected: 0, visitedStates: 0, unvisitedScenarios: 0,
       testCustomerIds: [], scenariosDetail: [], failures: [],
     };
-    for (const saved of map.scenarios || []) {
-      if (saved.truncated) continue;
+    const savedScenarios = (map.scenarios || []).filter((saved) => !saved.truncated);
+    for (let index = 0; index < savedScenarios.length; index += 1) {
+      const saved = savedScenarios[index];
       const pathActions = saved.path || [];
+      console.log(`[scenario] regression ${index + 1}/${savedScenarios.length}: ${pathActions.join(" → ") || "(root)"}`);
       try {
         const { fixture, state } = await runner.replay(pathActions);
         report.testedActions += 1;

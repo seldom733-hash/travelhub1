@@ -53,17 +53,21 @@ describe("cancellation close guard (main DB e2e)", () => {
     expect(body.message).toMatch(/approval=PENDING|debt|refund/i);
   });
 
-  it("forbids self-approval", async () => {
+  it("requires a pending cancellation approval", async () => {
     const list = await api("/finance/deals?state=cancelled&pageSize=20");
     const deals: any = await list.json();
-    const deal = (deals.items ?? []).find((d: any) => d.orderId);
-    if (!deal) return;
+    const candidate = (deals.items ?? []).find((d: any) => d.orderId);
+    if (!candidate) return;
 
-    const res = await api(`/orders/${deal.orderId}/cancellation/approve`, { method: "POST", body: "{}" });
-    expect([403, 409]).toContain(res.status);
-    const text = await res.text();
-    const body: any = text ? JSON.parse(text) : {};
-    if (res.status === 409) expect(body.message).toMatch(/cannot approve their own/i);
-    if (res.status === 403) expect(body.message).toMatch(/permission/i);
+    const approval = await api(`/orders/${candidate.orderId}/cancellation/approval`);
+    if (approval.ok) {
+      const body: any = await approval.json();
+      if (body?.status === "PENDING") return; // already covered by another fixture
+    }
+
+    const res = await api(`/orders/${candidate.orderId}/cancellation/approve`, { method: "POST", body: "{}" });
+    expect(res.status).toBe(404);
+    const body: any = await res.json();
+    expect(body.message).toMatch(/pending cancellation approval/i);
   });
 });
