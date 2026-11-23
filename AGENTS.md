@@ -7,6 +7,16 @@ For new UI screens, redesigns, or visual polish, use the `frontend-design` skill
 (design tokens, RU/AZ/EN copy, accessibility) and verify the result in the
 browser at desktop and mobile widths.
 
+## Engineering workflow
+
+Before changing code, follow [`docs/ENGINEERING.md`](docs/ENGINEERING.md) and
+[`docs/DEFINITION-OF-DONE.md`](docs/DEFINITION-OF-DONE.md). Use the project
+skills by task: `navitravel-backend`, `navitravel-frontend`,
+`navitravel-verify`, `navitravel-security`, `navitravel-review`.
+
+A successful build alone is not completion. Verify the API or browser behavior
+and state what was not verified.
+
 ## Graphify
 
 A project-scoped Graphify skill and a prebuilt code graph are available.
