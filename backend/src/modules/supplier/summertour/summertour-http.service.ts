@@ -120,9 +120,15 @@ export class SummertourHttpService {
       _: String(ts),
     };
 
-    // Add AGES if children > 0
-    if (params.children > 0 && params.childAges?.length) {
-      (queryParams as any).AGES = String(params.childAges[0]);
+    // Add AGES if children > 0. Summertour accepts the full CSVs of
+    // children's ages, not just the first child (same contract as KOMPAS/
+    // ANEX/KazUnion/Voyager). Pad missing ages with 0.
+    if (params.children > 0) {
+      const ages = Array.from(
+        { length: params.children },
+        (_, index) => Number(params.childAges?.[index] ?? 0),
+      );
+      (queryParams as any).AGES = ages.join(",");
     }
 
     const url = this.buildUrl(queryParams);
