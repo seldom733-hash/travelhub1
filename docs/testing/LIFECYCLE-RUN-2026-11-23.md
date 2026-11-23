@@ -204,3 +204,54 @@ availableActions = []
 Также исправлена вторая коллизия: импортированные `ORD-00019970` /
 `REQ-00019970` не были учтены в `BusinessSequence` (счётчики 93/156). Добавлен
 `nextCodeAbove()`: код заявки/заказа выделяется выше максимального импортированного.
+
+
+## Cancellation + penalty (2026-11-23)
+
+Сценарий: `backend/test/scenarios/lifecycle-cancel-penalty.js`
+
+Пройдено:
+
+```text
+confirmPrice → customerAccept → convert → process
+→ requestCancellation
+→ cancellation approval submitted (PENDING)
+→ client refund 700 AZN: approved + processed
+```
+
+Approval заблокирован:
+
+```text
+409 Cannot financially settle MKT-ORD-00020032: LEDGER_INCOMPLETE
+```
+
+Проверка БД:
+
+```text
+Payment CAPTURED 1000 — ledger entries: 0
+Refund PROCESSED 700 — ledger entries: 0
+```
+
+То есть settlement не может подтвердиться, пока ledger posting для платежа и
+возврата не создан. Penalty waiver недоступен, потому что settlement ещё не
+создан.
+
+### Исправлена атомарность approval
+
+До исправления approval сначала переводил заказ в `CANCELLATION_APPROVED`,
+затем вызывал settlement. Если settlement падал, заказ оставался в
+`CANCELLATION_APPROVED` без settlement.
+
+Теперь при ошибке статус откатывается в `CANCELLATION_REQUESTED`, пишется
+`approvalRolledBack`.
+
+### Следующий блокер
+
+`LedgerPostingConsumer` / PaymentCaptured / RefundProcessed должны создавать:
+
+```text
+PAYMENT_CAPTURED
+REFUND_PROCESSED
+```
+
+Без этого penalty settlement и waiver нельзя проверить через API.

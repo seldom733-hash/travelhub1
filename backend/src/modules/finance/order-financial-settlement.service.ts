@@ -246,7 +246,8 @@ export class OrderFinancialSettlementService {
     // FINANCE/ADMIN may approve the calculation they submitted; managers do
     // not have finance.settlement.approve, so operational segregation remains.
     const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { status: true } });
-    if (order?.status === "CANCELLATION_REQUESTED") {
+    const advanced = order?.status === "CANCELLATION_REQUESTED";
+    if (advanced) {
       await this.prisma.$transaction(async (tx) => {
         await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLATION_APPROVED", cancellationApprovedAt: new Date(), version: { increment: 1 } } });
         await tx.orderHistory.create({ data: { orderId, action: "approveCancellation", from: "CANCELLATION_REQUESTED", to: "CANCELLATION_APPROVED", source: "API", actorId: actor.id, actorName: actor.username, comment: "Финансовый расчёт утверждён" } });
@@ -255,7 +256,20 @@ export class OrderFinancialSettlementService {
     // Confirm the settlement in the same approval action. Previously the first
     // click only moved the order to CANCELLATION_APPROVED and returned without
     // creating OrderFinancialSettlement, leaving all penalty KPIs at zero.
-    const settlement = await this.confirm(orderId, approval.input as unknown as SettlementConfirmInput, actor);
+    // If confirmation is blocked, roll the status change back: an approved
+    // cancellation without a settlement must never be left behind.
+    let settlement;
+    try {
+      settlement = await this.confirm(orderId, approval.input as unknown as SettlementConfirmInput, actor);
+    } catch (error) {
+      if (advanced) {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLATION_REQUESTED", cancellationApprovedAt: null, cancellationApprovedById: null, version: { increment: 1 } } });
+          await tx.orderHistory.create({ data: { orderId, action: "approvalRolledBack", from: "CANCELLATION_APPROVED", to: "CANCELLATION_REQUESTED", source: "API", actorId: actor.id, actorName: actor.username, comment: "Финансовый расчёт не подтверждён; статус возвращён" } });
+        });
+      }
+      throw error;
+    }
     await this.prisma.cancellationApproval.update({ where: { id: approval.id }, data: { status: "APPROVED", approvedById: actor.id, approvedByName: actor.username, approvedAt: new Date() } });
     return settlement;
   }
