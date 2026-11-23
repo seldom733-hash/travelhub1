@@ -120,6 +120,11 @@ export default function SupplierUpdatesPage() {
     }
   }, []);
 
+  /** Update the visible runs table immediately — без ожидания полной перезагрузки. */
+  const upsertRun = useCallback((next: SupplierCatalogRun) => {
+    setRuns((current) => [next, ...current.filter((item) => item.id !== next.id)]);
+  }, []);
+
   const loadPhotoReviews = useCallback(async () => {
     try {
       setPhotoReviews(await supplierCatalogApi.photoReviews());
@@ -263,6 +268,7 @@ export default function SupplierUpdatesPage() {
   const pollRun = useCallback(async (id: string) => {
     const next = await supplierCatalogApi.run(id);
     setRun(next);
+    upsertRun(next);
     if (next.status !== "PREVIEWING" && next.status !== "APPLYING") {
       await loadRuns();
       // Discovery runs before an ALL preview (and after scoped previews);
@@ -271,7 +277,7 @@ export default function SupplierUpdatesPage() {
       setCapabilities(await supplierCatalogApi.capabilities());
     }
     return next;
-  }, [loadRuns]);
+  }, [loadRuns, upsertRun]);
 
   useEffect(() => {
     if (!run || !["PREVIEWING", "APPLYING"].includes(run.status)) return;
@@ -280,6 +286,22 @@ export default function SupplierUpdatesPage() {
     }, 1500);
     return () => window.clearInterval(timer);
   }, [run, pollRun]);
+
+  // Poll every active run in the table, not only the selected one. This keeps
+  // «Предпросмотр» → «Завершён/Ошибка/Отмена» in sync without a page reload.
+  const hasActiveRuns = runs.some((item) => ["PREVIEWING", "APPLYING"].includes(item.status));
+  useEffect(() => {
+    if (!hasActiveRuns) return;
+    const timer = window.setInterval(() => {
+      void supplierCatalogApi.runs(30)
+        .then((next) => {
+          setRuns(next);
+          setRun((current) => current ? (next.find((item) => item.id === current.id) ?? current) : current);
+        })
+        .catch((e) => setError((e as Error).message));
+    }, 1500);
+    return () => window.clearInterval(timer);
+  }, [hasActiveRuns]);
 
   // The selected run id is kept in the URL so a refresh / shared link opens
   // the same saved preview report instead of an empty panel.
@@ -304,6 +326,7 @@ export default function SupplierUpdatesPage() {
     try {
       const created = await supplierCatalogApi.preview({ supplierCode, serviceType, countryKey });
       setRun(created);
+      upsertRun(created);
       setRunInUrl(created.id);
     } catch (e) {
       setError((e as Error).message);
@@ -317,7 +340,9 @@ export default function SupplierUpdatesPage() {
     setBusy(true);
     setError("");
     try {
-      setRun(await supplierCatalogApi.confirm(run.id));
+      const next = await supplierCatalogApi.confirm(run.id);
+      setRun(next);
+      upsertRun(next);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -330,7 +355,9 @@ export default function SupplierUpdatesPage() {
     setBusy(true);
     setError("");
     try {
-      setRun(await supplierCatalogApi.manualRestore(run.id, itemId));
+      const next = await supplierCatalogApi.manualRestore(run.id, itemId);
+      setRun(next);
+      upsertRun(next);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -542,7 +569,7 @@ export default function SupplierUpdatesPage() {
             {run && ["PREVIEWING", "PREVIEW_READY"].includes(run.status) && (
               <button
                 type="button"
-                onClick={() => void supplierCatalogApi.cancel(run.id).then(setRun).catch((e) => setError((e as Error).message))}
+                onClick={() => void supplierCatalogApi.cancel(run.id).then((next) => { setRun(next); upsertRun(next); }).catch((e) => setError((e as Error).message))}
                 className="rounded-lg border border-line px-4 py-2 text-sm text-ink/60"
               >
                 {tr("Отменить", "Ləğv et", "Cancel")}
@@ -746,7 +773,7 @@ export default function SupplierUpdatesPage() {
                       <td className="px-2 py-2"><span className={`rounded-full border px-2 py-0.5 font-semibold ${item.status === "COMPLETED" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : item.status === "FAILED" || item.status === "PARTIAL" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>{runStatusLabel(item.status)}</span></td>
                       <td className="px-2 py-2">{coverageLabel(item.coverage)}</td>
                       <td className="px-2 py-2 text-ink/60">{item.createdByName ?? "—"}</td>
-                      <td className="px-2 py-2">{["PREVIEWING", "APPLYING"].includes(item.status) && <button type="button" onClick={(e) => { e.stopPropagation(); void supplierCatalogApi.cancel(item.id).then(() => loadRuns()).catch((err) => setError((err as Error).message)); }} className="rounded border border-rose-200 px-2 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50">{tr("Остановить", "Dayandır", "Stop")}</button>}</td>
+                      <td className="px-2 py-2">{["PREVIEWING", "APPLYING"].includes(item.status) && <button type="button" onClick={(e) => { e.stopPropagation(); void supplierCatalogApi.cancel(item.id).then((next) => { upsertRun(next); if (run?.id === item.id) setRun(next); }).catch((err) => setError((err as Error).message)); }} className="rounded border border-rose-200 px-2 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50">{tr("Остановить", "Dayandır", "Stop")}</button>}</td>
                     </tr>
                   ))}
                 </tbody>
