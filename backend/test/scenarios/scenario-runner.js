@@ -137,7 +137,7 @@ class Runner {
     await this.api.post("/auth/login", { username: process.env.SCENARIO_USER || "admin", password: process.env.SCENARIO_PASSWORD || "admin123" });
   }
 
-  async createFixture(label) {
+  async createFixture(label, overrides = {}) {
     this.createdFixtures += 1;
     const tag = `${RUN_ID}-${this.createdFixtures}`;
     const email = `scenario.${tag}@test.local`;
@@ -162,7 +162,7 @@ class Runner {
       travelers: [{ firstName: "SCENARIO", lastName: "TRAVELER", birthDate: "1990-01-01", position: 1 }],
       services: [{ serviceType: "HOTEL", title: `AUTOMATED TEST ${label || tag}`, data: { costPrice: "700", salePrice: "1000" } }],
     };
-    const created = await this.api.post("/requests", requestBody);
+    const created = await this.api.post("/requests", { ...requestBody, ...overrides });
     const state = { customerId: customer.id, requestId: created.id, orderId: null, bookingId: null };
     return state;
   }

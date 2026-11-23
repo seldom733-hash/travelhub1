@@ -180,9 +180,26 @@ refundedAmount = 0
 availableActions = [requestCancellation]
 ```
 
-Закрытие пока заблокировано, потому что у fixture есть supplier obligation
-на 700 AZN и нет поставщика/платежа поставщику. Это корректный close guard,
-но fixture нужно расширить supplier-контекстом.
+После добавления supplier-платежа fixture теперь доходит до CLOSED:
+
+```text
+request → order → booking → service → complete
+supplier payment 700 AZN (SPO-*)
+→ order.close
+```
+
+Итог:
+
+```text
+order.status   = CLOSED
+amount         = 1000
+paidAmount     = 1000
+refundedAmount = 0
+supplier payment = 700 AZN
+availableActions = []
+```
+
+Это подтверждает полный happy-path до закрытия.
 
 Также исправлена вторая коллизия: импортированные `ORD-00019970` /
 `REQ-00019970` не были учтены в `BusinessSequence` (счётчики 93/156). Добавлен
