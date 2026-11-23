@@ -22,7 +22,11 @@ export class SummerGdsFlightAddonService {
     "238": "IST",
   };
 
-  private readonly flightCache = new Map<string, Promise<number | null>>();
+  private readonly flightCache = new Map<string, { promise: Promise<number | null>; expiresAt: number }>();
+
+  /** Reuse a successful AZAL quote briefly; retry a missing/empty quote sooner. */
+  private static readonly FLIGHT_CACHE_TTL_MS = 10 * 60 * 1000;
+  private static readonly FLIGHT_RETRY_TTL_MS = 30 * 1000;
 
   constructor(
     private readonly azal: AzalAdapter,
@@ -193,11 +197,27 @@ export class SummerGdsFlightAddonService {
     passengers: { adults: number; children: number; childAges: number[] },
   ): Promise<number | null> {
     const key = `${airport}:${departureDate}:${returnDate}:${passengers.adults}:${passengers.children}:${passengers.childAges.join(",")}`;
+    const now = Date.now();
     const cached = this.flightCache.get(key);
-    if (cached) return cached;
-    const promise = this.loadMinRoundTrip(airport, departureDate, returnDate, passengers);
-    this.flightCache.set(key, promise);
-    // Short-lived cache: AZAL prices move; keep the map bounded.
+    if (cached && cached.expiresAt > now) return cached.promise;
+    if (cached) this.flightCache.delete(key);
+    const promise = this.loadMinRoundTrip(airport, departureDate, returnDate, passengers)
+      .then((value) => {
+        if (value == null) {
+          // A transient AZAL/CDP failure must not pin "no air price" for the
+          // whole process. Retry after a short backoff.
+          this.flightCache.delete(key);
+        } else {
+          this.flightCache.set(key, { promise, expiresAt: Date.now() + SummerGdsFlightAddonService.FLIGHT_CACHE_TTL_MS });
+        }
+        return value;
+      })
+      .catch((error) => {
+        this.flightCache.delete(key);
+        throw error;
+      });
+    this.flightCache.set(key, { promise, expiresAt: now + SummerGdsFlightAddonService.FLIGHT_RETRY_TTL_MS });
+    // Keep the map bounded during long-running syncs.
     if (this.flightCache.size > 500) {
       const oldest = this.flightCache.keys().next().value;
       if (oldest) this.flightCache.delete(oldest);
@@ -231,7 +251,12 @@ export class SummerGdsFlightAddonService {
         .flatMap((f) => f.fares)
         .filter((f) => f.available && Number(f.total.amount) > 0)
         .map((f) => Number(f.total.amount));
-      if (candidates.length === 0) return null;
+      if (candidates.length === 0) {
+        this.logger.warn(
+          `[AZAL ADD-ON EMPTY] ${airport} ${departureDate}/${returnDate} pax=${passengers.adults}A/${passengers.children}C flights=${flights.length}`,
+        );
+        return null;
+      }
       return this.publicFlightAmount(Math.min(...candidates));
     } catch (err) {
       this.logger.warn(`AZAL add-on ${airport} ${departureDate}/${returnDate}: ${(err as Error).message}`);
