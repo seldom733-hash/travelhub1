@@ -41,6 +41,8 @@ export interface SupplierSearchQuery {
   adults: number;
   children?: number;
   childAges?: number[];
+  infants?: number;
+  infantAges?: number[];
   /** Hotel filter. */
   hotel?: string;
   /** Hotel external ID (for supplier-specific filtering). */
@@ -399,6 +401,8 @@ export interface PriceCalendarQuery {
   adults: number;
   children?: number;
   childAges?: number[];
+  infants?: number;
+  infantAges?: number[];
   /** Night count. */
   nights: number;
   /** Date range (ISO-8601). */

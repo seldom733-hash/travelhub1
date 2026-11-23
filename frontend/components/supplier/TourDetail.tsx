@@ -86,6 +86,8 @@ export default function TourDetail({
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [childAges, setChildAges] = useState<number[]>([]);
+  const [infants, setInfants] = useState(0);
+  const [infantAges, setInfantAges] = useState<number[]>([]);
   const [nights, setNights] = useState(() => {
     // Prefer the nearest-price night count saved by the catalog sync, then the
     // supplier card value. ANEX starts at 2 nights; the select mirrors the
@@ -136,6 +138,8 @@ export default function TourDetail({
       adults,
       children: children || undefined,
       childAges: childAges.length > 0 ? childAges : undefined,
+      infants: infants || undefined,
+      infantAges: infantAges.length > 0 ? infantAges : undefined,
       tourIncValue: isGdsProgram ? storedTourInc : undefined,
       tourIncName: isGdsProgram ? (attributes?.tourIncName as string | undefined) : undefined,
     }),
@@ -149,6 +153,8 @@ export default function TourDetail({
       adults,
       children,
       childAges,
+      infants,
+      infantAges,
       isGdsProgram,
       storedTourInc,
       attributes?.tourIncName,
@@ -188,9 +194,11 @@ export default function TourDetail({
       adults,
       children,
       childAges,
+      infants,
+      infantAges,
       nights,
     }),
-    [departureCity, destination, attributes, adults, children, childAges, nights, locale],
+    [departureCity, destination, attributes, adults, children, childAges, infants, infantAges, nights, locale],
   );
 
   return (
@@ -284,11 +292,57 @@ export default function TourDetail({
                     }}
                     className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
                   >
-                    {Array.from({ length: 15 }, (_, i) => i).map((a) => (
+                    {Array.from({ length: 11 }, (_, i) => i + 2).map((a) => (
                       <option key={a} value={a}>
                         {a} {sx(locale, "лет", "yaş", "years")}
                       </option>
                     ))}
+                  </select>
+                ))}
+              </div>
+            )}
+
+            {/* Infants */}
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-ink/60">
+                {t("tour.infants", locale) ?? "Младенцы"}
+              </label>
+              <select
+                value={infants}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setInfants(v);
+                  if (v === 0) setInfantAges([]);
+                  else if (infantAges.length < v) setInfantAges([...infantAges, ...Array(v - infantAges.length).fill(0)]);
+                  else setInfantAges(infantAges.slice(0, v));
+                }}
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
+              >
+                {[0, 1, 2].map((n) => (
+                  <option key={n} value={n}>
+                    {n === 0 ? sx(locale, "Нет младенцев", "Körpə yoxdur", "No infants") : `${n} ${sx(locale, "младенцев", "körpə", "infants")}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {infants > 0 && (
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-ink/60">
+                  {t("tour.infant_ages", locale) ?? "Возраст младенца"}
+                </label>
+                {infantAges.map((age, idx) => (
+                  <select
+                    key={idx}
+                    value={age}
+                    onChange={(e) => {
+                      const next = [...infantAges];
+                      next[idx] = Number(e.target.value);
+                      setInfantAges(next);
+                    }}
+                    className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
+                  >
+                    {[0, 1, 2].map((a) => <option key={a} value={a}>{a} {sx(locale, "лет", "yaş", "years")}</option>)}
                   </select>
                 ))}
               </div>

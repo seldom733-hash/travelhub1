@@ -21,6 +21,8 @@ export interface SupplierSearchQuery {
   adults?: number;
   children?: number;
   childAges?: number[];
+  infants?: number;
+  infantAges?: number[];
   hotelExternalId?: string;
   hotel?: string;
   hotelStars?: string[];
@@ -121,6 +123,8 @@ export interface SupplierPriceCalendarEntryOffer {
   adults: number;
   children: number;
   childAges: number[];
+  infants?: number;
+  infantAges?: number[];
   availability: SupplierAvailability;
   price: number;
   currency: string;
@@ -273,6 +277,8 @@ function supplierSearchParams(
     adults: query.adults,
     children: query.children,
     childAges: query.childAges?.join(","),
+    infants: query.infants,
+    infantAges: query.infantAges?.join(","),
     meal: query.meal,
     hotel: query.hotel,
     hotelStars: query.hotelStars?.join(","),
@@ -317,6 +323,8 @@ export async function searchSupplierOffers(
     adults: query.adults,
     children: query.children,
     childAges: query.childAges?.join(","),
+    infants: query.infants,
+    infantAges: query.infantAges?.join(","),
     hotelStars: query.hotelStars?.join(","),
     meal: query.meal,
     page: query.page,

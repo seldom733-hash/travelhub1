@@ -38,7 +38,7 @@ export class SummerGdsFlightAddonService {
     program: string,
     departureDate: string | null | undefined,
     nights: number | null | undefined,
-    passengers: { adults: number; children?: number; childAges?: number[] } = { adults: 2 },
+    passengers: { adults: number; children?: number; childAges?: number[]; infants?: number; infantAges?: number[] } = { adults: 2 },
   ): Promise<number | null> {
     const airport = SummerGdsFlightAddonService.GDS_AIRPORT[String(program)];
     const n = Math.round(Number(nights) || 0);
@@ -47,19 +47,23 @@ export class SummerGdsFlightAddonService {
       adults: Math.max(1, Number(passengers.adults) || 2),
       children: Math.max(0, Number(passengers.children) || 0),
       childAges: passengers.childAges ?? [],
+      infants: Math.max(0, Number(passengers.infants) || 0),
+      infantAges: passengers.infantAges ?? [],
     });
   }
 
   /** Add AZAL round-trip flight cost to Summertour GDS search offers. */
   async applyToOffers(
     offers: SupplierOffer[],
-    passengers: { adults: number; children?: number; childAges?: number[] } = { adults: 1 },
+    passengers: { adults: number; children?: number; childAges?: number[]; infants?: number; infantAges?: number[] } = { adults: 1 },
   ): Promise<SupplierOffer[]> {
     if (offers.length === 0) return offers;
     const pax = {
       adults: Math.max(1, Number(passengers.adults) || 1),
       children: Math.max(0, Number(passengers.children) || 0),
       childAges: passengers.childAges ?? [],
+      infants: Math.max(0, Number(passengers.infants) || 0),
+      infantAges: passengers.infantAges ?? [],
     };
     const out: SupplierOffer[] = [];
     for (const offer of offers) {
@@ -111,6 +115,8 @@ export class SummerGdsFlightAddonService {
       adults: Math.max(1, Number(query.adults) || 1),
       children: Math.max(0, Number(query.children) || 0),
       childAges: query.childAges ?? [],
+      infants: Math.max(0, Number((query as any).infants) || 0),
+      infantAges: (query as any).infantAges ?? [],
     };
     const [outbound, inbound] = await Promise.all([
       this.calendarPrices("GYD", airport, minDate, maxDate, pax),
@@ -194,9 +200,9 @@ export class SummerGdsFlightAddonService {
     airport: string,
     departureDate: string,
     returnDate: string,
-    passengers: { adults: number; children: number; childAges: number[] },
+    passengers: { adults: number; children: number; childAges: number[]; infants: number; infantAges: number[] },
   ): Promise<number | null> {
-    const key = `${airport}:${departureDate}:${returnDate}:${passengers.adults}:${passengers.children}:${passengers.childAges.join(",")}`;
+    const key = `${airport}:${departureDate}:${returnDate}:${passengers.adults}:${passengers.children}:${passengers.childAges.join(",")}:${passengers.infants}:${passengers.infantAges.join(",")}`;
     const now = Date.now();
     const cached = this.flightCache.get(key);
     if (cached && cached.expiresAt > now) return cached.promise;
@@ -229,7 +235,7 @@ export class SummerGdsFlightAddonService {
     airport: string,
     departureDate: string,
     returnDate: string,
-    passengers: { adults: number; children: number; childAges: number[] },
+    passengers: { adults: number; children: number; childAges: number[]; infants: number; infantAges: number[] },
   ): Promise<number | null> {
     try {
       const result = await this.azal.search({
@@ -241,7 +247,7 @@ export class SummerGdsFlightAddonService {
         passengers: {
           adults: passengers.adults,
           children: passengers.children,
-          infants: 0,
+          infants: passengers.infants,
           childAges: passengers.childAges,
         },
       });
@@ -269,7 +275,7 @@ export class SummerGdsFlightAddonService {
     to: string,
     dateFrom: string,
     dateTo: string,
-    passengers: { adults: number; children: number; childAges: number[] },
+    passengers: { adults: number; children: number; childAges: number[]; infants: number; infantAges: number[] },
   ): Promise<Map<string, number>> {
     try {
       const result = await this.azal.calendar({
@@ -278,7 +284,7 @@ export class SummerGdsFlightAddonService {
         passengers: {
           adults: passengers.adults,
           children: passengers.children,
-          infants: 0,
+          infants: passengers.infants,
           childAges: passengers.childAges,
         },
         dates: { from: dateFrom, to: dateTo },

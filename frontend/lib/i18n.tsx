@@ -295,6 +295,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "tour.adults": { ru: "Взрослые", az: "Yetkinlər", en: "Adults" },
   "tour.children": { ru: "Дети", az: "Uşaqlar", en: "Children" },
   "tour.child_ages": { ru: "Возраст ребёнка", az: "Uşağın yaşı", en: "Child age" },
+  "tour.infants": { ru: "Младенцы", az: "Körpələr", en: "Infants" },
+  "tour.infant_ages": { ru: "Возраст младенца", az: "Körpənin yaşı", en: "Infant age" },
   "tour.calendar_hint": { ru: "Нажмите на цену, чтобы посмотреть варианты размещения и подать заявку.", az: "Yerləşmə variantlarını görmək və müraciət göndərmək üçün qiymətə klikləyin.", en: "Click a price to view room options and submit a request." },
   "tour.howto_title": { ru: "Как подать заявку", az: "Müraciəti necə göndərmək olar", en: "How to submit a request" },
   "tour.howto_step1": { ru: "Выберите параметры тура в панели слева", az: "Solda tur parametrlərini seçin", en: "Choose your tour parameters on the left" },

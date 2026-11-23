@@ -21,6 +21,8 @@ export type OfferSummary = {
   adults: number;
   children: number;
   childAges: number[];
+  infants?: number;
+  infantAges?: number[];
   nights: number;
 };
 

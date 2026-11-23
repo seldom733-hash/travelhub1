@@ -112,9 +112,9 @@ export default function DayTariffsPanel({
     return (
       <div
         data-testid="day-tariffs-empty"
-        className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center"
+        className="rounded-2xl border border-dashed border-line bg-panel p-6 text-center"
       >
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-ink/60">
           {emptyText ?? t("offer.select_day_hint", locale)}
         </p>
       </div>
@@ -126,14 +126,14 @@ export default function DayTariffsPanel({
   const entryDateLabel = entryDay && entryMonth && entryYear ? `${entryDay}.${entryMonth}.${entryYear.slice(-2)}` : entry.date;
 
   return (
-    <section aria-labelledby="day-tariffs-title" className="rounded-2xl border border-slate-200 bg-white">
+    <section aria-labelledby="day-tariffs-title" className="rounded-2xl border border-line bg-white">
       {/* Header — the selected day (§4.8.1, inline) */}
-      <div className="border-b border-slate-200 px-5 py-4">
-        <h3 id="day-tariffs-title" className="text-base font-bold text-slate-900">
+      <div className="border-b border-line px-5 py-4">
+        <h3 id="day-tariffs-title" className="text-base font-bold text-ink">
           {t("offer.request_title", locale)}
         </h3>
-        <div className="mt-0.5 text-sm font-medium text-slate-700">{title}</div>
-        <div className="mt-1 flex flex-wrap gap-1 text-xs text-slate-500">
+        <div className="mt-0.5 text-sm font-medium text-ink">{title}</div>
+        <div className="mt-1 flex flex-wrap gap-1 text-xs text-ink/60">
           <span>{entryDateLabel}</span>
           <span>·</span>
           <span>
@@ -144,6 +144,7 @@ export default function DayTariffsPanel({
           <span>
             {summary.adults} {t("supplier.adults", locale)}
             {summary.children > 0 && `, ${summary.children} ${t("supplier.children", locale)}`}
+            {(summary.infants ?? 0) > 0 && `, ${summary.infants} ${t("search.infants", locale)}`}
           </span>
           <span>·</span>
           <span>{ti("offer.tariffs_count", locale, { n: String(offers.length) })}</span>
@@ -151,16 +152,16 @@ export default function DayTariffsPanel({
       </div>
 
       <div className="px-5 pb-5">
-        <h4 className="mb-2 pt-4 text-sm font-semibold text-slate-800">
+        <h4 className="mb-2 pt-4 text-sm font-semibold text-ink">
           {t("offer.variants_title", locale)}
         </h4>
 
         {offers.length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-500">
+          <p className="py-8 text-center text-sm text-ink/60">
             {entry.absenceText ?? t("tour.no_offers", locale)}
           </p>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-line">
             {offers.map((offer, idx) => (
               <OfferRow
                 key={`${offer.externalOfferId}-${idx}`}
@@ -177,19 +178,19 @@ export default function DayTariffsPanel({
         )}
 
         {/* §4.8.13: ONE shared traveler form for every tariff of the day */}
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <h4 className="mb-3 text-sm font-semibold text-slate-800">
+        <div className="mt-4 rounded-xl border border-line bg-panel p-4">
+          <h4 className="mb-3 text-sm font-semibold text-ink">
             {t("offer.customer_title", locale)}
           </h4>
           {isClient ? (
-            <p className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            <p className="mb-3 rounded-lg border border-brand/20 bg-brand/10 px-3 py-2 text-xs text-brand-dark">
               {sx(locale, "Данные заполнены из профиля и не редактируются здесь.", "Məlumatlar profildən doldurulub və burada redaktə olunmur.", "Details are filled from your profile and cannot be edited here.")}{" "}
               <a href="/account/profile" className="font-semibold underline">
                 {sx(locale, "Изменить в профиле", "Profildə dəyişdir", "Edit in profile")}
               </a>
             </p>
           ) : user ? (
-            <p className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            <p className="mb-3 rounded-lg border border-brand/20 bg-brand/10 px-3 py-2 text-xs text-brand-dark">
               {t("offer.registered_hint", locale)}
             </p>
           ) : null}

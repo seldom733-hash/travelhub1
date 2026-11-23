@@ -148,6 +148,8 @@ export class SupplierOfferService {
         adults: query.adults,
         children: query.children,
         childAges: query.childAges,
+        infants: query.infants,
+        infantAges: query.infantAges,
       });
     }
     return priced;
@@ -255,6 +257,8 @@ export class SupplierOfferService {
         adults: ref.searchContext.adults ?? 2,
         children: ref.searchContext.children ?? 0,
         childAges: ref.searchContext.childAges ?? [],
+        infants: ref.searchContext.infants ?? 0,
+        infantAges: ref.searchContext.infantAges ?? [],
       },
     );
     if (addon == null) return snapshot;
