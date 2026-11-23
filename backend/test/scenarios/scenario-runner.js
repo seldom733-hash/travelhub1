@@ -612,7 +612,11 @@ async function main() {
   if (report.failedScenarios > 0) process.exitCode = 2;
 }
 
-main().catch(async (error) => {
-  console.error("[scenario] fatal:", errorMessage(error));
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch(async (error) => {
+    console.error("[scenario] fatal:", errorMessage(error));
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { Api, Runner, BASE, RUN_ID };

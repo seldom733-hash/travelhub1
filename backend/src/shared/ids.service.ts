@@ -45,6 +45,33 @@ export class IdsService {
     return `${prefix}-${String(value).padStart(digits, "0")}`;
   }
 
+  /**
+   * Allocate a canonical code above imported/historical numeric codes.
+   * Imports may insert ORD-00019970 / REQ-00019970 without advancing
+   * events.BusinessSequence; a fresh counter then collides at ORD-00000094.
+   * `table` is an internal trusted identifier, never user input.
+   */
+  async nextCodeAbove(
+    tx: Prisma.TransactionClient | null,
+    prefix: string,
+    table: string,
+    digits = 8,
+  ): Promise<string> {
+    const client = (tx && typeof (tx as { businessSequence?: unknown }).businessSequence !== "undefined"
+      ? tx
+      : this.prisma) as unknown as Prisma.TransactionClient;
+    const rows = await client.$queryRawUnsafe<Array<{ max: number | bigint | null }>>(
+      `SELECT MAX(NULLIF(substring(code from '^${prefix}-([0-9]+)$'), '')::bigint) AS max FROM ${table}`,
+    );
+    const max = Number(rows[0]?.max ?? 0);
+    let value = await this.allocate(tx, prefix);
+    if (Number.isFinite(max) && value <= max) {
+      value = max + 1;
+      await client.businessSequence.update({ where: { prefix }, data: { value } });
+    }
+    return `${prefix}-${String(value).padStart(digits, "0")}`;
+  }
+
   /** Атомарный increment +1. Прямой, без кэша/блоков/claim-гейтов: один вызов =
    *  один upsert = ровно один следующий номер (сплошная последовательность). */
   private async allocate(tx: Prisma.TransactionClient | null, prefix: string): Promise<number> {

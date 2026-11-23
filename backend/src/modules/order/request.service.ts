@@ -397,7 +397,7 @@ export class RequestService {
 
     const commerceSequence = await this.refNum.nextCommerceSequence(null as any);
     const referenceNumber = this.refNum.commerceRequestRef(commerceSequence);
-    const code = await this.ids.nextCode(null as any, "REQ");
+    const code = await this.ids.nextCodeAbove(null as any, "REQ", '"order"."Request"');
 
     const now = new Date();
     const supplierResponseDeadline = new Date(now.getTime() + DEFAULT_SUPPLIER_SLA_HOURS * 60 * 60 * 1000);

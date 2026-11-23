@@ -481,7 +481,7 @@ export class OrderService {
     const { payload, travelers } = input;
     assertValidOrderRequestedPayload(payload);
 
-    const code = await this.ids.nextCode(tx, "ORD");
+    const code = await this.ids.nextCodeAbove(tx, "ORD", '"order"."Order"');
     const number = await this.ids.nextOrderNumber(tx);
 
     // Shared Commerce Sequence: allocate 8-digit root for all entities in this chain.
@@ -726,7 +726,7 @@ export class OrderService {
     }
     assertOrderMoney(money, "confirmed/displayed price");
 
-    const code = await this.ids.nextCode(tx, "ORD");
+    const code = await this.ids.nextCodeAbove(tx, "ORD", '"order"."Order"');
     const number = await this.ids.nextOrderNumber(tx);
 
     // Request → Order: переиспользуем shared commerce root заявки (НЕ новая

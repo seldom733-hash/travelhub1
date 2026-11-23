@@ -148,3 +148,42 @@ client/supplier penalty reconciliation
    - close guard checks.
 3. Прогнать ветки client-fault / supplier-fault / platform-fault.
 4. Приложить fixture IDs и суммы.
+
+
+## Линейный happy-path (2026-11-23)
+
+Скрипт: `backend/test/scenarios/lifecycle-happy-path.js`
+
+Пройдено:
+
+```text
+request.confirmPrice
+request.customerAccept
+request.convert
+order.process
+order.confirm
+order.waitFirstPayment
+order.send
+booking.send
+booking.confirm
+booking.service
+booking.complete
+```
+
+Итог:
+
+```text
+order.status = FULFILLED
+amount = 1000
+paidAmount = 1000
+refundedAmount = 0
+availableActions = [requestCancellation]
+```
+
+Закрытие пока заблокировано, потому что у fixture есть supplier obligation
+на 700 AZN и нет поставщика/платежа поставщику. Это корректный close guard,
+но fixture нужно расширить supplier-контекстом.
+
+Также исправлена вторая коллизия: импортированные `ORD-00019970` /
+`REQ-00019970` не были учтены в `BusinessSequence` (счётчики 93/156). Добавлен
+`nextCodeAbove()`: код заявки/заказа выделяется выше максимального импортированного.
