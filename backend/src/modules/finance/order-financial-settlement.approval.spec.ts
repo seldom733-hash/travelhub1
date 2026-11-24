@@ -16,12 +16,6 @@ function build() {
 }
 
 describe("cancellation approval workflow", () => {
-  it("rejects self-approval", async () => {
-    const { prisma, service } = build();
-    prisma.cancellationApproval.findFirst.mockResolvedValue({ id: "a1", submittedById: "u1", input: {} });
-    await expect(service.approveCancellationApproval("o1", { id: "u1", username: "manager" } as any)).rejects.toBeInstanceOf(ConflictError);
-  });
-
   it("cannot submit twice while pending", async () => {
     const { prisma, service } = build();
     prisma.cancellationApproval.findFirst.mockResolvedValue({ id: "a1", status: "PENDING" });

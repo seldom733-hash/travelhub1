@@ -1552,8 +1552,14 @@ export class OrderService {
     // Cancelled deals close only when the retained money is explicitly
     // recognised as penalties: client net paid = client penalty, and supplier
     // net paid = platform/supplier penalty. Income is their difference.
-    const clientPenalty = new Prisma.Decimal(settlement?.clientPenaltyAmount ?? 0);
-    const supplierPenalty = new Prisma.Decimal(settlement?.supplierPenaltyAmount ?? 0);
+    // A waived penalty is not a recognised financial fact: keep the original
+    // amount for audit, but do not require the retained money to equal it.
+    const clientPenalty = settlement?.clientPenaltyStatus === "WAIVED"
+      ? new Prisma.Decimal(0)
+      : new Prisma.Decimal(settlement?.clientPenaltyAmount ?? 0);
+    const supplierPenalty = settlement?.supplierPenaltyStatus === "WAIVED"
+      ? new Prisma.Decimal(0)
+      : new Prisma.Decimal(settlement?.supplierPenaltyAmount ?? 0);
     const supplierNetPaid = new Prisma.Decimal(Math.max(0, supplierPaidTotal - supplierRefundedTotal));
     const clientPenaltyMismatch = cancellationStatus && netClientReceived.minus(clientPenalty).abs().greaterThan(new Prisma.Decimal("0.01"));
     const supplierPenaltyMismatch = cancellationStatus && supplierNetPaid.minus(supplierPenalty).abs().greaterThan(new Prisma.Decimal("0.01"));

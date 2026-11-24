@@ -149,7 +149,7 @@ export class LedgerService {
     const actorType = actor ? actor.type : null;
     const actorId = actor?.type === "USER" ? actor.id : actor?.type === "SYSTEM" ? (actor.id ?? null) : null;
 
-    const code = await this.ids.nextCode(tx, "LTX");
+    const code = await this.ids.nextCodeAbove(tx, "LTX", '"finance"."LedgerTransaction"');
     const row = await tx.ledgerTransaction.create({
       data: {
         code,

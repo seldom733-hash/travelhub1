@@ -255,3 +255,76 @@ REFUND_PROCESSED
 ```
 
 Без этого penalty settlement и waiver нельзя проверить через API.
+
+
+## 2026-11-24 — LEDGER_INCOMPLETE устранён, penalty waiver закрыт
+
+### Причина LEDGER_INCOMPLETE
+
+Импортированные `finance.LedgerTransaction` занимали `LTX-00000001…14`, а
+`events.BusinessSequence` для `LTX` был `0`. Первый ledger-факт получал
+`LTX-00000001` и падал на unique constraint; outbox-события уходили в `FAILED`
+с ошибкой `Ledger transaction conflict`.
+
+Исправлено: `LedgerService.createInTransaction()` использует
+`IdsService.nextCodeAbove("LTX", finance."LedgerTransaction")`, то есть
+выделяет код выше максимального существующего.
+
+### Ledger evidence
+
+После исправления happy-path создал:
+
+```text
+LTX-00000015  PAYMENT_CAPTURED  1000 AZN  PAY-00000089
+LTX-00000016  SUPPLIER_PAYOUT    700 AZN  SPO-00020033
+```
+
+Cancellation/waiver создал:
+
+```text
+LTX-00000025  PAYMENT_CAPTURED  1000 AZN  PAY-00000091
+LTX-00000026  REFUND_PROCESSED   700 AZN  RFD-00000009
+LTX-00000031  REFUND_PROCESSED   200 AZN  RFD-00000011
+LTX-00000032  REFUND_PROCESSED   100 AZN  RFD-00000013
+```
+
+### Cancellation + penalty waiver
+
+Сценарий `backend/test/scenarios/lifecycle-cancel-penalty.js`:
+
+```text
+request → order → requestCancellation
+→ approval PENDING → approval accepted
+→ client refund
+→ penalty waiver: clientPenaltyStatus=WAIVED, supplierPenaltyStatus=WAIVED
+→ remaining refund
+→ order.close → CLOSED
+```
+
+Результат:
+
+```text
+order.status      = CLOSED
+amount            = 1000 AZN
+paidAmount        = 1000 AZN
+refundedAmount    = 1000 AZN
+financialStatus   = FINANCIALLY_SETTLED
+clientPenalty     = 200 AZN (WAIVED)
+supplierPenalty   = 100 AZN (WAIVED)
+platformShare     = 200 AZN
+supplierShare     = 100 AZN
+```
+
+Найден и исправлен ещё один дефект: close guard требовал, чтобы удержанная
+сумма равнялась `clientPenaltyAmount`/`supplierPenaltyAmount`, даже когда
+штраф имел статус `WAIVED`. Теперь waived-штраф считается нулевым для close
+guard, но сумма сохраняется в settlement для аудита.
+
+### Проверка
+
+```text
+backend build                                  PASS
+finance/order targeted jest                    36/36 PASS
+happy-path scenario                            CLOSED
+cancel+waiver scenario                         CLOSED
+```

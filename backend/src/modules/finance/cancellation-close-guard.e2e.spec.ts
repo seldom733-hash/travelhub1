@@ -18,20 +18,31 @@ async function api(path: string, init: RequestInit = {}) {
   return fetch(`${API}${path}`, { ...init, headers: { "content-type": "application/json", authorization: `Bearer ${t}`, ...(init.headers ?? {}) } });
 }
 
+async function findOrder(statuses: string[]): Promise<any | null> {
+  const list = await api("/finance/deals?state=cancelled&pageSize=100");
+  const deals: any = await list.json();
+  for (const deal of deals.items ?? []) {
+    if (!deal.orderId) continue;
+    const res = await api(`/orders/${deal.orderId}`);
+    if (!res.ok) continue;
+    const order: any = await res.json();
+    if (statuses.includes(order.status)) return order;
+  }
+  return null;
+}
+
 describe("cancellation close guard (main DB e2e)", () => {
   jest.setTimeout(30000);
 
   it("blocks closing a cancelled order while approval is pending", async () => {
-    const list = await api("/finance/deals?state=cancelled&pageSize=20");
-    const deals: any = await list.json();
-    const deal = (deals.items ?? []).find((d: any) => d.orderId);
+    const deal = await findOrder(["CANCELLATION_APPROVED"]);
     if (!deal) return;
 
-    const pending = await api(`/orders/${deal.orderId}/cancellation/approval`);
+    const pending = await api(`/orders/${deal.id}/cancellation/approval`);
     const pendingText = await pending.text();
     const approval: any = pendingText ? JSON.parse(pendingText) : null;
     if (!approval || approval.status !== "PENDING") {
-      const submitted = await api(`/orders/${deal.orderId}/cancellation/submit`, {
+      const submitted = await api(`/orders/${deal.id}/cancellation/submit`, {
         method: "POST",
         body: JSON.stringify({
           cancellationReason: "CUSTOMER_FAULT",
@@ -46,7 +57,7 @@ describe("cancellation close guard (main DB e2e)", () => {
       expect(submitted.ok).toBe(true);
     }
 
-    const close = await api(`/orders/${deal.orderId}`, { method: "PATCH", body: JSON.stringify({ action: "close" }) });
+    const close = await api(`/orders/${deal.id}`, { method: "PATCH", body: JSON.stringify({ action: "close" }) });
     expect(close.status).toBe(409);
     const body: any = await close.json();
     expect(body.message).toMatch(/cannot be completed\/closed/i);
@@ -54,18 +65,16 @@ describe("cancellation close guard (main DB e2e)", () => {
   });
 
   it("requires a pending cancellation approval", async () => {
-    const list = await api("/finance/deals?state=cancelled&pageSize=20");
-    const deals: any = await list.json();
-    const candidate = (deals.items ?? []).find((d: any) => d.orderId);
+    const candidate = await findOrder(["CANCELLED", "CLOSED"]);
     if (!candidate) return;
 
-    const approval = await api(`/orders/${candidate.orderId}/cancellation/approval`);
+    const approval = await api(`/orders/${candidate.id}/cancellation/approval`);
     if (approval.ok) {
       const body: any = await approval.json();
       if (body?.status === "PENDING") return; // already covered by another fixture
     }
 
-    const res = await api(`/orders/${candidate.orderId}/cancellation/approve`, { method: "POST", body: "{}" });
+    const res = await api(`/orders/${candidate.id}/cancellation/approve`, { method: "POST", body: "{}" });
     expect(res.status).toBe(404);
     const body: any = await res.json();
     expect(body.message).toMatch(/pending cancellation approval/i);

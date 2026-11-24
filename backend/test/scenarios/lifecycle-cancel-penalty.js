@@ -142,6 +142,37 @@ async function main() {
     supplierPenaltyStatus: settlement.supplierPenaltyStatus,
   } : null;
 
+  // Waiving penalties turns them into non-recognised facts; close the deal
+  // after refunding whatever remains of the client's captured money.
+  let closeResult = null;
+  let closeError = null;
+  try {
+    const current = await api.get(`/orders/${fixture.orderId}`);
+    const dueBack = Number(current.paidAmount ?? 0) - Number(current.refundedAmount ?? 0);
+    if (dueBack > 0.009) {
+      const payments = await api.get(`/finance/payments?orderId=${encodeURIComponent(fixture.orderId)}&pageSize=50`);
+      const captured = (payments?.items ?? []).find((p) => p.status === "CAPTURED");
+      if (captured) {
+        const remainder = await api.post("/finance/refunds", {
+          paymentId: captured.id,
+          amount: dueBack.toFixed(2),
+          reason: "AUTOMATED SCENARIO TEST — remaining refund after penalty waiver",
+        });
+        await api.post(`/finance/refunds/${remainder.code}/approve`, {});
+        await api.post(`/finance/refunds/${remainder.code}/process`, {});
+      }
+    }
+    closeResult = await api.patch(`/orders/${fixture.orderId}`, {
+      action: "close",
+      reason: "AUTOMATED SCENARIO TEST — close after penalty waiver",
+    });
+    steps.push({ action: "close", entity: "order", from: "CANCELLATION_APPROVED" });
+    console.log(`[cancel] ${steps.length}. order.close`);
+  } catch (error) {
+    closeError = error instanceof Error ? error.message : String(error);
+    console.log("[cancel] close blocked:", closeError);
+  }
+
   const orderAfter = await api.get(`/orders/${fixture.orderId}`);
   const result = {
     runAt: new Date().toISOString(),
@@ -156,6 +187,8 @@ async function main() {
     waiverResponse: waived,
     waiverError,
     settlementAfterWaive: afterWaive,
+    closeResult,
+    closeError,
     order: {
       status: orderAfter.status,
       amount: orderAfter.amount,
@@ -164,7 +197,11 @@ async function main() {
       financialStatus: orderAfter.financialStatus,
       availableActions: orderAfter.availableActions,
     },
-    success: Boolean(afterWaive?.clientPenaltyStatus === "WAIVED" && afterWaive?.supplierPenaltyStatus === "WAIVED"),
+    success: Boolean(
+      afterWaive?.clientPenaltyStatus === "WAIVED" &&
+      afterWaive?.supplierPenaltyStatus === "WAIVED" &&
+      orderAfter.status === "CLOSED"
+    ),
   };
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
