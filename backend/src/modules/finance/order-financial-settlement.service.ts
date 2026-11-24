@@ -232,7 +232,7 @@ export class OrderFinancialSettlementService {
   async submitCancellationApproval(orderId: string, input: SettlementConfirmInput, actor: Actor) {
     const pending = await this.prisma.cancellationApproval.findFirst({ where: { orderId, status: "PENDING" } });
     if (pending) throw new ConflictError("Cancellation approval is already pending for this order");
-    const code = await this.ids.nextCode(this.prisma as any, "CNA");
+    const code = await this.ids.nextCodeAbove(this.prisma as any, "CNA", '"finance"."CancellationApproval"');
     const row = await this.prisma.cancellationApproval.create({
       data: { code, orderId, input: input as any, submittedById: actor.id, submittedByName: actor.username },
     });
@@ -615,7 +615,12 @@ export class OrderFinancialSettlementService {
       const clientPenalty = new Prisma.Decimal(input.clientPenaltyAmount ?? input.penaltyAmount ?? "0");
       const supplierPenalty = new Prisma.Decimal(input.supplierPenaltyAmount ?? input.supplierPenaltyShare ?? "0");
       const safeClientPenalty = ["SUPPLIER_FAULT", "NAVITRAVEL_FAULT"].includes(input.cancellationReason) ? new Prisma.Decimal(0) : clientPenalty;
-      const refundToClient = Prisma.Decimal.max(new Prisma.Decimal(0), context.capturedAmount.minus(safeClientPenalty));
+      // Refund target is net client liability. Already processed refunds must be
+      // deducted, otherwise the UI asks to refund the same money twice.
+      const refundToClient = Prisma.Decimal.max(
+        new Prisma.Decimal(0),
+        context.capturedAmount.minus(safeClientPenalty).minus(context.refundedAmount),
+      );
       return { ...baseResult, finalCustomerLiability: safeClientPenalty.toString(), clientPenaltyAmount: safeClientPenalty.toString(), supplierPenaltyAmount: supplierPenalty.toString(), cancellationResult: safeClientPenalty.minus(supplierPenalty).toString(), remainingToRefund: refundToClient.toString(), remainingToPay: "0.00" } as typeof baseResult & { supplierPenaltyAmount: string; cancellationResult: string };
     }
     return baseResult;

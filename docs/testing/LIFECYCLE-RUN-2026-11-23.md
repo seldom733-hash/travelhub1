@@ -372,3 +372,57 @@ LTX  → finance."LedgerTransaction"
 ```
 
 Это устраняет серию `500` при достижении счётчиком импортированного диапазона.
+
+
+## 2026-11-24 — repair MKT-ORD-00020031
+
+Симптом: после согласования отмены ввод штрафа 300 клиенту / 0 поставщику
+возвращал `LEDGER_INCOMPLETE`.
+
+Причина: платёж `PAY-00000087` (1000) и возврат `RFD-00000001` (700) были
+созданы до исправления LTX-последовательности. Их outbox-события
+`PaymentCaptured` / `RefundProcessed` лежали в `FAILED` с ошибкой
+`Ledger transaction conflict`, поэтому ledger не содержал фактов.
+
+Восстановление:
+
+```text
+события переведены FAILED → PENDING
+consumer создал:
+  LTX-00000055 PAYMENT_CAPTURED 1000 PAY-00000087
+  LTX-00000056 REFUND_PROCESSED 700 RFD-00000001
+```
+
+Также исправлен расчёт остатка возврата: preview учитывал уже обработанные
+возвраты, из-за чего показывал повторный возврат 700 вместо 0. Теперь:
+
+```text
+remainingToRefund = max(0, captured − clientPenalty − refunded)
+```
+
+Финальный settlement:
+
+```text
+SET-00000011
+captured         = 1000
+refunded         = 700
+finalLiability   = 300
+penaltyAmount    = 300
+clientPenalty    = 300
+supplierPenalty  = 0
+platformShare    = 300
+remainingToRefund= 0
+status           = FINANCIALLY_SETTLED_WITH_PENALTY
+order            = CLOSED
+```
+
+Ledger adjustment:
+
+```text
+LTX-00000059 PLATFORM_PENALTY_SHARE 300 FAD-00000017
+```
+
+Внимание: уже подтверждённый settlement нельзя пересчитать другим набором
+штрафов (API вернёт `already financially settled with a different calculation`).
+Для тестового fixture 20031 старый SET-00000010 был удалён вместе с его
+adjustment/ledger, после чего settlement собран заново.

@@ -10,7 +10,7 @@ function build() {
     },
     orderFinancialSettlement: { findUnique: jest.fn() },
   };
-  const ids: any = { nextCode: jest.fn().mockResolvedValue("CNA-00000001") };
+  const ids: any = { nextCodeAbove: jest.fn().mockResolvedValue("CNA-00000001") };
   const security: any = { audit: jest.fn() };
   return { prisma, service: new OrderFinancialSettlementService(prisma, ids, security, {} as any, {} as any) };
 }
