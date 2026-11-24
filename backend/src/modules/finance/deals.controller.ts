@@ -85,7 +85,7 @@ export class DealsController {
     const rows = await this.deals.exportRows(queryFrom({ ...query, pageSize: "100" }));
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Deals");
-    sheet.addRow(["Общий №", "REQ", "ORD", "BKG", "Стадия", "Клиент", "Услуга", "Тип", "Поставщик", "Туристы", "Сумма продажи", "Себестоимость", "Получено", "Долг клиента", "Возвращено", "Оплачено поставщику", "Долг поставщику", "Возврат поставщика", "Штраф клиента", "Штраф поставщика", "Ожидаемый доход", "Текущий доход", "Валюта"]);
+    sheet.addRow(["Общий №", "REQ", "ORD", "BKG", "Стадия", "Клиент", "Услуга", "Тип", "Поставщик", "Туристы", "Сумма продажи", "Себестоимость", "Получено", "Долг клиента", "Возвращено", "Оплачено поставщику", "Долг поставщику", "Возврат поставщика", "Штраф клиента", "Штраф от поставщика", "Ожидаемый доход", "Текущий доход", "Валюта"]);
     for (const row of rows) {
       sheet.addRow([row.sequence, row.requestCode, row.orderCode ?? "—", row.bookingCode ?? "—", row.stageLabel, row.customerName, row.productTitle, row.productType, row.supplierCode ?? "—", row.travelerCount ?? "—", row.salesAmount, row.costAmount, row.clientReceived, row.clientDebt, row.clientRefunded, row.supplierPaid, row.supplierDebt, row.supplierRefunded, row.clientPenalty, row.supplierPenalty, row.expectedIncome, row.currentIncome, row.currency]);
     }

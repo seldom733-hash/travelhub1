@@ -81,7 +81,7 @@ describe("UI-C1.2A — shared OperationsCenterShell is the canonical registry fr
     expect(screen.getAllByText("Центр операций").length).toBeGreaterThan(0); // breadcrumb + title
     const tablist = screen.getByRole("tablist");
     const tabs = within(tablist).getAllByRole("tab");
-    expect(tabs.map((el) => el.textContent)).toEqual(["Заявки", "Заказы", "Бронирования", "Платежи"]);
+    expect(tabs.map((el) => el.textContent)).toEqual(["Заявки", "Заказы", "Бронирования", "Платежи и возвраты"]);
   });
 
   it("(2) tabs are hidden when the permission is absent (not rendered, not disabled)", () => {
@@ -94,7 +94,7 @@ describe("UI-C1.2A — shared OperationsCenterShell is the canonical registry fr
     const tablist = screen.getByRole("tablist");
     const labels = within(tablist).getAllByRole("tab").map((el) => el.textContent);
     expect(labels).toEqual(["Заявки", "Заказы", "Бронирования"]);
-    expect(labels).not.toContain("Платежи");
+    expect(labels).not.toContain("Платежи и возвраты");
   });
 
   it("(3) active tab derives from the route/activeDomain prop (aria-selected) and matches canonical route", () => {
@@ -105,7 +105,7 @@ describe("UI-C1.2A — shared OperationsCenterShell is the canonical registry fr
     );
     const tablist = screen.getByRole("tablist");
     const active = within(tablist).getAllByRole("tab").find((el) => el.getAttribute("aria-selected") === "true");
-    expect(active?.textContent).toBe("Платежи");
+    expect(active?.textContent).toBe("Платежи и возвраты");
     expect(active?.getAttribute("href")).toBe("/app/payments");
   });
 

@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import OperationsCenterShell from "@/components/OperationsCenterShell";
 import Pagination from "@/components/Pagination";
 import { api } from "@/lib/api";
 import { useLocale, formatPrice, formatDate } from "@/lib/i18n";
 import DateTextInput from "@/components/forms/DateTextInput";
+import { useCan } from "@/lib/use-can";
 
 type Tab = "clients" | "suppliers";
 
@@ -93,6 +95,7 @@ const TEXT: Record<string, { az: string; en: string }> = {
   "Платежи и возвраты клиентов и расчёты с поставщиками.": { az: "Müştəri ödənişləri, qaytarmalar və təchizatçı hesablaşmaları.", en: "Client payments and refunds, supplier settlements." },
   "Платежи и возвраты (клиенты)": { az: "Ödənişlər və qaytarmalar (müştərilər)", en: "Payments and refunds (clients)" },
   "Платежи и возвраты (поставщики)": { az: "Ödənişlər və qaytarmalar (təchizatçılar)", en: "Payments and refunds (suppliers)" },
+  "Управление возвратами": { az: "Qaytarmaların idarəsi", en: "Manage refunds" },
   "Поиск по номеру оплаты": { az: "Ödəniş nömrəsi ilə axtarış", en: "Search by payment number" },
   "Дата оплаты с": { az: "Ödəniş tarixi (başlanğıc)", en: "Payment date from" },
   "Дата оплаты по": { az: "Ödəniş tarixi (son)", en: "Payment date to" },
@@ -148,6 +151,7 @@ function dateLabel(value: string | null): string {
 
 export default function PaymentsAndRefundsPage() {
   const locale = useLocale();
+  const canReadRefunds = useCan("finance.refund.read");
   const tr = (value: string) => locale === "az" ? TEXT[value]?.az ?? value : locale === "en" ? TEXT[value]?.en ?? value : value;
   const [tab, setTab] = useState<Tab>("clients");
   const [clientRows, setClientRows] = useState<TableRow[]>([]);
@@ -260,11 +264,21 @@ export default function PaymentsAndRefundsPage() {
   return (
     <OperationsCenterShell activeDomain="payments" visibleDomains={["payments"]} showPeriod={false}>
       <div className="space-y-4">
-        <div>
-          <h2 className="text-xl font-bold text-ink">{tr("Платежи и возвраты")}</h2>
-          <p className="mt-0.5 text-sm text-ink/60">
-            {tr("Платежи и возвраты клиентов и расчёты с поставщиками.")}
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-ink">{tr("Платежи и возвраты")}</h2>
+            <p className="mt-0.5 text-sm text-ink/60">
+              {tr("Платежи и возвраты клиентов и расчёты с поставщиками.")}
+            </p>
+          </div>
+          {canReadRefunds && (
+            <Link
+              href="/app/finance/refunds"
+              className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/70 transition-colors hover:bg-panel"
+            >
+              {tr("Управление возвратами")} →
+            </Link>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-white p-1">

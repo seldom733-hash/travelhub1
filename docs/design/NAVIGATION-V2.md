@@ -6,7 +6,7 @@
 
 ```text
 O1 = B′  единый Реестр сделок, отдельные Заявки/Заказы/Брони не восстанавливаем
-O2 = A   Возвраты в меню; Платежи поставщикам — не пункт меню
+O2 = A → уточнено владельцем: отдельный пункт «Возвраты» убран как дубль; возвраты доступны из «Платежи и возвраты»
 O3 = A   документы остаются в карточке сделки
 O4 = A   payment-terms: FINANCE/ADMIN/DIRECTOR, проверять и в route-guard
 O5 = A   мобильное меню — off-canvas drawer с подписями
@@ -39,7 +39,7 @@ isNavActive / activeGroupKey
 ### Меню
 
 ```text
-29 пунктов
+28 пунктов
 1 верхняя секция + 9 групп
 ```
 
@@ -137,11 +137,11 @@ frontend npx tsc --noEmit          PASS
 frontend npm run build             PASS
 frontend vitest run                81 files / 797 tests PASS
 backend npm run build              PASS
-browser 1440px                     29 links / 9 group headings
-browser 390px                      drawer 30 links (29 + marketplace)
+browser 1440px                     28 links / 9 group headings
+browser 390px                      drawer 29 links (28 + marketplace)
 RU / EN labels                     no raw nav.* / sidebar.* keys
 active state                       /app/crm → one aria-current
-group persistence                  closed 21 → reload 21 → open 29
+group persistence                  closed 20 → reload 20 → open 28
 ```
 
 ## Остаточные ограничения
@@ -153,3 +153,16 @@ group persistence                  closed 21 → reload 21 → open 29
   выполнялась; покрыто unit-тестами nav-guard.
 - `finance.bonus.read` применён SQL-ом на локальной БД; миграция добавлена для
   окружений, где выполняется `prisma migrate deploy`.
+
+
+## Уточнение 2026-11-24
+
+- Пункт «Возвраты» убран из меню, потому что возвраты уже есть в
+  «Платежи и возвраты».
+- Страница `/app/finance/refunds` остаётся рабочей и доступна из
+  «Платежи и возвраты» кнопкой «Управление возвратами».
+- «Финансовый журнал»: колонки «Тип» и «Источник» локализованы, значения
+  `PAYMENT_CAPTURED`, `REFUND_PROCESSED`, `SUPPLIER_PAYOUT` и source-типы
+  отображаются на RU/AZ/EN.
+- В карточке сделки формулировка изменена на «Штраф от поставщика» /
+  «Штрафы от поставщика».
