@@ -426,3 +426,20 @@ LTX-00000059 PLATFORM_PENALTY_SHARE 300 FAD-00000017
 штрафов (API вернёт `already financially settled with a different calculation`).
 Для тестового fixture 20031 старый SET-00000010 был удалён вместе с его
 adjustment/ledger, после чего settlement собран заново.
+
+
+## 2026-11-24 — deal-scoped LTX and UI refund wording
+
+- Новые ledger-факты получают код от номера сделки:
+  `LTX-00020045`, `LTX-00020045-2`, `LTX-00020045-3`.
+  Для этого `LedgerService` разрешает `commerceSequence` по source-факту и
+  резервирует ordinal в `events.BusinessSequence`.
+- Legacy LTX-коды не переписываются: append-only ledger сохраняет историю.
+- В карточке сделки «Возврат клиента» заменён на «Возврат клиенту»
+  (RU/AZ/EN).
+- `clientRefundDue` теперь вычитает признанный `clientPenalty`:
+  ```text
+  max(0, clientReceived − clientRefunded − clientPenalty)
+  ```
+  Поэтому после ввода штрафа 300 сообщение «У клиента осталось 300…»
+  больше не появляется.

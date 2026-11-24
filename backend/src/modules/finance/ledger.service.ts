@@ -53,6 +53,12 @@ export interface LedgerCreateInput {
   /** Опциональный human-readable business ref. */
   businessRef?: string | null;
   /**
+   * Shared commerce root of the related deal. When present, the LTX code is
+   * derived from the deal number (LTX-{dealSequence}[-ordinal]) instead of an
+   * independent LTX counter.
+   */
+  dealSequence?: string | null;
+  /**
    * Step 2.10C — бизнес-occurrence времени факта (UTC ISO 8601), ОТДЕЛЬНО от
    * createdAt (персистенция). NULL/undefined → NULL (неизвестно; без fabrication).
    * Authority: server-валидированный ISO 8601 (для event-порождённых фактов —
@@ -149,7 +155,17 @@ export class LedgerService {
     const actorType = actor ? actor.type : null;
     const actorId = actor?.type === "USER" ? actor.id : actor?.type === "SYSTEM" ? (actor.id ?? null) : null;
 
-    const code = await this.ids.nextCodeAbove(tx, "LTX", '"finance"."LedgerTransaction"');
+    const dealSequence = input.dealSequence === undefined
+      ? await this.resolveDealSequence(tx, sourceType, sourceId)
+      : input.dealSequence;
+    let code: string;
+    if (dealSequence) {
+      const sequence = dealSequence.replace(/\D/g, "").padStart(8, "0");
+      const ordinal = await this.ids.nextSequence(tx, `LTX:${sequence}`);
+      code = ordinal === 1 ? `LTX-${sequence}` : `LTX-${sequence}-${ordinal}`;
+    } else {
+      code = await this.ids.nextCodeAbove(tx, "LTX", '"finance"."LedgerTransaction"');
+    }
     const row = await tx.ledgerTransaction.create({
       data: {
         code,
@@ -210,6 +226,46 @@ export class LedgerService {
   }
 
   /** Whitelist DTO — внутренние/технические детали НЕ сериализуются сверх контракта. */
+  /**
+   * Resolve the deal root for a source fact. Kept inside the ledger writer so
+   * every producer (events, settlements, write-offs) gets the same numbering
+   * without duplicating lookup logic.
+   */
+  private async resolveDealSequence(
+    tx: Prisma.TransactionClient,
+    sourceType: string,
+    sourceId: string,
+  ): Promise<string | null> {
+    const db = tx as unknown as {
+      payment?: { findUnique(args: unknown): Promise<{ orderId: string | null } | null> };
+      refund?: { findUnique(args: unknown): Promise<{ orderId: string | null } | null> };
+      supplierPayout?: { findUnique(args: unknown): Promise<{ orderId: string | null } | null> };
+      supplierObligation?: { findUnique(args: unknown): Promise<{ orderId: string | null } | null> };
+      orderFinancialAdjustment?: { findUnique(args: unknown): Promise<{ orderId: string | null } | null> };
+      clientDebtWriteOff?: { findUnique(args: unknown): Promise<{ orderId: string | null } | null> };
+      supplierDebtWriteOff?: { findUnique(args: unknown): Promise<{ orderId: string | null } | null> };
+      order?: { findUnique(args: unknown): Promise<{ commerceSequence: string | null } | null> };
+    };
+    let orderId: string | null = null;
+    if (sourceType === "PAYMENT") {
+      orderId = (await db.payment?.findUnique({ where: { id: sourceId }, select: { orderId: true } }))?.orderId ?? null;
+    } else if (sourceType === "REFUND") {
+      orderId = (await db.refund?.findUnique({ where: { id: sourceId }, select: { orderId: true } }))?.orderId ?? null;
+    } else if (sourceType === "SUPPLIER_PAYOUT") {
+      orderId = (await db.supplierPayout?.findUnique({ where: { id: sourceId }, select: { orderId: true } }))?.orderId ?? null;
+    } else if (sourceType === "OBLIGATION") {
+      orderId = (await db.supplierObligation?.findUnique({ where: { id: sourceId }, select: { orderId: true } }))?.orderId ?? null;
+    } else if (sourceType === "ORDER_FINANCIAL_ADJUSTMENT") {
+      orderId = (await db.orderFinancialAdjustment?.findUnique({ where: { id: sourceId }, select: { orderId: true } }))?.orderId ?? null;
+    } else if (sourceType === "CLIENT_DEBT_WRITE_OFF") {
+      orderId = (await db.clientDebtWriteOff?.findUnique({ where: { id: sourceId }, select: { orderId: true } }))?.orderId ?? null;
+    } else if (sourceType === "SUPPLIER_DEBT_WRITE_OFF") {
+      orderId = (await db.supplierDebtWriteOff?.findUnique({ where: { id: sourceId }, select: { orderId: true } }))?.orderId ?? null;
+    }
+    if (!orderId) return null;
+    return (await db.order?.findUnique({ where: { id: orderId }, select: { commerceSequence: true } }))?.commerceSequence ?? null;
+  }
+
   private ledgerDto(r: {
     id: string;
     code: string;

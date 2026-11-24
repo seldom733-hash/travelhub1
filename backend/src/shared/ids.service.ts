@@ -72,6 +72,11 @@ export class IdsService {
     return `${prefix}-${String(value).padStart(digits, "0")}`;
   }
 
+  /** Allocate the next ordinal for a named sub-sequence (e.g. per-deal LTX). */
+  async nextSequence(tx: Prisma.TransactionClient | null, key: string): Promise<number> {
+    return this.allocate(tx, key);
+  }
+
   /** Атомарный increment +1. Прямой, без кэша/блоков/claim-гейтов: один вызов =
    *  один upsert = ровно один следующий номер (сплошная последовательность). */
   private async allocate(tx: Prisma.TransactionClient | null, prefix: string): Promise<number> {

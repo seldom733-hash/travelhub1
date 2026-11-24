@@ -284,8 +284,10 @@ export default function DealDetailPage() {
     }
     return list;
   })();
-  const clientRefundDue = deal.status === "CANCELLED"
-    ? Math.max(0, Number(deal.clientReceived) - Number(deal.clientRefundTotal))
+  // A recognised client penalty is retained by the company; only the money
+  // above the service price and above that penalty is still refundable.
+  const clientRefundDue = deal.isCancelledDeal
+    ? Math.max(0, Number(deal.clientReceived) - Number(deal.clientRefundTotal) - Number(deal.clientPenalty))
     : Math.max(0, Number(deal.clientReceived) - Number(deal.clientRefundTotal) - Number(deal.salesAmount));
   const hasOutstandingDebt = Number(deal.clientDebt) > 0 || Number(deal.supplierDebt) > 0 || clientRefundDue > 0;
   const daysToService = deal.trip.dateFrom
@@ -395,7 +397,7 @@ export default function DealDetailPage() {
             <section className="rounded-xl border border-[#e5e2da] bg-white shadow-sm">
               <Header title="Финансовая сводка по сделке" right={<span className="text-ink/60">⌃</span>} />
               <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4 xl:grid-cols-6">
-                {[["Сумма продажи", deal.salesAmount], ["Себестоимость", deal.costAmount], ["Получено от клиента", deal.clientReceived], ["Долг клиента", deal.clientDebt], ["Оплачено поставщику", deal.supplierPaid], ["Долг перед поставщиком", deal.supplierDebt], ["Возврат клиента", deal.clientRefundTotal], ["Возвраты в обработке", deal.clientRefundPending], ["Возврат от поставщика", deal.supplierRefunded], ["Штрафы клиента", deal.clientPenalty], ["Штрафы от поставщика", deal.supplierPenalty], ["Ожидаемый доход", deal.expectedIncome], ["Текущий доход", deal.currentIncome]].map(([label, value]) => <Mini key={label} label={label} value={money(value, deal.currency)} />)}
+                {[["Сумма продажи", deal.salesAmount], ["Себестоимость", deal.costAmount], ["Получено от клиента", deal.clientReceived], ["Долг клиента", deal.clientDebt], ["Оплачено поставщику", deal.supplierPaid], ["Долг перед поставщиком", deal.supplierDebt], ["Возврат клиенту", deal.clientRefundTotal], ["Возвраты в обработке", deal.clientRefundPending], ["Возврат от поставщика", deal.supplierRefunded], ["Штрафы клиента", deal.clientPenalty], ["Штрафы от поставщика", deal.supplierPenalty], ["Ожидаемый доход", deal.expectedIncome], ["Текущий доход", deal.currentIncome]].map(([label, value]) => <Mini key={label} label={label} value={money(value, deal.currency)} />)}
               </div>
             </section>
 
@@ -410,7 +412,7 @@ export default function DealDetailPage() {
 
             <div className="grid gap-3 lg:grid-cols-2">
               <PaymentSchedule sequence={deal.sequence} currency={deal.currency} />
-              <section className="rounded-xl border border-[#e5e2da] bg-white shadow-sm"><Header title="Штрафы и возвраты" right={<button type="button" onClick={() => setTab("penalties")} className="rounded border border-[#0f6b5f] px-2 py-1 text-[10px] font-semibold text-[#0f6b5f]">{dealText(locale, "Редактировать штрафы")}</button>} /><div className="divide-y divide-[#f0eee8] px-4 text-[11px]"><Line label="Штрафы клиента" value={money(deal.clientPenalty, deal.currency)} /><Line label="Штрафы поставщика" value={money(deal.supplierPenalty, deal.currency)} /><Line label="Возврат клиента" value={money(deal.clientRefundTotal, deal.currency)} /><Line label="Возврат от поставщика" value={money(deal.supplierRefunded, deal.currency)} /></div></section>
+              <section className="rounded-xl border border-[#e5e2da] bg-white shadow-sm"><Header title="Штрафы и возвраты" right={<button type="button" onClick={() => setTab("penalties")} className="rounded border border-[#0f6b5f] px-2 py-1 text-[10px] font-semibold text-[#0f6b5f]">{dealText(locale, "Редактировать штрафы")}</button>} /><div className="divide-y divide-[#f0eee8] px-4 text-[11px]"><Line label="Штрафы клиента" value={money(deal.clientPenalty, deal.currency)} /><Line label="Штрафы поставщика" value={money(deal.supplierPenalty, deal.currency)} /><Line label="Возврат клиенту" value={money(deal.clientRefundTotal, deal.currency)} /><Line label="Возврат от поставщика" value={money(deal.supplierRefunded, deal.currency)} /></div></section>
             </div>
 
             <section className="rounded-xl border border-[#e5e2da] bg-white shadow-sm">

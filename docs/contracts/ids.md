@@ -101,3 +101,40 @@ events.BusinessSequence), immutable append-only финансовый факт.
 операционные факты (Finance-owned), создаются только внутренним
 `SettlementService` (публичного POST нет), idempotency на DB-unique
 (sourceType+sourceId[+provider]), `IdsService.nextCode` в той же transaction.
+
+
+## 2026-11-24 — deal-scoped ledger codes
+
+Владелец установил правило: номер финансового кода должен соответствовать
+номеру сделки.
+
+Уже действующий контракт `referenceNumber`:
+
+```text
+Request  MKT-REQ-{commerceSequence}
+Order    MKT-ORD-{commerceSequence}
+Booking  MKT-BKG-{commerceSequence}
+Payment  MKT-PAY-{commerceSequence}-{ordinal}
+Refund   MKT-REF-{commerceSequence}
+```
+
+`LedgerTransaction` теперь также использует deal root:
+
+```text
+LTX-{commerceSequence}
+LTX-{commerceSequence}-2
+LTX-{commerceSequence}-3
+```
+
+Пример для сделки `MKT-ORD-00020045`:
+
+```text
+LTX-00020045     PAYMENT_CAPTURED
+LTX-00020045-2   REFUND_PROCESSED
+LTX-00020045-3   PLATFORM_PENALTY_SHARE
+```
+
+`LedgerService` разрешает `commerceSequence` по `sourceType/sourceId` и
+резервирует ordinal в `events.BusinessSequence` под ключом
+`LTX:{commerceSequence}`. Legacy LTX-коды остаются читаемыми; backfill не
+переписывает append-only ledger.
