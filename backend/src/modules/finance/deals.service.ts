@@ -41,11 +41,20 @@ export function computeDealIncome(input: {
   supplierPaid: number;
   supplierRefunded: number;
   clientWriteOff: number;
+  /** Recognised client penalty (0 for WAIVED/absent settlement). */
+  clientPenalty?: number;
+  /** Recognised supplier penalty (0 for WAIVED/absent settlement). */
+  supplierPenalty?: number;
 }) {
   const { isCancelledDeal, completed, sales, cost, clientReceived, clientRefunded, supplierPaid, supplierRefunded, clientWriteOff } = input;
   if (isCancelledDeal) {
     const cancellationResult = (clientReceived - clientRefunded) - (supplierPaid - supplierRefunded);
-    return { expectedIncome: 0, currentIncome: 0, cancellationResult, cancellationIncome: Math.max(0, cancellationResult), cancellationLoss: Math.min(0, cancellationResult), writeOffExpense: Math.max(0, clientWriteOff), cancelledSalesAmount: sales, lostIncome: Math.max(0, sales - cost - cancellationResult) };
+    // Owner rule: cancelled income is the recognised penalty spread, not the
+    // incidental cash difference (which can be zero before supplier payouts).
+    const currentIncome = input.clientPenalty === undefined && input.supplierPenalty === undefined
+      ? 0
+      : (input.clientPenalty ?? 0) - (input.supplierPenalty ?? 0);
+    return { expectedIncome: 0, currentIncome, cancellationResult, cancellationIncome: Math.max(0, cancellationResult), cancellationLoss: Math.min(0, cancellationResult), writeOffExpense: Math.max(0, clientWriteOff), cancelledSalesAmount: sales, lostIncome: Math.max(0, sales - cost - cancellationResult) };
   }
   if (completed) {
     const recognizedRevenue = sales - clientRefunded;
@@ -765,6 +774,8 @@ export class DealsService {
         supplierPaid,
         supplierRefunded,
         clientWriteOff,
+        clientPenalty: Number(clientPenalty),
+        supplierPenalty: Number(supplierPenalty),
       });
       const expectedIncome = income.expectedIncome;
       const currentIncome = income.currentIncome;

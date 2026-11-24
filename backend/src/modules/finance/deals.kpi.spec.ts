@@ -69,4 +69,24 @@ describe("Deals KPI income model", () => {
     const r = computeDealIncome({ ...base, isCancelledDeal: true, clientReceived: 200, clientRefunded: 50, supplierPaid: 100, supplierRefunded: 50 });
     expect(r.cancellationIncome).toBe(100);
   });
+
+  it("11 cancelled income uses client penalty minus supplier penalty", () => {
+    const withClientPenalty = computeDealIncome({
+      ...base, isCancelledDeal: true, clientReceived: 300, clientRefunded: 0,
+      clientPenalty: 300, supplierPenalty: 0,
+    });
+    expect(withClientPenalty.currentIncome).toBe(300);
+
+    const withBoth = computeDealIncome({
+      ...base, isCancelledDeal: true, clientReceived: 300, clientRefunded: 0,
+      clientPenalty: 300, supplierPenalty: 100,
+    });
+    expect(withBoth.currentIncome).toBe(200);
+
+    const negative = computeDealIncome({
+      ...base, isCancelledDeal: true, clientReceived: 300, clientRefunded: 0,
+      clientPenalty: 300, supplierPenalty: 700,
+    });
+    expect(negative.currentIncome).toBe(-400);
+  });
 });
