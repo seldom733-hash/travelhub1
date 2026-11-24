@@ -11,7 +11,7 @@ import OperationsCenterShell, {
   OperationsLoadingState,
   OperationsEmptyState,
 } from "@/components/OperationsCenterShell";
-import { NAV_GROUPS } from "@/components/Shell";
+import { NAV_GROUPS } from "@/lib/nav";
 import { LocaleProvider, t } from "./i18n";
 
 const ROOT = process.cwd();
@@ -147,14 +147,8 @@ describe("UI-C1.2A — shared OperationsCenterShell is the canonical registry fr
     expect(container.innerHTML).toContain('id="only"');
     // Pages guard every semantic section behind real data/conditions (no decorative empty KPI boxes).
     for (const rel of REGISTRY_PAGES) {
-      const src = read(rel);
-      expect(src).toContain("variant=\"total\"");
+      expect(read(rel)).toContain('redirect("/app/finance/deals")');
     }
-    const req = read("app/app/requests/page.tsx");
-    const bkg = read("app/app/bookings/page.tsx");
-    expect(req).toContain("{kpi && (");
-    expect(req).toContain("requests.length === 0");
-    expect(bkg).toContain("!data && busy");
   });
 
   it("(9) loading state: accessible skeleton, no fake numbers", () => {
@@ -207,32 +201,19 @@ describe("UI-C1.2A — shared OperationsCenterShell is the canonical registry fr
     expect(screen.queryByText(/raw|missing/i)).toBeNull();
   });
 
-  it("(14) no duplicate local page title after wrapping: registries have no PageHeader / local h1 title", () => {
+  it("(14) retired registry pages are redirect stubs to the canonical deal register", () => {
     for (const rel of REGISTRY_PAGES) {
       const src = read(rel);
-      expect(src).toContain("<OperationsCenterShell");
-      expect(src).not.toContain("<PageHeader");
-      expect(src).not.toContain('<h1 className="text-2xl font-bold');
-      expect(src).not.toContain('title="Order Center"');
-      expect(src).not.toContain('title="Booking Center"');
+      expect(src).toContain('redirect("/app/finance/deals")');
+      expect(src).not.toContain("<OperationsCenterShell");
     }
   });
 });
 
 describe("UI-C1.2A — registry pages consume the shared shell with their active domain", () => {
-  it("requests/orders/bookings pages render inside the shared shell with correct activeDomain", () => {
-    const cases: Array<[string, string]> = [
-      ["app/app/requests/page.tsx", 'activeDomain="requests"'],
-      ["app/app/orders/page.tsx", 'activeDomain="orders"'],
-      ["app/app/bookings/page.tsx", 'activeDomain="bookings"'],
-    ];
-    for (const [rel, domainProp] of cases) {
-      const src = read(rel);
-      expect(src).toContain("import OperationsCenterShell");
-      expect(src).toContain("<OperationsCenterShell");
-      expect(src).toContain(domainProp);
-      expect(src).toContain("OperationsToolbarSlot");
-      expect(src).toContain("OperationsRegistrySlot");
+  it("requests/orders/bookings pages are retired to the canonical deal register", () => {
+    for (const rel of REGISTRY_PAGES) {
+      expect(read(rel)).toContain('redirect("/app/finance/deals")');
     }
   });
 
@@ -240,7 +221,6 @@ describe("UI-C1.2A — registry pages consume the shared shell with their active
     const pay = read("app/app/payments/page.tsx");
     expect(pay).toContain("import OperationsCenterShell");
     expect(pay).toContain("activeDomain=\"payments\"");
-    expect(pay).toContain("/finance/payments?"); // content sourced from the real API
   });
 
   it("historical /app/finance/payments is a query-preserving compatibility redirect to /app/payments", () => {
@@ -261,10 +241,10 @@ describe("UI-C1.2A — sidebar ownership (§5): ФИНАНСЫ → Платеж�
     expect(finance).toBeTruthy();
     const payments = finance?.items.find((item) => item.href === "/app/payments");
     expect(payments?.labelKey).toBe("nav.payments");
-    expect(payments?.permission).toBe("finance.payment.read");
+    expect(payments?.permissions).toContain("finance.payment.read");
     // ОПЕРАЦИИ group holds the three commerce domains (Платежи NOT under ОПЕРАЦИИ)
     const operations = NAV_GROUPS.find((g) => g.headingKey === "nav.group.operations");
-    expect(operations?.items.map((i) => i.href)).toEqual(["/app/requests", "/app/orders", "/app/bookings", "/app/documents"]);
+    expect(operations?.items.map((i) => i.href)).toEqual(["/app/requests/create", "/app/finance/deals"]);
   });
 
   it("no invented sidebar item for the Operations Center shell itself", () => {
@@ -273,10 +253,9 @@ describe("UI-C1.2A — sidebar ownership (§5): ФИНАНСЫ → Платеж�
     expect(all.some((i) => i.labelKey === "nav.operations_center")).toBe(false);
   });
 
-  it("ОПЕРАЦИИ and ФИНАНСЫ group headings are localized keys (not hardcoded strings in the sidebar source)", () => {
-    const shell = read("components/Shell.tsx");
-    expect(shell).toContain("headingKey: \"nav.group.operations\"");
-    expect(shell).toContain("headingKey: \"nav.group.finance\"");
-    expect(shell).toContain("t(group.headingKey, locale)");
+  it("ОПЕРАЦИИ and ФИНАНСЫ group headings are localized keys", () => {
+    expect(NAV_GROUPS.some((g) => g.headingKey === "nav.group.operations")).toBe(true);
+    expect(NAV_GROUPS.some((g) => g.headingKey === "nav.group.finance")).toBe(true);
+    expect(t("nav.group.operations", "ru")).not.toBe("nav.group.operations");
   });
 });

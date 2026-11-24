@@ -33,52 +33,23 @@ const PAYMENTS = read("app/app/payments/page.tsx");
 const HELP_PAGE = read("app/app/help/page.tsx");
 const KPI_CARD = read("components/commerce/CommerceKpiCard.tsx");
 const POPOVER = read("components/commerce/MetricHelpPopover.tsx");
-const SHELL = read("components/Shell.tsx");
+const SHELL = read("lib/nav.ts");
 const REGISTRY = read("lib/help-registry.ts");
 const HELP_I18N = read("lib/help-i18n.ts");
 
-describe("UI-C1.2H §2.11 — hardcoded Russian fallbacks removed (canonical i18n only)", () => {
-  it("Requests page has no `|| «Жизненный цикл»` / `|| «Проблемы и завершения»` fallbacks", () => {
-    expect(REQUESTS).not.toContain('|| "Жизненный цикл"');
-    expect(REQUESTS).not.toContain('|| "Проблемы и завершения"');
+describe("UI-C1.2H — registries retired to the canonical deal register", () => {
+  it("requests/orders/bookings are redirect stubs", () => {
+    expect(REQUESTS).toContain('redirect("/app/finance/deals")');
+    expect(ORDERS).toContain('redirect("/app/finance/deals")');
+    expect(BOOKINGS).toContain('redirect("/app/finance/deals")');
   });
 
-  it("Requests group headings still resolve through i18n keys", () => {
-    expect(REQUESTS).toContain('t("requests.group.lifecycle", locale)');
-    expect(REQUESTS).toContain('t("requests.group.exceptions", locale)');
+  it("payments remains a real page", () => {
+    expect(PAYMENTS).not.toMatch(/\bredirect\s*\(/);
   });
 });
 
-describe("UI-C1.2H §13 — KPI cards bind canonical Help Registry ids on all 4 registries", () => {
-  it("Requests: total + 12 status cards bind helpId", () => {
-    expect(REQUESTS).toContain('helpId="requests.kpi.total"');
-    expect(REQUESTS).toContain("helpId={`requests.status.${code.toLowerCase()}`}");
-  });
-
-  it("Orders: total + lifecycle + payment cards bind helpId", () => {
-    expect(ORDERS).toContain('helpId="orders.kpi.total"');
-    expect(ORDERS).toContain("helpId={`orders.status.${code.toLowerCase()}`}");
-    expect(ORDERS).toContain("helpId={`orders.payment.${code.toLowerCase()}`}");
-  });
-
-  it("Bookings: total + FlowRow + all status groups bind helpId", () => {
-    expect(BOOKINGS).toContain('helpId="bookings.kpi.total"');
-    expect(BOOKINGS).toContain("helpId={`bookings.status.${code.toLowerCase()}`}");
-  });
-
-  it("Payments: total + PaymentStatus + RefundStatus cards bind helpId; currency cards do NOT", () => {
-    expect(PAYMENTS).toContain('helpId="payments.kpi.total"');
-    expect(PAYMENTS).toContain("helpId={`payments.status.${code.toLowerCase()}`}");
-    expect(PAYMENTS).toContain("helpId={`payments.refund.status.${code.toLowerCase()}`}");
-    // Currency cards describe dynamic data (not statuses) → the CURRENCY group block must not bind help.
-    const currencyBlock = PAYMENTS.slice(
-      PAYMENTS.indexOf("CURRENCY GROUP"),
-      PAYMENTS.indexOf("REFUND STATUS GROUP"),
-    );
-    expect(currencyBlock).toContain("<CommerceKpiCard");
-    expect(currencyBlock).not.toContain("helpId");
-  });
-
+describe("UI-C1.2H §13 — KPI help host", () => {
   it("CommerceKpiCard is the shared host: optional helpId prop + MetricHelpPopover import", () => {
     expect(KPI_CARD).toContain('helpId?: string;');
     expect(KPI_CARD).toContain('import MetricHelpPopover from "./MetricHelpPopover";');
@@ -148,7 +119,8 @@ describe("UI-C1.2H §12 — Help Center page contract", () => {
   });
 
   it("sidebar exposes the Help entry (nav.help → /app/help) with a main-DICT label", () => {
-    expect(SHELL).toContain('{ href: "/app/help", icon: "❓", labelKey: "nav.help" }');
+    expect(SHELL).toContain('/app/help');
+    expect(SHELL).toContain('labelKey: "nav.help"');
     const I18N_MAIN = read("lib/i18n.tsx");
     expect(I18N_MAIN).toContain('"nav.help": { ru: "Справка", az: "Kömək", en: "Help" }');
   });

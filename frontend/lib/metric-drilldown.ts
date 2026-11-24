@@ -128,13 +128,13 @@ export const METRIC_CONFIGS = {
   "analytics.orders": {
     metricId: "analytics.orders",
     destinationType: "DOMAIN_ROUTE" as DestinationType,
-    destination: "/app/orders",
+    destination: "/app/finance/deals",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
   },
   "analytics.bookings": {
     metricId: "analytics.bookings",
     destinationType: "DOMAIN_ROUTE" as DestinationType,
-    destination: "/app/bookings",
+    destination: "/app/finance/deals",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
   },
   "analytics.gmv": {
@@ -255,7 +255,7 @@ export const METRIC_CONFIGS = {
   "analytics.partner.name": {
     metricId: "analytics.partner.name",
     destinationType: "DETAIL_VIEW" as DestinationType,
-    destination: "/app/crm/partners",
+    destination: "/app/crm?tab=partners",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
     extraParams: { tab: "overview" },
     label: "Partner 360 — Обзор",
@@ -263,14 +263,14 @@ export const METRIC_CONFIGS = {
   "analytics.partner.gmv": {
     metricId: "analytics.partner.gmv",
     destinationType: "DETAIL_VIEW" as DestinationType,
-    destination: "/app/crm/partners",
+    destination: "/app/crm?tab=partners",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
     extraParams: { tab: "overview" },
   },
   "analytics.partner.revenue": {
     metricId: "analytics.partner.revenue",
     destinationType: "DETAIL_VIEW" as DestinationType,
-    destination: "/app/crm/partners",
+    destination: "/app/crm?tab=partners",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
     extraParams: { tab: "overview" },
   },
@@ -283,14 +283,14 @@ export const METRIC_CONFIGS = {
   "analytics.partner.orders": {
     metricId: "analytics.partner.orders",
     destinationType: "DETAIL_VIEW" as DestinationType,
-    destination: "/app/crm/partners",
+    destination: "/app/crm?tab=partners",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
     extraParams: { tab: "orders" },
   },
   "analytics.partner.bookings": {
     metricId: "analytics.partner.bookings",
     destinationType: "DETAIL_VIEW" as DestinationType,
-    destination: "/app/crm/partners",
+    destination: "/app/crm?tab=partners",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
     extraParams: { tab: "bookings" },
   },

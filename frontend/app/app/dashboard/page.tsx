@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { useCurrentUser } from "@/lib/use-user";
 import { useLocale, t } from "@/lib/i18n";
+import { NAV_BY_HREF, canAccess } from "@/lib/nav";
 
 const CARDS = [
   {
@@ -91,7 +92,12 @@ export default function OverviewPage() {
   const user = useCurrentUser();
   const locale = useLocale();
 
-  const visible = user ? CARDS.filter((c) => user.permissions.includes(c.permission)) : CARDS;
+  const visible = user
+    ? CARDS.filter((c) => {
+        const access = NAV_BY_HREF[c.href];
+        return access ? canAccess(user, access) : user.permissions.includes(c.permission);
+      })
+    : CARDS;
   const hiddenCount = CARDS.length - visible.length;
 
   return (

@@ -38,6 +38,7 @@ const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.ge
 const DAY = `${TODAY.getFullYear()}-${pad(TODAY.getMonth() + 1)}-15`;
 // A LATER day in the same month — used to prove the click switches the panel.
 const OTHER_DAY = `${TODAY.getFullYear()}-${pad(TODAY.getMonth() + 1)}-20`;
+const shortDate = (iso: string) => { const [y, m, d] = iso.split("-"); return `${d}.${m}.${y.slice(2)}`; };
 
 const offerFor = (date: string, id: string, price: number) => ({
   tourIncValue: "t1",
@@ -99,7 +100,7 @@ describe("TourDetail calendar → INLINE day tariffs (§4.9.4, no modal)", () =>
 
     // The nearest priced day of the loaded month is picked WITHOUT a click.
     const panel = await screen.findByRole("region", { name: /Подать заявку/ }, { timeout: 8000 });
-    expect(within(panel).getAllByText(DAY).length).toBeGreaterThan(0);
+    expect(panel.textContent).toContain(shortDate(DAY));
     // Its tariff is listed with a per-offer submit button.
     expect(within(panel).getByText("Варианты размещения и цены")).toBeTruthy();
     expect(within(panel).getAllByText("Rixos Dubai").length).toBeGreaterThanOrEqual(1);
@@ -117,7 +118,7 @@ describe("TourDetail calendar → INLINE day tariffs (§4.9.4, no modal)", () =>
     fireEvent.click(otherDay);
 
     const panel = await screen.findByRole("region", { name: /Подать заявку/ }, { timeout: 8000 });
-    expect(within(panel).getAllByText(OTHER_DAY).length).toBeGreaterThan(0);
+    expect(panel.textContent).toContain(shortDate(OTHER_DAY));
     // The other day carries its own tariff row.
     expect(within(panel).getAllByRole("button", { name: "Подать заявку" }).length).toBe(1);
   });

@@ -203,17 +203,10 @@ describe("R2 TOTAL KPI micro-closure — canonical labels + size variant", () =>
     expect(t("admin.kpi.total_bookings", "ru")).toBe("Всего бронирований");
   });
 
-  it("all three registries use variant=total and NOT full-width wrapper", () => {
-    const req = read("app/app/requests/page.tsx");
-    const ord = read("app/app/orders/page.tsx");
-    const bkg = read("app/app/bookings/page.tsx");
-    for (const src of [req, ord, bkg]) {
-      expect(src).toContain('variant="total"');
-      expect(src).toContain('className="w-fit max-w-full"');
+  it("retired registries redirect to the canonical deal register", () => {
+    for (const rel of ["app/app/requests/page.tsx", "app/app/orders/page.tsx", "app/app/bookings/page.tsx"]) {
+      expect(read(rel)).toContain('redirect("/app/finance/deals")');
     }
-    expect(req).toContain('label={t("requests.kpi.total", locale)}');
-    expect(ord).toContain('label={t("admin.kpi.total_orders", locale)}');
-    expect(bkg).toContain('label={t("admin.kpi.total_bookings", locale)}');
   });
 
   it("CommerceKpiCard total variant is ~15-20% larger than ordinary card", () => {
@@ -259,14 +252,6 @@ describe("R3 Page Composition & Information Hierarchy Parity — shared two-zone
     // Order meta card uses its own code/number fields (no commerceSequence in DTO).
     expect(req).toContain('t("detail.details.sequence", locale)');
     expect(bkg).toContain('t("detail.details.sequence", locale)');
-  });
-
-  it("Order and Booking Finance cards share identical grid breakpoint behavior", () => {
-    const ord = read("app/app/orders/[id]/page.tsx");
-    const bkg = read("app/app/bookings/[id]/page.tsx");
-    const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4";
-    expect(ord).toContain(GRID);
-    expect(bkg).toContain(GRID);
   });
 
   it("the shared layout primitive owns the page composition grid (no page-level wrapper)", () => {
@@ -525,7 +510,7 @@ describe("UI-C7 — Request UI Migration — header actions + presentation clean
     const req = read("app/app/requests/[id]/page.tsx");
     expect(req).toContain('flex h-full items-center justify-center');
     expect(req).toContain('flex h-full flex-col items-center justify-center gap-4');
-    expect(req).toContain('href="/app/requests"');
+    expect(req).toContain('href="/app/finance/deals"');
     expect(req).toContain("crm.loading");
     expect(req).toContain("crm.not_found");
     expect(req).toContain("crm.back_to_list");

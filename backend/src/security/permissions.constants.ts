@@ -127,6 +127,7 @@ export const PERMISSIONS = {
 
   // ── Finance (Phase 2, каталог прав зарезервирован) ───────────────────
   "finance.payment.read": "Чтение платежей",
+  "finance.bonus.read": "Просмотр бонусов менеджеров",
   "finance.payment.write": "Управление платежами",
   // D4 F3 fix: payment lifecycle endpoints (Step 2.12/2.12H) требуют granular
   // create/manage — эти ключи отсутствовали в каталоге и НЕ выдавались ни одной
@@ -376,6 +377,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // по клиентам; без write-команд).
     "sales.checkout.read",
     "finance.payment.read",
+    "finance.bonus.read",
     "finance.refund.read",
     "finance.dispute.read",
     "finance.invoice.read",
@@ -457,6 +459,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // не доказан). KPI не выдаётся (нет finance-контракта).
     "sales.sale.read",
     "finance.payment.read",
+    "finance.bonus.read",
     "finance.payment.write",
     "finance.payment.create",
     "finance.payment.manage",

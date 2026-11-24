@@ -316,7 +316,7 @@ export default function RequestDetailPage() {
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <div className="text-sm text-red-500">{error || t("crm.not_found", locale)}</div>
         <Link
-          href="/app/requests"
+          href="/app/finance/deals"
           className="rounded-lg border border-line bg-white px-4 py-2 text-sm text-ink/60 hover:bg-panel"
         >
           ← {t("crm.back_to_list", locale)}
@@ -350,7 +350,7 @@ export default function RequestDetailPage() {
           breadcrumbs={["TravelHub", t("requests.title", locale), r.referenceNumber]}
           reference={r.referenceNumber}
           secondary={r.code}
-          backHref="/app/requests"
+          backHref="/app/finance/deals"
           lifecycleStatus={<StatusBadge status={r.status} />}
           actions={
             user ? (

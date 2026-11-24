@@ -291,14 +291,14 @@ export default function BookingDetailPage() {
   }, [booking, loadBooking]);
 
   if (loading) {
-    return <div className="flex h-full items-center justify-center"><div className="text-sm text-slate-400">{t("crm.loading", locale)}</div></div>;
+    return <div className="flex h-full items-center justify-center"><div className="text-sm text-ink/60">{t("crm.loading", locale)}</div></div>;
   }
 
   if (error || !booking) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <div className="text-sm text-red-500">{error || t("crm.not_found", locale)}</div>
-        <Link href="/app/bookings" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">← {t("crm.back_to_list", locale)}</Link>
+        <Link href="/app/finance/deals" className="rounded-lg border border-line bg-white px-4 py-2 text-sm text-ink/60 hover:bg-panel">← {t("crm.back_to_list", locale)}</Link>
       </div>
     );
   }
@@ -315,7 +315,7 @@ export default function BookingDetailPage() {
           breadcrumbs={["TravelHub", t("bookings.title", locale), booking.referenceNumber]}
           reference={booking.referenceNumber}
           secondary={booking.code}
-          backHref="/app/bookings"
+          backHref="/app/finance/deals"
           lifecycleStatus={<StatusBadge status={booking.status} />}
           actions={
             <BookingActionBar
@@ -356,7 +356,7 @@ export default function BookingDetailPage() {
           {/* SECONDARY: Finance — split client and supplier money */}
           {booking.returnedToOrder ? (
             <EntitySectionCard title={t("bookings.financial", locale)}>
-              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+              <div className="rounded-lg border border-brand/20 bg-brand/10 px-3 py-2 text-sm text-ink">
                 Бронирование возвращено в заказ. Финансы и платежи ведутся в карточке заказа{" "}
                 <Link href={`/app/orders/${booking.orderId}`} className="font-semibold underline">
                   {booking.orderReference ?? booking.orderCode}
@@ -366,7 +366,7 @@ export default function BookingDetailPage() {
             </EntitySectionCard>
           ) : (
           <EntitySectionCard title={t("bookings.financial", locale)}>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">
               Оплаты клиента
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -375,7 +375,7 @@ export default function BookingDetailPage() {
               <EntityFinanceCell label="К оплате клиентом" value={formatPrice(clientFinance.due.toFixed(2), booking.currency ?? "AZN", locale)} tone="warning" />
             </div>
 
-            <div className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <div className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-ink/60">
               Оплаты поставщику
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -384,7 +384,7 @@ export default function BookingDetailPage() {
               <EntityFinanceCell label="Осталось оплатить" value={formatPrice(supplierFinance.remaining.toFixed(2), "AZN", locale)} tone="warning" />
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-3">
+            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-3 sm:grid-cols-3">
               <EntityFinanceCell label="Возвращено от поставщика" value={formatPrice(supplierFinance.refunded.toFixed(2), "AZN", locale)} tone="info" />
               <EntityFinanceCell label="Доход" value={formatPrice(income.toFixed(2), "AZN", locale)} tone={income >= 0 ? "positive" : "negative"} />
               {financialSummary?.paymentStatus && (
@@ -393,13 +393,13 @@ export default function BookingDetailPage() {
             </div>
 
             {activePayment && (
-              <div className="mt-3 flex flex-wrap gap-4 border-t border-slate-100 pt-3 text-xs text-slate-500">
+              <div className="mt-3 flex flex-wrap gap-4 border-t border-line pt-3 text-xs text-ink/60">
                 <span>{t("finance.payment_method", locale)}: {activePayment.paymentMethod ?? "—"}</span>
                 <span>{t("crm.detail.payment_status", locale)}: <StatusBadge status={activePayment.status ?? ""} /></span>
               </div>
             )}
             {!paymentsUnavailable && ledgerRows.length > 0 && (
-              <div className="mt-3 border-t border-slate-100 pt-3" data-testid="booking-payments-table">
+              <div className="mt-3 border-t border-line pt-3" data-testid="booking-payments-table">
                 <PaymentsTable rows={ledgerRows} ledger locale={locale} onActionCompleted={() => void loadBooking()} />
               </div>
             )}
@@ -409,7 +409,7 @@ export default function BookingDetailPage() {
                   type="button"
                   data-testid="booking-create-payment-button"
                   onClick={() => setCreatePaymentOpen(true)}
-                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                  className="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark"
                 >
                   Платёж клиента
                 </button>
@@ -430,9 +430,9 @@ export default function BookingDetailPage() {
               <div className="space-y-2">
                 {booking.passengers.map((p, i) => (
                   <EntityRow key={p.id}>
-                    <span className="font-medium text-slate-700">{i + 1}.</span>
-                    <span className="text-slate-700">{p.firstName} {p.lastName}</span>
-                    {p.passportNumber && <span className="text-slate-400">••••{p.passportNumber.slice(-4)}</span>}
+                    <span className="font-medium text-ink">{i + 1}.</span>
+                    <span className="text-ink">{p.firstName} {p.lastName}</span>
+                    {p.passportNumber && <span className="text-ink/60">••••{p.passportNumber.slice(-4)}</span>}
                     {p.dataCompleteness && <StatusBadge status={p.dataCompleteness === "COMPLETE" ? "CONFIRMED" : "WAITING_FOR_DATA"} />}
                   </EntityRow>
                 ))}
@@ -445,8 +445,8 @@ export default function BookingDetailPage() {
               <div className="space-y-2">
                 {booking.supplierConfirmations.map(sc => (
                   <EntityRow key={sc.id}>
-                    <span className="text-slate-500">{fmtTs(sc.receivedAt)}</span>
-                    {sc.rawPayload && <span className="truncate text-slate-400">{sc.rawPayload.slice(0, 120)}</span>}
+                    <span className="text-ink/60">{fmtTs(sc.receivedAt)}</span>
+                    {sc.rawPayload && <span className="truncate text-ink/60">{sc.rawPayload.slice(0, 120)}</span>}
                   </EntityRow>
                 ))}
               </div>

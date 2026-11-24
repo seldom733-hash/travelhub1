@@ -82,22 +82,23 @@ const TREND_WIDGETS: Record<string, string> = {
  *  Financial KPIs without honest target remain absent (NONE). */
 const WIDGET_ROUTES: Record<string, string> = {
   // Executive → operational centers
-  "orders":   "/app/orders",
-  "bookings": "/app/bookings",
-  // Operational → filtered operational centers
-  "orders-fulfilled":     "/app/orders?status=FULFILLED",
-  "bookings-confirmed":   "/app/bookings?status=CONFIRMED",
-  "bookings-completed":   "/app/bookings?status=COMPLETED",
-  "payments-captured":    "/app/payments?paymentStatus=CAPTURED",
-  "refunds-processed":    "/app/payments?refundStatus=PROCESSED",
-  // Marketplace → CRM
+  "orders":   "/app/finance/deals",
+  "bookings": "/app/finance/deals",
+  // Operational → canonical deal register (stage filters are server-supported).
+  "orders-fulfilled":     "/app/finance/deals?statusGroup=closed",
+  "bookings-confirmed":   "/app/finance/deals?statusGroup=open",
+  "bookings-completed":   "/app/finance/deals?statusGroup=closed",
+  // Payments has no honest URL-filter consumer yet; open the register itself.
+  "payments-captured":    "/app/payments",
+  "refunds-processed":    "/app/finance/refunds",
+  // Marketplace → CRM (customers/partners are tabs, not standalone routes).
   "marketplace-partners": "/app/crm?tab=partners&entitled=true",
-  "marketplace-customers": "/app/crm?tab=customers",
+  "marketplace-customers": "/app/crm?tab=customers&entitled=true",
   "partners":  "/app/crm?tab=partners&entitled=true",
-  "customers": "/app/crm?tab=customers",
+  "customers": "/app/crm?tab=customers&entitled=true",
   // Channels → operational
-  "marketplace-orders": "/app/orders",
-  "storefront-orders":  "/app/orders",
+  "marketplace-orders": "/app/finance/deals",
+  "storefront-orders":  "/app/finance/deals",
 };
 
 /** IDs rendered as trend charts (not KPI cards). */
@@ -118,7 +119,7 @@ const NON_KPI_IDS = new Set(["revenue-trend"]);  const SECTION_META: Record<stri
 
 /** Reconciliation badge for special KPI rendering. */
 function ReconciliationBadge({ status, locale = "ru" }: { status: number | null; locale?: Locale }) {
-  if (status === null || status === undefined) return <span className="text-sm text-slate-400">—</span>;
+  if (status === null || status === undefined) return <span className="text-sm text-ink/60">—</span>;
   if (status === 0) return (
     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">{t("cc.recon.balanced", locale)}</span>
   );
@@ -152,11 +153,11 @@ export function SectionGrid({
     return (
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-busy>
         {/* §SKELETON-PARITY: виджеты — карточки `rounded-2xl border bg-white p-4 shadow-sm`
-            (`SectionGrid.tsx:201`), а не блоки `h-24 bg-slate-100` без рамки. */}
+            (`SectionGrid.tsx:201`), а не блоки `h-24 bg-panel` без рамки. */}
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
-            <div className="mt-2 h-8 w-24 animate-pulse rounded bg-slate-100" />
+          <div key={i} className="rounded-2xl border border-line bg-white p-4 shadow-sm">
+            <div className="h-3 w-24 animate-pulse rounded bg-panel" />
+            <div className="mt-2 h-8 w-24 animate-pulse rounded bg-panel" />
           </div>
         ))}
       </div>
@@ -203,8 +204,8 @@ export function SectionGrid({
         // Special rendering for reconciliation
         if (wp.widgetId === "reconciliation") {
           return (
-            <div key={wp.widgetId} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("cc.kpi.reconciliation", locale)}</div>
+            <div key={wp.widgetId} className="rounded-2xl border border-line bg-white p-4 shadow-sm">
+              <div className="text-xs font-medium uppercase tracking-wide text-ink/60">{t("cc.kpi.reconciliation", locale)}</div>
               <div className="mt-2">
                 <ReconciliationBadge status={(val as { current: number | null }).current} locale={locale} />
               </div>
@@ -268,7 +269,7 @@ export function SectionGrid({
       {/* ─── Executive Section ─────────────────────────────────────── */}
       {hasSection("executive") && summary.sections.executive && (
         <section aria-labelledby="section-executive">
-          <h2 id="section-executive" className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+          <h2 id="section-executive" className="mb-4 flex items-center gap-2 text-lg font-semibold text-ink">
             {SECTION_META.executive.icon} {t(SECTION_META.executive.titleKey, locale)}
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -281,7 +282,7 @@ export function SectionGrid({
       {/* ─── Operational Section ───────────────────────────────────── */}
       {hasSection("operational") && summary.sections.operational && (
         <section aria-labelledby="section-operational">
-          <h2 id="section-operational" className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+          <h2 id="section-operational" className="mb-4 flex items-center gap-2 text-lg font-semibold text-ink">
             {SECTION_META.operational.icon} {t(SECTION_META.operational.titleKey, locale)}
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -293,7 +294,7 @@ export function SectionGrid({
       {/* ─── Financial Section ─────────────────────────────────────── */}
       {hasSection("financial") && summary.sections.financial && (
         <section aria-labelledby="section-financial">
-          <h2 id="section-financial" className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+          <h2 id="section-financial" className="mb-4 flex items-center gap-2 text-lg font-semibold text-ink">
             {SECTION_META.financial.icon} {t(SECTION_META.financial.titleKey, locale)}
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -305,7 +306,7 @@ export function SectionGrid({
       {/* ─── Marketplace Section ───────────────────────────────────── */}
       {hasSection("marketplace") && summary.sections.marketplace && (
         <section aria-labelledby="section-marketplace">
-          <h2 id="section-marketplace" className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+          <h2 id="section-marketplace" className="mb-4 flex items-center gap-2 text-lg font-semibold text-ink">
             {SECTION_META.marketplace.icon} {t(SECTION_META.marketplace.titleKey, locale)}
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -317,7 +318,7 @@ export function SectionGrid({
       {/* ─── Storefront SaaS Section ──────────────────────────────── */}
       {hasSection("storefrontSaaS") && summary.sections.storefrontSaaS && (
         <section aria-labelledby="section-storefrontSaaS">
-          <h2 id="section-storefrontSaaS" className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+          <h2 id="section-storefrontSaaS" className="mb-4 flex items-center gap-2 text-lg font-semibold text-ink">
             {SECTION_META.storefrontSaaS.icon} {t(SECTION_META.storefrontSaaS.titleKey, locale)}
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -388,7 +389,7 @@ function V3Section({ id, data, positions, locale = "ru" }: { id: string; data: R
 
   return (
     <section aria-labelledby={`section-${id}`}>
-      <h2 id={`section-${id}`} className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+      <h2 id={`section-${id}`} className="mb-4 flex items-center gap-2 text-lg font-semibold text-ink">
         {meta.icon} {t(meta.titleKey, locale)}
       </h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -414,9 +415,9 @@ function V3Section({ id, data, positions, locale = "ru" }: { id: string; data: R
             ? (formatPrice(numericVal, v.currency, locale) ?? String(v.current ?? "—"))
             : String(v.current ?? "—");
           return (
-            <div key={key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
-              <div className="mt-2 text-2xl font-bold text-slate-900">{displayValue}</div>
+            <div key={key} className="rounded-2xl border border-line bg-white p-4 shadow-sm">
+              <div className="text-xs font-medium uppercase tracking-wide text-ink/60">{label}</div>
+              <div className="mt-2 text-2xl font-bold text-ink">{displayValue}</div>
             </div>
           );
         })}
@@ -442,7 +443,7 @@ function AiInsightsSection({ data, locale = "ru" }: AiInsightsSectionProps) {
 
   return (
     <section aria-labelledby="section-insights">
-      <h2 id="section-insights" className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+      <h2 id="section-insights" className="mb-4 flex items-center gap-2 text-lg font-semibold text-ink">
         {SECTION_META.insights.icon} {t(SECTION_META.insights.titleKey, locale)}
       </h2>
       <div className="grid gap-4 lg:grid-cols-3">

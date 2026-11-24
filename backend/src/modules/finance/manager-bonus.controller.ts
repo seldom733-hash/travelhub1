@@ -7,7 +7,7 @@ export class ManagerBonusController {
   constructor(private readonly bonuses: ManagerBonusService) {}
 
   @Get()
-  @RequirePermissions("finance.overview.read")
+  @RequirePermissions("finance.bonus.read")
   list(@Query("periods") periods?: string, @Query("basis") basis?: string, @Query("period") period?: string) {
     return this.bonuses.list(periods, basis, period);
   }

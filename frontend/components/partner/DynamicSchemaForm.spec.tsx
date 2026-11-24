@@ -24,7 +24,7 @@ describe("DynamicSchemaForm (Step 1.8 §8)", () => {
     expect(screen.getByLabelText("Число").getAttribute("type")).toBe("number");
     expect(screen.getByLabelText("Целое").getAttribute("type")).toBe("number");
     expect(screen.getByLabelText("Булево").getAttribute("type")).toBe("checkbox");
-    expect(screen.getByLabelText("Дата").getAttribute("type")).toBe("date");
+    expect(screen.getByLabelText("Дата").getAttribute("type")).toBe("text");
     expect(screen.getByLabelText("Время").getAttribute("type")).toBe("time");
     expect(screen.getByLabelText("Выбор").tagName).toBe("SELECT");
     expect(screen.getByLabelText("Валюта").getAttribute("type")).toBe("text");

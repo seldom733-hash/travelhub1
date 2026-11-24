@@ -11,6 +11,12 @@ vi.mock("@/lib/api", () => ({
 
 vi.mock("@/lib/use-can", () => ({ useCan: () => true }));
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => "/app/whatsapp",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { api } from "@/lib/api";
 
 const getMock = api.get as ReturnType<typeof vi.fn>;

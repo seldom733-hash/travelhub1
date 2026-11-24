@@ -6,7 +6,7 @@ import { t, type Locale } from "./i18n";
 const ROOT = join(__dirname, "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 
-const SHELL = read("components/Shell.tsx");
+const SHELL = read("lib/nav.ts");
 const I18N = read("lib/i18n.tsx");
 const PAGE = read("app/app/whatsapp/page.tsx");
 const LIB = read("lib/whatsapp.ts");
@@ -82,7 +82,7 @@ describe("M3 UI registry — WhatsApp Inbox (§25)", () => {
   it("sidebar: /app/whatsapp в группе SERVICE с правом whatsapp.read", () => {
     expect(SHELL).toContain('href: "/app/whatsapp"');
     expect(SHELL).toContain('labelKey: "nav.whatsapp"');
-    expect(SHELL).toContain('permission: "whatsapp.read"');
+    expect(SHELL).toContain('"whatsapp.read"');
   });
 
   it("i18n: все ключи inbox определены и резолвятся во всех трёх локалях", () => {

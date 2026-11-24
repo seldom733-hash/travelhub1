@@ -9,6 +9,7 @@
  * иначе кнопка скрыта). UNKNOWN-обязательства (aznAmount null) помечены и
  * блокируют выплату («never zero»). Currency/суммы — строки (Decimal safe).
  */
+import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { WorkspacePageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import PageHeader from "@/components/PageHeader";
@@ -175,6 +176,12 @@ function ObligationsContent() {
         breadcrumbs={["TravelHub", t("nav.group.finance", locale), t("finance.obligations.title", locale)]}
         actions={
           <div className="flex items-center gap-2">
+            <Link
+              href="/app/finance/reports/debt-as-of"
+              className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 transition-colors hover:bg-panel"
+            >
+              {t("nav.supplier_debt_report", locale)}
+            </Link>
             <TableExportButton
               exportUrl="/api/v1/finance/obligations/export"
               extraParams={{ status, supplierCode, overdue: overdueOnly ? "true" : "" }}

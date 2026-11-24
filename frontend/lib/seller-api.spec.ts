@@ -8,7 +8,7 @@ beforeEach(() => {
   lastRequest = null;
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
     lastRequest = { url, init };
-    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true }), json: async () => ({ ok: true }) };
   });
   vi.stubGlobal("fetch", fetchMock);
 });

@@ -297,7 +297,7 @@ export default function OrderDetailPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <div className="text-sm text-red-500">{error || t("crm.not_found", locale)}</div>
-        <Link href="/app/orders" className="rounded-lg border border-line bg-white px-4 py-2 text-sm text-ink/60 hover:bg-panel">{t("crm.back_to_list", locale)}</Link>
+        <Link href="/app/finance/deals" className="rounded-lg border border-line bg-white px-4 py-2 text-sm text-ink/60 hover:bg-panel">{t("crm.back_to_list", locale)}</Link>
       </div>
     );
   }
@@ -321,7 +321,7 @@ export default function OrderDetailPage() {
           breadcrumbs={["TravelHub", t("orders.title", locale), order.referenceNumber]}
           reference={order.referenceNumber}
           secondary={order.number}
-          backHref="/app/orders"
+          backHref="/app/finance/deals"
           lifecycleStatus={<StatusBadge status={order.status} />}
           paymentStatus={<StatusBadge status={order.paymentStatus} />}
           actions={
@@ -346,12 +346,12 @@ export default function OrderDetailPage() {
             <EntityFieldGrid>
               {order.customerId && (
                 <EntityField label={t("crm.col.customer", locale)} value={
-                  <EntityLink href={`/app/crm/customers/${order.customerId}`}>{order.customerDisplayName ?? order.customerId}</EntityLink>
+                  <EntityLink href={`/app/references/clients/${order.customerId}`}>{order.customerDisplayName ?? order.customerId}</EntityLink>
                 } />
               )}
               {order.sellerPartnerId && (
                 <EntityField label={t("crm.col.seller_partner", locale)} value={
-                  <EntityLink href={`/app/crm/partners/${order.sellerPartnerId}`}>{order.partnerDisplayName ?? order.sellerPartnerId}</EntityLink>
+                  <EntityLink href={`/app/references/suppliers/${order.sellerPartnerId}`}>{order.partnerDisplayName ?? order.sellerPartnerId}</EntityLink>
                 } />
               )}
               <EntityField label={t("reqflow.travelers", locale)} value={order.travelerCount ?? null} />

@@ -16,6 +16,7 @@ import PageHeader from "@/components/PageHeader";
 import { useLocale, t, formatPrice } from "@/lib/i18n";
 import { financeCenterApi, type FinanceOverview, type AznMetric, type CurrencyAmount } from "@/lib/finance-center-api";
 import DateTextInput from "@/components/forms/DateTextInput";
+import { useCan } from "@/lib/use-can";
 
 /** Цвет availability-бейджа. */
 function availabilityTone(a: string): string {
@@ -132,6 +133,7 @@ function ObligationsCard({ data }: { data: FinanceOverview }) {
 
 function OverviewContent() {
   const locale = useLocale();
+  const canPayout = useCan("finance.supplier_payout.read");
   const [data, setData] = useState<FinanceOverview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -195,8 +197,8 @@ function OverviewContent() {
               <AznCard titleKey="finance.overview.supplier_cash_paid" metric={{ amount: data.supplierPayouts.paidAzn, availability: "OK" }} />
               <AznCard titleKey="finance.overview.expected_margin" metric={data.expectedMargin} />
             </div>
-            {/* Supplier payments registry KPI: derived from dueDate + allocations. */}
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {/* Supplier payments registry KPI: hidden without payout permission. */}
+            {canPayout && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <a href="/app/finance/supplier-payments" className="rounded-xl border border-line bg-white p-4 shadow-sm transition-colors hover:border-rose-200">
                 <p className="text-xs font-medium uppercase tracking-wide text-ink/60">{t("finance.supplier_payments.kpi.overdue", locale)}</p>
                 <p className="mt-2 font-mono text-xl font-semibold text-rose-600">
@@ -233,7 +235,7 @@ function OverviewContent() {
                   {data.supplierPayables.unallocatedCount} {t("finance.supplier_payments.kpi.items", locale)}
                 </p>
               </a>
-            </div>
+            </div>}
             <div className="grid gap-4 sm:grid-cols-2">
               <CurrencyBreakdown titleKey="finance.overview.customer_receipts" rows={data.customerReceipts.byCurrency} azn={data.customerReceipts.azn} />
               <CurrencyBreakdown titleKey="finance.overview.customer_debt" rows={data.customerDebt.byCurrency} azn={data.customerDebt.azn} />

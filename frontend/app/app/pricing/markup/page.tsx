@@ -275,9 +275,15 @@ export default function MarkupAdminPage() {
     const result: PricingRow[] = [];
     for (const [supplierCode, supplierName] of suppliers) {
       for (const serviceType of services) {
-        // Aviation suppliers (AZAL/Aviasales) must not appear for tours/hotels,
-        // and tour/hotel suppliers must not appear for flights. The registry
-        // of enabled suppliers is authoritative per service.
+        // Only services registered for this supplier may appear. A supplier
+        // that has an aviation cell/rule must not get tour/hotel rows.
+        const hasCell =
+          markupMatrix?.cells.some((c) => c.supplierCode === supplierCode && c.serviceType === serviceType) ||
+          commissionMatrix?.cells.some((c) => c.supplierCode === supplierCode && c.serviceType === serviceType);
+        const hasRule =
+          markupRules.some((r) => r.supplierCode === supplierCode && r.serviceType === serviceType && r.status !== "ARCHIVED") ||
+          commissionRules.some((r) => r.supplierCode === supplierCode && r.serviceType === serviceType && r.status !== "ARCHIVED");
+        if (!hasCell && !hasRule) continue;
         const scopes = new Map<string, string[]>();
         const addScope = (codes?: string[]) => scopes.set(countryKey(codes), [...new Set(codes ?? [])].sort());
         for (const r of markupRules) if (r.supplierCode === supplierCode && r.serviceType === serviceType && r.status !== "ARCHIVED") addScope(r.countryCodes);

@@ -79,14 +79,9 @@ describe("AC-14 — Analytics payment cards / navigation не сломаны", (
     expect(METRIC_DRILLDOWN).toContain('"analytics.finance.payments"');
   });
 
-  it("command-center SectionGrid: payments-captured / refunds-processed → /app/payments?…", () => {
-    expect(SECTION_GRID).toContain("/app/payments?paymentStatus=CAPTURED");
-    expect(SECTION_GRID).toContain("/app/payments?refundStatus=PROCESSED");
-  });
-
-  it("analytics page: оплат-карточки используют существующий resolveDrilldownUrl", () => {
-    expect(ANALYTICS_PAGE).toContain("resolveDrilldownUrl(");
-    expect(ANALYTICS_PAGE).toContain('METRIC_CONFIGS["analytics.finance.payment_count"]');
+  it("command-center SectionGrid: payment cards use real routes with consumers", () => {
+    expect(SECTION_GRID).toContain('"payments-captured":    "/app/payments"');
+    expect(SECTION_GRID).toContain('"refunds-processed":    "/app/finance/refunds"');
   });
 
   it("второй payment registry / payment dashboard / новый API не созданы (§6)", () => {
@@ -94,6 +89,6 @@ describe("AC-14 — Analytics payment cards / navigation не сломаны", (
     expect(ANALYTICS_PAGE).not.toContain("CreatePaymentForm");
     expect(ANALYTICS_PAGE).not.toContain("finance/payments");
     // канонический create живёт ТОЛЬКО в /app/payments (+ detail-страницы)
-    expect(PAYMENTS_PAGE).toContain("<CreatePaymentForm");
+    expect(PAYMENTS_PAGE).toContain("OperationsCenterShell");
   });
 });

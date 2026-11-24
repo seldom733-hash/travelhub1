@@ -86,10 +86,10 @@ export default function DocumentDetailPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-6">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-slate-500">
-        <Link href="/app/documents" className="hover:text-blue-600">{t("nav.documents", locale)}</Link>
+      <nav className="flex items-center gap-2 text-sm text-ink/60">
+        <Link href="/app/finance/deals" className="hover:text-brand">{t("nav.documents", locale)}</Link>
         <span>/</span>
-        <span className="text-slate-700">{doc?.code ?? "…"}</span>
+        <span className="text-ink">{doc?.code ?? "…"}</span>
       </nav>
 
       {busy ? (
@@ -100,30 +100,30 @@ export default function DocumentDetailPage() {
         <div role="status" aria-busy="true" className="space-y-6">
           <div className="flex items-start justify-between">
             <div>
-              <div className="h-8 w-56 animate-pulse rounded bg-slate-200" />
+              <div className="h-8 w-56 animate-pulse rounded bg-panel" />
               <div className="mt-1 flex items-center gap-3">
-                <div className="h-5 w-24 animate-pulse rounded-full bg-slate-100" />
-                <div className="h-4 w-32 animate-pulse rounded bg-slate-100" />
+                <div className="h-5 w-24 animate-pulse rounded-full bg-panel" />
+                <div className="h-4 w-32 animate-pulse rounded bg-panel" />
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-8 w-28 animate-pulse rounded-lg border border-slate-200 bg-white" />
-              <div className="h-8 w-32 animate-pulse rounded-lg border border-slate-200 bg-white" />
+              <div className="h-8 w-28 animate-pulse rounded-lg border border-line bg-white" />
+              <div className="h-8 w-32 animate-pulse rounded-lg border border-line bg-white" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4 rounded-lg border border-line bg-white p-4 sm:grid-cols-3">
             {Array.from({ length: 9 }, (_, i) => (
               <div key={i}>
-                <div className="h-3 w-20 animate-pulse rounded bg-slate-100" />
-                <div className="mt-0.5 h-4 w-24 animate-pulse rounded bg-slate-200" />
+                <div className="h-3 w-20 animate-pulse rounded bg-panel" />
+                <div className="mt-0.5 h-4 w-24 animate-pulse rounded bg-panel" />
               </div>
             ))}
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <div className="mb-3 h-3 w-32 animate-pulse rounded bg-slate-100" />
+          <div className="rounded-lg border border-line bg-white p-4">
+            <div className="mb-3 h-3 w-32 animate-pulse rounded bg-panel" />
             <div className="space-y-2">
               {Array.from({ length: 2 }, (_, i) => (
-                <div key={i} className="h-9 animate-pulse rounded-lg bg-slate-50" />
+                <div key={i} className="h-9 animate-pulse rounded-lg bg-panel" />
               ))}
             </div>
           </div>
@@ -136,16 +136,16 @@ export default function DocumentDetailPage() {
           {/* Header */}
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-slate-800">{doc.code}</h1>
+              <h1 className="text-2xl font-bold text-ink">{doc.code}</h1>
               <div className="mt-1 flex items-center gap-3">
                 <StatusBadge status={doc.status} />
-                <span className="text-sm text-slate-500">{documentTypeLabel(doc.type, locale)}</span>
+                <span className="text-sm text-ink/60">{documentTypeLabel(doc.type, locale)}</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <a
                 href={documentsApi.downloadUrl(doc.id)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink hover:bg-panel"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -163,7 +163,7 @@ export default function DocumentDetailPage() {
           </div>
 
           {/* Info card */}
-          <div className="grid grid-cols-2 gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4 rounded-lg border border-line bg-white p-4 sm:grid-cols-3">
             <InfoItem label={t("documents.detail.booking", locale)} value={bookingCode ?? "—"} />
             <InfoItem label={t("documents.detail.order", locale)} value={orderCode ?? "—"} />
             <InfoItem label={t("documents.detail.payment", locale)} value={doc.paymentStatus ?? "—"} />
@@ -178,15 +178,15 @@ export default function DocumentDetailPage() {
 
           {/* Travelers (from snapshot) */}
           {travelers.length > 0 && (
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{t("documents.detail.traveler", locale)}</h2>
+            <div className="rounded-lg border border-line bg-white p-4">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/60">{t("documents.detail.traveler", locale)}</h2>
               <div className="space-y-2">
                 {travelers.map((tr, i) => (
-                  <div key={i} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                    <span className="font-medium text-slate-700">
+                  <div key={i} className="flex items-center justify-between rounded-lg bg-panel px-3 py-2">
+                    <span className="font-medium text-ink">
                       {String(tr.firstName ?? "")} {String(tr.lastName ?? "")}
                     </span>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-ink/60">
                       {tr.passportNumber ? String(tr.passportNumber) : t("documents.pii.redacted", locale)}
                     </span>
                   </div>
@@ -197,13 +197,13 @@ export default function DocumentDetailPage() {
 
           {/* Versions */}
           {doc.versions.length > 0 && (
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{t("documents.detail.versions", locale)}</h2>
+            <div className="rounded-lg border border-line bg-white p-4">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/60">{t("documents.detail.versions", locale)}</h2>
               <div className="space-y-1.5">
                 {doc.versions.map((v) => (
-                  <div key={v.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
-                    <span className="font-mono font-medium text-slate-700">v{v.versionNumber}</span>
-                    <span className="text-slate-500">{fmtDate(v.createdAt, locale)}</span>
+                  <div key={v.id} className="flex items-center justify-between rounded-lg bg-panel px-3 py-2 text-xs">
+                    <span className="font-mono font-medium text-ink">v{v.versionNumber}</span>
+                    <span className="text-ink/60">{fmtDate(v.createdAt, locale)}</span>
                   </div>
                 ))}
               </div>
@@ -212,14 +212,14 @@ export default function DocumentDetailPage() {
 
           {/* History */}
           {doc.history.length > 0 && (
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{t("documents.detail.history", locale)}</h2>
+            <div className="rounded-lg border border-line bg-white p-4">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/60">{t("documents.detail.history", locale)}</h2>
               <div className="space-y-1.5">
                 {doc.history.map((h) => (
-                  <div key={h.id} className="rounded-lg bg-slate-50 px-3 py-2 text-xs">
-                    <div className="font-medium text-slate-600">{h.action}</div>
-                    {h.comment && <div className="text-slate-400">{h.comment}</div>}
-                    <div className="text-slate-400">{fmtDate(h.createdAt, locale)}</div>
+                  <div key={h.id} className="rounded-lg bg-panel px-3 py-2 text-xs">
+                    <div className="font-medium text-ink/60">{h.action}</div>
+                    {h.comment && <div className="text-ink/60">{h.comment}</div>}
+                    <div className="text-ink/60">{fmtDate(h.createdAt, locale)}</div>
                   </div>
                 ))}
               </div>
@@ -230,12 +230,12 @@ export default function DocumentDetailPage() {
           {invalidateOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
               <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-                <h3 className="mb-4 text-lg font-semibold text-slate-800">{t("documents.detail.invalidate_title", locale)}</h3>
+                <h3 className="mb-4 text-lg font-semibold text-ink">{t("documents.detail.invalidate_title", locale)}</h3>
                 <textarea
                   value={invalidateReason}
                   onChange={(e) => setInvalidateReason(e.target.value)}
                   placeholder={t("documents.detail.invalidate_reason", locale)}
-                  className="mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                  className="mb-4 w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
                   rows={3}
                 />
                 {invalidateError && (
@@ -244,7 +244,7 @@ export default function DocumentDetailPage() {
                 <div className="flex justify-end gap-2">
                   <button
                     onClick={() => { setInvalidateOpen(false); setInvalidateReason(""); setInvalidateError(""); }}
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+                    className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink/60 hover:bg-panel"
                   >
                     {t("documents.detail.invalidate_cancel", locale)}
                   </button>
@@ -268,8 +268,8 @@ export default function DocumentDetailPage() {
 function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</div>
-      <div className="mt-0.5 text-sm font-medium text-slate-700">{value}</div>
+      <div className="text-xs font-medium uppercase tracking-wide text-ink/60">{label}</div>
+      <div className="mt-0.5 text-sm font-medium text-ink">{value}</div>
     </div>
   );
 }
