@@ -434,7 +434,10 @@ adjustment/ledger, после чего settlement собран заново.
   `LTX-00020045`, `LTX-00020045-2`, `LTX-00020045-3`.
   Для этого `LedgerService` разрешает `commerceSequence` по source-факту и
   резервирует ordinal в `events.BusinessSequence`.
-- Legacy LTX-коды не переписываются: append-only ledger сохраняет историю.
+- Legacy LTX-коды не переписываются автоматически: append-only ledger сохраняет
+историю. Для тестовой сделки `MKT-ORD-00020031` legacy-проводки были
+перенумерованы в `LTX-00020031`, `LTX-00020031-2`, `LTX-00020031-3`;
+счётчик `LTX:00020031` выставлен в 3.
 - В карточке сделки «Возврат клиента» заменён на «Возврат клиенту»
   (RU/AZ/EN).
 - `clientRefundDue` теперь вычитает признанный `clientPenalty`:
