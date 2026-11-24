@@ -316,7 +316,7 @@ export class OrderFinancialSettlementService {
     if (!reason) throw new ValidationDomainError("Write-off reason is required");
     const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { id: true, status: true, cancelledAt: true, amount: true, currency: true } });
     if (!order) throw new NotFoundError(`Order ${orderId} not found`);
-    if (!["CANCELLED", "CLOSED"].includes(order.status) && !order.cancelledAt) throw new ValidationDomainError("Client debt write-off is allowed only for a cancelled order");
+    if (!["CANCELLED", "CLOSED", "CANCELLATION_APPROVED"].includes(order.status) && !order.cancelledAt) throw new ValidationDomainError("Client debt write-off is allowed only for a cancelled order");
     const [payments, refunds, settlement, previous] = await Promise.all([
       this.prisma.payment.aggregate({ where: { orderId, status: { in: ["CAPTURED", "REFUNDED"] } }, _sum: { amount: true } }),
       this.prisma.refund.aggregate({ where: { orderId, status: "PROCESSED" }, _sum: { amount: true } }),
@@ -348,7 +348,7 @@ export class OrderFinancialSettlementService {
     if (!reason) throw new ValidationDomainError("Write-off reason is required");
     const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { id: true, code: true, status: true, cancelledAt: true, amount: true, currency: true, commercialSnapshot: true } });
     if (!order) throw new NotFoundError(`Order ${orderId} not found`);
-    if (!["CANCELLED", "CLOSED"].includes(order.status) && !order.cancelledAt) throw new ValidationDomainError("Supplier debt write-off is allowed only for a cancelled order");
+    if (!["CANCELLED", "CLOSED", "CANCELLATION_APPROVED"].includes(order.status) && !order.cancelledAt) throw new ValidationDomainError("Supplier debt write-off is allowed only for a cancelled order");
     const [outgoing, incoming, obligations, previous] = await Promise.all([
       this.prisma.supplierPayout.aggregate({ where: { orderId, status: "CONFIRMED", direction: { not: "INCOMING" } }, _sum: { amount: true } }),
       this.prisma.supplierPayout.aggregate({ where: { orderId, status: "CONFIRMED", direction: "INCOMING" }, _sum: { amount: true } }),
