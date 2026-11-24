@@ -95,7 +95,7 @@ function makeService(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
   prisma.$transaction = jest.fn().mockImplementation(async (fn: any) => fn(prisma));
-  const ids = { nextCode: jest.fn().mockResolvedValue("SPO-00000001") };
+  const ids = { nextCode: jest.fn().mockResolvedValue("SPO-00000001"), nextCodeAbove: jest.fn().mockResolvedValue("SPO-00000001") };
   const security = { audit: jest.fn().mockResolvedValue(undefined) };
   const eventBus = { emit: jest.fn().mockResolvedValue("evt-1"), publishEvent: jest.fn().mockResolvedValue(undefined) };
   const fxRates = {

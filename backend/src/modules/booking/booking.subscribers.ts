@@ -199,7 +199,7 @@ export class BookingSubscribers implements OnModuleInit {
             }
             code = bookingRefNum;
           } else {
-            code = await this.ids.nextCode(tx, "BKG");
+            code = await this.ids.nextCodeAbove(tx, "BKG", '"booking"."Booking"');
             bookingRefNum = await this.generateBookingReferenceNumber(tx, order, item);
           }
           // Step 2.8: canonical cardinality 1 OrderItem → 1 Booking. orderItemId

@@ -232,7 +232,7 @@ export class SupplierObligationService {
       ? computeDueDate(terms.rule, terms.days, ctx.confirmedAt ?? new Date())
       : null;
 
-    const code = await this.ids.nextCode(tx, "SBO");
+    const code = await this.ids.nextCodeAbove(tx, "SBO", '"finance"."SupplierObligation"');
     const commerceSequence = input.commerceSequence?.trim() || null;
     let dealOrdinal: number | null = null;
     if (commerceSequence) {
@@ -532,7 +532,7 @@ export class SupplierObligationService {
       }
     }
 
-    const code = await this.ids.nextCode(null, "SPO");
+    const code = await this.ids.nextCodeAbove(null, "SPO", '"finance"."SupplierPayout"');
     let payoutEventId = "";
     const dto = await this.prisma.$transaction(async (tx) => {
       // Gаged atomic update: инкремент paid / декремент remaining ТОЛЬКО если

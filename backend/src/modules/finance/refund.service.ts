@@ -142,7 +142,7 @@ export class RefundService {
           );
         }
 
-        const code = await this.ids.nextCode(tx, "RFD");
+        const code = await this.ids.nextCodeAbove(tx, "RFD", '"finance"."Refund"');
         // Step 3.12 — tenant-scoped reference number for Refund
         const referenceNumber = await this.generateRefundReferenceNumber(tx, payment);
         const now = new Date();

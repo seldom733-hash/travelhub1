@@ -216,7 +216,7 @@ export class PaymentService {
           method: paymentMethod,
         });
 
-        const code = await this.ids.nextCode(tx, "PAY");
+        const code = await this.ids.nextCodeAbove(tx, "PAY", '"finance"."Payment"');
         // Shared Commerce Sequence: derive Payment ref from Order's commerceSequence.
         const { referenceNumber, paymentOrdinal } = await this.generateCommercePaymentRef(tx, fresh);
         const created = await tx.payment.create({

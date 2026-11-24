@@ -328,3 +328,47 @@ finance/order targeted jest                    36/36 PASS
 happy-path scenario                            CLOSED
 cancel+waiver scenario                         CLOSED
 ```
+
+
+## 2026-11-24 — все ветки отмены
+
+Параметризованный сценарий `lifecycle-cancel-penalty.js` запускается с
+`CANCEL_REASON` и проверяет четыре причины отмены.
+
+| Причина | Итог | Возвращено клиенту | Штраф | Доли |
+|---|---|---|---|---|
+| `CUSTOMER_FAULT` | CLOSED | 1000 AZN | 300 AZN | platform 200 / supplier 100 |
+| `SUPPLIER_FAULT` | CLOSED | 1000 AZN | 0 | 0 / 0 |
+| `NAVITRAVEL_FAULT` | CLOSED | 1000 AZN | 100 AZN | platform 100 / supplier 0 |
+| `FORCE_MAJEURE` | CLOSED | 1000 AZN | 0 | 0 / 0 |
+
+Для всех четырёх:
+
+```text
+order.status      = CLOSED
+paidAmount        = 1000 AZN
+refundedAmount    = 1000 AZN
+financialStatus   = FINANCIALLY_SETTLED
+clientPenaltyStatus = WAIVED
+supplierPenaltyStatus = WAIVED
+```
+
+### Генерализованное исправление последовательностей
+
+Во время `FORCE_MAJEURE` обнаружилась следующая коллизия: импортированные
+`PAY-00019970` и аналогичные коды не были учтены счётчиками `BusinessSequence`.
+Первый новый `PAY`/`RFD`/`SBO`/`SPO`/`BKG`/`CNA` падал на unique constraint.
+
+Исправлено через `nextCodeAbove` для:
+
+```text
+PAY  → finance."Payment"
+RFD  → finance."Refund"
+SBO  → finance."SupplierObligation"
+SPO  → finance."SupplierPayout"
+BKG  → booking."Booking"
+CNA  → finance."CancellationApproval"
+LTX  → finance."LedgerTransaction"
+```
+
+Это устраняет серию `500` при достижении счётчиком импортированного диапазона.

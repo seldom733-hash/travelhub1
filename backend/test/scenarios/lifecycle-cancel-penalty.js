@@ -15,6 +15,27 @@ const { Api, Runner } = require("./scenario-runner");
 
 const OUT_DIR = path.resolve(__dirname, "../../../reports/scenario-runner");
 const PRIORITY = ["confirmPrice", "customerAccept", "convert", "process", "confirm", "waitFirstPayment", "send"];
+const REASON = process.env.CANCEL_REASON || "CUSTOMER_FAULT";
+const VARIANTS = {
+  CUSTOMER_FAULT: {
+    clientPenaltyAmount: "200", supplierPenaltyAmount: "100", penaltyAmount: "300",
+    platformPenaltyShare: "200", supplierPenaltyShare: "100", finalCustomerLiability: "300",
+  },
+  SUPPLIER_FAULT: {
+    clientPenaltyAmount: "0", supplierPenaltyAmount: "0", penaltyAmount: "0",
+    platformPenaltyShare: "0", supplierPenaltyShare: "0", finalCustomerLiability: "0",
+  },
+  NAVITRAVEL_FAULT: {
+    clientPenaltyAmount: "0", supplierPenaltyAmount: "0", penaltyAmount: "100",
+    platformPenaltyShare: "100", supplierPenaltyShare: "0", finalCustomerLiability: "0",
+  },
+  FORCE_MAJEURE: {
+    clientPenaltyAmount: "0", supplierPenaltyAmount: "0", penaltyAmount: "0",
+    platformPenaltyShare: "0", supplierPenaltyShare: "0", finalCustomerLiability: "0",
+  },
+};
+const VARIANT = VARIANTS[REASON] ?? VARIANTS.CUSTOMER_FAULT;
+
 const MAX_STEPS = Number(process.env.LIFECYCLE_MAX_STEPS || 16);
 
 async function main() {
@@ -56,7 +77,7 @@ async function main() {
     const payments = await api.get(`/finance/payments?orderId=${encodeURIComponent(fixture.orderId)}&pageSize=50`);
     const captured = (payments?.items ?? []).find((p) => p.status === "CAPTURED");
     const paid = Number(captured?.amount ?? 0);
-    const refundAmount = Math.max(0, paid - 300);
+    const refundAmount = Math.max(0, paid - Number(VARIANT.finalCustomerLiability));
     if (captured && refundAmount > 0) {
       refund = await api.post("/finance/refunds", {
         paymentId: captured.id,
@@ -71,14 +92,9 @@ async function main() {
   }
 
   const cancellation = {
-    cancellationReason: "CUSTOMER_FAULT",
-    clientPenaltyAmount: "200",
-    supplierPenaltyAmount: "100",
-    penaltyAmount: "300",
-    platformPenaltyShare: "200",
-    supplierPenaltyShare: "100",
-    finalCustomerLiability: "300",
-    reason: "AUTOMATED SCENARIO TEST — client-fault penalty schedule",
+    cancellationReason: REASON,
+    ...VARIANT,
+    reason: `AUTOMATED SCENARIO TEST — ${REASON} penalty schedule`,
   };
 
   const submitted = await api.post(`/orders/${fixture.orderId}/cancellation/submit`, cancellation);
@@ -205,7 +221,7 @@ async function main() {
   };
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
-  const file = path.join(OUT_DIR, `cancel-penalty-${Date.now()}.json`);
+  const file = path.join(OUT_DIR, `cancel-${REASON.toLowerCase()}-${Date.now()}.json`);
   fs.writeFileSync(file, JSON.stringify(result, null, 2), "utf8");
   console.log(`[cancel] order: ${orderAfter.status}; penalty before=${JSON.stringify(beforeWaive)}`);
   console.log(`[cancel] penalty after=${JSON.stringify(afterWaive)}`);

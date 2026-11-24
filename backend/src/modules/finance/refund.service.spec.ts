@@ -90,7 +90,7 @@ function makePrismaStub(): PrismaStub {
 }
 
 function makeService(prisma: PrismaStub): RefundService {
-  const ids = { nextCode: jest.fn().mockResolvedValue("RFD-00000001") } as unknown as IdsService;
+  const ids = { nextCode: jest.fn().mockResolvedValue("RFD-00000001"), nextCodeAbove: jest.fn().mockResolvedValue("RFD-00000001") } as unknown as IdsService;
   const security = { audit: jest.fn().mockResolvedValue(undefined) } as unknown as SecurityService;
   const eventBus = {
     emit: jest.fn().mockResolvedValue("evt-1"),

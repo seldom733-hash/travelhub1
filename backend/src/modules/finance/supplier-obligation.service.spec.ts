@@ -125,7 +125,7 @@ function uniqueViolation(field: string): Error {
 interface Harness {
   service: SupplierObligationService;
   prisma: Record<string, Record<string, jest.Mock>>;
-  ids: { nextCode: jest.Mock };
+  ids: { nextCode: jest.Mock; nextCodeAbove: jest.Mock };
   security: { audit: jest.Mock };
   eventBus: { emit: jest.Mock; publishPending: jest.Mock; publishEvent: jest.Mock };
 }
@@ -161,7 +161,7 @@ function makeService(opts: { obligation?: ObligationRow | null; payoutByProvider
   prisma.$transaction = { ...({} as Record<string, jest.Mock>) };
   const $transaction = jest.fn().mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma));
   (prisma as Record<string, unknown>).$transaction = $transaction;
-  const ids = { nextCode: jest.fn().mockResolvedValue("SBO-00000009") };
+  const ids = { nextCode: jest.fn().mockResolvedValue("SBO-00000009"), nextCodeAbove: jest.fn().mockResolvedValue("SBO-00000009") };
   const security = { audit: jest.fn().mockResolvedValue(undefined) };
   const eventBus = { emit: jest.fn().mockResolvedValue("evt-out"), publishPending: jest.fn().mockResolvedValue(1), publishEvent: jest.fn().mockResolvedValue(1) };
   const service = new SupplierObligationService(prisma as never, ids as never, security as never, eventBus as never);

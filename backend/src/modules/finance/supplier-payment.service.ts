@@ -265,7 +265,7 @@ export class SupplierPaymentService {
 
     const code = payoutContext.orderId
       ? await this.nextOrderPaymentCode(payoutContext.orderId)
-      : await this.ids.nextCode(null, "SPO");
+      : await this.ids.nextCodeAbove(null, "SPO", '"finance"."SupplierPayout"');
     let created: { id: string; code: string } | undefined;
     try {
       created = await this.prisma.$transaction(async (tx) => {
