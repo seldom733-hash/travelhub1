@@ -1540,14 +1540,8 @@ export class OrderService {
     const supplierPaidTotal = Number(outgoing._sum.amount ?? 0);
     const supplierRefundedTotal = Number(incoming._sum.amount ?? 0);
     const useObligationCost = obligationCost > 0 && obligationCost < Number(amount);
-    // A recognised supplier penalty is retained by the supplier and therefore
-    // is not a debt of the company. Without this, a paid supplier invoice whose
-    // amount is kept as a cancellation penalty blocks close forever.
-    const retainedSupplierPenalty = ["CONFIRMED", "WITHHELD", "RECEIVED"].includes(settlement?.supplierPenaltyStatus ?? "")
-      ? Number(settlement?.supplierPenaltyAmount ?? 0)
-      : 0;
     const baseSupplierDebt = cancellationStatus
-      ? Math.max(0, supplierPaidTotal - supplierRefundedTotal - retainedSupplierPenalty)
+      ? Math.max(0, supplierPaidTotal - supplierRefundedTotal)
       : useObligationCost && obligationDebt > 0
         ? obligationDebt
         : Math.max(0, cost - supplierPaidTotal + supplierRefundedTotal);

@@ -446,3 +446,31 @@ adjustment/ledger, после чего settlement собран заново.
   ```
   Поэтому после ввода штрафа 300 сообщение «У клиента осталось 300…»
   больше не появляется.
+
+
+## 2026-11-24 — supplier debt must be closed before close
+
+Правило владельца: пока долг перед поставщиком не закрыт, сделку закрывать
+нельзя. При отмене с уже оплаченным поставщику 700 и удержанными им 700:
+
+```text
+supplierDebt = supplierPaid − supplierRefunded = 700
+```
+
+Закрытие разрешено только после явного `SUPPLIER_DEBT_WRITE_OFF` на 700.
+После этого:
+
+```text
+supplierDebt = 0
+clientPenalty = 300
+supplierPenalty = 700
+currentIncome = −400
+```
+
+Ручные тестовые сделки:
+
+```text
+00020069  no payment / no penalties        CLOSED  income 0
+00020070  client penalty only             CLOSED  income 300
+00020071  client + supplier penalty       CLOSED  income −400
+```

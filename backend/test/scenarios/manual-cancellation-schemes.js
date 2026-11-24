@@ -159,6 +159,24 @@ async function runCase(api, runner, name, options) {
 
   await api.patch(`/orders/${fixture.orderId}`, { action: "requestCancellation", reason: `HAND ${name}` });
 
+  await settle(api, fixture.orderId, {
+    cancellationReason: "CUSTOMER_FAULT",
+    clientPenaltyAmount: String(options.clientPenalty),
+    supplierPenaltyAmount: String(options.supplierPenalty),
+    penaltyAmount: String(options.clientPenalty + options.supplierPenalty),
+    platformPenaltyShare: String(options.clientPenalty),
+    supplierPenaltyShare: String(options.supplierPenalty),
+    finalCustomerLiability: String(options.clientPenalty),
+    reason: `HAND ${name} — manual cancellation`,
+  });
+
+  if (options.supplierPenalty > 0) {
+    await api.post(`/orders/${fixture.orderId}/financial-settlement/write-off-supplier-debt`, {
+      amount: String(options.supplierPenalty),
+      reason: `HAND ${name} — supplier retains paid amount as penalty; debt is closed`,
+    }).then(() => steps.push({ supplierDebtWriteOff: options.supplierPenalty }))
+      .catch((error) => steps.push({ supplierDebtWriteOffError: String(error) }));
+  }
   if (bookingId) {
     await api.patch(`/bookings/${bookingId}`, { action: "cancel", reason: `HAND ${name} — cancellation` })
       .catch((error) => steps.push({ bookingCancelError: String(error) }));

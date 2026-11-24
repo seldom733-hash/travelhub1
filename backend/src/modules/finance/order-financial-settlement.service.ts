@@ -367,7 +367,15 @@ export class OrderFinancialSettlementService {
       }
     }
     const obligationDebt = Number(obligations._sum.remainingAmount ?? 0);
-    const baseDebt = obligationDebt > 0 ? obligationDebt : Math.max(0, cost - Number(outgoing._sum.amount ?? 0) + Number(incoming._sum.amount ?? 0));
+    const isCancellation = ["CANCELLED", "CLOSED", "CANCELLATION_APPROVED"].includes(order.status) || Boolean(order.cancelledAt);
+    // For a cancellation, a paid-but-not-refunded supplier amount is the debt
+    // that must be explicitly written off before close. The open obligation is
+    // cancelled separately when the supplier deadline has not been reached.
+    const baseDebt = isCancellation
+      ? Math.max(0, Number(outgoing._sum.amount ?? 0) - Number(incoming._sum.amount ?? 0))
+      : obligationDebt > 0
+        ? obligationDebt
+        : Math.max(0, cost - Number(outgoing._sum.amount ?? 0) + Number(incoming._sum.amount ?? 0));
     const debt = Math.max(0, baseDebt - Number(previous._sum.amount ?? 0));
     if (debt <= 0) throw new ConflictError("Supplier has no outstanding debt to write off");
     const amount = input.amount ? new Prisma.Decimal(input.amount) : new Prisma.Decimal(debt);
