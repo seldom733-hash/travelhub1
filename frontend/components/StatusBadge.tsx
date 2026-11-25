@@ -102,50 +102,50 @@ const SUPPORT_STATUS_I18N: Record<string, string> = {
 
 /** Tailwind classes for status badge color. */
 const STATUS_CLS: Record<string, string> = {
-  DRAFT: "bg-slate-100 text-slate-600 border-slate-200",
-  COMPLETE: "bg-sky-50 text-sky-700 border-sky-200",
-  REVIEWED: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  DRAFT: "bg-panel text-ink/60 border-line",
+  COMPLETE: "bg-brand/10 text-brand-dark border-brand/20",
+  REVIEWED: "bg-brand/10 text-brand-dark border-brand/20",
   PUBLISHED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   CHANGED: "bg-amber-50 text-amber-700 border-amber-200",
-  ARCHIVED: "bg-slate-100 text-slate-500 border-slate-200",
+  ARCHIVED: "bg-panel text-ink/60 border-line",
   SUSPENDED: "bg-orange-50 text-orange-700 border-orange-200",
-  NEW: "bg-slate-100 text-slate-600 border-slate-200",
-  IN_PROCESSING: "bg-sky-50 text-sky-700 border-sky-200",
+  NEW: "bg-panel text-ink/60 border-line",
+  IN_PROCESSING: "bg-brand/10 text-brand-dark border-brand/20",
   WAITING_FOR_DATA: "bg-amber-50 text-amber-700 border-amber-200",
   READY_FOR_BOOKING: "bg-violet-50 text-violet-700 border-violet-200",
-  SENT_TO_BOOKING: "bg-cyan-50 text-cyan-700 border-cyan-200",
-  PARTIALLY_FULFILLED: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  SENT_TO_BOOKING: "bg-brand/10 text-brand-dark border-brand/20",
+  PARTIALLY_FULFILLED: "bg-brand/10 text-brand-dark border-brand/20",
   FULFILLED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   READY_TO_CLOSE: "bg-teal-50 text-teal-700 border-teal-200",
-  CLOSED: "bg-slate-100 text-slate-500 border-slate-200",
+  CLOSED: "bg-panel text-ink/60 border-line",
   CANCELLED: "bg-red-50 text-red-600 border-red-200",
   PROBLEM: "bg-red-100 text-red-700 border-red-300",
-  PREPARING_REQUEST: "bg-sky-50 text-sky-700 border-sky-200",
-  SENT_TO_SUPPLIER: "bg-cyan-50 text-cyan-700 border-cyan-200",
+  PREPARING_REQUEST: "bg-brand/10 text-brand-dark border-brand/20",
+  SENT_TO_SUPPLIER: "bg-brand/10 text-brand-dark border-brand/20",
   AWAITING_CONFIRMATION: "bg-amber-50 text-amber-700 border-amber-200",
   CONFIRMED: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  IN_SERVICE: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  IN_SERVICE: "bg-brand/10 text-brand-dark border-brand/20",
   COMPLETED: "bg-emerald-100 text-emerald-800 border-emerald-300",
   SUPPLIER_REJECTED: "bg-red-50 text-red-600 border-red-200",
   NEEDS_CLARIFICATION: "bg-amber-50 text-amber-700 border-amber-200",
   CHANGE_REQUESTED: "bg-amber-50 text-amber-700 border-amber-200",
   CANCELLATION_REQUESTED: "bg-orange-50 text-orange-700 border-orange-200",
-  UNPAID: "bg-slate-100 text-slate-600 border-slate-200",
+  UNPAID: "bg-panel text-ink/60 border-line",
   PARTIALLY_PAID: "bg-amber-50 text-amber-700 border-amber-200",
   PAID: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  REFUNDED: "bg-slate-100 text-slate-500 border-slate-200",
+  REFUNDED: "bg-panel text-ink/60 border-line",
   ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  INACTIVE: "bg-slate-100 text-slate-500 border-slate-200",
+  INACTIVE: "bg-panel text-ink/60 border-line",
   LOCKED: "bg-red-50 text-red-600 border-red-200",
   SUBMITTED: "bg-amber-50 text-amber-700 border-amber-200",
-  IN_REVIEW: "bg-sky-50 text-sky-700 border-sky-200",
+  IN_REVIEW: "bg-brand/10 text-brand-dark border-brand/20",
   APPROVED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   REJECTED: "bg-red-50 text-red-600 border-red-200",
   CHANGES_REQUESTED: "bg-orange-50 text-orange-700 border-orange-200",
   // Payment entity statuses
   PENDING: "bg-amber-50 text-amber-700 border-amber-200",
   CAPTURED: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  AUTHORIZED: "bg-blue-50 text-blue-700 border-blue-200",
+  AUTHORIZED: "bg-brand/10 text-brand-dark border-brand/20",
   FAILED: "bg-red-50 text-red-600 border-red-200",
   // Refund entity statuses
   REQUESTED: "bg-amber-50 text-amber-700 border-amber-200",
@@ -159,29 +159,29 @@ const STATUS_CLS: Record<string, string> = {
   PRICE_CHANGED: "bg-orange-50 text-orange-700 border-orange-200",
   CUSTOMER_ACCEPTED: "bg-teal-50 text-teal-700 border-teal-200",
   CONVERTED: "bg-purple-50 text-purple-700 border-purple-200",
-  UNAVAILABLE: "bg-slate-100 text-slate-500 border-slate-200",
-  EXPIRED: "bg-slate-100 text-slate-500 border-slate-200",
+  UNAVAILABLE: "bg-panel text-ink/60 border-line",
+  EXPIRED: "bg-panel text-ink/60 border-line",
   CUSTOMER_PAYMENT_TIMEOUT: "bg-red-50 text-red-600 border-red-200",
-  CANCELLED_BY_CUSTOMER: "bg-slate-100 text-slate-600 border-slate-200",
+  CANCELLED_BY_CUSTOMER: "bg-panel text-ink/60 border-line",
   // Marketing
   SCHEDULED: "bg-violet-50 text-violet-700 border-violet-200",
   PAUSED: "bg-amber-50 text-amber-700 border-amber-200",
   // Document statuses
-  NOT_ISSUED: "bg-slate-100 text-slate-600 border-slate-200",
+  NOT_ISSUED: "bg-panel text-ink/60 border-line",
   ISSUED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   SUPERSEDED: "bg-amber-50 text-amber-700 border-amber-200",
   INVALIDATED: "bg-red-50 text-red-600 border-red-200",
 };
 
 const SUPPORT_STATUS_CLS: Record<string, string> = {
-  OPEN: "bg-sky-50 text-sky-700 border-sky-200",
-  IN_PROGRESS: "bg-blue-50 text-blue-700 border-blue-200",
+  OPEN: "bg-brand/10 text-brand-dark border-brand/20",
+  IN_PROGRESS: "bg-brand/10 text-brand-dark border-brand/20",
   WAITING_CUSTOMER: "bg-amber-50 text-amber-700 border-amber-200",
   WAITING_PARTNER: "bg-orange-50 text-orange-700 border-orange-200",
   WAITING_INTERNAL: "bg-purple-50 text-purple-700 border-purple-200",
   ESCALATED: "bg-red-50 text-red-600 border-red-200",
   RESOLVED: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  CLOSED: "bg-slate-100 text-slate-500 border-slate-200",
+  CLOSED: "bg-panel text-ink/60 border-line",
 };
 
 export default function StatusBadge({ status, label: labelOverride }: { status: string; label?: string }) {
@@ -191,7 +191,7 @@ export default function StatusBadge({ status, label: labelOverride }: { status: 
   // canonical label source (UI-C1.2B §19 — Requests registry unifies the table
   // badge with the KPI card / filter label on requests.kpi.*).
   const label = labelOverride ?? (i18nKey ? t(i18nKey, locale) : status);
-  const cls = STATUS_CLS[status] ?? SUPPORT_STATUS_CLS[status] ?? "bg-slate-100 text-slate-600 border-slate-200";
+  const cls = STATUS_CLS[status] ?? SUPPORT_STATUS_CLS[status] ?? "bg-panel text-ink/60 border-line";
 
   return (
     <span

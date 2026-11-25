@@ -23,11 +23,11 @@ export default function Pagination({
         type="button"
         disabled={page <= 1}
         onClick={() => onChange(page - 1)}
-        className="rounded-lg border border-slate-200 px-3 py-1.5 text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-lg border border-line px-3 py-1.5 text-ink/60 transition-colors hover:bg-panel focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-40"
       >
         ← {t("pagination.prev", locale)}
       </button>
-      <span className="text-xs text-slate-500" aria-live="polite">
+      <span className="text-xs text-ink/60" aria-live="polite">
         {t("pagination.page", locale)} {formatNumber(page, locale)} {t("pagination.of", locale)}{" "}
         {formatNumber(totalPages, locale)}
       </span>
@@ -35,7 +35,7 @@ export default function Pagination({
         type="button"
         disabled={page >= totalPages}
         onClick={() => onChange(page + 1)}
-        className="rounded-lg border border-slate-200 px-3 py-1.5 text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-lg border border-line px-3 py-1.5 text-ink/60 transition-colors hover:bg-panel focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-40"
       >
         {t("pagination.next", locale)} →
       </button>

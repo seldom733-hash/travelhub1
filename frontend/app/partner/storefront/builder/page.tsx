@@ -180,7 +180,7 @@ export default function StorefrontBuilderPage() {
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-sm text-slate-400">Загрузка конструктора…</div>;
+    return <div className="p-8 text-center text-sm text-ink/60">Загрузка конструктора…</div>;
   }
 
   if (!page) {
@@ -198,14 +198,14 @@ export default function StorefrontBuilderPage() {
 
   return (
     <div className="mx-auto max-w-7xl p-4 sm:p-6">
-      <Link href="/partner/storefront" className="text-xs text-slate-500 hover:text-emerald-700">← Управление витриной</Link>
+      <Link href="/partner/storefront" className="text-xs text-ink/60 hover:text-emerald-700">← Управление витриной</Link>
       {notice && <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">{notice}</div>}
-      <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-        <span className="text-xs font-medium text-slate-500">Страница:</span>
+      <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-white px-3 py-2">
+        <span className="text-xs font-medium text-ink/60">Страница:</span>
         <select
           value={currentPageId ?? ""}
           onChange={(e) => { setPage(null); setCurrentPageId(e.target.value); }}
-          className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+          className="rounded-lg border border-line px-2 py-1.5 text-sm"
         >
           {pages.map((p) => <option key={p.id} value={p.id}>{p.name}{p.isHome ? " (главная)" : ""}{p.published ? "" : " · черновик"}</option>)}
         </select>

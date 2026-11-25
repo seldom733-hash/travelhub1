@@ -29,7 +29,7 @@ describe("Skeletons §PDP-SKELETON-PARITY", () => {
   it("PdpSkeleton: панель подбора содержит 4 поля (город/взрослые/дети/ночи)", () => {
     const { container } = render(<PdpSkeleton />);
     // Источник истины: `TourDetail.tsx:141-250` — `space-y-4 rounded-2xl ... p-5` c 4 полями.
-    const card = container.querySelector(".rounded-2xl.border-slate-200.bg-white.p-5.space-y-4");
+    const card = container.querySelector(".rounded-2xl.border-line.bg-white.p-5.space-y-4");
     expect(card).toBeTruthy();
     expect(card?.children.length).toBe(4);
   });

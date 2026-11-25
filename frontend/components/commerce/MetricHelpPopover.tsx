@@ -80,7 +80,7 @@ export default function MetricHelpPopover({ entryId }: { entryId: string }) {
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={triggerLabel}
-        className="flex size-5 items-center justify-center rounded-full border border-slate-200 bg-white text-[10px] font-bold leading-none text-slate-400 transition-colors hover:border-blue-300 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+        className="flex size-5 items-center justify-center rounded-full border border-line bg-white text-[10px] font-bold leading-none text-ink/60 transition-colors hover:border-brand/25 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
         <span aria-hidden="true">{helpT("help.trigger_symbol", locale)}</span>
       </button>
@@ -90,14 +90,14 @@ export default function MetricHelpPopover({ entryId }: { entryId: string }) {
           role="dialog"
           aria-label={title}
           tabIndex={-1}
-          className="absolute right-0 top-full z-50 mt-1.5 w-72 max-w-[min(20rem,calc(100vw-3rem))] rounded-xl border border-slate-200 bg-white p-3 text-left shadow-lg outline-none"
+          className="absolute right-0 top-full z-50 mt-1.5 w-72 max-w-[min(20rem,calc(100vw-3rem))] rounded-xl border border-line bg-white p-3 text-left shadow-lg outline-none"
         >
-          <div className="text-sm font-semibold text-slate-900">{title}</div>
-          <p className="mt-1 text-xs leading-relaxed text-slate-600">{short}</p>
+          <div className="text-sm font-semibold text-ink">{title}</div>
+          <p className="mt-1 text-xs leading-relaxed text-ink/60">{short}</p>
           <Link
             href={`/app/help?topic=${encodeURIComponent(entry.id)}`}
             onClick={() => setOpen(false)}
-            className="mt-2 inline-block text-xs font-medium text-blue-600 underline-offset-2 hover:underline"
+            className="mt-2 inline-block text-xs font-medium text-brand underline-offset-2 hover:underline"
           >
             {detailsLabel} →
           </Link>

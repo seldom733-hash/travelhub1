@@ -46,8 +46,8 @@ export default function AccountBookingsPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{t("account.bookings_title", locale)}</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-ink">{t("account.bookings_title", locale)}</h1>
+          <p className="mt-1 text-sm text-ink/60">
             {data !== null ? `${t("account.bookings", locale)}: ${data.total}` : t("state.loading", locale)}
           </p>
         </div>
@@ -59,16 +59,16 @@ export default function AccountBookingsPage() {
               `rounded-2xl border bg-white p-5 shadow-sm` с шапкой и `dl`
               `grid-cols-2 sm:grid-cols-4`; прежние `h-20` блоки не совпадали. */}
           {[0, 1, 2].map((i) => (
-            <li key={i} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <li key={i} className="rounded-2xl border border-line bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between gap-3">
-                <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
-                <div className="h-5 w-24 animate-pulse rounded-full bg-slate-100" />
+                <div className="h-4 w-32 animate-pulse rounded bg-panel" />
+                <div className="h-5 w-24 animate-pulse rounded-full bg-panel" />
               </div>
               <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
                 {Array.from({ length: 4 }, (_, j) => (
                   <div key={j} className="space-y-1">
-                    <div className="h-3 w-20 animate-pulse rounded bg-slate-100" />
-                    <div className="h-4 w-24 animate-pulse rounded bg-slate-100" />
+                    <div className="h-3 w-20 animate-pulse rounded bg-panel" />
+                    <div className="h-4 w-24 animate-pulse rounded bg-panel" />
                   </div>
                 ))}
               </div>
@@ -76,39 +76,39 @@ export default function AccountBookingsPage() {
           ))}
         </ul>
       ) : data.items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
-          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-slate-50 text-2xl" aria-hidden>
+        <div className="rounded-2xl border border-dashed border-line bg-white px-6 py-12 text-center">
+          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-panel text-2xl" aria-hidden>
             📑
           </div>
-          <p className="text-base font-medium text-slate-700">{t("account.bookings_empty", locale)}</p>
+          <p className="text-base font-medium text-ink">{t("account.bookings_empty", locale)}</p>
         </div>
       ) : (
         <>
           <ul className="space-y-3">
             {data.items.map((b) => (
-              <li key={b.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <li key={b.id} className="rounded-2xl border border-line bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="font-semibold text-slate-900">{b.referenceNumber}</div>
-                  <span className="inline-flex shrink-0 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                  <div className="font-semibold text-ink">{b.referenceNumber}</div>
+                  <span className="inline-flex shrink-0 rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-medium text-brand-dark">
                     {bookingStatusLabel(b.status, locale)}
                   </span>
                 </div>
                 <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
                   <div>
-                    <dt className="text-xs text-slate-500">{t("account.booking_order", locale)}</dt>
-                    <dd className="font-medium text-slate-900">{b.orderCode}</dd>
+                    <dt className="text-xs text-ink/60">{t("account.booking_order", locale)}</dt>
+                    <dd className="font-medium text-ink">{b.orderCode}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-slate-500">{t("account.booking_amount", locale)}</dt>
-                    <dd className="text-slate-700">{formatPrice(b.amount, b.currency, locale) ?? "—"}</dd>
+                    <dt className="text-xs text-ink/60">{t("account.booking_amount", locale)}</dt>
+                    <dd className="text-ink">{formatPrice(b.amount, b.currency, locale) ?? "—"}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-slate-500">{t("account.booking_service_date", locale)}</dt>
-                    <dd className="text-slate-700">{formatDate(b.serviceDate, locale) || "—"}</dd>
+                    <dt className="text-xs text-ink/60">{t("account.booking_service_date", locale)}</dt>
+                    <dd className="text-ink">{formatDate(b.serviceDate, locale) || "—"}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-slate-500">{t("account.booking_created", locale)}</dt>
-                    <dd className="text-slate-700">{formatDate(b.createdAt, locale)}</dd>
+                    <dt className="text-xs text-ink/60">{t("account.booking_created", locale)}</dt>
+                    <dd className="text-ink">{formatDate(b.createdAt, locale)}</dd>
                   </div>
                 </dl>
               </li>
@@ -120,17 +120,17 @@ export default function AccountBookingsPage() {
             <button
               onClick={goPrev}
               disabled={page <= 1}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-lg border border-line bg-white px-3 py-1.5 text-ink transition-colors hover:bg-panel disabled:cursor-not-allowed disabled:opacity-40"
             >
               {t("pagination.prev", locale)}
             </button>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-ink/60">
               {t("pagination.page", locale)} {data.page} {t("pagination.of", locale)} {totalPages} · {data.total}
             </span>
             <button
               onClick={goNext}
               disabled={!data.hasMore}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-lg border border-line bg-white px-3 py-1.5 text-ink transition-colors hover:bg-panel disabled:cursor-not-allowed disabled:opacity-40"
             >
               {t("pagination.next", locale)}
             </button>

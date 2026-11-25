@@ -46,7 +46,7 @@ export function KpiCard({ title, value, format = "number", currency = "AZN", pos
   const hasDelta = value.deltaPercent !== null && value.deltaPercent !== undefined;
 
   // Determine polarity
-  let polarityClass = "text-slate-400";
+  let polarityClass = "text-ink/60";
   if (hasDelta && value.deltaPercent! !== 0) {
     const isPositive = value.deltaPercent! > 0;
     if (positiveIsUp) {
@@ -58,8 +58,8 @@ export function KpiCard({ title, value, format = "number", currency = "AZN", pos
 
   const inner = (
     <>
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{title}</div>
-      <div className="mt-2 text-2xl font-bold text-slate-900">{formatted}</div>
+      <div className="text-xs font-medium uppercase tracking-wide text-ink/60">{title}</div>
+      <div className="mt-2 text-2xl font-bold text-ink">{formatted}</div>
       {hasDelta && (
         <div className={`mt-1 text-xs font-medium ${polarityClass}`}>
           {value.deltaPercent! > 0 ? "↑" : value.deltaPercent! < 0 ? "↓" : "→"}{" "}
@@ -73,7 +73,7 @@ export function KpiCard({ title, value, format = "number", currency = "AZN", pos
     return (
       <Link
         href={href}
-        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-blue-300 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer block"
+        className="rounded-2xl border border-line bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-brand/25 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand cursor-pointer block"
         title={subtitle}
       >
         {inner}
@@ -82,7 +82,7 @@ export function KpiCard({ title, value, format = "number", currency = "AZN", pos
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" title={subtitle}>
+    <div className="rounded-2xl border border-line bg-white p-4 shadow-sm" title={subtitle}>
       {inner}
     </div>
   );

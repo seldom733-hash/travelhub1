@@ -22,7 +22,7 @@ export default function MarketplaceBuilderPreviewPage() {
   }, []);
 
   if (error) return <div className="p-8 text-sm text-rose-600">{error}</div>;
-  if (page === undefined) return <div className="p-8 text-sm text-slate-400">Загрузка предпросмотра…</div>;
-  if (!page) return <div className="p-8 text-sm text-slate-400">Черновик не найден.</div>;
+  if (page === undefined) return <div className="p-8 text-sm text-ink/60">Загрузка предпросмотра…</div>;
+  if (!page) return <div className="p-8 text-sm text-ink/60">Черновик не найден.</div>;
   return <MarketplaceRenderer pageOverride={page} />;
 }

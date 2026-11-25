@@ -65,7 +65,7 @@ export default function DefaultConfigActions({
         type="button"
         onClick={handleRestore}
         disabled={busy !== null}
-        className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-panel disabled:cursor-not-allowed disabled:opacity-50"
       >
         <ArrowCounterClockwise className="h-4 w-4" />
         {busy === "restore" ? t("constructor.saving", locale) : t("constructor.restore_default", locale)}
@@ -74,7 +74,7 @@ export default function DefaultConfigActions({
         type="button"
         onClick={handleMakeDefault}
         disabled={busy !== null}
-        className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-panel disabled:cursor-not-allowed disabled:opacity-50"
       >
         <BookmarkSimple className="h-4 w-4" />
         {busy === "makeDefault" ? t("constructor.saving", locale) : t("constructor.make_default", locale)}

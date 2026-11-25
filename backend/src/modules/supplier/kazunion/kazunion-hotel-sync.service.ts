@@ -18,7 +18,8 @@
  * recorded as an error — never as "0 hotels" — so a blocked sync cannot look
  * like an empty catalog.
  */
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
+import { ProductHistoryRecorder } from "../product-history-recorder.service";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
@@ -88,6 +89,7 @@ export class KazunionHotelSyncService {
     private readonly hotels: KazunionHotelAdapter,
     private readonly pricing: SupplierPricingService,
     private readonly ids: IdsService,
+    @Optional() private readonly history?: ProductHistoryRecorder,
   ) {}
 
   async getKazunionPartner(): Promise<{ id: string } | null> {
@@ -355,6 +357,9 @@ export class KazunionHotelSyncService {
         if (geoCountryId && !(existing as any).geoCountryId) patch.geoCountryId = geoCountryId;
         if (Object.keys(patch).length > 0) {
           await tx.product.update({ where: { id: existing.id }, data: patch });
+        }
+        if (this.history) {
+          await this.history.record(tx, existing.id, existing.version, patch);
         }
         const counts = await this.upsertTariffs(tx, existing.id, tariffs);
         result.tariffsCreated += counts.created;

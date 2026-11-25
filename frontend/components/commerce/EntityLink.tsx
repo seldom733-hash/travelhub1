@@ -23,7 +23,7 @@ export default function EntityLink({
     <Link
       href={href}
       onClick={onClick}
-      className={`font-medium text-blue-600 hover:underline ${className ?? ""}`}
+      className={`font-medium text-brand hover:underline ${className ?? ""}`}
     >
       {children}
     </Link>

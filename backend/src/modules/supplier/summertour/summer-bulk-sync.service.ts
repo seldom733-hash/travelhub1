@@ -1,4 +1,5 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
+import { ProductHistoryRecorder } from "../product-history-recorder.service";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
 import { SummertourNewAdapter } from "./summertour-new.adapter";
@@ -47,6 +48,7 @@ export class SummerBulkSyncService {
     private readonly pricing: SupplierPricingService,
     private readonly flightAddon: SummerGdsFlightAddonService,
     private readonly ids: IdsService,
+    @Optional() private readonly history?: ProductHistoryRecorder,
   ) {}
 
   /**
@@ -317,7 +319,7 @@ export class SummerBulkSyncService {
     // Check if product exists
     const existing = await this.prisma.product.findUnique({
       where: { supplierRef: productCode },
-      select: { id: true, code: true, status: true, version: true },
+      select: { id: true, code: true, status: true, version: true, title: true, attributes: true },
     });
 
     // Название карточки — единый формат «Отель (Страна)» (как у KOMPAS).
@@ -329,10 +331,18 @@ export class SummerBulkSyncService {
     if (existing) {
       // Update attributes, title (hotel-only naming) and tariff
       await this.prisma.$transaction(async (tx: any) => {
+        const changed: Record<string, unknown> = {};
+        if (existing.title !== title) changed.title = title;
+        const curAttrs = (existing.attributes ?? {}) as Record<string, unknown>;
+        if (JSON.stringify(curAttrs) !== JSON.stringify(attributes)) changed.attributes = attributes;
+        if (geoCountryId && (existing as any).geoCountryId !== geoCountryId) changed.geoCountryId = geoCountryId;
         await tx.product.update({
           where: { id: existing.id },
           data: { title, attributes, updatedAt: new Date(), geoCountryId },
         });
+        if (this.history) {
+          await this.history.record(tx, existing.id, existing.version, changed);
+        }
 
         const tariff = await tx.tariff.findFirst({
           where: { productId: existing.id },

@@ -6,7 +6,8 @@
  * One card per unique (tourIncValue, hotelKey). Starting price = min price across offers.
  * Runs as admin (no PARTNER ownership restrictions on create).
  */
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
+import { ProductHistoryRecorder } from "../product-history-recorder.service";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
 import { SupplierOfferService } from "../supplier-offer.service";
@@ -93,6 +94,7 @@ export class SummerSyncService {
     private readonly pricing: SupplierPricingService,
     private readonly flightAddon: SummerGdsFlightAddonService,
     private readonly ids: IdsService,
+    @Optional() private readonly history?: ProductHistoryRecorder,
   ) {}
 
   /**
@@ -485,16 +487,24 @@ export class SummerSyncService {
     // Check if product already exists
     const existing = await this.prisma.product.findUnique({
       where: { supplierRef: productCode },
-      select: { id: true, code: true, status: true, version: true },
+      select: { id: true, code: true, status: true, version: true, title: true, attributes: true, isGds: true },
     });
 
     if (existing) {
       // Update: refresh attributes, title (hotel-only naming) and tariffs
       await this.prisma.$transaction(async (tx: any) => {
+        const changed: Record<string, unknown> = {};
+        if (existing.title !== title) changed.title = title;
+        const curAttrs = (existing.attributes ?? {}) as Record<string, unknown>;
+        if (JSON.stringify(curAttrs) !== JSON.stringify(attributes)) changed.attributes = attributes;
+        if (existing.isGds !== isGds) changed.isGds = isGds;
         await tx.product.update({
           where: { id: existing.id },
           data: { title, attributes, isGds, updatedAt: new Date() },
         });
+        if (this.history) {
+          await this.history.record(tx, existing.id, existing.version, changed);
+        }
 
         // Update tariff price if changed
         const tariff = await tx.tariff.findFirst({

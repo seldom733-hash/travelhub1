@@ -160,47 +160,47 @@ export default function ConstructorHeroTab({ slug, config, onSaved, onSaving, on
   return (
     <div className="space-y-6 text-ink">
       {/* Carousel settings */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">
+      <div className="rounded-lg border border-line bg-white p-5">
+        <h3 className="mb-4 text-sm font-semibold text-ink">
           <ArrowsClockwise className="mr-1.5 inline h-4 w-4" />
           Carousel
         </h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={cfg.carousel.autoplay} onChange={(e) => setCfg((p) => ({ ...p, carousel: { ...p.carousel, autoplay: e.target.checked } }))} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
-            <span className="text-sm text-slate-700">{t("constructor.hero_autoplay", locale)}</span>
+            <input type="checkbox" checked={cfg.carousel.autoplay} onChange={(e) => setCfg((p) => ({ ...p, carousel: { ...p.carousel, autoplay: e.target.checked } }))} className="h-4 w-4 rounded border-line text-brand" />
+            <span className="text-sm text-ink">{t("constructor.hero_autoplay", locale)}</span>
           </label>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">{t("constructor.hero_interval", locale)}</label>
-            <input type="number" min={3000} max={15000} step={500} value={cfg.carousel.interval} onChange={(e) => setCfg((p) => ({ ...p, carousel: { ...p.carousel, interval: Number(e.target.value) } }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink outline-none focus:border-blue-500" />
+            <label className="mb-1 block text-xs font-medium text-ink/60">{t("constructor.hero_interval", locale)}</label>
+            <input type="number" min={3000} max={15000} step={500} value={cfg.carousel.interval} onChange={(e) => setCfg((p) => ({ ...p, carousel: { ...p.carousel, interval: Number(e.target.value) } }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none focus:border-brand" />
           </div>
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={cfg.carousel.showArrows} onChange={(e) => setCfg((p) => ({ ...p, carousel: { ...p.carousel, showArrows: e.target.checked } }))} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
-            <span className="text-sm text-slate-700">{t("constructor.hero_show_arrows", locale)}</span>
+            <input type="checkbox" checked={cfg.carousel.showArrows} onChange={(e) => setCfg((p) => ({ ...p, carousel: { ...p.carousel, showArrows: e.target.checked } }))} className="h-4 w-4 rounded border-line text-brand" />
+            <span className="text-sm text-ink">{t("constructor.hero_show_arrows", locale)}</span>
           </label>
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={cfg.carousel.showIndicators} onChange={(e) => setCfg((p) => ({ ...p, carousel: { ...p.carousel, showIndicators: e.target.checked } }))} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
-            <span className="text-sm text-slate-700">{t("constructor.hero_show_indicators", locale)}</span>
+            <input type="checkbox" checked={cfg.carousel.showIndicators} onChange={(e) => setCfg((p) => ({ ...p, carousel: { ...p.carousel, showIndicators: e.target.checked } }))} className="h-4 w-4 rounded border-line text-brand" />
+            <span className="text-sm text-ink">{t("constructor.hero_show_indicators", locale)}</span>
           </label>
         </div>
       </div>
 
       {/* Slides */}
       {cfg.slides.map((slide, idx) => (
-        <div key={slide.id} className="rounded-lg border border-slate-200 bg-white p-5">
+        <div key={slide.id} className="rounded-lg border border-line bg-white p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-900">
+            <h3 className="text-sm font-semibold text-ink">
               {t("constructor.tab_hero", locale)} {idx + 1} / {cfg.slides.length}
             </h3>
             <div className="flex items-center gap-1">
               {idx > 0 && (
-                <button onClick={() => moveSlide(idx, idx - 1)} className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-100">↑</button>
+                <button onClick={() => moveSlide(idx, idx - 1)} className="rounded px-2 py-1 text-xs text-ink/60 hover:bg-panel">↑</button>
               )}
               {idx < cfg.slides.length - 1 && (
-                <button onClick={() => moveSlide(idx, idx + 1)} className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-100">↓</button>
+                <button onClick={() => moveSlide(idx, idx + 1)} className="rounded px-2 py-1 text-xs text-ink/60 hover:bg-panel">↓</button>
               )}
               {cfg.slides.length > 1 && (
-                <button onClick={() => removeSlide(idx)} className="rounded p-1 text-slate-400 hover:text-red-500" aria-label={t("constructor.hero_delete_slide", locale)}>
+                <button onClick={() => removeSlide(idx)} className="rounded p-1 text-ink/60 hover:text-red-500" aria-label={t("constructor.hero_delete_slide", locale)}>
                   <Trash className="h-4 w-4" />
                 </button>
               )}
@@ -211,11 +211,11 @@ export default function ConstructorHeroTab({ slug, config, onSaved, onSaving, on
           <div className="mb-4">
             {slide.imageUrl ? (
               <div className="flex items-start gap-3">
-                <div className="relative h-28 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                <div className="relative h-28 flex-shrink-0 overflow-hidden rounded-lg border border-line bg-panel">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={slide.imageUrl} alt="" className="h-full w-full object-cover" />
                 </div>
-                <div className="flex-1 text-xs text-slate-500 space-y-1">
+                <div className="flex-1 text-xs text-ink/60 space-y-1">
                   {slide.imageMeta && (
                     <>
                       <div>{slide.imageMeta.width} × {slide.imageMeta.height} · {slide.imageMeta.format} · {(slide.imageMeta.size / 1024 / 1024).toFixed(1)} MB</div>
@@ -224,10 +224,10 @@ export default function ConstructorHeroTab({ slug, config, onSaved, onSaving, on
                           ? t("constructor.hero_image_valid", locale)
                           : t("constructor.hero_image_invalid", locale)}
                       </div>
-                      <div className="text-slate-400">{t("constructor.hero_min_dimensions", locale)}</div>
+                      <div className="text-ink/60">{t("constructor.hero_min_dimensions", locale)}</div>
                     </>
                   )}
-                  <button onClick={() => fileRefs.current.get(idx)?.click()} className="mt-1 text-blue-600 hover:underline">
+                  <button onClick={() => fileRefs.current.get(idx)?.click()} className="mt-1 text-brand hover:underline">
                     {t("constructor.hero_replace_image", locale)}
                   </button>
                 </div>
@@ -236,10 +236,10 @@ export default function ConstructorHeroTab({ slug, config, onSaved, onSaving, on
               <button
                 onClick={() => fileRefs.current.get(idx)?.click()}
                 disabled={uploadingIdx === idx}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 px-6 py-6 transition-colors hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-line bg-panel px-6 py-6 transition-colors hover:border-brand/25 hover:bg-brand/10 disabled:opacity-50"
               >
-                <Upload className="h-5 w-5 text-slate-400" />
-                <span className="text-sm text-slate-500">
+                <Upload className="h-5 w-5 text-ink/60" />
+                <span className="text-sm text-ink/60">
                   {uploadingIdx === idx ? t("constructor.saving", locale) : t("constructor.hero_upload_image", locale)}
                 </span>
               </button>
@@ -257,40 +257,40 @@ export default function ConstructorHeroTab({ slug, config, onSaved, onSaving, on
           <div className="grid gap-3 sm:grid-cols-3">
             {(["ru", "az", "en"] as const).map((loc) => (
               <div key={loc} className="space-y-2">
-                <label className="mb-1 block text-xs font-medium text-slate-500 uppercase">{loc}</label>
+                <label className="mb-1 block text-xs font-medium text-ink/60 uppercase">{loc}</label>
                 <input
                   type="text"
                   placeholder={t("constructor.hero_slide_title", locale)}
                   value={slide.title[loc] ?? ""}
                   onChange={(e) => updateSlideLocale(idx, "title", loc, e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink outline-none focus:border-blue-500"
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none focus:border-brand"
                 />
                 <input
                   type="text"
                   placeholder={t("constructor.hero_slide_subtitle", locale)}
                   value={slide.subtitle[loc] ?? ""}
                   onChange={(e) => updateSlideLocale(idx, "subtitle", loc, e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink outline-none focus:border-blue-500"
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none focus:border-brand"
                 />
                 <input
                   type="text"
                   placeholder="CTA"
                   value={slide.ctaLabel[loc] ?? ""}
                   onChange={(e) => updateSlideLocale(idx, "ctaLabel", loc, e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink outline-none focus:border-blue-500"
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none focus:border-brand"
                 />
               </div>
             ))}
           </div>
 
           <div className="mt-3">
-            <label className="mb-1 block text-xs font-medium text-slate-500">CTA URL</label>
+            <label className="mb-1 block text-xs font-medium text-ink/60">CTA URL</label>
             <input
               type="text"
               value={slide.ctaUrl}
               onChange={(e) => updateSlide(idx, { ctaUrl: e.target.value })}
               placeholder="/search"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink outline-none focus:border-blue-500"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none focus:border-brand"
             />
           </div>
         </div>
@@ -300,7 +300,7 @@ export default function ConstructorHeroTab({ slug, config, onSaved, onSaving, on
       {cfg.slides.length < MAX_SLIDES && (
         <button
           onClick={addSlide}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-200 bg-white px-6 py-4 text-sm text-slate-500 transition-colors hover:border-blue-300 hover:bg-blue-50"
+          className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-line bg-white px-6 py-4 text-sm text-ink/60 transition-colors hover:border-brand/25 hover:bg-brand/10"
         >
           <Plus className="h-4 w-4" />
           {t("constructor.hero_add_slide", locale)} ({cfg.slides.length}/{MAX_SLIDES})
@@ -309,7 +309,7 @@ export default function ConstructorHeroTab({ slug, config, onSaved, onSaving, on
 
       {/* Save + Default actions */}
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={handleSave} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700">
+        <button onClick={handleSave} className="rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-dark">
           {t("constructor.hero_save", locale)}
         </button>
         <DefaultConfigActions

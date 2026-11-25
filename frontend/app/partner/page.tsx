@@ -14,12 +14,12 @@ interface Stat {
 }
 
 const STATS: Stat[] = [
-  { key: "total", labelKey: "partner.overview.total", filter: null, accent: "bg-slate-900" },
+  { key: "total", labelKey: "partner.overview.total", filter: null, accent: "bg-ink" },
   { key: "draft", labelKey: "partner.overview.draft", filter: "draft", accent: "bg-amber-500" },
-  { key: "in_moderation", labelKey: "partner.overview.in_moderation", filter: "in_moderation", accent: "bg-blue-500" },
+  { key: "in_moderation", labelKey: "partner.overview.in_moderation", filter: "in_moderation", accent: "bg-brand" },
   { key: "changes_requested", labelKey: "partner.overview.changes_requested", filter: "changes_requested", accent: "bg-rose-500" },
   { key: "published", labelKey: "partner.overview.published", filter: "published", accent: "bg-emerald-500" },
-  { key: "archived", labelKey: "partner.overview.archived", filter: "archived", accent: "bg-slate-400" },
+  { key: "archived", labelKey: "partner.overview.archived", filter: "archived", accent: "bg-panel" },
 ];
 
 /** Сводка портфеля (только own-scope): лёгкие запросы total по фильтрам. */
@@ -56,8 +56,8 @@ export default function PartnerOverviewPage() {
     <div>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{pt("partner.overview.title", locale)}</h1>
-          <p className="mt-1 text-sm text-slate-500">{pt("partner.overview.subtitle", locale)}</p>
+          <h1 className="text-2xl font-bold text-ink">{pt("partner.overview.title", locale)}</h1>
+          <p className="mt-1 text-sm text-ink/60">{pt("partner.overview.subtitle", locale)}</p>
         </div>
         <Link
           href="/partner/products/new"
@@ -74,13 +74,13 @@ export default function PartnerOverviewPage() {
           <Link
             key={s.key}
             href={s.filter ? `/partner/products?filter=${s.filter}` : "/partner/products"}
-            className="group rounded-2xl border border-slate-200 bg-white p-4 transition-shadow hover:shadow-md"
+            className="group rounded-2xl border border-line bg-white p-4 transition-shadow hover:shadow-md"
           >
             <div className={`mb-3 inline-flex size-9 items-center justify-center rounded-xl text-sm font-bold text-white ${s.accent}`}>
               {counts ? counts[s.key] ?? 0 : "…"}
             </div>
-            <div className="text-xs font-medium text-slate-500">{pt(s.labelKey, locale)}</div>
-            <div className="mt-1 text-[10px] text-slate-300 transition-colors group-hover:text-emerald-600">{pt("partner.overview.open", locale)} →</div>
+            <div className="text-xs font-medium text-ink/60">{pt(s.labelKey, locale)}</div>
+            <div className="mt-1 text-[10px] text-ink/60 transition-colors group-hover:text-emerald-600">{pt("partner.overview.open", locale)} →</div>
           </Link>
         ))}
       </div>

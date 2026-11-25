@@ -149,7 +149,7 @@ export default function PartnerCustomersPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-400">
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-ink/60">
         {pt("partner.state.loading", locale)}
       </div>
     );
@@ -162,10 +162,10 @@ export default function PartnerCustomersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-slate-900">
+          <h1 className="text-lg font-bold text-ink">
             {isPro ? pt("partner.nav.crm", locale) : pt("partner.nav.customers", locale)}
           </h1>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-ink/60">
             {isPro
               ? pt("partner.crm.description.pro", locale)
               : pt("partner.crm.description.basic", locale)}
@@ -182,7 +182,7 @@ export default function PartnerCustomersPage() {
           )}
           <button
             onClick={() => void loadCustomers()}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel"
           >
             ⟳
           </button>
@@ -220,7 +220,7 @@ export default function PartnerCustomersPage() {
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && void loadCustomers()}
           placeholder={pt("partner.crm.search_placeholder", locale)}
-          className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+          className="w-64 rounded-lg border border-line bg-white px-3 py-1.5 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
         />
       </div>
 
@@ -235,9 +235,9 @@ export default function PartnerCustomersPage() {
       )}
 
       {/* Customer Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+          <thead className="border-b border-line bg-panel text-xs uppercase tracking-wide text-ink/60">
             <tr>
               <th className="px-4 py-2.5 font-medium">{t("crm.col.code", locale)}</th>
               <th className="px-4 py-2.5 font-medium">{t("crm.col.name", locale)}</th>
@@ -252,21 +252,21 @@ export default function PartnerCustomersPage() {
               <tr
                 key={c.id}
                 onClick={() => void openDetail(c.id)}
-                className={`cursor-pointer border-b border-slate-50 transition-colors hover:bg-emerald-50/50 ${
+                className={`cursor-pointer border-b border-line transition-colors hover:bg-emerald-50/50 ${
                   selectedCustomer?.id === c.id ? "bg-emerald-50/60" : ""
                 }`}
               >
                 <td className="px-4 py-2.5 font-mono text-xs text-emerald-600">{c.code}</td>
-                <td className="px-4 py-2.5 font-medium text-slate-800">{displayName(c)}</td>
-                {isPro && <td className="px-4 py-2.5 text-slate-500">{c.email}</td>}
-                <td className="px-4 py-2.5 text-slate-500">{c.type === "COMPANY" ? t("crm.type.company", locale) : t("crm.type.person", locale)}</td>
-                {isPro && <td className="px-4 py-2.5 text-slate-500">{(c as any)._relation?.leadSource ?? "—"}</td>}
+                <td className="px-4 py-2.5 font-medium text-ink">{displayName(c)}</td>
+                {isPro && <td className="px-4 py-2.5 text-ink/60">{c.email}</td>}
+                <td className="px-4 py-2.5 text-ink/60">{c.type === "COMPANY" ? t("crm.type.company", locale) : t("crm.type.person", locale)}</td>
+                {isPro && <td className="px-4 py-2.5 text-ink/60">{(c as any)._relation?.leadSource ?? "—"}</td>}
                 <td className="px-4 py-2.5"><StatusBadge status={c.status} /></td>
               </tr>
             ))}
             {(customerData?.items ?? []).length === 0 && (
               <tr>
-                <td colSpan={isPro ? 6 : 5} className="px-4 py-8 text-center text-sm text-slate-400">
+                <td colSpan={isPro ? 6 : 5} className="px-4 py-8 text-center text-sm text-ink/60">
                   {pt("partner.crm.empty", locale)}
                 </td>
               </tr>
@@ -281,28 +281,28 @@ export default function PartnerCustomersPage() {
       {/* ── Intake Panel (Pro only) ── */}
       {showIntake && isPro && (          <PanelFrame title={pt("partner.crm.add_customer", locale)} subtitle="STOREFRONT PRO" onClose={() => setShowIntake(false)}>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.first_name", locale)}</label>
-            <input value={intakeForm.firstName} onChange={(e) => setIntakeForm({ ...intakeForm, firstName: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400" />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{pt("partner.crm.intake.first_name", locale)}</label>
+            <input value={intakeForm.firstName} onChange={(e) => setIntakeForm({ ...intakeForm, firstName: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-emerald-400" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.last_name", locale)}</label>
-            <input value={intakeForm.lastName} onChange={(e) => setIntakeForm({ ...intakeForm, lastName: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400" />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{pt("partner.crm.intake.last_name", locale)}</label>
+            <input value={intakeForm.lastName} onChange={(e) => setIntakeForm({ ...intakeForm, lastName: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-emerald-400" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.email", locale)}</label>
-            <input value={intakeForm.email} onChange={(e) => setIntakeForm({ ...intakeForm, email: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400" />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{pt("partner.crm.intake.email", locale)}</label>
+            <input value={intakeForm.email} onChange={(e) => setIntakeForm({ ...intakeForm, email: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-emerald-400" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.phone", locale)}</label>
-            <input value={intakeForm.phone} onChange={(e) => setIntakeForm({ ...intakeForm, phone: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400" />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{pt("partner.crm.intake.phone", locale)}</label>
+            <input value={intakeForm.phone} onChange={(e) => setIntakeForm({ ...intakeForm, phone: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-emerald-400" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.company", locale)}</label>
-            <input value={intakeForm.companyName} onChange={(e) => setIntakeForm({ ...intakeForm, companyName: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400" />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{pt("partner.crm.intake.company", locale)}</label>
+            <input value={intakeForm.companyName} onChange={(e) => setIntakeForm({ ...intakeForm, companyName: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-emerald-400" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.source", locale)}</label>
-            <select value={intakeForm.leadSource} onChange={(e) => setIntakeForm({ ...intakeForm, leadSource: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{pt("partner.crm.intake.source", locale)}</label>
+            <select value={intakeForm.leadSource} onChange={(e) => setIntakeForm({ ...intakeForm, leadSource: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-emerald-400">
               <option value="DIRECT">{t("crm.lead_source.direct", locale)}</option>
               <option value="STOREFRONT">{t("crm.lead_source.storefront", locale)}</option>
               <option value="PHONE">{t("crm.lead_source.phone", locale)}</option>
@@ -314,21 +314,21 @@ export default function PartnerCustomersPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.notes", locale)}</label>
-            <textarea value={intakeForm.notes} onChange={(e) => setIntakeForm({ ...intakeForm, notes: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400" rows={3} />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{pt("partner.crm.intake.notes", locale)}</label>
+            <textarea value={intakeForm.notes} onChange={(e) => setIntakeForm({ ...intakeForm, notes: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-emerald-400" rows={3} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.initial_note", locale)}</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{pt("partner.crm.intake.initial_note", locale)}</label>
             <textarea
               value={intakeForm.initialNote}
               onChange={(e) => setIntakeForm({ ...intakeForm, initialNote: e.target.value })}
               rows={3}
               maxLength={5000}
               aria-label={pt("partner.crm.intake.initial_note", locale)}
-              className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400"
+              className="w-full resize-none rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-emerald-400"
               placeholder={pt("partner.crm.intake.initial_note_ph", locale)}
             />
-            <div className="mt-1 text-right text-xs text-slate-400">
+            <div className="mt-1 text-right text-xs text-ink/60">
               {intakeForm.initialNote.length}/5000
             </div>
           </div>
@@ -346,27 +346,27 @@ export default function PartnerCustomersPage() {
       {selectedCustomer && (
         <div className="fixed inset-0 z-30 flex justify-end bg-black/20" onClick={() => setSelectedCustomer(null)}>
           <aside
-            className="thin-scroll fade-in-up h-full w-[420px] overflow-y-auto border-l border-slate-200 bg-white shadow-xl"
+            className="thin-scroll fade-in-up h-full w-[420px] overflow-y-auto border-l border-line bg-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+            <div className="flex items-start justify-between border-b border-line px-5 py-4">
               <div>
                 <div className="font-mono text-xs text-emerald-600">{selectedCustomer.code}</div>
-                <div className="text-lg font-bold text-slate-900">{displayName(selectedCustomer)}</div>
+                <div className="text-lg font-bold text-ink">{displayName(selectedCustomer)}</div>
                 <StatusBadge status={selectedCustomer.status} />
               </div>
-              <button onClick={() => setSelectedCustomer(null)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100">✕</button>
+              <button onClick={() => setSelectedCustomer(null)} className="rounded-md p-1 text-ink/60 hover:bg-panel">✕</button>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 border-b border-slate-100 px-4 pt-2">
+            <div className="flex gap-1 border-b border-line px-4 pt-2">
               {(["overview", "orders", "bookings", "payments", "relations"] as const).map((dt) => (
                 <button
                   key={dt}
                   onClick={() => { setDetailTab(dt); setEditingRelation(false); }}
                   className={`rounded-t-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                    detailTab === dt ? "bg-emerald-50 text-emerald-600" : "text-slate-400 hover:text-slate-600"
+                    detailTab === dt ? "bg-emerald-50 text-emerald-600" : "text-ink/60 hover:text-ink/60"
                   }`}
                 >
                   {dt === "overview" ? pt("partner.crm.tab.overview", locale) : dt === "orders" ? pt("partner.crm.tab.orders", locale) : dt === "bookings" ? pt("partner.crm.tab.bookings", locale) : dt === "payments" ? pt("partner.crm.tab.payments", locale) : pt("partner.crm.tab.relations", locale)}
@@ -382,13 +382,13 @@ export default function PartnerCustomersPage() {
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     {isPro && (
                       <>
-                        <div className="rounded-lg bg-slate-50 px-3 py-2">
-                          <div className="text-slate-400">{pt("partner.crm.email", locale)}</div>
-                          <div className="break-all font-medium text-slate-700">{selectedCustomer.email ?? "—"}</div>
+                        <div className="rounded-lg bg-panel px-3 py-2">
+                          <div className="text-ink/60">{pt("partner.crm.email", locale)}</div>
+                          <div className="break-all font-medium text-ink">{selectedCustomer.email ?? "—"}</div>
                         </div>
-                        <div className="rounded-lg bg-slate-50 px-3 py-2">
-                          <div className="text-slate-400">{pt("partner.crm.phone", locale)}</div>
-                          <div className="font-medium text-slate-700">{selectedCustomer.phone ?? "—"}</div>
+                        <div className="rounded-lg bg-panel px-3 py-2">
+                          <div className="text-ink/60">{pt("partner.crm.phone", locale)}</div>
+                          <div className="font-medium text-ink">{selectedCustomer.phone ?? "—"}</div>
                         </div>
                       </>
                     )}
@@ -402,9 +402,9 @@ export default function PartnerCustomersPage() {
                         <div className="font-medium text-emerald-700">{selectedCustomer._relation.lifecycle ?? "—"}</div>
                       </div>
                       {selectedCustomer._relation.leadSource && (
-                        <div className="rounded-lg bg-blue-50 px-3 py-2">
-                          <div className="text-blue-400">{pt("partner.crm.source", locale)}</div>
-                          <div className="font-medium text-blue-700">{t(`crm.lead_source.${selectedCustomer._relation.leadSource.toLowerCase()}`, locale) ?? selectedCustomer._relation.leadSource}</div>
+                        <div className="rounded-lg bg-brand/10 px-3 py-2">
+                          <div className="text-brand/70">{pt("partner.crm.source", locale)}</div>
+                          <div className="font-medium text-brand-dark">{t(`crm.lead_source.${selectedCustomer._relation.leadSource.toLowerCase()}`, locale) ?? selectedCustomer._relation.leadSource}</div>
                         </div>
                       )}
                       {selectedCustomer._relation.tags.length > 0 && (
@@ -418,9 +418,9 @@ export default function PartnerCustomersPage() {
                         </div>
                       )}
                       {selectedCustomer._relation.notes && (
-                        <div className="rounded-lg bg-slate-50 px-3 py-2">
-                          <div className="text-slate-400">{pt("partner.crm.notes", locale)}</div>
-                          <div className="whitespace-pre-wrap font-medium text-slate-700">{selectedCustomer._relation.notes}</div>
+                        <div className="rounded-lg bg-panel px-3 py-2">
+                          <div className="text-ink/60">{pt("partner.crm.notes", locale)}</div>
+                          <div className="whitespace-pre-wrap font-medium text-ink">{selectedCustomer._relation.notes}</div>
                         </div>
                       )}
                     </div>
@@ -434,9 +434,9 @@ export default function PartnerCustomersPage() {
                   )}
 
                   <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div className="rounded-lg bg-blue-50 px-3 py-2 text-center">
-                      <div className="font-bold text-blue-700">{selectedCustomer.summary.totalOrders}</div>
-                      <div className="text-blue-500">{pt("partner.crm.summary.orders", locale)}</div>
+                    <div className="rounded-lg bg-brand/10 px-3 py-2 text-center">
+                      <div className="font-bold text-brand-dark">{selectedCustomer.summary.totalOrders}</div>
+                      <div className="text-brand">{pt("partner.crm.summary.orders", locale)}</div>
                     </div>
                     <div className="rounded-lg bg-green-50 px-3 py-2 text-center">
                       <div className="font-bold text-green-700">{selectedCustomer.summary.totalBookings}</div>
@@ -454,15 +454,15 @@ export default function PartnerCustomersPage() {
               {detailTab === "orders" && (
                 <div className="space-y-2">
                   {selectedCustomer.orders.length === 0 ? (
-                    <div className="py-4 text-center text-xs text-slate-400">{pt("partner.crm.empty.orders", locale)}</div>
+                    <div className="py-4 text-center text-xs text-ink/60">{pt("partner.crm.empty.orders", locale)}</div>
                   ) : (
                     selectedCustomer.orders.map((o) => (
-                      <div key={o.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                      <div key={o.id} className="rounded-lg border border-line px-3 py-2 text-xs">
                         <div className="flex items-center justify-between">
                           <span className="font-mono text-emerald-600">{o.code}</span>
                           <StatusBadge status={o.status} />
                         </div>
-                        <div className="mt-1 text-slate-500">{o.number} · {formatPrice(o.amount, o.currency, locale) ?? "—"}</div>
+                        <div className="mt-1 text-ink/60">{o.number} · {formatPrice(o.amount, o.currency, locale) ?? "—"}</div>
                       </div>
                     ))
                   )}
@@ -473,15 +473,15 @@ export default function PartnerCustomersPage() {
               {detailTab === "bookings" && (
                 <div className="space-y-2">
                   {selectedCustomer.bookings.length === 0 ? (
-                    <div className="py-4 text-center text-xs text-slate-400">{pt("partner.crm.empty.bookings", locale)}</div>
+                    <div className="py-4 text-center text-xs text-ink/60">{pt("partner.crm.empty.bookings", locale)}</div>
                   ) : (
                     selectedCustomer.bookings.map((b) => (
-                      <div key={b.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                      <div key={b.id} className="rounded-lg border border-line px-3 py-2 text-xs">
                         <div className="flex items-center justify-between">
                           <span className="font-mono text-emerald-600">{b.code}</span>
                           <StatusBadge status={b.status} />
                         </div>
-                        <div className="mt-1 text-slate-500">{formatPrice(b.amount, b.currency, locale) ?? "—"}</div>
+                        <div className="mt-1 text-ink/60">{formatPrice(b.amount, b.currency, locale) ?? "—"}</div>
                       </div>
                     ))
                   )}
@@ -492,15 +492,15 @@ export default function PartnerCustomersPage() {
               {detailTab === "payments" && (
                 <div className="space-y-2">
                   {selectedCustomer.payments.length === 0 ? (
-                    <div className="py-4 text-center text-xs text-slate-400">{pt("partner.crm.empty.payments", locale)}</div>
+                    <div className="py-4 text-center text-xs text-ink/60">{pt("partner.crm.empty.payments", locale)}</div>
                   ) : (
                     selectedCustomer.payments.map((p) => (
-                      <div key={p.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                      <div key={p.id} className="rounded-lg border border-line px-3 py-2 text-xs">
                         <div className="flex items-center justify-between">
                           <span className="font-mono text-emerald-600">{p.code}</span>
                           <StatusBadge status={p.status} />
                         </div>
-                        <div className="mt-1 text-slate-500">{formatPrice(p.amount, p.currency, locale) ?? "—"}</div>
+                        <div className="mt-1 text-ink/60">{formatPrice(p.amount, p.currency, locale) ?? "—"}</div>
                       </div>
                     ))
                   )}
@@ -514,8 +514,8 @@ export default function PartnerCustomersPage() {
                     editingRelation ? (
                       <div className="space-y-3">
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-slate-400">{pt("partner.crm.lifecycle", locale)}</label>
-                          <select value={relationForm.lifecycle} onChange={(e) => setRelationForm({ ...relationForm, lifecycle: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400">
+                          <label className="mb-1 block text-xs font-medium text-ink/60">{pt("partner.crm.lifecycle", locale)}</label>
+                          <select value={relationForm.lifecycle} onChange={(e) => setRelationForm({ ...relationForm, lifecycle: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-emerald-400">
                             <option value="">—</option>
                             <option value="LEAD">LEAD</option>
                             <option value="PROSPECT">PROSPECT</option>
@@ -524,32 +524,32 @@ export default function PartnerCustomersPage() {
                           </select>
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-slate-400">{pt("partner.crm.relation.tags_hint", locale)}</label>
-                          <input value={relationForm.tags} onChange={(e) => setRelationForm({ ...relationForm, tags: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
+                          <label className="mb-1 block text-xs font-medium text-ink/60">{pt("partner.crm.relation.tags_hint", locale)}</label>
+                          <input value={relationForm.tags} onChange={(e) => setRelationForm({ ...relationForm, tags: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-emerald-400" />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-slate-400">{pt("partner.crm.notes", locale)}</label>
-                          <textarea value={relationForm.notes} onChange={(e) => setRelationForm({ ...relationForm, notes: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" rows={3} />
+                          <label className="mb-1 block text-xs font-medium text-ink/60">{pt("partner.crm.notes", locale)}</label>
+                          <textarea value={relationForm.notes} onChange={(e) => setRelationForm({ ...relationForm, notes: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-emerald-400" rows={3} />
                         </div>
                         <div className="flex gap-2">
                           <button onClick={() => void saveRelation()} disabled={savingRelation} className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
                             {savingRelation ? "…" : pt("partner.crm.relation.save", locale)}
                           </button>
-                          <button onClick={() => setEditingRelation(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs text-slate-600 hover:bg-slate-50">
+                          <button onClick={() => setEditingRelation(false)} className="rounded-lg border border-line px-4 py-2 text-xs text-ink/60 hover:bg-panel">
                             {pt("partner.crm.relation.cancel", locale)}
                           </button>
                         </div>
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        <div className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                        <div className="rounded-lg border border-line px-3 py-2 text-xs">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium text-slate-700">{pt("partner.crm.relation.my_relation", locale)}</span>
+                            <span className="font-medium text-ink">{pt("partner.crm.relation.my_relation", locale)}</span>
                             <button onClick={() => setEditingRelation(true)} className="text-emerald-600 hover:text-emerald-700">{pt("partner.crm.relation.edit", locale)}</button>
                           </div>
-                          <div className="mt-1 text-slate-500">{selectedCustomer._relation.lifecycle ?? "—"}</div>
+                          <div className="mt-1 text-ink/60">{selectedCustomer._relation.lifecycle ?? "—"}</div>
                           {selectedCustomer._relation.leadSource && (
-                            <div className="mt-1 text-slate-400">Источник: {selectedCustomer._relation.leadSource}</div>
+                            <div className="mt-1 text-ink/60">Источник: {selectedCustomer._relation.leadSource}</div>
                           )}
                         </div>
                       </div>
@@ -559,7 +559,7 @@ export default function PartnerCustomersPage() {
                       {pt("partner.crm.empty.relations_basic", locale)}
                     </div>
                   ) : (
-                    <div className="py-4 text-center text-xs text-slate-400">{pt("partner.crm.empty.relations", locale)}</div>
+                    <div className="py-4 text-center text-xs text-ink/60">{pt("partner.crm.empty.relations", locale)}</div>
                   )}
                 </>
               )}

@@ -87,13 +87,13 @@ export default function AccountNotificationsPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{t("account.notifications", locale)}</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-ink">{t("account.notifications", locale)}</h1>
+          <p className="mt-1 text-sm text-ink/60">
             Изменения цены, статусов заявок и другие события по вашим обращениям.
           </p>
         </div>
         {data && data.unread > 0 && (
-          <button type="button" onClick={() => void markAll()} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+          <button type="button" onClick={() => void markAll()} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-medium text-ink hover:bg-panel">
             Прочитать все
           </button>
         )}
@@ -101,10 +101,10 @@ export default function AccountNotificationsPage() {
 
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
 
-      {loading && !data && <div className="text-sm text-slate-400">Загрузка…</div>}
+      {loading && !data && <div className="text-sm text-ink/60">Загрузка…</div>}
 
       {data && data.items.length === 0 && (
-        <div className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+        <div className="rounded-xl border border-dashed border-line bg-white p-8 text-center text-sm text-ink/60">
           Уведомлений пока нет.
         </div>
       )}
@@ -121,27 +121,27 @@ export default function AccountNotificationsPage() {
               onClick={() => void markRead(row)}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") void markRead(row); }}
               className={`block w-full rounded-xl border p-4 text-left transition-colors ${
-                row.readAt ? "border-slate-200 bg-white" : "border-blue-200 bg-blue-50/60 hover:bg-blue-50"
+                row.readAt ? "border-line bg-white" : "border-brand/20 bg-brand/60 hover:bg-brand/10"
               }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    {!row.readAt && <span className="size-2 rounded-full bg-blue-600" aria-label="Непрочитано" />}
-                    <div className="font-semibold text-slate-900">{row.title}</div>
+                    {!row.readAt && <span className="size-2 rounded-full bg-brand" aria-label="Непрочитано" />}
+                    <div className="font-semibold text-ink">{row.title}</div>
                   </div>
-                  {row.body && <div className="mt-1 text-sm text-slate-600">{row.body}</div>}
+                  {row.body && <div className="mt-1 text-sm text-ink/60">{row.body}</div>}
                   {pricePayload && (
                     <div className="mt-2 flex items-center gap-2 text-sm">
-                      <span className="text-slate-400 line-through">{String(pricePayload.oldPrice ?? "—")}</span>
-                      <span className="text-slate-400">→</span>
+                      <span className="text-ink/60 line-through">{String(pricePayload.oldPrice ?? "—")}</span>
+                      <span className="text-ink/60">→</span>
                       <span className="font-semibold text-emerald-700">
                         {String(pricePayload.newPrice ?? "—")} {String(pricePayload.currency ?? "")}
                       </span>
                     </div>
                   )}
                 </div>
-                <span className="shrink-0 text-xs text-slate-400">
+                <span className="shrink-0 text-xs text-ink/60">
                   {new Date(row.createdAt).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" })}
                 </span>
               </div>

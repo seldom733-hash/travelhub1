@@ -40,7 +40,7 @@ describe("TableHeaderFilter — rendering", () => {
       />,
     );
     const btn = screen.getByRole("button", { name: /Статус filter/i });
-    expect(btn.className).toContain("bg-blue-100");
+    expect(btn.className).toContain("bg-brand/15");
   });
 
   it("shows inactive state when value is empty", () => {
@@ -54,7 +54,7 @@ describe("TableHeaderFilter — rendering", () => {
       />,
     );
     const btn = screen.getByRole("button", { name: /Статус filter/i });
-    expect(btn.className).not.toContain("bg-blue-100");
+    expect(btn.className).not.toContain("bg-brand/15");
   });
 
   it("disables the button when disabled prop is true", () => {

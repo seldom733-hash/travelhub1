@@ -34,9 +34,9 @@ export interface RequestAvailableActions {
  */
 const TONE_CLASSES = {
   success: "bg-emerald-600 text-white hover:bg-emerald-700",
-  primary: "bg-blue-600 text-white hover:bg-blue-700",
+  primary: "bg-brand text-white hover:bg-brand-dark",
   danger: "bg-red-600 text-white hover:bg-red-700",
-  neutral: "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50",
+  neutral: "bg-white border border-line text-ink/60 hover:bg-panel",
 } as const;
 
 const BTN =
@@ -98,7 +98,7 @@ export default function RequestActionBar({
     <div className="flex flex-wrap items-center gap-4">
       {showSupplier && (
         <div className="flex flex-col items-start gap-1">
-          <span className="text-[10px] font-medium uppercase text-slate-400">
+          <span className="text-[10px] font-medium uppercase text-ink/60">
             {t("reqflow.supplier_actions", locale)}
           </span>
           <div className="flex flex-wrap items-center gap-2">
@@ -132,7 +132,7 @@ export default function RequestActionBar({
                   placeholder={t("requests.price_proposal_placeholder", locale)}
                   aria-label={t("requests.price_proposal_placeholder", locale)}
                   inputMode="decimal"
-                  className="w-32 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-32 rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-ink/60 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
                 />
                 <button
                   type="button"
@@ -178,7 +178,7 @@ export default function RequestActionBar({
 
       {showCustomer && (
         <div className="flex flex-col items-start gap-1">
-          <span className="text-[10px] font-medium uppercase text-slate-400">
+          <span className="text-[10px] font-medium uppercase text-ink/60">
             {t("reqflow.customer_actions", locale)}
           </span>
           <div className="flex flex-wrap items-center gap-2">
@@ -208,7 +208,7 @@ export default function RequestActionBar({
 
       {showConvert && (
         <div className="flex flex-col items-start gap-1">
-          <span className="text-[10px] font-medium uppercase text-slate-400">
+          <span className="text-[10px] font-medium uppercase text-ink/60">
             {t("reqflow.converted_hint", locale)}
           </span>
           <button

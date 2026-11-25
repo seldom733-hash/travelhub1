@@ -63,8 +63,8 @@ export default function ServiceFacts({
   ].filter(Boolean).join(", ");
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6">
-      <h4 className="text-sm font-semibold text-slate-800">
+    <div className="rounded-2xl border border-line bg-white p-6">
+      <h4 className="text-sm font-semibold text-ink">
         {sx(locale, "Характеристики услуги", "Xidmətin xüsusiyyətləri", "Service details")}
       </h4>
       <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
@@ -100,8 +100,8 @@ export default function ServiceFacts({
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs text-slate-400">{label}</dt>
-      <dd className="mt-0.5 font-medium text-slate-800">{value}</dd>
+      <dt className="text-xs text-ink/60">{label}</dt>
+      <dd className="mt-0.5 font-medium text-ink">{value}</dd>
     </div>
   );
 }

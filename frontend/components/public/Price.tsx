@@ -27,14 +27,14 @@ export default function Price({
   const color = tone === "gold" ? "text-gold" : isBasicTone
     ? tone === "light"
       ? "text-white"
-      : "text-slate-900"
+      : "text-ink"
     : "text-gold";
   const prefix = withPrefix ? `${t("price.from", locale)} ` : "";
 
   // formatPrice returns null only for null/undefined/empty/NaN/negative.
   // 0 returns as visible zero ("0 ₼"), which is correct.
   if (formatted === null) {
-    return <span className="text-sm text-slate-400">{t("price.on_request", locale)}</span>;
+    return <span className="text-sm text-ink/60">{t("price.on_request", locale)}</span>;
   }
 
   const cls =

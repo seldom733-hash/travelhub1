@@ -37,15 +37,15 @@ describe("WorkspaceSkeletons §SKELETON-PARITY", () => {
   it("сегментный каркас = полоса PageHeader + `space-y-4 p-6`, без KPI и без старой геометрии", () => {
     const markup = markupOf(<WorkspacePageSkeleton />);
     // PageHeader.tsx:20
-    expect(markup).toContain("border-b border-slate-200 bg-white px-6 py-4");
+    expect(markup).toContain("border-b border-line bg-white px-6 py-4");
     // users/catalog/marketing/finance-*: `space-y-4 p-6`
     expect(markup).toContain("space-y-4 p-6");
     // OperationsRegistrySlot: `rounded-xl … shadow-sm`
-    expect(markup).toContain("rounded-xl border border-slate-200 bg-white shadow-sm");
+    expect(markup).toContain("rounded-xl border border-line bg-white shadow-sm");
     // Прежняя чужая геометрия не должна вернуться.
     expect(markup).not.toContain("lg:p-10");
     expect(markup).not.toContain("h-24");
-    expect(markup).not.toContain("rounded-2xl bg-slate-100");
+    expect(markup).not.toContain("rounded-2xl bg-panel");
   });
 
   it("реестровый каркас с `toolbar` добавляет строку фильтров (finance/obligations)", () => {
@@ -61,7 +61,7 @@ describe("WorkspaceSkeletons §SKELETON-PARITY", () => {
     expect(markup).toContain("space-y-6 p-6");
     expect(markup).toContain("grid gap-4 sm:grid-cols-2 lg:grid-cols-3");
     expect(markup.match(/grid gap-4 sm:grid-cols-2"/g)?.length).toBe(2);
-    expect(markup).toContain("rounded-xl border border-slate-200 bg-white shadow-sm");
+    expect(markup).toContain("rounded-xl border border-line bg-white shadow-sm");
     // Панели-реестра (таблицы) на этой странице нет.
     expect(markup).not.toContain("space-y-2 p-4");
   });
@@ -82,7 +82,7 @@ describe("WorkspaceSkeletons §SKELETON-PARITY", () => {
 
   it("каркас detail-страницы = две полосы-шапки + сетка `lg:grid-cols-3`", () => {
     const markup = markupOf(<EntityDetailSkeleton />);
-    expect(markup.match(/border-b border-slate-200 bg-white px-6 py-4/g)?.length).toBe(2);
+    expect(markup.match(/border-b border-line bg-white px-6 py-4/g)?.length).toBe(2);
     expect(markup).toContain("grid grid-cols-1 gap-4 lg:grid-cols-3");
     expect(markup).toContain("lg:col-span-2");
     expect(markup).toContain("flex-1 overflow-y-auto p-6");
@@ -92,17 +92,17 @@ describe("WorkspaceSkeletons §SKELETON-PARITY", () => {
     const markup = markupOf(<DashboardPageSkeleton />);
     expect(markup).toContain("p-6 lg:p-10");
     expect(markup).toContain("mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3");
-    expect(markup).toContain("rounded-2xl border border-slate-200 bg-white");
-    expect(markup).not.toContain("border-b border-slate-200 bg-white px-6 py-4");
+    expect(markup).toContain("rounded-2xl border border-line bg-white");
+    expect(markup).not.toContain("border-b border-line bg-white px-6 py-4");
   });
 
   it("каркас формы = `mx-auto max-w-3xl`, полосу PageHeader добавляет только `header`", () => {
     expect(markupOf(<FormPageSkeleton />)).toContain("mx-auto w-full max-w-3xl space-y-4 p-6");
-    expect(markupOf(<FormPageSkeleton />)).not.toContain("border-b border-slate-200 bg-white px-6 py-4");
+    expect(markupOf(<FormPageSkeleton />)).not.toContain("border-b border-line bg-white px-6 py-4");
 
     const withHeader = markupOf(<FormPageSkeleton maxWidth="max-w-xl" header />);
     expect(withHeader).toContain("mx-auto w-full max-w-xl space-y-4 p-6");
-    expect(withHeader).toContain("border-b border-slate-200 bg-white px-6 py-4");
+    expect(withHeader).toContain("border-b border-line bg-white px-6 py-4");
   });
 
   it("каркас очереди = `space-y-4` без page-padding + `lg:grid-cols-2`", () => {
@@ -111,12 +111,12 @@ describe("WorkspaceSkeletons §SKELETON-PARITY", () => {
     expect((container.firstElementChild as HTMLElement).className).toBe("space-y-4");
     const markup = container.innerHTML;
     expect(markup).toContain("grid gap-4 lg:grid-cols-2");
-    expect(markup).toContain("rounded-2xl border border-slate-200 bg-white shadow-sm");
+    expect(markup).toContain("rounded-2xl border border-line bg-white shadow-sm");
   });
 
-  it("каркас crm = таб-полоса `bg-slate-50 px-6 pt-2` + KPI-строка", () => {
+  it("каркас crm = таб-полоса `bg-panel px-6 pt-2` + KPI-строка", () => {
     const markup = markupOf(<TabsPageSkeleton />);
-    expect(markup).toContain("flex gap-1 border-b border-slate-200 bg-slate-50 px-6 pt-2");
+    expect(markup).toContain("flex gap-1 border-b border-line bg-panel px-6 pt-2");
     expect(markup).toContain("xl:grid-cols-6");
   });
 

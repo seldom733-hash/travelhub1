@@ -64,23 +64,23 @@ export default function AccountProfilePage() {
   };
 
   if (error && !profile) return <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600">{error}</div>;
-  if (!profile) return <div className="text-sm text-slate-400">{t("state.loading", locale)}</div>;
+  if (!profile) return <div className="text-sm text-ink/60">{t("state.loading", locale)}</div>;
 
   const hasCustomer = profile.customer !== null;
 
   return (
     <div className="max-w-xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">{t("account.profile", locale)}</h1>
-        <p className="mt-1 text-sm text-slate-500">{t("account.updated_hint", locale)}</p>
+        <h1 className="text-2xl font-bold text-ink">{t("account.profile", locale)}</h1>
+        <p className="mt-1 text-sm text-ink/60">{t("account.updated_hint", locale)}</p>
       </div>
 
-      <form onSubmit={(e) => void save(e)} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <form onSubmit={(e) => void save(e)} className="space-y-4 rounded-2xl border border-line bg-white p-6 shadow-sm">
         <div className="grid grid-cols-2 gap-3">
           {hasCustomer ? (
             <>
               <div>
-                <label htmlFor="p-first" className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+                <label htmlFor="p-first" className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
                   {t("account.field.first_name", locale)}
                 </label>
                 <input
@@ -88,11 +88,11 @@ export default function AccountProfilePage() {
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   autoComplete="given-name"
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-lg border border-line bg-panel px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand"
                 />
               </div>
               <div>
-                <label htmlFor="p-last" className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+                <label htmlFor="p-last" className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
                   {t("account.field.last_name", locale)}
                 </label>
                 <input
@@ -100,13 +100,13 @@ export default function AccountProfilePage() {
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   autoComplete="family-name"
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-lg border border-line bg-panel px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand"
                 />
               </div>
             </>
           ) : (
             <div className="col-span-2">
-              <label htmlFor="p-full" className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+              <label htmlFor="p-full" className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
                 {t("account.field.full_name", locale)}
               </label>
               <input
@@ -114,14 +114,14 @@ export default function AccountProfilePage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 autoComplete="name"
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                className="w-full rounded-lg border border-line bg-panel px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand"
               />
             </div>
           )}
         </div>
 
         <div>
-          <label htmlFor="p-email" className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+          <label htmlFor="p-email" className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
             {t("account.field.email", locale)}
           </label>
           <input
@@ -130,13 +130,13 @@ export default function AccountProfilePage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+            className="w-full rounded-lg border border-line bg-panel px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand"
           />
         </div>
 
         {hasCustomer && (
           <div>
-            <label htmlFor="p-phone" className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+            <label htmlFor="p-phone" className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
               {t("account.field.phone", locale)}
             </label>
             <input
@@ -144,7 +144,7 @@ export default function AccountProfilePage() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               autoComplete="tel"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-lg border border-line bg-panel px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand"
             />
           </div>
         )}
@@ -152,7 +152,7 @@ export default function AccountProfilePage() {
         {/* M4.3: login identity (User.loginPhone) — read-only display; смена
             телефона входа отложена (§20: verification flow, support path). */}
         <div>
-          <label htmlFor="p-login-phone" className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+          <label htmlFor="p-login-phone" className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
             {t("account.field.login_phone", locale)}
           </label>
           <input
@@ -161,10 +161,10 @@ export default function AccountProfilePage() {
             readOnly
             disabled
             autoComplete="tel"
-            className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-3 py-2.5 text-sm text-slate-500 outline-none"
+            className="w-full cursor-not-allowed rounded-lg border border-line bg-panel px-3 py-2.5 text-sm text-ink/60 outline-none"
             placeholder={profile.user.phone ? undefined : t("account.login_phone_missing", locale)}
           />
-          <p className="mt-1 text-xs text-slate-400">{t("account.login_phone_hint", locale)}</p>
+          <p className="mt-1 text-xs text-ink/60">{t("account.login_phone_hint", locale)}</p>
         </div>
 
         {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600">{error}</div>}
@@ -173,7 +173,7 @@ export default function AccountProfilePage() {
         <button
           type="submit"
           disabled={busy || !email}
-          className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           {busy ? t("account.saving", locale) : t("account.save", locale)}
         </button>

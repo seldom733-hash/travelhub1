@@ -18,17 +18,17 @@ type Row = {
 };
 
 const META: Record<string, { icon: string; tone: string; label: string }> = {
-  DEAL_CREATED: { icon: "🏷", tone: "border-sky-200 bg-sky-50 text-sky-800", label: "Новая сделка" },
+  DEAL_CREATED: { icon: "🏷", tone: "border-brand/20 bg-brand/10 text-ink", label: "Новая сделка" },
   WHATSAPP_MESSAGE_LINKED: { icon: "💬", tone: "border-emerald-200 bg-emerald-50 text-emerald-800", label: "Сообщение клиента" },
   WHATSAPP_MESSAGE_UNLINKED: { icon: "👤", tone: "border-amber-200 bg-amber-50 text-amber-800", label: "Неизвестный номер" },
   ORDER_PROBLEM: { icon: "⚠", tone: "border-amber-300 bg-amber-50 text-amber-900", label: "Проблема" },
-  ORDER_SUSPENDED: { icon: "⏸", tone: "border-slate-300 bg-slate-50 text-slate-700", label: "Приостановлена" },
-  ORDER_RESUMED: { icon: "▶", tone: "border-sky-200 bg-sky-50 text-sky-800", label: "Возобновлена" },
+  ORDER_SUSPENDED: { icon: "⏸", tone: "border-line bg-panel text-ink", label: "Приостановлена" },
+  ORDER_RESUMED: { icon: "▶", tone: "border-brand/20 bg-brand/10 text-ink", label: "Возобновлена" },
   ORDER_CANCELLATION_REQUESTED: { icon: "🛑", tone: "border-rose-200 bg-rose-50 text-rose-800", label: "Запрошена отмена" },
   ORDER_CANCELLATION_APPROVED: { icon: "✔", tone: "border-violet-200 bg-violet-50 text-violet-800", label: "Отмена согласована" },
   ORDER_CANCELLED: { icon: "✖", tone: "border-red-300 bg-red-50 text-red-800", label: "Отменена" },
   ORDER_FULFILLED: { icon: "✅", tone: "border-emerald-200 bg-emerald-50 text-emerald-800", label: "Выполнена" },
-  ORDER_CLOSED: { icon: "🔒", tone: "border-slate-300 bg-slate-100 text-slate-700", label: "Закрыта" },
+  ORDER_CLOSED: { icon: "🔒", tone: "border-line bg-panel text-ink", label: "Закрыта" },
   SUPPLIER_PAYMENT_DUE: { icon: "⏰", tone: "border-amber-300 bg-amber-50 text-amber-900", label: "Оплата поставщику" },
   SUPPLIER_PAYMENT_OVERDUE: { icon: "⛔", tone: "border-red-300 bg-red-50 text-red-800", label: "Просрочена оплата" },
 };

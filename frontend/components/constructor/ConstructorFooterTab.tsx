@@ -63,26 +63,26 @@ export default function ConstructorFooterTab({ slug, config, headerConfig, onSav
   return (
     <div className="space-y-6">
       {/* Brand name — inherited from Header (read-only) */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">{t("constructor.footer_brand_name", locale)}</h3>
-        <p className="mb-2 text-xs text-slate-500">{t("constructor.footer_brand_name_hint", locale) || "Brand name is inherited from the Header tab (single source of truth)."}</p>
-        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+      <div className="rounded-lg border border-line bg-white p-5">
+        <h3 className="mb-4 text-sm font-semibold text-ink">{t("constructor.footer_brand_name", locale)}</h3>
+        <p className="mb-2 text-xs text-ink/60">{t("constructor.footer_brand_name_hint", locale) || "Brand name is inherited from the Header tab (single source of truth)."}</p>
+        <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink">
           {inheritedBrandName}
         </div>
       </div>
 
       {/* Description */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">{t("constructor.footer_description", locale)}</h3>
+      <div className="rounded-lg border border-line bg-white p-5">
+        <h3 className="mb-4 text-sm font-semibold text-ink">{t("constructor.footer_description", locale)}</h3>
         <div className="grid gap-3 sm:grid-cols-3">
           {(["ru", "az", "en"] as const).map((loc) => (
             <div key={loc}>
-              <label className="mb-1 block text-xs font-medium text-slate-500 uppercase">{loc}</label>
+              <label className="mb-1 block text-xs font-medium text-ink/60 uppercase">{loc}</label>
               <textarea
                 value={cfg.description?.[loc] ?? ""}
                 onChange={(e) => setCfg((prev) => ({ ...prev, description: { ...prev.description, [loc]: e.target.value } }))}
                 rows={3}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-brand focus:ring-1 focus:ring-brand/20"
               />
             </div>
           ))}
@@ -90,44 +90,44 @@ export default function ConstructorFooterTab({ slug, config, headerConfig, onSav
       </div>
 
       {/* Contacts */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">{t("constructor.footer_phone", locale)} / {t("constructor.footer_email", locale)}</h3>
+      <div className="rounded-lg border border-line bg-white p-5">
+        <h3 className="mb-4 text-sm font-semibold text-ink">{t("constructor.footer_phone", locale)} / {t("constructor.footer_email", locale)}</h3>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">{t("constructor.footer_phone", locale)}</label>
-            <input type="tel" value={cfg.phone ?? ""} onChange={(e) => setCfg((p) => ({ ...p, phone: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+            <label className="mb-1 block text-xs font-medium text-ink/60">{t("constructor.footer_phone", locale)}</label>
+            <input type="tel" value={cfg.phone ?? ""} onChange={(e) => setCfg((p) => ({ ...p, phone: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">{t("constructor.footer_email", locale)}</label>
-            <input type="email" value={cfg.email ?? ""} onChange={(e) => setCfg((p) => ({ ...p, email: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+            <label className="mb-1 block text-xs font-medium text-ink/60">{t("constructor.footer_email", locale)}</label>
+            <input type="email" value={cfg.email ?? ""} onChange={(e) => setCfg((p) => ({ ...p, email: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand" />
           </div>
         </div>
-        <p className="mt-2 text-xs text-slate-500">{t("constructor.footer_contacts_hint", locale)}</p>
+        <p className="mt-2 text-xs text-ink/60">{t("constructor.footer_contacts_hint", locale)}</p>
       </div>
 
       {/* Copyright */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">{t("constructor.footer_copyright", locale)}</h3>
+      <div className="rounded-lg border border-line bg-white p-5">
+        <h3 className="mb-4 text-sm font-semibold text-ink">{t("constructor.footer_copyright", locale)}</h3>
         <div className="grid gap-3 sm:grid-cols-3">
           {(["ru", "az", "en"] as const).map((loc) => (
             <div key={loc}>
-              <label className="mb-1 block text-xs font-medium text-slate-500 uppercase">{loc}</label>
+              <label className="mb-1 block text-xs font-medium text-ink/60 uppercase">{loc}</label>
               <input
                 type="text"
                 value={cfg.copyright?.[loc] ?? ""}
                 onChange={(e) => setCfg((prev) => ({ ...prev, copyright: { ...prev.copyright, [loc]: e.target.value } }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-brand focus:ring-1 focus:ring-brand/20"
               />
             </div>
           ))}
         </div>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-ink/60">
           {t("constructor.footer_copyright_hint", locale)}
         </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={handleSave} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700">
+        <button onClick={handleSave} className="rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-dark">
           {t("constructor.footer_save", locale)}
         </button>
         <DefaultConfigActions

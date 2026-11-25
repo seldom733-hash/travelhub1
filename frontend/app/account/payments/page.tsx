@@ -37,8 +37,8 @@ export default function AccountPaymentsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">{t("account.payments_title", locale)}</h1>
-        <p className="mt-1 text-sm text-slate-500">{t("account.order_payment", locale)}</p>
+        <h1 className="text-2xl font-bold text-ink">{t("account.payments_title", locale)}</h1>
+        <p className="mt-1 text-sm text-ink/60">{t("account.order_payment", locale)}</p>
       </div>
       {loaded ? (
         <NotAvailableCard icon="💳" emptyText={t("account.payments_empty", locale)} hint={t("account.not_yet", locale)} />

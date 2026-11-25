@@ -7,12 +7,13 @@
  * Maldives, Qatar, Singapore, Thailand, Turkey) — all discovered live,
  * never hardcoded.
  */
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
 import { KazunionAdapter, kazunionCountryCandidates, type KazunionSearchQuery } from "./kazunion.adapter";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
 import { resolveGeoCountryId } from "../geo-country-resolver";
+import { ProductHistoryRecorder } from "../product-history-recorder.service";
 import type { SupplierOffer } from "../supplier.types";
 
 export interface KazunionSyncResult {
@@ -61,6 +62,7 @@ export class KazunionSyncService {
     private readonly kazunion: KazunionAdapter,
     private readonly pricing: SupplierPricingService,
     private readonly ids: IdsService,
+    @Optional() private readonly history?: ProductHistoryRecorder,
   ) {}
 
   /** Find (or create) the KazUnion supplier partner under the unified PRN-* code scheme. */
@@ -318,6 +320,7 @@ export class KazunionSyncService {
         if (existing) {
           await this.prisma.$transaction(async (tx: any) => {
             const currentAttrs = existing.attributes as any;
+            const changed: Record<string, unknown> = {};
             if (currentAttrs?.startingPrice !== minPrice) {
               await tx.product.update({
                 where: { id: existing.id },
@@ -325,6 +328,8 @@ export class KazunionSyncService {
                   attributes: { ...currentAttrs, startingPrice: minPrice, currency },
                 },
               });
+              changed.startingPrice = minPrice;
+              changed.currency = currency;
             }
             const tariff = await tx.tariff.findFirst({
               where: { productId: existing.id },
@@ -345,6 +350,10 @@ export class KazunionSyncService {
                 where: { id: existing.id },
                 data: geoPatch,
               });
+              changed.geoCountryId = geoPatch.geoCountryId;
+            }
+            if (this.history) {
+              await this.history.record(tx, existing.id, existing.version, changed);
             }
           });
           if (minPrice > 0 && (existing.attributes as any)?.startingPrice !== minPrice) {

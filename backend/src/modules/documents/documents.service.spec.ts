@@ -50,10 +50,11 @@ function createMockPrisma() {
     booking: {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
-      findMany: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     order: {
       findUnique: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     passenger: {
       findMany: jest.fn(),
@@ -192,6 +193,144 @@ describe("DocumentsService", () => {
       const result = await service.listBuyerDocuments("user-1");
 
       expect(result).toEqual({ items: [], total: 0 });
+    });
+  });
+
+  // ── Reference enrichment: same contract for admin registry and buyer cabinet ──
+
+  describe("document reference enrichment", () => {
+    const docRow = (over: Record<string, unknown> = {}) => ({
+      id: "doc-1",
+      code: "VCH-00000001",
+      type: "VOUCHER",
+      status: "ISSUED",
+      orderId: "ord-1",
+      bookingId: "bkg-1",
+      customerId: "cus-1",
+      serviceDate: null,
+      totalAmount: null,
+      paidAmount: null,
+      currency: "AZN",
+      paymentStatus: null,
+      version: 1,
+      createdAt: new Date("2026-01-01T00:00:00Z"),
+      ...over,
+    });
+
+    it("E1: admin registry resolves bookingCode/orderCode/dealSequence", async () => {
+      prisma.document.findMany.mockResolvedValue([docRow()]);
+      prisma.document.count.mockResolvedValue(1);
+      prisma.document.groupBy.mockResolvedValue([{ type: "VOUCHER", _count: { type: 1 } }]);
+      prisma.order.findMany.mockResolvedValue([
+        { id: "ord-1", code: "ORD-00000001", commerceSequence: "00000001" },
+      ]);
+      prisma.booking.findMany.mockResolvedValue([{ id: "bkg-1", code: "BKG-00000001" }]);
+
+      const result = await service.listAllDocuments(1, 20);
+
+      expect(result.items[0]).toMatchObject({
+        bookingCode: "BKG-00000001",
+        bookingId: "bkg-1",
+        orderCode: "ORD-00000001",
+        dealSequence: "00000001",
+      });
+      expect(prisma.order.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ["ord-1"] } },
+        select: { id: true, code: true, commerceSequence: true },
+      });
+    });
+
+    it("E2: buyer cabinet gets the same enrichment (regression: bookingCode was always null)", async () => {
+      prisma.user.findUniqueOrThrow.mockResolvedValue({ id: "user-1", customerId: "cus-1" });
+      prisma.document.findMany.mockResolvedValue([docRow()]);
+      prisma.document.count.mockResolvedValue(1);
+      prisma.order.findMany.mockResolvedValue([
+        { id: "ord-1", code: "ORD-00000001", commerceSequence: "00000001" },
+      ]);
+      prisma.booking.findMany.mockResolvedValue([{ id: "bkg-1", code: "BKG-00000001" }]);
+
+      const result = await service.listBuyerDocuments("user-1");
+
+      expect(result.items[0]).toMatchObject({
+        bookingCode: "BKG-00000001",
+        orderCode: "ORD-00000001",
+        dealSequence: "00000001",
+      });
+    });
+
+    it("E3: no fallback to referenceNumber when commerceSequence is missing", async () => {
+      prisma.document.findMany.mockResolvedValue([docRow()]);
+      prisma.document.count.mockResolvedValue(1);
+      prisma.document.groupBy.mockResolvedValue([]);
+      prisma.order.findMany.mockResolvedValue([{ id: "ord-1", code: "ORD-00000001", commerceSequence: null }]);
+
+      const result = await service.listAllDocuments(1, 20);
+
+      expect(result.items[0].dealSequence).toBeNull();
+    });
+
+    it("E4: documents without booking do not query bookings", async () => {
+      prisma.document.findMany.mockResolvedValue([docRow({ bookingId: null })]);
+      prisma.document.count.mockResolvedValue(1);
+      prisma.document.groupBy.mockResolvedValue([]);
+
+      const result = await service.listAllDocuments(1, 20);
+
+      expect(prisma.booking.findMany).not.toHaveBeenCalled();
+      expect(result.items[0].bookingCode).toBeNull();
+    });
+  });
+
+  // ── Server-side search and sort for the documents registry ──
+
+  describe("listAllDocuments — server-side search & sort", () => {
+    it("S1: q matches document code, order codes and booking codes", async () => {
+      prisma.document.findMany.mockResolvedValue([]);
+      prisma.document.count.mockResolvedValue(0);
+      prisma.document.groupBy.mockResolvedValue([]);
+      prisma.order.findMany.mockResolvedValue([{ id: "ord-1" }]);
+      prisma.booking.findMany.mockResolvedValue([{ id: "bkg-1" }]);
+
+      await service.listAllDocuments(1, 20, undefined, undefined, "  00020071  ");
+
+      expect(prisma.document.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: [
+              { code: { contains: "00020071", mode: "insensitive" } },
+              { orderId: { in: ["ord-1"] } },
+              { bookingId: { in: ["bkg-1"] } },
+            ],
+          },
+        }),
+      );
+      expect(prisma.document.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({ OR: expect.any(Array) }),
+      });
+    });
+
+    it("S2: whitelisted sort field and direction are applied", async () => {
+      prisma.document.findMany.mockResolvedValue([]);
+      prisma.document.count.mockResolvedValue(0);
+      prisma.document.groupBy.mockResolvedValue([]);
+
+      await service.listAllDocuments(1, 20, undefined, undefined, undefined, "totalAmount", "asc");
+
+      expect(prisma.document.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { totalAmount: "asc" } }),
+      );
+    });
+
+    it("S3: unknown sort field falls back to createdAt", async () => {
+      prisma.document.findMany.mockResolvedValue([]);
+      prisma.document.count.mockResolvedValue(0);
+      prisma.document.groupBy.mockResolvedValue([]);
+
+      await service.listAllDocuments(1, 20, undefined, undefined, undefined, "customer.email", "asc");
+
+      expect(prisma.document.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { createdAt: "asc" } }),
+      );
     });
   });
 

@@ -24,17 +24,17 @@ export default function EntityField({
 }) {
   return (
     <div className={`flex flex-col gap-0.5 ${className ?? ""}`}>
-      <span className="text-xs font-medium uppercase text-slate-400">{label}</span>
+      <span className="text-xs font-medium uppercase text-ink/60">{label}</span>
       {mono ? (
-        <span className="font-mono text-xs font-medium text-blue-600">
+        <span className="font-mono text-xs font-medium text-brand">
           {value ?? <EntityEmptyValue />}
         </span>
       ) : (
-        <span className="text-sm font-medium text-slate-700">
+        <span className="text-sm font-medium text-ink">
           {value ?? <EntityEmptyValue />}
         </span>
       )}
-      {meta && <span className="text-xs text-slate-400">{meta}</span>}
+      {meta && <span className="text-xs text-ink/60">{meta}</span>}
     </div>
   );
 }

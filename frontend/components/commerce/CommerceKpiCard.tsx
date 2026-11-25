@@ -41,15 +41,15 @@ export default function CommerceKpiCard({
     total ? "px-5 py-4" : "px-4 py-3"
   } ${
     active
-      ? "border-blue-300 bg-blue-50 ring-1 ring-blue-200"
-      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+      ? "border-brand/25 bg-brand/10 ring-1 ring-brand"
+      : "border-line bg-white hover:border-line hover:bg-panel"
   } ${onClick ? "cursor-pointer" : ""}`;
 
   const labelClassName = `font-medium leading-snug ${
-    total ? "text-sm text-slate-600" : "text-xs text-slate-500"
+    total ? "text-sm text-ink/60" : "text-xs text-ink/60"
   } ${helpId ? "pr-6" : ""}`;
 
-  const valueClassName = `mt-1 font-bold leading-tight text-slate-900 ${
+  const valueClassName = `mt-1 font-bold leading-tight text-ink ${
     total ? "text-[21px]" : "text-lg"
   }`;
 

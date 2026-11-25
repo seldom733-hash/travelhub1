@@ -99,6 +99,53 @@ export interface PublicTariff {
   validTo: string | null;
 }
 
+/** Сводка предложений физического отеля / сопоставимого тура. */
+export interface PublicOfferSummary {
+  minPrice: string | null;
+  minPriceCurrency: string;
+  minPartnerCode: string | null;
+  offersCount: number;
+  hasAlternatives: boolean;
+  hotelId?: string | null;
+}
+
+export interface PublicHotelOffer {
+  supplierCode: string;
+  externalKey: string;
+  productId: string;
+  productCode: string;
+  productName: string;
+  price: number | null;
+  currency: string;
+  sourceCurrency: string;
+  comparable: boolean;
+}
+
+export interface PublicHotelOffers {
+  hotelId: string;
+  minPrice: number | null;
+  minPartnerCode: string | null;
+  minPriceCurrency: string;
+  offers: PublicHotelOffer[];
+}
+
+export interface PublicComparableTours {
+  productId: string;
+  minPrice: number | null;
+  minPartnerCode: string | null;
+  count: number;
+  currency: string;
+  comparable: Array<{
+    id: string;
+    code: string;
+    title: string;
+    price: number | null;
+    currency: string;
+    partnerCode: string | null;
+    comparable: boolean;
+  }>;
+}
+
 export interface PublicProductDetail {
   product: {
     id: string;
@@ -116,6 +163,7 @@ export interface PublicProductDetail {
     availability: PublicAvailabilitySummary | null;
     seller: PublicSeller | null;
     partnerCode?: string | null;
+    bestOffer?: PublicOfferSummary | null;
     publishedAt: string;
     version: number;
     /**
@@ -174,6 +222,10 @@ export interface PublicListQuery {
   geoResort?: string;
   /** Исключить GDS-туры/отели из выдачи. */
   excludeGds?: boolean;
+  /** Filter by public supplier code (attributes.supplierCode, e.g. SUMMERTOUR). */
+  supplierCode?: string;
+  /** Filter by tour program (attributes.tourIncName, e.g. "Antalya 2027"). */
+  program?: string;
 }
 
 export class PublicApiError extends Error {
@@ -214,6 +266,8 @@ export function buildPublicQuery(q: PublicListQuery = {}): string {
   if (q.geoCity) sp.set("geoCity", q.geoCity);
   if (q.geoResort) sp.set("geoResort", q.geoResort);
   if (q.excludeGds) sp.set("excludeGds", "1");
+  if (q.supplierCode) sp.set("supplierCode", q.supplierCode);
+  if (q.program) sp.set("program", q.program);
   for (const [k, v] of Object.entries(q.f ?? {})) {
     if (v !== undefined && v !== "") sp.set(`f[${k}]`, v);
   }
@@ -246,6 +300,8 @@ export const publicApi = {
     return http<PublicListResult>(`/products${qs ? `?${qs}` : ""}`);
   },
   getProduct: (slugOrId: string): Promise<PublicProductDetail> => http<PublicProductDetail>(`/products/${encodeURIComponent(slugOrId)}`),
+  getHotelOffers: (hotelId: string): Promise<PublicHotelOffers> => http<PublicHotelOffers>(`/hotels/${encodeURIComponent(hotelId)}/offers`),
+  getComparableTours: (productId: string): Promise<PublicComparableTours> => http<PublicComparableTours>(`/tours/${encodeURIComponent(productId)}/comparable`),
   listCategories: (): Promise<PublicCategory[]> => http<PublicCategory[]>("/categories"),
   listDestinations: (excludeGds = false): Promise<PublicDestination[]> =>
     http<PublicDestination[]>(`/destinations${excludeGds ? "?excludeGds=1" : ""}`),

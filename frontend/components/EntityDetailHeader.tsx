@@ -42,9 +42,9 @@ export default function EntityDetailHeader({
   return (
     <>
       {/* Breadcrumb bar + back-to-list */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-white px-6 py-4">
         <div>
-          <div className="text-xs text-slate-400">
+          <div className="text-xs text-ink/60">
             {breadcrumbs.map((c, i) => (
               <span key={i}>
                 {i > 0 && <span className="mx-1">/</span>}
@@ -52,14 +52,14 @@ export default function EntityDetailHeader({
               </span>
             ))}
           </div>
-          <h1 className="mt-0.5 text-lg font-bold text-slate-900">{reference}</h1>
+          <h1 className="mt-0.5 text-lg font-bold text-ink">{reference}</h1>
         </div>
         <div className="flex items-center gap-2">
           {actions}
           {backHref && (
             <Link
               href={backHref}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel"
             >
               ← {t("crm.back_to_list", locale)}
             </Link>
@@ -68,11 +68,11 @@ export default function EntityDetailHeader({
       </div>
 
       {/* Secondary reference + status badges bar */}
-      <div className="border-b border-slate-200 bg-white px-6 py-4">
+      <div className="border-b border-line bg-white px-6 py-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             {secondary && (
-              <div className="font-mono text-xs text-blue-600">{secondary}</div>
+              <div className="font-mono text-xs text-brand">{secondary}</div>
             )}
             <div className="mt-1 flex flex-wrap items-center gap-2">
               {lifecycleStatus}

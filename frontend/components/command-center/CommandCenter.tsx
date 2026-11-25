@@ -264,16 +264,16 @@ export function CommandCenter() {
   if (summaryLoading && !summary) {
     return (
       <div className="p-6 lg:p-10">
-        <h1 className="text-2xl font-bold text-slate-900">{t("cc.title", locale)}</h1>
-        <p className="mt-1 text-sm text-slate-500">{t("cc.loading", locale)}</p>
+        <h1 className="text-2xl font-bold text-ink">{t("cc.title", locale)}</h1>
+        <p className="mt-1 text-sm text-ink/60">{t("cc.loading", locale)}</p>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-busy>
           {/* §SKELETON-PARITY: реальный виджет — карточка `KpiCard`
-              (`KpiCard.tsx:85`: `rounded-2xl border border-slate-200 bg-white p-4 shadow-sm`
+              (`KpiCard.tsx:85`: `rounded-2xl border border-line bg-white p-4 shadow-sm`
               + подпись `text-xs` + значение `text-2xl`), а не блок без рамки/фона. */}
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
-              <div className="mt-2 h-8 w-24 animate-pulse rounded bg-slate-100" />
+            <div key={i} className="rounded-2xl border border-line bg-white p-4 shadow-sm">
+              <div className="h-3 w-24 animate-pulse rounded bg-panel" />
+              <div className="mt-2 h-8 w-24 animate-pulse rounded bg-panel" />
             </div>
           ))}
         </div>
@@ -285,8 +285,8 @@ export function CommandCenter() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center p-6 text-center">
         <div className="text-4xl">🔑</div>
-        <h1 className="mt-4 text-xl font-bold text-slate-900">{t("cc.auth_required", locale)}</h1>
-        <p className="mt-2 text-sm text-slate-500">{t("cc.auth_hint", locale)}</p>
+        <h1 className="mt-4 text-xl font-bold text-ink">{t("cc.auth_required", locale)}</h1>
+        <p className="mt-2 text-sm text-ink/60">{t("cc.auth_hint", locale)}</p>
       </div>
     );
   }
@@ -295,8 +295,8 @@ export function CommandCenter() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center p-6 text-center">
         <div className="text-4xl">🔒</div>
-        <h1 className="mt-4 text-xl font-bold text-slate-900">{t("cc.access_denied", locale)}</h1>
-        <p className="mt-2 text-sm text-slate-500">{t("cc.access_denied_hint", locale)}</p>
+        <h1 className="mt-4 text-xl font-bold text-ink">{t("cc.access_denied", locale)}</h1>
+        <p className="mt-2 text-sm text-ink/60">{t("cc.access_denied_hint", locale)}</p>
       </div>
     );
   }
@@ -304,10 +304,10 @@ export function CommandCenter() {
   if (summary && !hasAnySection) {
     return (
       <div className="p-6 lg:p-10">
-        <h1 className="text-2xl font-bold text-slate-900">{t("cc.title", locale)}</h1>
-        <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-12 text-center">
+        <h1 className="text-2xl font-bold text-ink">{t("cc.title", locale)}</h1>
+        <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-panel p-12 text-center">
           <div className="text-3xl">📊</div>
-          <p className="mt-3 text-sm text-slate-500">{t("cc.no_sections", locale)}</p>
+          <p className="mt-3 text-sm text-ink/60">{t("cc.no_sections", locale)}</p>
         </div>
       </div>
     );
@@ -317,8 +317,8 @@ export function CommandCenter() {
     <div className="p-6 lg:p-10">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{t("cc.title", locale)}</h1>
-          <p className="mt-1 text-sm text-slate-500">{t("cc.subtitle.marketplace", locale)} · UTC</p>
+          <h1 className="text-2xl font-bold text-ink">{t("cc.title", locale)}</h1>
+          <p className="mt-1 text-sm text-ink/60">{t("cc.subtitle.marketplace", locale)} · UTC</p>
         </div>
         <div className="flex items-center gap-3">
           <PeriodSelector
@@ -332,7 +332,7 @@ export function CommandCenter() {
             <button
               onClick={customize.editing ? customize.cancelCustomize : customize.enterCustomize}
               className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                customize.editing ? "bg-red-50 text-red-600 hover:bg-red-100" : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                customize.editing ? "bg-red-50 text-red-600 hover:bg-red-100" : "bg-brand/10 text-brand hover:bg-brand/15"
               }`}
               aria-label={customize.editing ? t("cc.cancel", locale) : t("cc.customize", locale)}
             >

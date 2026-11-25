@@ -48,20 +48,20 @@ function CreateCaseContent() {
           </div>
         )}
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+        <div className="rounded-xl border border-line bg-white p-6 shadow-sm space-y-4">
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
               {t("support.form.title_label", effectiveLocale)} *
             </label>
             <input
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
               maxLength={200}
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
               {t("support.form.description_label", effectiveLocale)}
             </label>
             <textarea
@@ -69,18 +69,18 @@ function CreateCaseContent() {
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={4}
               maxLength={5000}
-              className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+              className="w-full resize-none rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
                 {t("support.form.type_label", effectiveLocale)}
               </label>
               <select
                 value={form.caseType}
                 onChange={(e) => setForm({ ...form, caseType: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
               >
                 {CASE_TYPES.map((ty) => (
                   <option key={ty} value={ty}>{t(`support.type.${ty}`, effectiveLocale)}</option>
@@ -88,13 +88,13 @@ function CreateCaseContent() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
                 {t("support.form.priority_label", effectiveLocale)}
               </label>
               <select
                 value={form.priority}
                 onChange={(e) => setForm({ ...form, priority: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
               >
                 {PRIORITIES.map((p) => (
                   <option key={p} value={p}>{t(`support.priority.${p}`, effectiveLocale)}</option>
@@ -103,27 +103,27 @@ function CreateCaseContent() {
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
               {t("support.form.source_label", effectiveLocale)}
             </label>
             <input
               value={form.source}
               onChange={(e) => setForm({ ...form, source: e.target.value })}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
               placeholder="email / phone / chat / web"
             />
           </div>
           <div className="flex gap-3 pt-2">
             <button
               onClick={() => router.push("/app/support")}
-              className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              className="rounded-lg border border-line bg-white px-4 py-2.5 text-sm font-medium text-ink/60 hover:bg-panel"
             >
               {t("support.form.cancel", effectiveLocale)}
             </button>
             <button
               onClick={() => void createCase()}
               disabled={creating || !form.title.trim()}
-              className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
             >
               {creating ? "…" : t("support.form.submit", effectiveLocale)}
             </button>

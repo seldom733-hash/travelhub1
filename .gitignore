@@ -34,7 +34,7 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Stray root artifacts (не проект — только корень, не backend/frontend src)
+# Stray root artifacts (╨╜╨╡ ╨┐╤Ç╨╛╨╡╨║╤é ΓÇö ╤é╨╛╨╗╤î╨║╨╛ ╨║╨╛╤Ç╨╡╨╜╤î, ╨╜╨╡ backend/frontend src)
 /src/
 /public/
 skills-lock.json
@@ -50,12 +50,12 @@ skills-lock.json
 backend/uploads/
 uploads/
 
-# DR backup artifacts (Step 2.17A) — never commit dumps/checksums/evidence
+# DR backup artifacts (Step 2.17A) ΓÇö never commit dumps/checksums/evidence
 backend/.backups/
 *.dump
 *.dump.sha256
 
-# Step 2.17B perf harness run artifacts (generated, bulk) — never commit by default
+# Step 2.17B perf harness run artifacts (generated, bulk) ΓÇö never commit by default
 backend/artifacts/performance/
 login.json
 
@@ -77,14 +77,14 @@ backend/probe-*.txt
 # Archived unused files (moved out of backend/frontend/root with paths preserved)
 /unneeded/
 
-# Hotel photos (707 MB, downloaded separately — referenced by lib/hotel-photo.ts)
+# Hotel photos (707 MB, downloaded separately ΓÇö referenced by lib/hotel-photo.ts)
 frontend/public/hotels/
 
-# Единый каталог фото отелей: сгенерированные реестр и журнал загрузок
-# (пересоздаются scripts/hotel-registry.ts и scripts/hotel-photo-catalog.ts)
+# ╨ò╨┤╨╕╨╜╤ï╨╣ ╨║╨░╤é╨░╨╗╨╛╨│ ╤ä╨╛╤é╨╛ ╨╛╤é╨╡╨╗╨╡╨╣: ╤ü╨│╨╡╨╜╨╡╤Ç╨╕╤Ç╨╛╨▓╨░╨╜╨╜╤ï╨╡ ╤Ç╨╡╨╡╤ü╤é╤Ç ╨╕ ╨╢╤â╤Ç╨╜╨░╨╗ ╨╖╨░╨│╤Ç╤â╨╖╨╛╨║
+# (╨┐╨╡╤Ç╨╡╤ü╨╛╨╖╨┤╨░╤Ä╤é╤ü╤Å scripts/hotel-registry.ts ╨╕ scripts/hotel-photo-catalog.ts)
 backend/data/
 
-# WhatsApp runtime artifacts: Baileys session (secrets — NEVER commit) + media
+# WhatsApp runtime artifacts: Baileys session (secrets ΓÇö NEVER commit) + media
 backend/.whatsapp-session/
 backend/.whatsapp-media/
 
@@ -103,3 +103,26 @@ docs/audit/catalog-review-state.json
 # Graphify local virtualenv / generated graph
 .venv-graphify/
 graphify-out/
+
+# Local runtime artifacts — never commit (secrets, browser profiles, heavy reports)
+.chrome-azal-cdp/
+.chrome-aviasales-cdp/
+backend/.env.*.bak
+backend/whatsapp-session/
+backend/.kompas-captcha-auto.jpg
+backend/kompas-buttons.json
+backend/kompas-search.html
+backend/summertour-results.html
+reports/
+video-prod/build/
+video-prod/__pycache__/
+diffstat.txt
+*.bak
+backend/kompas-selects.json
+frontend/public/*.png
+video-prod/check/
+video-prod/shots/
+video-prod/tools/
+video-prod/*.png
+video-prod/*.mp3
+video-prod/*.wav

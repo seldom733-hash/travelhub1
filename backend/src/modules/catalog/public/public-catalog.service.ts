@@ -21,7 +21,7 @@
  * никогда не подставляется 0. Availability (§12): только существующие строки
  * Availability (discovery-read, не Booking).
  */
-import { Inject, Injectable, Optional } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import { Prisma } from "../../../generated/prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { HotelMatchingService } from "../hotel/hotel-matching.service";
@@ -45,6 +45,7 @@ import {
   type PublicFilterOption,
   type PublicMedia,
   type PublicMediaDerivative,
+  type PublicOfferSummary,
   type PublicProductCard,
   type PublicProductDetail,
   type PublicProductListQuery,
@@ -103,6 +104,8 @@ type SupplierFxByPartner = Map<string, Map<string, Prisma.Decimal>>;
 interface HotelRegistryEntry {
   imageUrl: string | null;
   canonicalName: string | null;
+  /** Физический отель из реестра — нужен для сводки предложений. */
+  hotelId?: string | null;
 }
 
 /** Курс offer-цены в AZN (fail-open: нет курса → исходные цена/валюта). */
@@ -136,6 +139,8 @@ interface PublicProductRow {
 
 @Injectable()
 export class PublicCatalogService {
+  private readonly logger = new Logger(PublicCatalogService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     @Inject("ObjectStorageService") private readonly storage: ObjectStorageService,
@@ -347,9 +352,10 @@ export class PublicCatalogService {
     const fx = await this.supplierFxByPartner(rows.map((r) => r.partnerId));
 
     const hotelRegistry = await this.hotelRegistryMap(rows);
+    const bestOffers = await this.bestOffersForRows(rows);
     const items = await Promise.all(
       rows.map((r) =>
-        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null, r.partnerId ? (partnerCodes.get(r.partnerId) ?? null) : null, fx, hotelRegistry),
+        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null, r.partnerId ? (partnerCodes.get(r.partnerId) ?? null) : null, fx, hotelRegistry, bestOffers.get(r.id) ?? null),
       ),
     );
 
@@ -522,9 +528,10 @@ export class PublicCatalogService {
     const partnerCodes = await this.partnerCodesOf(typed.map((r) => r.partnerId));
     const fx = await this.supplierFxByPartner(typed.map((r) => r.partnerId));
     const hotelRegistry = await this.hotelRegistryMap(typed);
+    const bestOffers = await this.bestOffersForRows(typed);
     const items = await Promise.all(
       typed.map((r) =>
-        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null, r.partnerId ? (partnerCodes.get(r.partnerId) ?? null) : null, fx, hotelRegistry),
+        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null, r.partnerId ? (partnerCodes.get(r.partnerId) ?? null) : null, fx, hotelRegistry, bestOffers.get(r.id) ?? null),
       ),
     );
     return { items, total, page, pageSize };
@@ -997,6 +1004,45 @@ export class PublicCatalogService {
   }
 
   /** Маппинг детали (PDP) — общий для Marketplace и Storefront-контура. */
+  /**
+   * Best-effort сводка предложений для PDP. Не критична для отображения товара:
+   * при отсутствии реестра/матчинга или ошибке агрегации карточка остаётся
+   * рабочей, а блок предложений просто не показывается.
+   */
+  private async bestOfferSummary(
+    row: PublicProductRow,
+    hotel: HotelRegistryEntry | null,
+  ): Promise<PublicOfferSummary | null> {
+    try {
+      if (row.type === "HOTEL" && hotel?.hotelId && this.hotelMatching) {
+        const s = await this.getHotelOffers(hotel.hotelId);
+        if (s.offers.length === 0) return null;
+        return {
+          minPrice: s.minPrice == null ? null : String(s.minPrice),
+          minPriceCurrency: s.minPriceCurrency,
+          minPartnerCode: s.minPartnerCode,
+          offersCount: s.offers.length,
+          hasAlternatives: s.offers.length > 1,
+          hotelId: hotel.hotelId,
+        };
+      }
+      if (row.type === "TOUR" && this.tourMatching) {
+        const s = await this.getComparableTours(row.id);
+        return {
+          minPrice: s.minPrice == null ? null : String(s.minPrice),
+          minPriceCurrency: s.currency,
+          minPartnerCode: s.minPartnerCode,
+          offersCount: s.count,
+          hasAlternatives: s.count > 1,
+        };
+      }
+    } catch {
+      // Enrichment: предложение может быть недоступно (нет реестра/курса).
+      return null;
+    }
+    return null;
+  }
+
   private async toDetail(
     row: PublicProductRow,
     seller: PublicSeller | null,
@@ -1072,6 +1118,7 @@ export class PublicCatalogService {
         availability,
         seller,
         partnerCode,
+        bestOffer: await this.bestOfferSummary(row, hotel),
         publishedAt: row.publishedAt!.toISOString(),
         version: row.version,
         hotelImage: hotel?.imageUrl ?? null,
@@ -1121,6 +1168,7 @@ export class PublicCatalogService {
       select: {
         supplierCode: true,
         externalKey: true,
+        hotelId: true,
         hotel: { select: { name: true, photoFile: true, photoUpdatedAt: true } },
       },
     });
@@ -1128,6 +1176,7 @@ export class PublicCatalogService {
       map.set(`${ref.supplierCode}\u0000${ref.externalKey}`, {
         imageUrl: ref.hotel?.photoFile ? hotelPhotoUrl(ref.hotel.photoFile, ref.hotel.photoUpdatedAt) : null,
         canonicalName: ref.hotel?.name?.trim() || null,
+        hotelId: ref.hotelId,
       });
     }
     const missing = [...pairs.values()].filter((p) => !map.has(`${p.supplierCode}\u0000${p.externalKey}`));
@@ -1153,7 +1202,7 @@ export class PublicCatalogService {
     const [supplierCode, externalKey] = key.split("\u0000");
     const ref = await this.prisma.hotelSupplierRef.findUnique({
       where: { supplierCode_externalKey: { supplierCode, externalKey } },
-      select: { hotel: { select: { name: true, photoFile: true, photoUpdatedAt: true } } },
+      select: { hotelId: true, hotel: { select: { name: true, photoFile: true, photoUpdatedAt: true } } },
     });
     if (!ref?.hotel) {
       const photo = await this.prisma.hotelPhotoRef.findUnique({
@@ -1169,6 +1218,7 @@ export class PublicCatalogService {
     return {
       imageUrl: ref.hotel.photoFile ? hotelPhotoUrl(ref.hotel.photoFile, ref.hotel.photoUpdatedAt) : null,
       canonicalName: ref.hotel.name?.trim() || null,
+      hotelId: ref.hotelId,
     };
   }
 
@@ -1219,6 +1269,7 @@ export class PublicCatalogService {
     partnerCode: string | null,
     fx: SupplierFxByPartner,
     hotelRegistry?: Map<string, HotelRegistryEntry>,
+    bestOffer?: PublicOfferSummary | null,
   ): Promise<PublicProductCard> {
     const primary = row.media.find((m) => m.isPrimary) ?? row.media[0] ?? null;
     const primaryImage = primary
@@ -1288,6 +1339,7 @@ export class PublicCatalogService {
       partnerCode,
       availabilitySummary: availability,
       seller,
+      bestOffer: bestOffer ?? null,
       publishedAt: row.publishedAt!.toISOString(),
     };
   }
@@ -1354,6 +1406,102 @@ export class PublicCatalogService {
    * Один batch на страницу (партнёры + строки курсов), без N+1. Пусто/ошибка →
    * пустая карта (fail-open: цены показываются в исходной валюте).
    */
+  /**
+   * Батчевая сводка предложений для карточек списка: ОДИН SQL на всю страницу
+   * вместо N+1 вызовов getHotelOffers/getComparableTours. Отели-grouping по
+   * каноническому Hotel.id; туры дополнительно ограничены датой/ночами/взрослыми
+   * из карточки, чтобы не показывать цену другой поездки.
+   */
+  private async bestOffersForRows(
+    rows: PublicProductRow[],
+  ): Promise<Map<string, PublicOfferSummary>> {
+    const result = new Map<string, PublicOfferSummary>();
+    if (rows.length === 0) return result;
+
+    try {
+      const offers = await this.prisma.$queryRaw<Array<{
+        cardId: string;
+        partnerId: string | null;
+        price: Prisma.Decimal;
+        currency: string;
+      }>>(Prisma.sql`
+        WITH ids AS (SELECT unnest(${rows.map((r) => r.id)}::text[]) AS id),
+        cards AS (
+          SELECT ids.id AS "cardId", lower(p."type"::text) AS service,
+                 r."hotelId" AS "hotelId",
+                 p."attributes"->>'priceDate' AS "priceDate",
+                 p."attributes"->>'priceNights' AS "priceNights",
+                 p."attributes"->>'priceAdults' AS "priceAdults"
+          FROM ids
+          JOIN catalog."Product" p ON p."id" = ids.id
+          LEFT JOIN catalog."HotelSupplierRef" r
+            ON r."supplierCode" = p."attributes"->>'supplierCode'
+           AND r."externalKey"  = p."attributes"->>'hotelKey'
+          WHERE p."status" = 'PUBLISHED' AND p."type" IN ('TOUR','HOTEL')
+        )
+        SELECT c."cardId" AS "cardId", o."partnerId" AS "partnerId",
+               (o."attributes"->>'startingPrice')::numeric AS price,
+               coalesce(o."attributes"->>'currency','AZN') AS currency
+        FROM cards c
+        JOIN catalog."HotelSupplierRef" r2 ON r2."hotelId" = c."hotelId"
+        JOIN catalog."Product" o
+          ON o."status" = 'PUBLISHED' AND o."type" IN ('TOUR','HOTEL')
+         AND o."attributes"->>'supplierCode' = r2."supplierCode"
+         AND o."attributes"->>'hotelKey' = r2."externalKey"
+         AND o."attributes"->>'startingPrice' ~ '^[0-9]+(\\.[0-9]+)?$'
+         AND (o."attributes"->>'startingPrice')::numeric > 0
+         AND (c.service = 'hotel' OR (
+               coalesce(o."attributes"->>'priceDate','') = coalesce(c."priceDate",'')
+           AND coalesce(o."attributes"->>'priceNights','') = coalesce(c."priceNights",'')
+           AND coalesce(o."attributes"->>'priceAdults','') = coalesce(c."priceAdults",'')
+             ))
+      `);
+
+      if (offers.length === 0) return result;
+      const partnerIds = [...new Set(offers.map((o) => o.partnerId).filter((id): id is string => !!id))];
+      const [fx, partners] = await Promise.all([
+        this.supplierFxByPartner(partnerIds),
+        partnerIds.length
+          ? this.prisma.partner.findMany({ where: { id: { in: partnerIds } }, select: { id: true, code: true } })
+          : Promise.resolve([]),
+      ]);
+      const codeById = new Map(partners.map((p) => [p.id, p.code] as const));
+
+      const byCard = new Map<string, typeof offers>();
+      for (const offer of offers) {
+        const list = byCard.get(offer.cardId) ?? [];
+        list.push(offer);
+        byCard.set(offer.cardId, list);
+      }
+      for (const row of rows) {
+        const list = byCard.get(row.id) ?? [];
+        const priced = list.map((o) => ({
+          price: this.toComparablePrice(Number(o.price), o.currency, o.partnerId, fx),
+          partnerCode: o.partnerId ? (codeById.get(o.partnerId) ?? null) : null,
+        }));
+        const currencies = new Set(priced.map((p) => p.price.currency.toUpperCase()));
+        if (currencies.size !== 1) {
+          result.set(row.id, { minPrice: null, minPriceCurrency: "AZN", minPartnerCode: null, offersCount: list.length, hasAlternatives: list.length > 1 });
+          continue;
+        }
+        let best = priced[0];
+        for (const item of priced) if (item.price.amount < best.price.amount) best = item;
+        result.set(row.id, {
+          minPrice: best.price.amount.toFixed(2),
+          minPriceCurrency: best.price.currency,
+          minPartnerCode: best.partnerCode,
+          offersCount: list.length,
+          hasAlternatives: list.length > 1,
+        });
+      }
+    } catch (error) {
+      // Enrichment списка: при ошибке БД карточки остаются рабочими, но сбой
+      // не должен быть невидимым — логируем без PII и без supplier payload.
+      this.logger.warn(`bestOffer batch failed: ${(error as Error).message}`);
+    }
+    return result;
+  }
+
   private async supplierFxByPartner(partnerIds: Array<string | null>): Promise<SupplierFxByPartner> {
     const empty: SupplierFxByPartner = new Map();
     const distinct = [...new Set(partnerIds.filter((id): id is string => !!id))];
@@ -1597,17 +1745,19 @@ export class PublicCatalogService {
     // складывать AZN, USD и EUR. При смешанных валютах минимум не выдумываем.
     const currencies = new Set(priced.filter((o) => o.price != null).map((o) => o.currency.toUpperCase()));
     let minPrice: number | null = null;
-    let minPartnerCode: string | null = null;
+    let minPartnerId: string | null = null;
     let minPriceCurrency = currencies.size === 1 ? [...currencies][0] : "AZN";
     if (currencies.size === 1) {
       for (const offer of priced) {
         if (offer.price == null) continue;
         if (minPrice === null || offer.price < minPrice) {
           minPrice = offer.price;
-          minPartnerCode = offer.supplierCode;
+          minPartnerId = offers.find((o) => o.productId === offer.productId)?.partnerId ?? null;
         }
       }
     }
+    // Публичный код партнёра (PAR-*), не internal partnerId и не supplierCode.
+    const minPartnerCode = minPartnerId ? ((await this.partnerCodesOf([minPartnerId])).get(minPartnerId) ?? null) : null;
 
     priced.sort((a, b) => (a.price ?? Number.POSITIVE_INFINITY) - (b.price ?? Number.POSITIVE_INFINITY));
     return { hotelId, minPrice, minPartnerCode, minPriceCurrency, offers: priced };
@@ -1621,7 +1771,8 @@ export class PublicCatalogService {
   async getComparableTours(productId: string): Promise<{
     productId: string;
     minPrice: number | null;
-    minPartnerId: string | null;
+    /** Публичный CRM Partner.code лучшего предложения (не внутренний partnerId). */
+    minPartnerCode: string | null;
     count: number;
     currency: string;
     comparable: Array<{
@@ -1630,19 +1781,19 @@ export class PublicCatalogService {
       title: string;
       price: number | null;
       currency: string;
-      partnerId: string | null;
+      partnerCode: string | null;
       comparable: boolean;
     }>;
   }> {
-    const empty = { productId, minPrice: null, minPartnerId: null, count: 0, currency: "AZN", comparable: [] };
+    const empty = { productId, minPrice: null, minPartnerCode: null, count: 0, currency: "AZN", comparable: [] };
     if (!this.tourMatching) return empty;
     const base = await this.prisma.product.findFirst({
-      where: { id: productId, ...this.marketplaceWhere() },
+      where: { OR: [{ id: productId }, { code: productId }], ...this.marketplaceWhere() },
       select: { id: true, partnerId: true, attributes: true },
     });
     if (!base) throw new NotFoundError("Product not found");
 
-    const alternatives = await this.tourMatching.findComparableTours(productId, this.marketplaceWhere());
+    const alternatives = await this.tourMatching.findComparableTours(base.id, this.marketplaceWhere());
     const baseAttrs = (base.attributes ?? {}) as Record<string, unknown>;
     const basePrice = typeof baseAttrs.startingPrice === "number" ? baseAttrs.startingPrice : null;
     const baseCurrency = typeof baseAttrs.currency === "string" ? baseAttrs.currency : "AZN";
@@ -1661,15 +1812,16 @@ export class PublicCatalogService {
         title: item.title,
         price: display?.amount ?? null,
         currency: display?.currency ?? item.currency,
-        partnerId: item.partnerId,
+        partnerCode: null as string | null, // ниже заменяется публичным кодом, не internal partnerId
         comparable: display?.comparable ?? false,
       };
     });
 
+    const partnerIdById = new Map(alternatives.map((a) => [a.id, a.partnerId] as const));
     const withPrice: Array<{ price: number; currency: string; partnerId: string | null }> = [];
     if (baseDisplay) withPrice.push({ price: baseDisplay.amount, currency: baseDisplay.currency, partnerId: base.partnerId });
     for (const item of priced) {
-      if (item.price != null) withPrice.push({ price: item.price, currency: item.currency, partnerId: item.partnerId });
+      if (item.price != null) withPrice.push({ price: item.price, currency: item.currency, partnerId: partnerIdById.get(item.id) ?? null });
     }
     const currencies = new Set(withPrice.map((entry) => entry.currency.toUpperCase()));
     let minPrice: number | null = null;
@@ -1683,11 +1835,18 @@ export class PublicCatalogService {
       }
     }
 
+    // Наружу отдаём только публичный код партнёра; internal partnerId остаётся
+    // внутри сервиса (нужен лишь для курсов и выбора минимума).
+    const partnerCodes = await this.partnerCodesOf(withPrice.map((entry) => entry.partnerId));
+    for (const item of priced) {
+      const pid = partnerIdById.get(item.id);
+      item.partnerCode = pid ? (partnerCodes.get(pid) ?? null) : null;
+    }
     priced.sort((a, b) => (a.price ?? Number.POSITIVE_INFINITY) - (b.price ?? Number.POSITIVE_INFINITY));
     return {
       productId,
       minPrice,
-      minPartnerId,
+      minPartnerCode: minPartnerId ? (partnerCodes.get(minPartnerId) ?? null) : null,
       count: 1 + alternatives.length,
       currency: currencies.size === 1 ? [...currencies][0] : baseDisplay?.currency ?? baseCurrency,
       comparable: priced,

@@ -45,14 +45,14 @@ export default function MediaGallery({
   if (images.length === 0) {
     if (hotelPhoto) {
       return (
-        <div className="overflow-hidden rounded-xl bg-slate-100">
+        <div className="overflow-hidden rounded-xl bg-panel">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={hotelPhoto} alt="Hotel" loading="lazy" className="aspect-[16/9] w-full object-cover" />
         </div>
       );
     }
     return (
-      <div className="flex aspect-[16/9] w-full items-center justify-center rounded-xl bg-slate-100 text-5xl text-slate-300">
+      <div className="flex aspect-[16/9] w-full items-center justify-center rounded-xl bg-panel text-5xl text-ink/60">
         🏝
       </div>
     );
@@ -63,7 +63,7 @@ export default function MediaGallery({
   return (
     <div className="space-y-2">
       <div
-        className="relative overflow-hidden rounded-xl bg-slate-100"
+        className="relative overflow-hidden rounded-xl bg-panel"
         tabIndex={0}
         role="group"
         aria-roledescription="gallery"
@@ -87,7 +87,7 @@ export default function MediaGallery({
               type="button"
               onClick={() => go(-1)}
               aria-label={t("pdp.gallery_prev", locale)}
-              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-slate-900/50 p-2 text-white backdrop-blur transition hover:bg-slate-900/70 focus-visible:outline-2 focus-visible:outline-white"
+              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-ink/50 p-2 text-white backdrop-blur transition hover:bg-ink/70 focus-visible:outline-2 focus-visible:outline-white"
             >
               ←
             </button>
@@ -95,7 +95,7 @@ export default function MediaGallery({
               type="button"
               onClick={() => go(1)}
               aria-label={t("pdp.gallery_next", locale)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-slate-900/50 p-2 text-white backdrop-blur transition hover:bg-slate-900/70 focus-visible:outline-2 focus-visible:outline-white"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-ink/50 p-2 text-white backdrop-blur transition hover:bg-ink/70 focus-visible:outline-2 focus-visible:outline-white"
             >
               →
             </button>
@@ -112,8 +112,8 @@ export default function MediaGallery({
               onClick={() => setActive(i)}
               aria-label={`${i + 1} / ${images.length}`}
               aria-current={i === active}
-              className={`overflow-hidden rounded-lg border-2 transition focus-visible:outline-2 focus-visible:outline-blue-500 ${
-                i === active ? "border-blue-600" : "border-transparent hover:border-blue-300"
+              className={`overflow-hidden rounded-lg border-2 transition focus-visible:outline-2 focus-visible:outline-brand ${
+                i === active ? "border-brand" : "border-transparent hover:border-brand/25"
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}

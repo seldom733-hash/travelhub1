@@ -114,9 +114,9 @@ function StatusBadge({ status, slaBreached, locale = "ru" }: { status: string; s
     OPEN: slaBreached
       ? "bg-red-100 text-red-800 border-red-200"
       : "bg-amber-100 text-amber-800 border-amber-200",
-    ACKNOWLEDGED: "bg-blue-100 text-blue-800 border-blue-200",
+    ACKNOWLEDGED: "bg-brand/15 text-ink border-brand/20",
     RESOLVED: "bg-green-100 text-green-800 border-green-200",
-    DISMISSED: "bg-slate-100 text-slate-600 border-slate-200",
+    DISMISSED: "bg-panel text-ink/60 border-line",
   };
 
   return (
@@ -133,10 +133,10 @@ function StatusBadge({ status, slaBreached, locale = "ru" }: { status: string; s
 
 function CategoryBadge({ category, locale = "ru" }: { category: string; locale?: Locale }) {
   const colors: Record<string, string> = {
-    OPERATIONAL: "bg-slate-100 text-slate-700",
+    OPERATIONAL: "bg-panel text-ink",
     FINANCIAL: "bg-emerald-50 text-emerald-700",
     CATALOG: "bg-violet-50 text-violet-700",
-    CHANNEL: "bg-cyan-50 text-cyan-700",
+    CHANNEL: "bg-brand/10 text-brand-dark",
   };
 
   const labels: Record<string, Record<string, string>> = {
@@ -214,7 +214,7 @@ function QueueItem({
   );
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+    <div className="rounded-xl border border-line bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -222,10 +222,10 @@ function QueueItem({
             <StatusBadge status={signal.status} slaBreached={isSlaBreached} locale={locale} />
             <CategoryBadge category={signal.category} locale={locale} />
           </div>
-          <h3 className="text-sm font-semibold text-slate-900 truncate">
+          <h3 className="text-sm font-semibold text-ink truncate">
             {t(signal.titleKey, locale)}
           </h3>
-          <p className="mt-1 text-xs text-slate-600 line-clamp-2">
+          <p className="mt-1 text-xs text-ink/60 line-clamp-2">
             {interpolate(t(signal.descriptionKey, locale), signal.descriptionParams)}
           </p>
         </div>
@@ -237,8 +237,8 @@ function QueueItem({
         <div className="mt-3 space-y-1.5">
           {presentEvidence(signal.code, signal.evidence, locale).map((ev, i) => (
             <div key={i} className="flex items-start gap-2 text-xs">
-              <span className="shrink-0 text-slate-500 min-w-[120px]">{ev.label}</span>
-              <span className={ev.highlight ? "font-semibold text-slate-900" : "text-slate-700"}>
+              <span className="shrink-0 text-ink/60 min-w-[120px]">{ev.label}</span>
+              <span className={ev.highlight ? "font-semibold text-ink" : "text-ink"}>
                 {ev.value}
               </span>
             </div>
@@ -248,25 +248,25 @@ function QueueItem({
 
       {/* Stage D: WHY Attribution Block */}
       {signal.why && (
-        <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
-          <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+        <div className="mt-3 rounded-lg border border-line bg-panel p-3">
+          <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink/60">
             {t("cc.why.title", locale)}
           </div>
           <div className="space-y-1.5">
             {signal.why.status === "INSUFFICIENT_EVIDENCE" ? (
-              <p className="text-xs text-slate-500 italic">
+              <p className="text-xs text-ink/60 italic">
                 {t("cc.why.insufficient", locale)}
               </p>
             ) : (
               <>
                 {signal.why.primaryDriver && (
                   <div className="flex items-start gap-2">
-                    <span className="inline-flex shrink-0 items-center rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                    <span className="inline-flex shrink-0 items-center rounded bg-brand/15 px-1.5 py-0.5 text-[10px] font-medium text-brand-dark">
                       {signal.why.status === "PROVEN_CAUSE"
                         ? t("cc.why.proven_cause", locale)
                         : t("cc.why.observed_driver", locale)}
                     </span>
-                    <span className="text-xs text-slate-700">
+                    <span className="text-xs text-ink">
                       {t(signal.why.primaryDriver.textKey, locale)}: {signal.why.primaryDriver.factualValue}
                     </span>
                   </div>
@@ -276,7 +276,7 @@ function QueueItem({
                     <span className="inline-flex shrink-0 items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
                       {t("cc.why.contributing_factor", locale)}
                     </span>
-                    <span className="text-xs text-slate-600">
+                    <span className="text-xs text-ink/60">
                       {t(factor.textKey, locale)}: {factor.factualValue}
                     </span>
                   </div>
@@ -293,8 +293,8 @@ function QueueItem({
 
       {/* Stage F: ACTION Block */}
       {signal.actions && signal.actions.length > 0 && (
-        <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
-          <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+        <div className="mt-3 rounded-lg border border-line bg-panel p-3">
+          <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink/60">
             {t("cc.action.title", locale)}
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -315,8 +315,8 @@ function QueueItem({
                 }}
                 className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
                   action.eligible
-                    ? "bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
-                    : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+                    ? "bg-brand/10 text-brand-dark hover:bg-brand/15 border border-brand/20"
+                    : "bg-panel text-ink/60 cursor-not-allowed border border-line"
                 }`}
                 disabled={!action.eligible}
                 title={action.descriptionKey ? t(action.descriptionKey, locale) : undefined}
@@ -329,8 +329,8 @@ function QueueItem({
       )}
 
       {/* Footer */}
-      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-        <div className="text-xs text-slate-500">
+      <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
+        <div className="text-xs text-ink/60">
           <span>{t("cc.queue.detected", locale)}: {relativeTime(signal.firstDetectedAt, locale)}</span>
           {signal.lastDetectedAt !== signal.firstDetectedAt && (
             <span className="ml-2">
@@ -343,7 +343,7 @@ function QueueItem({
             <button
               onClick={() => handleAction("acknowledge")}
               disabled={loading !== null}
-              className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+              className="rounded bg-brand/10 px-2 py-1 text-xs font-medium text-brand-dark hover:bg-brand/15 disabled:opacity-50"
             >
               {loading === "acknowledge" ? "…" : t("cc.queue.acknowledge", locale)}
             </button>
@@ -361,7 +361,7 @@ function QueueItem({
             <button
               onClick={() => handleAction("dismiss")}
               disabled={loading !== null}
-              className="rounded bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+              className="rounded bg-panel px-2 py-1 text-xs font-medium text-ink/60 hover:bg-panel disabled:opacity-50"
             >
               {loading === "dismiss" ? "…" : t("cc.queue.dismiss", locale)}
             </button>
@@ -398,17 +398,17 @@ export function DecisionQueue({
       <div className="mb-4 flex items-center justify-between">
         <h2
           id="decision-queue-heading"
-          className="flex items-center gap-2 text-lg font-semibold text-slate-900"
+          className="flex items-center gap-2 text-lg font-semibold text-ink"
         >
           ⚠️ {t("cc.queue.title", locale)}
         </h2>
-        <div className="flex items-center gap-3 text-xs text-slate-500">
+        <div className="flex items-center gap-3 text-xs text-ink/60">
           <span className="flex items-center gap-1">
             <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
             {t("cc.queue.open", locale)}: {summary.open}
           </span>
           <span className="flex items-center gap-1">
-            <span className="inline-block h-2 w-2 rounded-full bg-blue-400" />
+            <span className="inline-block h-2 w-2 rounded-full bg-brand/30" />
             {t("cc.queue.acknowledged", locale)}: {summary.acknowledged}
           </span>
           {summary.slaBreached > 0 && (
@@ -421,13 +421,13 @@ export function DecisionQueue({
       </div>
 
       {/* Filter Tabs */}
-      <div className="mb-4 flex gap-1 rounded-lg bg-slate-100 p-1">
+      <div className="mb-4 flex gap-1 rounded-lg bg-panel p-1">
         <button
           onClick={() => setFilter("active")}
           className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
             filter === "active"
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-600 hover:text-slate-900"
+              ? "bg-white text-ink shadow-sm"
+              : "text-ink/60 hover:text-ink"
           }`}
         >
           {t("cc.queue.active", locale)} ({activeSignals.length})
@@ -436,8 +436,8 @@ export function DecisionQueue({
           onClick={() => setFilter("history")}
           className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
             filter === "history"
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-600 hover:text-slate-900"
+              ? "bg-white text-ink shadow-sm"
+              : "text-ink/60 hover:text-ink"
           }`}
         >
           {t("cc.queue.history", locale)} ({historySignals.length})
@@ -446,8 +446,8 @@ export function DecisionQueue({
 
       {/* Queue Items */}
       {displayedSignals.length === 0 ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
-          <div className="text-sm text-slate-500">
+        <div className="rounded-xl border border-line bg-white p-8 text-center">
+          <div className="text-sm text-ink/60">
             {t("cc.queue.empty", locale)}
           </div>
         </div>

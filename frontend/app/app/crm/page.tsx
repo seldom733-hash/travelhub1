@@ -80,12 +80,12 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
 
   // ── Platform CRM state ──
   const [customerData, setCustomerData] = useState<Page<Customer> | null>(null);
-  // selectedCustomer removed — use dedicated /app/crm/customers/:id page
+  // selectedCustomer removed — use dedicated /app/references/clients/:id page
   const [customerSearch, setCustomerSearch] = useState(initialCustomerSearch ?? "");
   const [customerPage, setCustomerPage] = useState(initialCustomerPage ?? 1);
   const [customerStatusFilter, setCustomerStatusFilter] = useState<string | undefined>(initialCustomerStatus || undefined);
   const [customerTypeFilter, setCustomerTypeFilter] = useState<string | undefined>(initialCustomerType || undefined);
-  // customerDetailTab removed — use dedicated /app/crm/customers/:id page
+  // customerDetailTab removed — use dedicated /app/references/clients/:id page
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ type: "PERSON", firstName: "", lastName: "", companyName: "", email: "", phone: "" });
@@ -98,11 +98,11 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
 
   // ── Platform Partner CRM state ──
   const [partnerListData, setPartnerListData] = useState<Page<Partner> | null>(null);
-  // selectedPartner removed — use dedicated /app/crm/partners/:id page
+  // selectedPartner removed — use dedicated /app/references/suppliers/:id page
   const [partnerSearch, setPartnerSearch] = useState(initialPartnerSearch ?? "");
   const [partnerPage, setPartnerPage] = useState(initialPartnerPage ?? 1);
   const [partnerStatusFilter, setPartnerStatusFilter] = useState<string | undefined>(initialPartnerStatus || undefined);
-  // partnerDetailTab removed — use dedicated /app/crm/partners/:id page
+  // partnerDetailTab removed — use dedicated /app/references/suppliers/:id page
   const [partnerCustomerDetailTab, setPartnerCustomerDetailTab] = useState<"overview" | "orders" | "bookings" | "payments" | "relations">("overview");
   const [partnerError, setPartnerError] = useState("");
   const [partnerLoadError, setPartnerLoadError] = useState(false);
@@ -244,7 +244,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
     }
   }, [crmContext, tab, loadCustomers, loadPartners, loadPartnerCustomers]);
 
-  // ── Entity navigation now uses dedicated /app/crm/customers/:id and /app/crm/partners/:id pages ──
+  // ── Entity navigation now uses dedicated /app/references/clients/:id and /app/references/suppliers/:id pages ──
 
   // ── Partner Customer actions ──
   const openPartnerCustomerDetail = async (id: string) => {
@@ -332,14 +332,14 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
             actions={
               <div className="flex items-center gap-2">
                 {/* Step 3.6A: Platform CRM Create Customer removed — Platform manages identity, not sales CRM */}
-                <button onClick={() => void loadCustomers()} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">⟳</button>
+                <button onClick={() => void loadCustomers()} className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel">⟳</button>
               </div>
             }
           />
 
           {/* Platform context badge */}
           <div className="px-6 pt-2 flex items-center gap-3">
-            <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+            <span className="inline-flex items-center rounded-full bg-brand/15 px-2.5 py-0.5 text-xs font-medium text-brand-dark">
               {t("crm.context.platform", locale)}
             </span>
             {dateFrom && dateTo && (
@@ -355,14 +355,14 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 border-b border-slate-200 bg-slate-50 px-6 pt-2">
-            <button onClick={() => setTab("customers")} className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${tab === "customers" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+          <div className="flex gap-1 border-b border-line bg-panel px-6 pt-2">
+            <button onClick={() => setTab("customers")} className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${tab === "customers" ? "bg-white text-brand shadow-sm" : "text-ink/60 hover:text-ink"}`}>
               {t("crm.tab.customers", locale)}
             </button>
-            <button onClick={() => { setTab("partners"); }} className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${tab === "partners" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+            <button onClick={() => { setTab("partners"); }} className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${tab === "partners" ? "bg-white text-brand shadow-sm" : "text-ink/60 hover:text-ink"}`}>
               {t("crm.tab.partners", locale)}
             </button>
-            <button onClick={() => { setTab("analytics"); }} className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${tab === "analytics" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+            <button onClick={() => { setTab("analytics"); }} className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${tab === "analytics" ? "bg-white text-brand shadow-sm" : "text-ink/60 hover:text-ink"}`}>
               {t("crm.analytics.tab", locale)}
             </button>
           </div>
@@ -392,28 +392,28 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                 onChange={(e) => tab === "customers" ? setCustomerSearch(e.target.value) : setPartnerSearch(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { tab === "customers" ? void loadCustomers() : void loadPartners(); } }}
                 placeholder={t("crm.search.placeholder", locale)}
-                className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="w-64 rounded-lg border border-line bg-white px-3 py-1.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand"
               />
               {dateFrom && dateTo && (
-                <button onClick={() => { setDateFrom(''); setDateTo(''); setCustomerPage(1); setPartnerPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50">
+                <button onClick={() => { setDateFrom(''); setDateTo(''); setCustomerPage(1); setPartnerPage(1); }} className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel">
                   ✕ {t('crm.filter.clear_dates', locale) || 'Период'}
                 </button>
               )}
               {tab === 'customers' && (
                 <>
-                  <select value={customerTypeFilter ?? ''} onChange={(e) => { setCustomerTypeFilter(e.target.value || undefined); setCustomerPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400">
+                  <select value={customerTypeFilter ?? ''} onChange={(e) => { setCustomerTypeFilter(e.target.value || undefined); setCustomerPage(1); }} className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-brand">
                     <option value="">{t('crm.filter.type.all', locale)}</option>
                     <option value="PERSON">{t('crm.type.person', locale)}</option>
                     <option value="COMPANY">{t('crm.type.company', locale)}</option>
                   </select>
-                  <select value={customerStatusFilter ?? ''} onChange={(e) => { setCustomerStatusFilter(e.target.value || undefined); setCustomerPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400">
+                  <select value={customerStatusFilter ?? ''} onChange={(e) => { setCustomerStatusFilter(e.target.value || undefined); setCustomerPage(1); }} className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-brand">
                     <option value="">{t('crm.filter.status.all', locale)}</option>
                     <option value="ACTIVE">{t('crm.status.active', locale)}</option>
                     <option value="INACTIVE">{t('crm.status.inactive', locale)}</option>
                     <option value="SUSPENDED">{t('crm.status.suspended', locale)}</option>
                   </select>
                   {(customerTypeFilter || customerStatusFilter) && (
-                    <button onClick={() => { setCustomerTypeFilter(undefined); setCustomerStatusFilter(undefined); setCustomerPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50">
+                    <button onClick={() => { setCustomerTypeFilter(undefined); setCustomerStatusFilter(undefined); setCustomerPage(1); }} className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel">
                       ✕ {t('crm.filter.clear', locale)}
                     </button>
                   )}
@@ -421,19 +421,19 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
               )}
               {tab === 'partners' && (
                 <>
-                  <select value={partnerStatusFilter ?? ''} onChange={(e) => { setPartnerStatusFilter(e.target.value || undefined); setPartnerPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400">
+                  <select value={partnerStatusFilter ?? ''} onChange={(e) => { setPartnerStatusFilter(e.target.value || undefined); setPartnerPage(1); }} className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-brand">
                     <option value="">{t('crm.filter.status.all', locale)}</option>
                     <option value="ACTIVE">{t('crm.status.active', locale)}</option>
                     <option value="INACTIVE">{t('crm.status.inactive', locale)}</option>
                     <option value="SUSPENDED">{t('crm.status.suspended', locale)}</option>
                   </select>
                   {partnerStatusFilter && (
-                    <button onClick={() => { setPartnerStatusFilter(undefined); setPartnerPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50">
+                    <button onClick={() => { setPartnerStatusFilter(undefined); setPartnerPage(1); }} className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel">
                       ✕ {t('crm.filter.clear', locale)}
                     </button>
                   )}
                   {canPartnerWrite && (
-                    <button onClick={() => setShowPartnerCreate((v) => !v)} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50">
+                    <button onClick={() => setShowPartnerCreate((v) => !v)} className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel">
                       {showPartnerCreate ? t('crm.cancel', locale) : t('crm.partner.add', locale)}
                     </button>
                   )}
@@ -443,18 +443,18 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                         value={partnerForm.name}
                         onChange={(e) => setPartnerForm((f) => ({ ...f, name: e.target.value }))}
                         placeholder={t('crm.partner.name_placeholder', locale)}
-                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-400"
+                        className="rounded-lg border border-line bg-white px-3 py-1.5 text-sm outline-none focus:border-brand"
                       />
                       <input
                         value={partnerForm.countryCode}
                         onChange={(e) => setPartnerForm((f) => ({ ...f, countryCode: e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2) }))}
                         placeholder={t('crm.partner.country_placeholder', locale)}
-                        className="w-20 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-400"
+                        className="w-20 rounded-lg border border-line bg-white px-3 py-1.5 text-sm outline-none focus:border-brand"
                       />
                       <button
                         onClick={() => void createPartner()}
                         disabled={creatingPartner}
-                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+                        className="rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white transition hover:bg-brand-dark disabled:opacity-50"
                       >
                         {creatingPartner ? t('crm.saving', locale) : t('crm.partner.add', locale)}
                       </button>
@@ -496,9 +496,9 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
 
             {/* Customer Table */}
             {tab === "customers" && (
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
                 <table className="w-full text-left text-sm">
-                  <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+                  <thead className="border-b border-line bg-panel text-xs uppercase tracking-wide text-ink/60">
                     <tr>
                       <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.code", locale)}</SortableHeader>
                       <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>{t("crm.col.name", locale)}</SortableHeader>
@@ -510,17 +510,17 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                   </thead>
                   <tbody>
                     {(customerData?.items ?? []).map((c) => (
-                      <tr key={c.id} className="border-b border-slate-50 transition-colors hover:bg-blue-50/50">
-                        <td className="px-4 py-2.5"><Link href={`/app/crm/customers/${c.id}`} className="font-mono text-xs text-blue-600 hover:underline">{c.code}</Link></td>
-                        <td className="px-4 py-2.5"><Link href={`/app/crm/customers/${c.id}`} className="font-medium text-slate-800 hover:underline">{displayName(c)}</Link></td>
-                        <td className="px-4 py-2.5 text-slate-500">{c.phone ?? "—"}</td>
-                        <td className="px-4 py-2.5 text-slate-500">{c.email}</td>
-                        <td className="px-4 py-2.5 text-slate-500">{c.type === "COMPANY" ? t("crm.type.company", locale) : t("crm.type.person", locale)}</td>
+                      <tr key={c.id} className="border-b border-line transition-colors hover:bg-brand/50">
+                        <td className="px-4 py-2.5"><Link href={`/app/references/clients/${c.id}`} className="font-mono text-xs text-brand hover:underline">{c.code}</Link></td>
+                        <td className="px-4 py-2.5"><Link href={`/app/references/clients/${c.id}`} className="font-medium text-ink hover:underline">{displayName(c)}</Link></td>
+                        <td className="px-4 py-2.5 text-ink/60">{c.phone ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-ink/60">{c.email}</td>
+                        <td className="px-4 py-2.5 text-ink/60">{c.type === "COMPANY" ? t("crm.type.company", locale) : t("crm.type.person", locale)}</td>
                         <td className="px-4 py-2.5"><StatusBadge status={c.status} /></td>
                       </tr>
                     ))}
                     {(customerData?.items ?? []).length === 0 && (
-                      <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">{t("crm.customers_empty", locale)}</td></tr>
+                      <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-ink/60">{t("crm.customers_empty", locale)}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -532,9 +532,9 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
 
             {/* Partner Table */}
             {tab === "partners" && (
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
                 <table className="w-full text-left text-sm">
-                  <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+                  <thead className="border-b border-line bg-panel text-xs uppercase tracking-wide text-ink/60">
                     <tr>
                       <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.code", locale)}</SortableHeader>
                       <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>{t("crm.col.name", locale)}</SortableHeader>
@@ -542,21 +542,21 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                       <SortableHeader field="country" currentSort={sortState} onSort={handleSort}>{t("crm.col.country", locale)}</SortableHeader>
                       <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("crm.col.status", locale)}</SortableHeader>
                       {canPartnerWrite && (
-                        <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.col.actions", locale)}</th>
+                        <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-ink/60">{t("crm.col.actions", locale)}</th>
                       )}
                     </tr>
                   </thead>
                   <tbody>
                     {(partnerListData?.items ?? []).map((p) => (
-                      <tr key={p.id} className="border-b border-slate-50 transition-colors hover:bg-blue-50/50">
-                        <td className="px-4 py-2.5"><Link href={`/app/crm/partners/${p.id}`} className="font-mono text-xs text-blue-600 hover:underline">{p.code}</Link></td>
-                        <td className="px-4 py-2.5"><Link href={`/app/crm/partners/${p.id}`} className="font-medium text-slate-800 hover:underline">{p.name}</Link></td>
-                        <td className="px-4 py-2.5 text-slate-500">{p.contactEmail ?? "—"}</td>
-                        <td className="px-4 py-2.5 text-slate-500">{p.countryCode ?? "—"}</td>
+                      <tr key={p.id} className="border-b border-line transition-colors hover:bg-brand/50">
+                        <td className="px-4 py-2.5"><Link href={`/app/references/suppliers/${p.id}`} className="font-mono text-xs text-brand hover:underline">{p.code}</Link></td>
+                        <td className="px-4 py-2.5"><Link href={`/app/references/suppliers/${p.id}`} className="font-medium text-ink hover:underline">{p.name}</Link></td>
+                        <td className="px-4 py-2.5 text-ink/60">{p.contactEmail ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-ink/60">{p.countryCode ?? "—"}</td>
                         <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
                         {canPartnerWrite && (
                           <td className="px-4 py-2.5">
-                            <button onClick={() => void togglePartnerStatus(p)} className="text-xs font-medium text-blue-600 hover:underline">
+                            <button onClick={() => void togglePartnerStatus(p)} className="text-xs font-medium text-brand hover:underline">
                               {p.status === "ACTIVE" ? t("crm.partner.deactivate", locale) : t("crm.partner.activate", locale)}
                             </button>
                           </td>
@@ -564,7 +564,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                       </tr>
                     ))}
                     {(partnerListData?.items ?? []).length === 0 && (
-                      <tr><td colSpan={canPartnerWrite ? 6 : 5} className="px-4 py-8 text-center text-sm text-slate-400">{t("crm.partners_empty", locale)}</td></tr>
+                      <tr><td colSpan={canPartnerWrite ? 6 : 5} className="px-4 py-8 text-center text-sm text-ink/60">{t("crm.partners_empty", locale)}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -585,55 +585,55 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
       {showCreate && (
         <PanelFrame title={t("crm.create_customer", locale)} subtitle="Platform CRM" onClose={() => { setShowCreate(false); setInitialNote(""); }}>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.type", locale)}</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("crm.create.form.type", locale)}</label>
             <select
               value={form.type}
               onChange={(e) => setForm({ ...form, type: e.target.value })}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
             >
               <option value="PERSON">{t("crm.type.person", locale)}</option>
               <option value="COMPANY">{t("crm.type.company", locale)}</option>
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.firstName", locale)}</label>
-            <input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("crm.create.form.firstName", locale)}</label>
+            <input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.lastName", locale)}</label>
-            <input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("crm.create.form.lastName", locale)}</label>
+            <input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.companyName", locale)}</label>
-            <input value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("crm.create.form.companyName", locale)}</label>
+            <input value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.email", locale)} *</label>
-            <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" placeholder="email@example.com" />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("crm.create.form.email", locale)} *</label>
+            <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand" placeholder="email@example.com" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.phone", locale)}</label>
-            <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("crm.create.form.phone", locale)}</label>
+            <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("notes.initial_note", locale)}</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("notes.initial_note", locale)}</label>
             <textarea
               value={initialNote}
               onChange={(e) => setInitialNote(e.target.value)}
               rows={3}
               maxLength={5000}
               aria-label={t("notes.initial_note", locale)}
-              className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+              className="w-full resize-none rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
               placeholder={t("notes.initial_note_helper", locale)}
             />
-            <div className="mt-1 text-right text-xs text-slate-400">
+            <div className="mt-1 text-right text-xs text-ink/60">
               {initialNote.length}/5000 {t("notes.initial_note_max", locale)}
             </div>
           </div>
           <button
             onClick={() => void createCustomer()}
             disabled={creating || !form.email.trim()}
-            className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
           >
             {creating ? t("crm.detail.creating", locale) : t("crm.create_customer", locale)}
           </button>
@@ -653,11 +653,11 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
           actions={
             <div className="flex items-center gap-2">
               {crmTier === "PRO" && canCreateOwn && (
-                <button onClick={() => setShowIntake((v) => !v)} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700">
+                <button onClick={() => setShowIntake((v) => !v)} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-dark">
                   ＋ {t("crm.add_customer", locale)}
                 </button>
               )}
-              <button onClick={() => void loadPartnerCustomers()} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">⟳</button>
+              <button onClick={() => void loadPartnerCustomers()} className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel">⟳</button>
             </div>
           }
         />
@@ -680,16 +680,16 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
               value={partnerSearch}
               onChange={(e) => setPartnerSearch(e.target.value)}
               placeholder={t("crm.search.placeholder", locale)}
-              className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              className="w-64 rounded-lg border border-line bg-white px-3 py-1.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand"
             />
           </div>
 
           {partnerError && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{partnerError}</div>}
 
           {/* Partner Customer Table */}
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+              <thead className="border-b border-line bg-panel text-xs uppercase tracking-wide text-ink/60">
                 <tr>
                   <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.code", locale)}</SortableHeader>
                   <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>{t("crm.col.name", locale)}</SortableHeader>
@@ -699,17 +699,17 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
               </thead>
               <tbody>
                 {(partnerData?.items ?? []).map((c) => (
-                  <tr key={c.id} onClick={() => void openPartnerCustomerDetail(c.id)} className={`cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50 ${selectedPartnerCustomer?.id === c.id ? "bg-blue-50/60" : ""}`}>
-                    <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{c.code}</td>
-                    <td className="px-4 py-2.5 font-medium text-slate-800">{displayName(c)}</td>
-                    <td className="px-4 py-2.5 text-slate-500">{c.email}</td>
-                    <td className="px-4 py-2.5 text-slate-500">{c.type === "COMPANY" ? t("crm.type.company", locale) : t("crm.type.person", locale)}</td>
-                    {crmTier === "PRO" && <td className="px-4 py-2.5 text-slate-500">{c._relation?.lifecycle ?? "—"}</td>}
+                  <tr key={c.id} onClick={() => void openPartnerCustomerDetail(c.id)} className={`cursor-pointer border-b border-line transition-colors hover:bg-brand/50 ${selectedPartnerCustomer?.id === c.id ? "bg-brand/60" : ""}`}>
+                    <td className="px-4 py-2.5 font-mono text-xs text-brand">{c.code}</td>
+                    <td className="px-4 py-2.5 font-medium text-ink">{displayName(c)}</td>
+                    <td className="px-4 py-2.5 text-ink/60">{c.email}</td>
+                    <td className="px-4 py-2.5 text-ink/60">{c.type === "COMPANY" ? t("crm.type.company", locale) : t("crm.type.person", locale)}</td>
+                    {crmTier === "PRO" && <td className="px-4 py-2.5 text-ink/60">{c._relation?.lifecycle ?? "—"}</td>}
                     <td className="px-4 py-2.5"><StatusBadge status={c.status} /></td>
                   </tr>
                 ))}
                 {(partnerData?.items ?? []).length === 0 && (
-                  <tr><td colSpan={crmTier === "PRO" ? 6 : 5} className="px-4 py-8 text-center text-sm text-slate-400">{t("crm.customers_empty", locale)}</td></tr>
+                  <tr><td colSpan={crmTier === "PRO" ? 6 : 5} className="px-4 py-8 text-center text-sm text-ink/60">{t("crm.customers_empty", locale)}</td></tr>
                 )}
               </tbody>
             </table>
@@ -724,24 +724,24 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
       {showIntake && crmTier === "PRO" && (
         <PanelFrame title={t("crm.add_customer", locale)} subtitle={t("crm.title_pro", locale)} onClose={() => setShowIntake(false)}>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.firstName", locale)}</label>
-            <input value={intakeForm.firstName} onChange={(e) => setIntakeForm({ ...intakeForm, firstName: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("crm.create.form.firstName", locale)}</label>
+            <input value={intakeForm.firstName} onChange={(e) => setIntakeForm({ ...intakeForm, firstName: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.lastName", locale)}</label>
-            <input value={intakeForm.lastName} onChange={(e) => setIntakeForm({ ...intakeForm, lastName: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("crm.create.form.lastName", locale)}</label>
+            <input value={intakeForm.lastName} onChange={(e) => setIntakeForm({ ...intakeForm, lastName: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.email", locale)}</label>
-            <input value={intakeForm.email} onChange={(e) => setIntakeForm({ ...intakeForm, email: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("crm.create.form.email", locale)}</label>
+            <input value={intakeForm.email} onChange={(e) => setIntakeForm({ ...intakeForm, email: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.phone", locale)}</label>
-            <input value={intakeForm.phone} onChange={(e) => setIntakeForm({ ...intakeForm, phone: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("crm.create.form.phone", locale)}</label>
+            <input value={intakeForm.phone} onChange={(e) => setIntakeForm({ ...intakeForm, phone: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.intake.lead_source", locale)}</label>
-            <select value={intakeForm.leadSource} onChange={(e) => setIntakeForm({ ...intakeForm, leadSource: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("crm.intake.lead_source", locale)}</label>
+            <select value={intakeForm.leadSource} onChange={(e) => setIntakeForm({ ...intakeForm, leadSource: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand">
               <option value="DIRECT">{t("crm.lead_source.direct", locale)}</option>
               <option value="STOREFRONT">{t("crm.lead_source.storefront", locale)}</option>
               <option value="PHONE">{t("crm.lead_source.phone", locale)}</option>
@@ -753,25 +753,25 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.intake.notes", locale)}</label>
-            <textarea value={intakeForm.notes} onChange={(e) => setIntakeForm({ ...intakeForm, notes: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" rows={3} />
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("crm.intake.notes", locale)}</label>
+            <textarea value={intakeForm.notes} onChange={(e) => setIntakeForm({ ...intakeForm, notes: e.target.value })} className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand" rows={3} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("notes.initial_note", locale)}</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{t("notes.initial_note", locale)}</label>
             <textarea
               value={intakeForm.initialNote}
               onChange={(e) => setIntakeForm({ ...intakeForm, initialNote: e.target.value })}
               rows={3}
               maxLength={5000}
               aria-label={t("notes.initial_note", locale)}
-              className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+              className="w-full resize-none rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
               placeholder={t("notes.initial_note_helper", locale)}
             />
-            <div className="mt-1 text-right text-xs text-slate-400">
+            <div className="mt-1 text-right text-xs text-ink/60">
               {intakeForm.initialNote.length}/5000
             </div>
           </div>
-          <button onClick={() => void createIntake()} disabled={intaking || !intakeForm.email.trim()} className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+          <button onClick={() => void createIntake()} disabled={intaking || !intakeForm.email.trim()} className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50">
             {intaking ? t("crm.detail.creating", locale) : t("crm.intake.submit", locale)}
           </button>
         </PanelFrame>
@@ -779,19 +779,19 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
 
       {/* Partner Customer Detail Panel */}
       {selectedPartnerCustomer && (
-        <aside className="thin-scroll fade-in-up w-96 shrink-0 overflow-y-auto border-l border-slate-200 bg-white">
-          <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+        <aside className="thin-scroll fade-in-up w-96 shrink-0 overflow-y-auto border-l border-line bg-white">
+          <div className="flex items-start justify-between border-b border-line px-5 py-4">
             <div>
-              <div className="font-mono text-xs text-blue-600">{selectedPartnerCustomer.code}</div>
-              <div className="text-lg font-bold text-slate-900">{displayName(selectedPartnerCustomer)}</div>
+              <div className="font-mono text-xs text-brand">{selectedPartnerCustomer.code}</div>
+              <div className="text-lg font-bold text-ink">{displayName(selectedPartnerCustomer)}</div>
               <StatusBadge status={selectedPartnerCustomer.status} />
             </div>
-            <button onClick={() => setSelectedPartnerCustomer(null)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100">✕</button>
+            <button onClick={() => setSelectedPartnerCustomer(null)} className="rounded-md p-1 text-ink/60 hover:bg-panel">✕</button>
           </div>
 
-          <div className="flex gap-1 border-b border-slate-100 px-4 pt-2">
+          <div className="flex gap-1 border-b border-line px-4 pt-2">
             {(["overview", "orders", "bookings", "payments", "relations"] as const).map((dt) => (
-              <button key={dt} onClick={() => setPartnerCustomerDetailTab(dt)} className={`rounded-t-lg px-3 py-1.5 text-xs font-medium transition-colors ${partnerCustomerDetailTab === dt ? "bg-blue-50 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}>
+              <button key={dt} onClick={() => setPartnerCustomerDetailTab(dt)} className={`rounded-t-lg px-3 py-1.5 text-xs font-medium transition-colors ${partnerCustomerDetailTab === dt ? "bg-brand/10 text-brand" : "text-ink/60 hover:text-ink/60"}`}>
                 {t(`crm.detail.${dt}`, locale)}
               </button>
             ))}
@@ -801,25 +801,25 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
             {partnerCustomerDetailTab === "overview" && (
               <>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.col.email", locale)}</div><div className="break-all font-medium text-slate-700">{selectedPartnerCustomer.email}</div></div>
-                  <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.create.form.phone", locale)}</div><div className="font-medium text-slate-700">{selectedPartnerCustomer.phone ?? "—"}</div></div>
+                  <div className="rounded-lg bg-panel px-3 py-2"><div className="text-ink/60">{t("crm.col.email", locale)}</div><div className="break-all font-medium text-ink">{selectedPartnerCustomer.email}</div></div>
+                  <div className="rounded-lg bg-panel px-3 py-2"><div className="text-ink/60">{t("crm.create.form.phone", locale)}</div><div className="font-medium text-ink">{selectedPartnerCustomer.phone ?? "—"}</div></div>
                 </div>
                 {crmTier === "PRO" && selectedPartnerCustomer._relation && (
                   <div className="space-y-2 text-xs">
                     <div className="rounded-lg bg-emerald-50 px-3 py-2"><div className="text-emerald-400">{t("crm.col.lifecycle", locale)}</div><div className="font-medium text-emerald-700">{selectedPartnerCustomer._relation.lifecycle ?? "—"}</div></div>
                     {selectedPartnerCustomer._relation.leadSource && (
-                      <div className="rounded-lg bg-blue-50 px-3 py-2"><div className="text-blue-400">{t("crm.col.lead_source", locale)}</div><div className="font-medium text-blue-700">{selectedPartnerCustomer._relation.leadSource}</div></div>
+                      <div className="rounded-lg bg-brand/10 px-3 py-2"><div className="text-brand/70">{t("crm.col.lead_source", locale)}</div><div className="font-medium text-brand-dark">{selectedPartnerCustomer._relation.leadSource}</div></div>
                     )}
                     {selectedPartnerCustomer._relation.tags.length > 0 && (
                       <div className="rounded-lg bg-violet-50 px-3 py-2"><div className="text-violet-400">{t("crm.col.tags", locale)}</div><div className="flex flex-wrap gap-1 mt-1">{selectedPartnerCustomer._relation.tags.map((tag) => <span key={tag} className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] text-violet-700">{tag}</span>)}</div></div>
                     )}
                     {selectedPartnerCustomer._relation.notes && (
-                      <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.col.notes", locale)}</div><div className="font-medium text-slate-700 whitespace-pre-wrap">{selectedPartnerCustomer._relation.notes}</div></div>
+                      <div className="rounded-lg bg-panel px-3 py-2"><div className="text-ink/60">{t("crm.col.notes", locale)}</div><div className="font-medium text-ink whitespace-pre-wrap">{selectedPartnerCustomer._relation.notes}</div></div>
                     )}
                   </div>
                 )}
                 <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="rounded-lg bg-blue-50 px-3 py-2 text-center"><div className="font-bold text-blue-700">{selectedPartnerCustomer.summary.totalOrders}</div><div className="text-blue-500">{t("crm.detail.total_orders", locale)}</div></div>
+                  <div className="rounded-lg bg-brand/10 px-3 py-2 text-center"><div className="font-bold text-brand-dark">{selectedPartnerCustomer.summary.totalOrders}</div><div className="text-brand">{t("crm.detail.total_orders", locale)}</div></div>
                   <div className="rounded-lg bg-green-50 px-3 py-2 text-center"><div className="font-bold text-green-700">{selectedPartnerCustomer.summary.totalBookings}</div><div className="text-green-500">{t("crm.detail.total_bookings", locale)}</div></div>
                   <div className="rounded-lg bg-purple-50 px-3 py-2 text-center"><div className="font-bold text-purple-700">{selectedPartnerCustomer.summary.totalPayments}</div><div className="text-purple-500">{t("crm.detail.total_payments", locale)}</div></div>
                 </div>
@@ -827,34 +827,34 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
             )}              {partnerCustomerDetailTab === "orders" && selectedPartnerCustomer.orders.length > 0 && (
               <div className="space-y-2">
                 {selectedPartnerCustomer.orders.map((o) => (
-                  <div key={o.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                    <div className="flex items-center justify-between"><span className="font-mono text-blue-600">{o.code}</span><StatusBadge status={o.status} /></div>
-                    <div className="mt-1 text-slate-500">{o.number} · {formatPrice(o.amount, o.currency, locale) ?? "—"}</div>
+                  <div key={o.id} className="rounded-lg border border-line px-3 py-2 text-xs">
+                    <div className="flex items-center justify-between"><span className="font-mono text-brand">{o.code}</span><StatusBadge status={o.status} /></div>
+                    <div className="mt-1 text-ink/60">{o.number} · {formatPrice(o.amount, o.currency, locale) ?? "—"}</div>
                   </div>
                 ))}
               </div>
             )}              {partnerCustomerDetailTab === "bookings" && selectedPartnerCustomer.bookings.length > 0 && (
               <div className="space-y-2">
                 {selectedPartnerCustomer.bookings.map((b) => (
-                  <div key={b.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                    <div className="flex items-center justify-between"><span className="font-mono text-blue-600">{b.code}</span><StatusBadge status={b.status} /></div>
-                    <div className="mt-1 text-slate-500">{formatPrice(b.amount, b.currency, locale) ?? "—"}</div>
+                  <div key={b.id} className="rounded-lg border border-line px-3 py-2 text-xs">
+                    <div className="flex items-center justify-between"><span className="font-mono text-brand">{b.code}</span><StatusBadge status={b.status} /></div>
+                    <div className="mt-1 text-ink/60">{formatPrice(b.amount, b.currency, locale) ?? "—"}</div>
                   </div>
                 ))}
               </div>
             )}              {partnerCustomerDetailTab === "payments" && selectedPartnerCustomer.payments.length > 0 && (
               <div className="space-y-2">
                 {selectedPartnerCustomer.payments.map((p) => (
-                  <div key={p.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                    <div className="flex items-center justify-between"><span className="font-mono text-blue-600">{p.code}</span><StatusBadge status={p.status} /></div>
-                    <div className="mt-1 text-slate-500">{formatPrice(p.amount, p.currency, locale) ?? "—"}</div>
+                  <div key={p.id} className="rounded-lg border border-line px-3 py-2 text-xs">
+                    <div className="flex items-center justify-between"><span className="font-mono text-brand">{p.code}</span><StatusBadge status={p.status} /></div>
+                    <div className="mt-1 text-ink/60">{formatPrice(p.amount, p.currency, locale) ?? "—"}</div>
                   </div>
                 ))}
               </div>
             )}              {partnerCustomerDetailTab === "relations" && crmTier === "PRO" && selectedPartnerCustomer._relation && (
-              <div className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                <div className="font-medium text-slate-700">{t("crm.detail.your_relation", locale)}</div>
-                <div className="mt-1 text-slate-500">{selectedPartnerCustomer._relation.lifecycle ?? "—"}</div>
+              <div className="rounded-lg border border-line px-3 py-2 text-xs">
+                <div className="font-medium text-ink">{t("crm.detail.your_relation", locale)}</div>
+                <div className="mt-1 text-ink/60">{selectedPartnerCustomer._relation.lifecycle ?? "—"}</div>
               </div>
             )}
           </div>

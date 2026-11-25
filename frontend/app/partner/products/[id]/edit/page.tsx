@@ -147,19 +147,19 @@ export default function EditProductPage() {
     return <div className="py-16 text-center text-sm text-rose-600">{pt("partner.error.not_found", locale)}</div>;
   }
   if (!product || !values) {
-    return <div className="py-16 text-center text-sm text-slate-400">{pt("partner.state.loading", locale)}</div>;
+    return <div className="py-16 text-center text-sm text-ink/60">{pt("partner.state.loading", locale)}</div>;
   }
 
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-5">
-        <Link href={`/partner/products/${product.id}`} className="text-sm text-slate-500 hover:text-emerald-700">
+        <Link href={`/partner/products/${product.id}`} className="text-sm text-ink/60 hover:text-emerald-700">
           {pt("partner.product.back", locale)}
         </Link>
-        <h1 className="mt-1 text-2xl font-bold text-slate-900">{pt("partner.product.edit", locale)}</h1>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+        <h1 className="mt-1 text-2xl font-bold text-ink">{pt("partner.product.edit", locale)}</h1>
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink/60">
           <span className="font-mono">{product.code}</span>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{pt(`partner.status.${product.status}`, locale)}</span>
+          <span className="rounded-full bg-panel px-2 py-0.5 text-ink/60">{pt(`partner.status.${product.status}`, locale)}</span>
           {product.draft && (
             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">
               {pt("partner.product.proposal_n", locale)} (v{product.draft.version})
@@ -172,7 +172,7 @@ export default function EditProductPage() {
       {savedMsg && <div className="mb-4 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{savedMsg}</div>}
 
       {lifecycle === "locked" && (
-        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        <div className="mb-4 rounded-xl border border-brand/20 bg-brand/10 px-4 py-3 text-sm text-ink">
           {pt("partner.form.locked_submitted", locale)}
         </div>
       )}

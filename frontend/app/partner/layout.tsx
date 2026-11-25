@@ -95,13 +95,13 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
   }, [mounted, pathname, user, router]);
 
   if (!mounted || !user || user.role !== "PARTNER") {
-    return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">…</div>;
+    return <div className="flex min-h-screen items-center justify-center bg-ink text-ink/60">…</div>;
   }
 
   // Pending applicant: children рендерятся ТОЛЬКО для onboarding-путей.
   const pending = !user.partnerId;
   if (pending && !isOnboardingPath(pathname)) {
-    return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">…</div>;
+    return <div className="flex min-h-screen items-center justify-center bg-ink text-ink/60">…</div>;
   }
 
   const NAV = pending
@@ -115,14 +115,14 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-panel">
       {/* ── Header ── */}
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-line bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
           {/* Workspace title — static label, NOT a link */}
           <div className="flex shrink-0 items-center gap-2" role="presentation">
             <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-600 text-base font-bold text-white">T</div>
-            <span className="text-base font-bold text-slate-900">
+            <span className="text-base font-bold text-ink">
               {brandName}
               <span className="ml-2 hidden rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 sm:inline">
                 {pt("partner.nav.cabinet", locale)}
@@ -138,7 +138,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
                   key={item.href}
                   href={item.href}
                   className={`rounded-lg px-3 py-1.5 transition-colors ${
-                    active ? "bg-emerald-50 font-medium text-emerald-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    active ? "bg-emerald-50 font-medium text-emerald-700" : "text-ink/60 hover:bg-panel hover:text-ink"
                   }`}
                 >
                   <span aria-hidden className="mr-1.5">
@@ -153,17 +153,17 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
           <div className="ml-auto flex items-center gap-2">
             <Link
               href="/"
-              className="hidden rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 transition-colors hover:border-emerald-300 hover:text-emerald-700 sm:block"
+              className="hidden rounded-lg border border-line px-3 py-1.5 text-xs text-ink/60 transition-colors hover:border-emerald-300 hover:text-emerald-700 sm:block"
             >
               {pt("partner.nav.to_marketplace", locale)}
             </Link>
             <LocaleSelector />
-            <div className="flex items-center gap-2 border-l border-slate-200 pl-2">
-              <span className="hidden max-w-32 truncate text-xs text-slate-500 md:block">{user.fullName ?? user.username}</span>
+            <div className="flex items-center gap-2 border-l border-line pl-2">
+              <span className="hidden max-w-32 truncate text-xs text-ink/60 md:block">{user.fullName ?? user.username}</span>
               <span className="rounded-full bg-emerald-600/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">PARTNER</span>
               <button
                 onClick={logout}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 transition-colors hover:bg-slate-100"
+                className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink/60 transition-colors hover:bg-panel"
               >
                 {pt("partner.nav.logout", locale)}
               </button>
@@ -175,7 +175,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
       {/* ── Content ── */}
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
 
-      <footer className="border-t border-slate-200 bg-white py-5 text-center text-xs text-slate-400">
+      <footer className="border-t border-line bg-white py-5 text-center text-xs text-ink/60">
         {brandName} — {pt("partner.nav.cabinet", locale)}
       </footer>
     </div>

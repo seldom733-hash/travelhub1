@@ -62,8 +62,8 @@ export default function TableExportButton({
 
   const btnBase =
     size === "sm"
-      ? "rounded border border-slate-200 bg-white px-2 py-1 text-[10px] font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-      : "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50";
+      ? "rounded border border-line bg-white px-2 py-1 text-[10px] font-medium text-ink/60 hover:bg-panel disabled:opacity-50"
+      : "rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel disabled:opacity-50";
 
   return (
     <span className="inline-flex items-center gap-1 relative group">

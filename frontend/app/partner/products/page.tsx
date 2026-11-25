@@ -21,7 +21,7 @@ export default async function PartnerProductsPage({
     page: Math.max(1, Number(sp.page) || 1),
   };
   return (
-    <Suspense fallback={<div className="py-16 text-center text-sm text-slate-400">…</div>}>
+    <Suspense fallback={<div className="py-16 text-center text-sm text-ink/60">…</div>}>
       <PartnerProductsList initial={initial} />
     </Suspense>
   );

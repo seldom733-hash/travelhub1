@@ -51,14 +51,14 @@ export default function ProductDetailPage() {
   useEffect(() => { void loadProduct(); }, [loadProduct]);
 
   if (loading) {
-    return <div className="flex h-full items-center justify-center"><div className="text-sm text-slate-400">{t("crm.loading", locale)}</div></div>;
+    return <div className="flex h-full items-center justify-center"><div className="text-sm text-ink/60">{t("crm.loading", locale)}</div></div>;
   }
 
   if (error || !product) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <div className="text-sm text-red-500">{error || t("crm.not_found", locale)}</div>
-        <Link href="/app/catalog" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">{t("crm.back_to_list", locale)}</Link>
+        <Link href="/app/catalog" className="rounded-lg border border-line bg-white px-4 py-2 text-sm text-ink/60 hover:bg-panel">{t("crm.back_to_list", locale)}</Link>
       </div>
     );
   }
@@ -68,17 +68,17 @@ export default function ProductDetailPage() {
       <PageHeader
         title={product.title}
         breadcrumbs={["TravelHub", t("catalog.title", locale), product.code]}
-        actions={<Link href="/app/catalog" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">← {t("crm.back_to_list", locale)}</Link>}
+        actions={<Link href="/app/catalog" className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel">← {t("crm.back_to_list", locale)}</Link>}
       />
 
-      <div className="border-b border-slate-200 bg-white px-6 py-4">
+      <div className="border-b border-line bg-white px-6 py-4">
         <div className="flex items-center gap-4">
           <div>
-            <div className="font-mono text-xs text-blue-600">{product.code}</div>
-            <div className="text-lg font-bold text-slate-900">{product.title}</div>
+            <div className="font-mono text-xs text-brand">{product.code}</div>
+            <div className="text-lg font-bold text-ink">{product.title}</div>
             <div className="mt-1 flex items-center gap-2">
               <StatusBadge status={product.status} />
-              <span className="text-xs text-slate-400">{product.type}</span>
+              <span className="text-xs text-ink/60">{product.type}</span>
             </div>
           </div>
         </div>
@@ -87,28 +87,28 @@ export default function ProductDetailPage() {
       <div className="flex-1 overflow-y-auto p-6">
         <div className="space-y-4 text-sm">
           <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("catalog.col.type", locale)}</div><div className="font-medium text-slate-700">{product.type}</div></div>
-            <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("catalog.col.slug", locale)}</div><div className="font-medium text-slate-700">/{product.slug}</div></div>
+            <div className="rounded-lg bg-panel px-4 py-3"><div className="text-ink/60">{t("catalog.col.type", locale)}</div><div className="font-medium text-ink">{product.type}</div></div>
+            <div className="rounded-lg bg-panel px-4 py-3"><div className="text-ink/60">{t("catalog.col.slug", locale)}</div><div className="font-medium text-ink">/{product.slug}</div></div>
           </div>
 
           {product.partnerId && (
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs">
-              <div className="text-slate-400">{t("catalog.col.partner", locale)}</div>
-              <Link href={`/app/crm/partners/${product.partnerId}`} className="font-medium text-blue-600 hover:underline">{product.partnerDisplayName ?? product.partnerId}</Link>
+            <div className="rounded-lg bg-panel px-4 py-3 text-xs">
+              <div className="text-ink/60">{t("catalog.col.partner", locale)}</div>
+              <Link href={`/app/references/suppliers/${product.partnerId}`} className="font-medium text-brand hover:underline">{product.partnerDisplayName ?? product.partnerId}</Link>
             </div>
           )}
 
           {product.description && (
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs">
-              <div className="text-slate-400">{t("catalog.col.description", locale)}</div>
-              <div className="mt-1 font-medium text-slate-700 whitespace-pre-wrap">{product.description}</div>
+            <div className="rounded-lg bg-panel px-4 py-3 text-xs">
+              <div className="text-ink/60">{t("catalog.col.description", locale)}</div>
+              <div className="mt-1 font-medium text-ink whitespace-pre-wrap">{product.description}</div>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.col.created", locale)}</div><div className="font-medium text-slate-700">{new Date(product.createdAt).toLocaleDateString()}</div></div>
+            <div className="rounded-lg bg-panel px-4 py-3"><div className="text-ink/60">{t("crm.col.created", locale)}</div><div className="font-medium text-ink">{new Date(product.createdAt).toLocaleDateString()}</div></div>
             {product.publishedAt && (
-              <div className="rounded-lg bg-green-50 px-4 py-3"><div className="text-slate-400">{t("catalog.col.published", locale)}</div><div className="font-medium text-green-700">{new Date(product.publishedAt).toLocaleDateString()}</div></div>
+              <div className="rounded-lg bg-green-50 px-4 py-3"><div className="text-ink/60">{t("catalog.col.published", locale)}</div><div className="font-medium text-green-700">{new Date(product.publishedAt).toLocaleDateString()}</div></div>
             )}
           </div>
 

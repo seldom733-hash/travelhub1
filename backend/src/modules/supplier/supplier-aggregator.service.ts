@@ -854,6 +854,31 @@ export class SupplierAggregatorService {
         perSupplierQueries[code] = { ...q, hotelExternalId: match.externalId };
       }
     }
+
+    // Fallback: единый реестр отелей. SupplierGeoLink покрывает не все отели
+    // (например, VOYAGER/HURAWALHI 23280 есть в HotelSupplierRef, но нет в
+    // geo-инжесте). Без native id поиск по имени отбрасывает ВСЕ предложения
+    // поставщика, хотя у него они есть — подставляем ключ из реестра.
+    const unresolved = Object.keys(perSupplierQueries).filter(
+      (code) => !perSupplierQueries[code].hotelExternalId,
+    );
+    if (unresolved.length === 0) return;
+    const refs = await this.prisma.hotelSupplierRef.findMany({
+      where: {
+        supplierCode: { in: unresolved },
+        ...(iso ? { hotel: { countryCode: iso } } : {}),
+      },
+      select: { supplierCode: true, externalKey: true, hotel: { select: { name: true } } },
+    });
+    for (const [code, q] of Object.entries(perSupplierQueries)) {
+      if (q.hotelExternalId) continue;
+      const ref = refs.find(
+        (r) => r.supplierCode === code && this.normHotel(r.hotel?.name ?? "") === wanted,
+      );
+      if (ref) {
+        perSupplierQueries[code] = { ...q, hotelExternalId: ref.externalKey };
+      }
+    }
   }
 
   /**

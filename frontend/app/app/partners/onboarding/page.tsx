@@ -96,13 +96,13 @@ export default function PartnerOnboardingReviewPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">{t("partner.review_title", locale)}</h1>
-          <p className="text-xs text-slate-500">
+          <h1 className="text-xl font-bold text-ink">{t("partner.review_title", locale)}</h1>
+          <p className="text-xs text-ink/60">
             {t("partner.review_subtitle", locale)} · {total}
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs">
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs">
             <option value="">{t("partner.review_queue", locale)}</option>
             <option value="SUBMITTED">SUBMITTED</option>
             <option value="IN_REVIEW">IN REVIEW</option>
@@ -110,7 +110,7 @@ export default function PartnerOnboardingReviewPage() {
             <option value="REJECTED">REJECTED</option>
             <option value="CHANGES_REQUESTED">CHANGES REQUESTED</option>
           </select>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("partner.review_search", locale)} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("partner.review_search", locale)} className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand" />
         </div>
       </div>
 
@@ -118,29 +118,29 @@ export default function PartnerOnboardingReviewPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* ── Queue ── */}
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <section className="rounded-2xl border border-line bg-white shadow-sm">
+          <div className="border-b border-line px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink/60">
             {t("partner.review_queue", locale)}
           </div>
           {loading ? (
-            <div className="px-4 py-8 text-center text-sm text-slate-400">{t("state.loading", locale)}</div>
+            <div className="px-4 py-8 text-center text-sm text-ink/60">{t("state.loading", locale)}</div>
           ) : items.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-slate-400">{t("partner.review_empty", locale)}</div>
+            <div className="px-4 py-8 text-center text-sm text-ink/60">{t("partner.review_empty", locale)}</div>
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-line">
               {items.map((item) => (
                 <li key={item.id}>
                   <button
                     onClick={() => void open(item.id)}
-                    className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 ${selected?.id === item.id ? "bg-blue-50/60" : ""}`}
+                    className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-panel ${selected?.id === item.id ? "bg-brand/60" : ""}`}
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-slate-800">{item.brandName}</div>
-                      <div className="truncate text-xs text-slate-400">
+                      <div className="truncate text-sm font-medium text-ink">{item.brandName}</div>
+                      <div className="truncate text-xs text-ink/60">
                         {item.code} · {item.user?.email ?? item.user?.username} · {item.country}
                       </div>
                     </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.status === "IN_REVIEW" ? "bg-amber-50 text-amber-700" : "bg-blue-50 text-blue-700"}`}>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.status === "IN_REVIEW" ? "bg-amber-50 text-amber-700" : "bg-brand/10 text-brand-dark"}`}>
                       {STATUS_LABELS[item.status] ?? item.status}
                     </span>
                   </button>
@@ -156,32 +156,32 @@ export default function PartnerOnboardingReviewPage() {
         </section>
 
         {/* ── Detail ── */}
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <section className="rounded-2xl border border-line bg-white shadow-sm">
+          <div className="border-b border-line px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink/60">
             {t("partner.review_detail", locale)}
           </div>
           {!selected ? (
-            <div className="px-4 py-8 text-center text-sm text-slate-400">{t("partner.review_select_hint", locale)}</div>
+            <div className="px-4 py-8 text-center text-sm text-ink/60">{t("partner.review_select_hint", locale)}</div>
           ) : (
             <div className="space-y-4 px-4 py-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${selected.status === "IN_REVIEW" ? "bg-amber-50 text-amber-700" : selected.status === "SUBMITTED" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"}`}>
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${selected.status === "IN_REVIEW" ? "bg-amber-50 text-amber-700" : selected.status === "SUBMITTED" ? "bg-brand/10 text-brand-dark" : "bg-panel text-ink/60"}`}>
                   {STATUS_LABELS[selected.status] ?? selected.status}
                 </span>
-                <span className="text-xs text-slate-400">{selected.code}</span>
-                <span className="text-xs text-slate-400">· {selected.user?.username}</span>
+                <span className="text-xs text-ink/60">{selected.code}</span>
+                <span className="text-xs text-ink/60">· {selected.user?.username}</span>
               </div>
 
               <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-                <div className="flex justify-between gap-2"><dt className="text-slate-500">{t("partner.brand_name", locale)}</dt><dd className="font-medium">{selected.brandName}</dd></div>
-                <div className="flex justify-between gap-2"><dt className="text-slate-500">{t("partner.applicant_type", locale)}</dt><dd className="font-medium">{selected.applicantType}</dd></div>
-                <div className="flex justify-between gap-2"><dt className="text-slate-500">{t("partner.country", locale)}</dt><dd className="font-medium">{selected.country}</dd></div>
-                <div className="flex justify-between gap-2"><dt className="text-slate-500">{t("partner.contact_email", locale)}</dt><dd className="font-medium truncate">{selected.contactEmail}</dd></div>
-                {selected.legalName && <div className="flex justify-between gap-2"><dt className="text-slate-500">{t("partner.legal_name", locale)}</dt><dd className="font-medium">{selected.legalName}</dd></div>}
-                {selected.registrationNumber && <div className="flex justify-between gap-2"><dt className="text-slate-500">{t("partner.registration_number", locale)}</dt><dd className="font-medium">{selected.registrationNumber}</dd></div>}
-                {selected.taxId && <div className="flex justify-between gap-2"><dt className="text-slate-500">{t("partner.tax_id", locale)}</dt><dd className="font-medium">{selected.taxId}</dd></div>}
-                {selected.website && <div className="col-span-2 flex justify-between gap-2"><dt className="text-slate-500">{t("partner.website", locale)}</dt><dd className="font-medium truncate">{selected.website}</dd></div>}
-                {selected.businessDescription && <div className="col-span-2"><dt className="text-slate-500 text-xs">{t("partner.business_description", locale)}</dt><dd className="text-slate-700">{selected.businessDescription}</dd></div>}
+                <div className="flex justify-between gap-2"><dt className="text-ink/60">{t("partner.brand_name", locale)}</dt><dd className="font-medium">{selected.brandName}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-ink/60">{t("partner.applicant_type", locale)}</dt><dd className="font-medium">{selected.applicantType}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-ink/60">{t("partner.country", locale)}</dt><dd className="font-medium">{selected.country}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-ink/60">{t("partner.contact_email", locale)}</dt><dd className="font-medium truncate">{selected.contactEmail}</dd></div>
+                {selected.legalName && <div className="flex justify-between gap-2"><dt className="text-ink/60">{t("partner.legal_name", locale)}</dt><dd className="font-medium">{selected.legalName}</dd></div>}
+                {selected.registrationNumber && <div className="flex justify-between gap-2"><dt className="text-ink/60">{t("partner.registration_number", locale)}</dt><dd className="font-medium">{selected.registrationNumber}</dd></div>}
+                {selected.taxId && <div className="flex justify-between gap-2"><dt className="text-ink/60">{t("partner.tax_id", locale)}</dt><dd className="font-medium">{selected.taxId}</dd></div>}
+                {selected.website && <div className="col-span-2 flex justify-between gap-2"><dt className="text-ink/60">{t("partner.website", locale)}</dt><dd className="font-medium truncate">{selected.website}</dd></div>}
+                {selected.businessDescription && <div className="col-span-2"><dt className="text-ink/60 text-xs">{t("partner.business_description", locale)}</dt><dd className="text-ink">{selected.businessDescription}</dd></div>}
               </dl>
 
               {selected.decisionReason && (
@@ -192,9 +192,9 @@ export default function PartnerOnboardingReviewPage() {
 
               {/* Actions */}
               {(canStart || canDecide) && (
-                <div className="space-y-3 border-t border-slate-100 pt-3">
+                <div className="space-y-3 border-t border-line pt-3">
                   {canStart && (
-                    <button onClick={() => void runAction("IN_REVIEW")} disabled={busy} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                    <button onClick={() => void runAction("IN_REVIEW")} disabled={busy} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark disabled:opacity-50">
                       {t("partner.review_start", locale)}
                     </button>
                   )}
@@ -214,7 +214,7 @@ export default function PartnerOnboardingReviewPage() {
                   {action && (
                     <div className="space-y-2">
                       {action !== "approve" && (
-                        <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder={t("partner.reason_placeholder", locale)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+                        <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder={t("partner.reason_placeholder", locale)} className="w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm outline-none focus:border-brand" />
                       )}
                       <div className="flex gap-2">
                         <button
@@ -224,7 +224,7 @@ export default function PartnerOnboardingReviewPage() {
                         >
                           {busy ? t("state.loading", locale) : t("partner.review_confirm", locale)}
                         </button>
-                        <button onClick={() => { setAction(null); setReason(""); }} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100">
+                        <button onClick={() => { setAction(null); setReason(""); }} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink/60 hover:bg-panel">
                           {t("partner.cancel", locale)}
                         </button>
                       </div>
@@ -234,12 +234,12 @@ export default function PartnerOnboardingReviewPage() {
               )}
 
               {selected.history.length > 0 && (
-                <div className="border-t border-slate-100 pt-3">
-                  <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">{t("partner.history_title", locale)}</div>
+                <div className="border-t border-line pt-3">
+                  <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink/60">{t("partner.history_title", locale)}</div>
                   <ol className="space-y-1">
                     {selected.history.slice(0, 8).map((h) => (
-                      <li key={h.id} className="text-xs text-slate-500">
-                        <span className="font-medium text-slate-600">{h.action.replaceAll("_", " ")}</span>
+                      <li key={h.id} className="text-xs text-ink/60">
+                        <span className="font-medium text-ink/60">{h.action.replaceAll("_", " ")}</span>
                         {h.actorName ? ` · ${h.actorName}` : ""}
                         {h.comment ? ` — ${h.comment}` : ""}
                       </li>

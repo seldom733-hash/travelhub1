@@ -85,29 +85,29 @@ export default function RefundsPage() {
       {notice && <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
 
       {canWrite && (
-        <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mb-4 rounded-xl border border-line bg-white p-4">
           <h3 className="mb-3 text-sm font-semibold">Создать возврат</h3>
           <div className="grid gap-2 sm:grid-cols-4">
-            <select value={paymentId} onChange={(e) => setPaymentId(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">
+            <select value={paymentId} onChange={(e) => setPaymentId(e.target.value)} className="rounded-lg border border-line px-3 py-2 text-sm">
               <option value="">Выберите оплаченный платёж</option>
               {payments.map((p) => <option key={p.id} value={p.id}>{p.referenceNumber ?? p.code} · {p.amount} {p.currency} · {p.orderCode ?? ""}</option>)}
             </select>
-            <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Сумма" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-            <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Причина" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-            <button type="button" disabled={busy || !paymentId || !amount.trim() || !reason.trim()} onClick={() => void create()} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Создать</button>
+            <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Сумма" className="rounded-lg border border-line px-3 py-2 text-sm" />
+            <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Причина" className="rounded-lg border border-line px-3 py-2 text-sm" />
+            <button type="button" disabled={busy || !paymentId || !amount.trim() || !reason.trim()} onClick={() => void create()} className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Создать</button>
           </div>
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-line bg-white">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="bg-panel text-xs uppercase text-ink/60">
             <tr><th className="px-3 py-2">Код</th><th className="px-3 py-2">Платёж</th><th className="px-3 py-2">Номер сделки</th><th className="px-3 py-2 text-right">Сумма</th><th className="px-3 py-2">Статус</th><th className="px-3 py-2">Действия</th></tr>
           </thead>
           <tbody>
-            {refunds.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-500">Возвратов нет</td></tr>}
+            {refunds.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-ink/60">Возвратов нет</td></tr>}
             {refunds.map((r) => (
-              <tr key={r.code} className="border-t border-slate-100">
+              <tr key={r.code} className="border-t border-line">
                 <td className="px-3 py-2 font-mono text-xs">{r.referenceNumber ?? r.code}</td>
                 <td className="px-3 py-2 font-mono text-xs">{r.paymentCode ?? "—"}</td><td className="px-3 py-2 font-mono text-xs">{r.dealNumber ? `Сделка № ${r.dealNumber}` : (r.orderCode ?? "—")}</td>
                 <td className="px-3 py-2 text-right font-mono">{formatPrice(r.amount, r.currency, locale) ?? r.amount}</td>

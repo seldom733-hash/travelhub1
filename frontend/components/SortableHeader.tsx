@@ -70,12 +70,12 @@ export default function SortableHeader({
         <button
           type="button"
           onClick={handleClick}
-          className={`inline-flex items-center gap-1 text-left text-xs font-medium uppercase tracking-wide text-slate-400 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ${alignRight ? 'flex-row-reverse text-right' : ''}`}
+          className={`inline-flex items-center gap-1 text-left text-xs font-medium uppercase tracking-wide text-ink/60 transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${alignRight ? 'flex-row-reverse text-right' : ''}`}
           aria-sort={isActive ? (direction === "asc" ? "ascending" : "descending") : "none"}
           title={isActive ? `Sorted ${direction === "asc" ? "ascending" : "descending"}` : "Click to sort"}
         >
           {children}
-          <span className="text-slate-400" aria-hidden="true">
+          <span className="text-ink/60" aria-hidden="true">
             {isActive ? (direction === "asc" ? "↑" : "↓") : ""}
           </span>
         </button>

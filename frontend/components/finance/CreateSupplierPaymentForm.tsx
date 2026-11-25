@@ -171,43 +171,43 @@ export default function CreateSupplierPaymentForm({
         className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 className="mb-4 text-lg font-bold text-slate-900">Создать платёж поставщику</h2>
+        <h2 className="mb-4 text-lg font-bold text-ink">Создать платёж поставщику</h2>
 
         {success ? (
           <div className="space-y-4">
             <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
               Платёж поставщику создан.
             </div>
-            <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+            <button type="button" onClick={onClose} className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-medium text-ink/60 hover:bg-panel">
               Закрыть
             </button>
           </div>
         ) : (
           <form onSubmit={(event) => void submit(event)} className="space-y-4">
-            <div className="flex gap-1 rounded-lg bg-slate-100 p-1 text-xs">
+            <div className="flex gap-1 rounded-lg bg-panel p-1 text-xs">
               <button
                 type="button"
                 onClick={() => setDirection("EXPENSE")}
-                className={`flex-1 rounded-md px-3 py-2 font-semibold ${direction === "EXPENSE" ? "bg-rose-100 text-rose-700" : "text-slate-500"}`}
+                className={`flex-1 rounded-md px-3 py-2 font-semibold ${direction === "EXPENSE" ? "bg-rose-100 text-rose-700" : "text-ink/60"}`}
               >
                 Расход · платёж поставщику
               </button>
               <button
                 type="button"
                 onClick={() => setDirection("INCOME")}
-                className={`flex-1 rounded-md px-3 py-2 font-semibold ${direction === "INCOME" ? "bg-emerald-100 text-emerald-800" : "text-slate-500"}`}
+                className={`flex-1 rounded-md px-3 py-2 font-semibold ${direction === "INCOME" ? "bg-emerald-100 text-emerald-800" : "text-ink/60"}`}
               >
                 Приход · возврат от поставщика
               </button>
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Заказ</label>
-              <input value={`${orderCode}${bookingCode ? ` · ${bookingCode}` : ""}`} readOnly disabled className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500" />
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink/60">Заказ</label>
+              <input value={`${orderCode}${bookingCode ? ` · ${bookingCode}` : ""}`} readOnly disabled className="w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink/60" />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="supplier-payment-supplier">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink/60" htmlFor="supplier-payment-supplier">
                 Поставщик
               </label>
               <select
@@ -215,7 +215,7 @@ export default function CreateSupplierPaymentForm({
                 value={supplierCode}
                 onChange={(event) => setSupplierCode(event.target.value)}
                 disabled={busy || obligations.length > 0 || suppliers.length > 1}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm"
               >
                 {defaultSupplierCode && !suppliers.some((supplier) => supplier.supplierCode === defaultSupplierCode) && (
                   <option value={defaultSupplierCode}>{defaultSupplierName ?? defaultSupplierCode}</option>
@@ -229,23 +229,23 @@ export default function CreateSupplierPaymentForm({
               </select>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs">
+            <div className="grid grid-cols-3 gap-2 rounded-lg border border-line bg-panel px-3 py-2.5 text-xs">
               <div>
-                <div className="font-semibold uppercase tracking-wide text-slate-500">Себестоимость</div>
-                <div className="mt-1 font-semibold text-slate-900">{formatPrice(cost.toFixed(2), "AZN", locale) ?? "—"}</div>
+                <div className="font-semibold uppercase tracking-wide text-ink/60">Себестоимость</div>
+                <div className="mt-1 font-semibold text-ink">{formatPrice(cost.toFixed(2), "AZN", locale) ?? "—"}</div>
               </div>
               <div>
-                <div className="font-semibold uppercase tracking-wide text-slate-500">Оплачено</div>
+                <div className="font-semibold uppercase tracking-wide text-ink/60">Оплачено</div>
                 <div className="mt-1 font-semibold text-emerald-700">{formatPrice(paid.toFixed(2), "AZN", locale) ?? "—"}</div>
               </div>
               <div>
-                <div className="font-semibold uppercase tracking-wide text-slate-500">Осталось</div>
+                <div className="font-semibold uppercase tracking-wide text-ink/60">Осталось</div>
                 <div className="mt-1 font-semibold text-amber-700">{formatPrice(remaining.toFixed(2), "AZN", locale) ?? "—"}</div>
               </div>
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="supplier-payment-amount">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink/60" htmlFor="supplier-payment-amount">
                 Сумма платежа *
               </label>
               <input
@@ -257,15 +257,15 @@ export default function CreateSupplierPaymentForm({
                   setAmount(event.target.value);
                 }}
                 disabled={busy}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm"
               />
-              <div className="mt-1 text-xs text-slate-400">
+              <div className="mt-1 text-xs text-ink/60">
                 {direction === "EXPENSE" ? "Не больше остатка к оплате поставщику" : "Сумма возврата от поставщика"}
               </div>
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="supplier-payment-method">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink/60" htmlFor="supplier-payment-method">
                 {t("payments.create.method", locale)}
               </label>
               <select
@@ -273,7 +273,7 @@ export default function CreateSupplierPaymentForm({
                 value={paymentMethod}
                 onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
                 disabled={busy}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm"
               >
                 {PAYMENT_METHODS.map((method) => (
                   <option key={method} value={method}>
@@ -284,7 +284,7 @@ export default function CreateSupplierPaymentForm({
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="supplier-payment-reason">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink/60" htmlFor="supplier-payment-reason">
                 Причина *
               </label>
               <input
@@ -293,13 +293,13 @@ export default function CreateSupplierPaymentForm({
                 onChange={(event) => setReason(event.target.value)}
                 disabled={busy}
                 maxLength={255}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm"
               />
-              <div className="mt-1 text-xs text-slate-400">Обязательно, 1–255 символов</div>
+              <div className="mt-1 text-xs text-ink/60">Обязательно, 1–255 символов</div>
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="supplier-payment-note">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink/60" htmlFor="supplier-payment-note">
                 Примечание
               </label>
               <textarea
@@ -308,12 +308,12 @@ export default function CreateSupplierPaymentForm({
                 onChange={(event) => setNote(event.target.value)}
                 disabled={busy}
                 rows={3}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm"
               />
             </div>
 
             {direction === "EXPENSE" && obligations.length === 0 && (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-ink/60">
                 По заказу нет обязательств — платёж будет создан без распределения, только с привязкой к заказу.
               </p>
             )}
@@ -327,7 +327,7 @@ export default function CreateSupplierPaymentForm({
               >
                 {busy ? "…" : "Создать"}
               </button>
-              <button type="button" onClick={onClose} disabled={busy} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600">
+              <button type="button" onClick={onClose} disabled={busy} className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-medium text-ink/60">
                 Отмена
               </button>
             </div>

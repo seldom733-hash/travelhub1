@@ -67,7 +67,7 @@ function peerLabel(canonicalPhone: string | null, remoteJid: string): string {
 function badgeClass(status: WhatsAppMatchingStatus): string {
   if (status === "MATCHED") return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (status === "AMBIGUOUS") return "border-amber-200 bg-amber-50 text-amber-700";
-  return "border-slate-200 bg-slate-100 text-slate-500";
+  return "border-line bg-panel text-ink/60";
 }
 
 function MatchingBadge({ status, locale }: { status: WhatsAppMatchingStatus; locale: Locale }) {
@@ -332,8 +332,8 @@ export default function WhatsappInboxPage() {
       <NotificationStrip scope="whatsapp" />
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">{t("whatsapp.title", locale)}</h1>
-          <p className="text-xs text-slate-400">{t("whatsapp.subtitle", locale)}</p>
+          <h1 className="text-lg font-semibold text-ink">{t("whatsapp.title", locale)}</h1>
+          <p className="text-xs text-ink/60">{t("whatsapp.subtitle", locale)}</p>
         </div>
         <button
           type="button"
@@ -341,7 +341,7 @@ export default function WhatsappInboxPage() {
             void loadList();
             if (selectedId) void loadThread(selectedId, { silent: true });
           }}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+          className="rounded-lg border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink/60 transition-colors hover:bg-panel"
         >
           {t("whatsapp.refresh", locale)}
         </button>
@@ -349,13 +349,13 @@ export default function WhatsappInboxPage() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)_340px]">
         {/* ── Колонка 1: список диалогов ─────────────────────────────────── */}
-        <aside className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <aside className="flex flex-col overflow-hidden rounded-xl border border-line bg-white">
+          <div className="flex items-center justify-between border-b border-line px-3 py-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-ink/60">
               {t("whatsapp.list_title", locale)}
             </span>
           </div>
-          <div className="flex flex-wrap items-center gap-1 border-b border-slate-100 px-3 py-2">
+          <div className="flex flex-wrap items-center gap-1 border-b border-line px-3 py-2">
             {FILTERS.map((f) => (
               <button
                 key={f}
@@ -363,8 +363,8 @@ export default function WhatsappInboxPage() {
                 onClick={() => setFilter(f)}
                 className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
                   filter === f
-                    ? "bg-blue-600 text-white"
-                    : "border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                    ? "bg-brand text-white"
+                    : "border border-line bg-white text-ink/60 hover:bg-panel"
                 }`}
               >
                 {t(f === "ALL" ? "whatsapp.filter.all" : `whatsapp.filter.${f}`, locale)}
@@ -375,7 +375,7 @@ export default function WhatsappInboxPage() {
               <select
                 value={accountId}
                 onChange={(e) => setAccountId(e.target.value)}
-                className="ml-auto max-w-[130px] rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600"
+                className="ml-auto max-w-[130px] rounded-lg border border-line bg-white px-2 py-1 text-[11px] font-medium text-ink/60"
                 data-testid="account-filter"
               >
                 <option value="ALL">{t("whatsapp.account.all", locale)}</option>
@@ -388,7 +388,7 @@ export default function WhatsappInboxPage() {
               </select>
             )}
           </div>
-          <div className="thin-scroll max-h-[70vh] min-h-[260px] overflow-y-auto divide-y divide-slate-50">
+          <div className="thin-scroll max-h-[70vh] min-h-[260px] overflow-y-auto divide-y divide-line">
             {listLoading && rows.length === 0 ? (
               /* §SKELETON-PARITY: реальные строки (:416-431) — прямые дети
                  контейнера `divide-y` (:389), `px-3 py-2.5`, две строки текста.
@@ -397,10 +397,10 @@ export default function WhatsappInboxPage() {
                 {[0, 1, 2, 3, 4].map((i) => (
                   <div key={i} className="px-3 py-2.5">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
-                      <div className="h-3 w-10 shrink-0 animate-pulse rounded bg-slate-100" />
+                      <div className="h-4 w-2/3 animate-pulse rounded bg-panel" />
+                      <div className="h-3 w-10 shrink-0 animate-pulse rounded bg-panel" />
                     </div>
-                    <div className="mt-1 h-3 w-1/3 animate-pulse rounded bg-slate-100" />
+                    <div className="mt-1 h-3 w-1/3 animate-pulse rounded bg-panel" />
                   </div>
                 ))}
               </>
@@ -413,13 +413,13 @@ export default function WhatsappInboxPage() {
                     setListLoading(true);
                     void loadList();
                   }}
-                  className="rounded-lg border border-slate-200 px-2.5 py-1 font-medium text-slate-600 hover:bg-slate-50"
+                  className="rounded-lg border border-line px-2.5 py-1 font-medium text-ink/60 hover:bg-panel"
                 >
                   {t("whatsapp.refresh", locale)}
                 </button>
               </div>
             ) : rows.length === 0 ? (
-              <p className="p-4 text-center text-xs text-slate-400">{t("whatsapp.empty_list", locale)}</p>
+              <p className="p-4 text-center text-xs text-ink/60">{t("whatsapp.empty_list", locale)}</p>
             ) : (
               rows.map((row) => {
                 const selected = row.id === selectedId;
@@ -429,14 +429,14 @@ export default function WhatsappInboxPage() {
                     type="button"
                     onClick={() => select(row.id)}
                     className={`w-full px-3 py-2.5 text-left transition-colors ${
-                      selected ? "bg-blue-50" : "hover:bg-slate-50"
+                      selected ? "bg-brand/10" : "hover:bg-panel"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-medium text-slate-800">
+                      <span className="truncate text-sm font-medium text-ink">
                         {peerLabel(row.canonicalPhone, row.remoteJid)}
                       </span>
-                      <span className="shrink-0 text-[10px] text-slate-400">
+                      <span className="shrink-0 text-[10px] text-ink/60">
                         {fmtTime(row.lastMessageAt, locale)}
                       </span>
                     </div>
@@ -451,7 +451,7 @@ export default function WhatsappInboxPage() {
                       {accounts.length > 1 && row.accountId && (
                         <span
                           title={accountLabel(accounts, row.accountId)}
-                          className="max-w-[80px] truncate rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600"
+                          className="max-w-[80px] truncate rounded-full border border-brand/20 bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand"
                           data-testid="conversation-account-badge"
                         >
                           {accountLabel(accounts, row.accountId)}
@@ -459,13 +459,13 @@ export default function WhatsappInboxPage() {
                       )}
                     </div>
                     <div className="mt-1 flex items-center gap-2">
-                      <span className="min-w-0 flex-1 truncate text-xs text-slate-500">
+                      <span className="min-w-0 flex-1 truncate text-xs text-ink/60">
                         {row.lastMessagePreview ?? "—"}
                       </span>
                       {row.unreadCount > 0 && (
                         <span
                           title={ti("whatsapp.unread_count", locale, { n: row.unreadCount })}
-                          className="shrink-0 rounded-full bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                          className="shrink-0 rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-semibold text-white"
                         >
                           {row.unreadCount}
                         </span>
@@ -479,20 +479,20 @@ export default function WhatsappInboxPage() {
         </aside>
 
         {/* ── Колонка 2: история + composer ──────────────────────────────── */}
-        <section className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <section className="flex flex-col overflow-hidden rounded-xl border border-line bg-white">
           {!detail ? (
             <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-1 p-6 text-center">
-              <p className="text-sm font-medium text-slate-600">{t("whatsapp.no_selection", locale)}</p>
-              <p className="text-xs text-slate-400">{t("whatsapp.no_selection_hint", locale)}</p>
+              <p className="text-sm font-medium text-ink/60">{t("whatsapp.no_selection", locale)}</p>
+              <p className="text-xs text-ink/60">{t("whatsapp.no_selection_hint", locale)}</p>
             </div>
           ) : (
             <>
-              <header className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
+              <header className="flex items-center gap-3 border-b border-line px-4 py-3">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-slate-800">
+                  <div className="truncate text-sm font-semibold text-ink">
                     {peerLabel(detail.canonicalPhone, detail.remoteJid)}
                   </div>
-                  <div className="truncate text-[11px] text-slate-400">
+                  <div className="truncate text-[11px] text-ink/60">
                     {detail.customer ? detail.customer.code : t("whatsapp.customer.none", locale)}
                   </div>
                 </div>
@@ -509,7 +509,7 @@ export default function WhatsappInboxPage() {
 
               {/* §10 LID→PN: бинд номера к lid-диалогу — только пока номер не разрешён. */}
               {detail.canonicalPhone === null && detail.remoteJid.endsWith("@lid") && (
-                <div className="border-b border-slate-100 bg-amber-50 px-4 py-2">
+                <div className="border-b border-line bg-amber-50 px-4 py-2">
                   {!bindOpen ? (
                     <div className="flex items-center gap-3">
                       <button
@@ -575,20 +575,20 @@ export default function WhatsappInboxPage() {
 
               <div
                 ref={threadRef}
-                className="thin-scroll h-[46vh] min-h-[280px] space-y-2 overflow-y-auto bg-slate-50 px-4 py-3"
+                className="thin-scroll h-[46vh] min-h-[280px] space-y-2 overflow-y-auto bg-panel px-4 py-3"
               >
                 {threadLoading && timeline.length === 0 ? (
                   /* §SKELETON-PARITY: реальные «пузыри» (:586-592) —
                      `max-w-[78%] rounded-2xl px-3 py-2`, исходящие прижаты вправо
-                     (`justify-end`), фон контейнера `bg-slate-50`, поэтому заглушка
-                     белая/голубая, а не `bg-slate-100` (была не видна). */
+                     (`justify-end`), фон контейнера `bg-panel`, поэтому заглушка
+                     белая/голубая, а не `bg-panel` (была не видна). */
                   <>
                     {[0, 1, 2].map((i) => {
                       const outbound = i % 2 === 1;
                       return (
                         <div key={i} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
                           <div
-                            className={`h-10 animate-pulse rounded-2xl ${outbound ? "w-1/2 bg-blue-100/70" : "w-2/3 border border-slate-200 bg-white"}`}
+                            className={`h-10 animate-pulse rounded-2xl ${outbound ? "w-1/2 bg-brand/70" : "w-2/3 border border-line bg-white"}`}
                           />
                         </div>
                       );
@@ -597,7 +597,7 @@ export default function WhatsappInboxPage() {
                 ) : threadError ? (
                   <p className="text-xs text-red-600">{threadError}</p>
                 ) : timeline.length === 0 ? (
-                  <p className="pt-8 text-center text-xs text-slate-400">
+                  <p className="pt-8 text-center text-xs text-ink/60">
                     {t("whatsapp.messages_empty", locale)}
                   </p>
                 ) : (
@@ -609,8 +609,8 @@ export default function WhatsappInboxPage() {
                         <div
                           className={`max-w-[78%] rounded-2xl px-3 py-2 text-sm ${
                             outbound
-                              ? "bg-blue-600 text-white"
-                              : "border border-slate-200 bg-white text-slate-800"
+                              ? "bg-brand text-white"
+                              : "border border-line bg-white text-ink"
                           }`}
                         >
                           <div className="whitespace-pre-wrap break-words">
@@ -633,7 +633,7 @@ export default function WhatsappInboxPage() {
                                 className={`mt-1 flex max-w-full items-center gap-2 rounded-lg border px-2 py-1 text-xs font-medium ${
                                   outbound
                                     ? "border-white/30 bg-white/15 text-white hover:bg-white/25"
-                                    : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                                    : "border-line bg-panel text-ink hover:bg-panel"
                                 }`}
                               >
                                 <span className="truncate">
@@ -646,7 +646,7 @@ export default function WhatsappInboxPage() {
                             ))}
                           <div
                             className={`mt-1 flex flex-wrap items-center gap-2 text-[10px] ${
-                              outbound ? "text-blue-100" : "text-slate-400"
+                              outbound ? "text-white" : "text-ink/60"
                             }`}
                           >
                             <span>{fmtTime(item.occurredAt, locale)}</span>
@@ -666,17 +666,17 @@ export default function WhatsappInboxPage() {
                 )}
               </div>
 
-              <div className="space-y-2 border-t border-slate-100 px-4 py-3">
+              <div className="space-y-2 border-t border-line px-4 py-3">
                 {sendError && <p className="text-xs text-red-600">{sendError}</p>}
                 {upload && (
-                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
-                    <span className="truncate font-medium text-slate-700">{upload.filename}</span>
-                    <span className="shrink-0 text-slate-400">{fmtBytes(upload.size)}</span>
+                  <div className="flex items-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-xs">
+                    <span className="truncate font-medium text-ink">{upload.filename}</span>
+                    <span className="shrink-0 text-ink/60">{fmtBytes(upload.size)}</span>
                     <button
                       type="button"
                       onClick={() => setUpload(null)}
                       disabled={sending || uploading}
-                      className="ml-auto shrink-0 rounded px-1 font-semibold text-slate-400 hover:text-slate-600 disabled:opacity-40"
+                      className="ml-auto shrink-0 rounded px-1 font-semibold text-ink/60 hover:text-ink/60 disabled:opacity-40"
                       title={t("whatsapp.attach_remove", locale)}
                     >
                       ×
@@ -699,7 +699,7 @@ export default function WhatsappInboxPage() {
                     type="button"
                     onClick={() => fileRef.current?.click()}
                     disabled={!canSend || detail.suppressed || sending || uploading}
-                    className="h-[44px] shrink-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="h-[44px] shrink-0 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink/60 transition-colors hover:bg-panel disabled:cursor-not-allowed disabled:opacity-40"
                     title={t("whatsapp.attach", locale)}
                   >
                     {uploading ? t("whatsapp.attach_uploading", locale) : t("whatsapp.attach", locale)}
@@ -717,19 +717,19 @@ export default function WhatsappInboxPage() {
                     maxLength={4000}
                     disabled={!canSend || detail.suppressed || sending}
                     placeholder={t("whatsapp.send_placeholder", locale)}
-                    className="min-h-[44px] flex-1 resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50"
+                    className="min-h-[44px] flex-1 resize-none rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink/60 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand disabled:cursor-not-allowed disabled:bg-panel"
                   />
                   <button
                     type="button"
                     onClick={() => void handleSend()}
                     disabled={!canSend || detail.suppressed || sending || uploading || (text.trim() === "" && !upload)}
-                    className="h-[44px] shrink-0 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="h-[44px] shrink-0 rounded-lg bg-brand px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {sending ? t("whatsapp.sending", locale) : t("whatsapp.send", locale)}
                   </button>
                 </div>
                 {!canSend && (
-                  <p className="text-[11px] text-slate-400">{t("whatsapp.send_no_permission", locale)}</p>
+                  <p className="text-[11px] text-ink/60">{t("whatsapp.send_no_permission", locale)}</p>
                 )}
               </div>
             </>
@@ -737,47 +737,47 @@ export default function WhatsappInboxPage() {
         </section>
 
         {/* ── Колонка 3: контекст, клиент, привязка ───────────────────────── */}
-        <aside className="thin-scroll flex max-h-[70vh] min-h-[260px] flex-col gap-4 overflow-y-auto rounded-xl border border-slate-200 bg-white p-4">
+        <aside className="thin-scroll flex max-h-[70vh] min-h-[260px] flex-col gap-4 overflow-y-auto rounded-xl border border-line bg-white p-4">
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-ink/60">
               {t("whatsapp.context.title", locale)}
             </h3>
             {detail?.context ? (
-              <div className="mt-2 rounded-lg bg-slate-50 p-3 text-sm">
+              <div className="mt-2 rounded-lg bg-panel p-3 text-sm">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-semibold uppercase text-slate-500">
+                  <span className="text-[11px] font-semibold uppercase text-ink/60">
                     {t(`whatsapp.context.${detail.context.type}`, locale)}
                   </span>
-                  <span className="truncate font-mono text-xs text-blue-600">{detail.context.code}</span>
+                  <span className="truncate font-mono text-xs text-brand">{detail.context.code}</span>
                 </div>
                 {detail.context.status && (
-                  <div className="mt-1 text-xs text-slate-500">{detail.context.status}</div>
+                  <div className="mt-1 text-xs text-ink/60">{detail.context.status}</div>
                 )}
               </div>
             ) : (
-              <p className="mt-1 text-xs text-slate-400">{t("whatsapp.context.none", locale)}</p>
+              <p className="mt-1 text-xs text-ink/60">{t("whatsapp.context.none", locale)}</p>
             )}
           </div>
 
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-ink/60">
               {t("whatsapp.customer.title", locale)}
             </h3>
             {detail?.customer ? (
               <div className="mt-2 space-y-0.5 text-sm">
-                <div className="font-medium text-slate-800">{detail.customer.name}</div>
-                <div className="font-mono text-xs text-slate-400">{detail.customer.code}</div>
-                <div className="text-xs text-slate-500">{detail.customer.email}</div>
+                <div className="font-medium text-ink">{detail.customer.name}</div>
+                <div className="font-mono text-xs text-ink/60">{detail.customer.code}</div>
+                <div className="text-xs text-ink/60">{detail.customer.email}</div>
               </div>
             ) : (
-              <p className="mt-1 text-xs text-slate-400">{t("whatsapp.customer.none", locale)}</p>
+              <p className="mt-1 text-xs text-ink/60">{t("whatsapp.customer.none", locale)}</p>
             )}
             {linkOk && <p className="mt-1 text-xs font-medium text-green-600">{linkOk}</p>}
           </div>
 
           {detail && detail.candidates.length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-ink/60">
                 {t("whatsapp.candidates.title", locale)}
               </h3>
               <div className="mt-2 space-y-2">
@@ -787,14 +787,14 @@ export default function WhatsappInboxPage() {
                     className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
                   >
                     <div className="min-w-0">
-                      <div className="truncate text-xs font-medium text-slate-800">{c.name}</div>
-                      <div className="truncate font-mono text-[11px] text-slate-400">{c.code}</div>
+                      <div className="truncate text-xs font-medium text-ink">{c.name}</div>
+                      <div className="truncate font-mono text-[11px] text-ink/60">{c.code}</div>
                     </div>
                     <button
                       type="button"
                       onClick={() => void linkTo(c.id)}
                       disabled={!canManage || linkBusy}
-                      className="shrink-0 rounded-md bg-blue-600 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="shrink-0 rounded-md bg-brand px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {t("whatsapp.link", locale)}
                     </button>
@@ -810,12 +810,12 @@ export default function WhatsappInboxPage() {
                 type="button"
                 onClick={() => setLinkOpen((v) => !v)}
                 disabled={!canManage}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="w-full rounded-lg border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink/60 transition-colors hover:bg-panel disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {t("whatsapp.link_action", locale)}
               </button>
               {!canManage && (
-                <p className="mt-1 text-[11px] text-slate-400">{t("whatsapp.link_no_permission", locale)}</p>
+                <p className="mt-1 text-[11px] text-ink/60">{t("whatsapp.link_no_permission", locale)}</p>
               )}
               {linkOpen && (
                 <div className="mt-2 space-y-2">
@@ -827,13 +827,13 @@ export default function WhatsappInboxPage() {
                         if (e.key === "Enter" && linkQuery.trim()) void searchCustomers();
                       }}
                       placeholder={t("whatsapp.link_search_placeholder", locale)}
-                      className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                      className="min-w-0 flex-1 rounded-lg border border-line px-2.5 py-1.5 text-xs outline-none transition focus:border-brand focus:ring-2 focus:ring-brand"
                     />
                     <button
                       type="button"
                       onClick={() => void searchCustomers()}
                       disabled={linkBusy || linkQuery.trim() === ""}
-                      className="shrink-0 rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="shrink-0 rounded-lg bg-brand px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {t("whatsapp.link_search", locale)}
                     </button>
@@ -841,25 +841,25 @@ export default function WhatsappInboxPage() {
                   {linkError && <p className="text-xs text-red-600">{linkError}</p>}
                   {linkResults !== null &&
                     (linkResults.length === 0 ? (
-                      <p className="text-xs text-slate-400">{t("whatsapp.link_none", locale)}</p>
+                      <p className="text-xs text-ink/60">{t("whatsapp.link_none", locale)}</p>
                     ) : (
                       <div className="space-y-2">
                         {linkResults.map((c) => (
                           <div
                             key={c.id}
-                            className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2"
+                            className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2"
                           >
                             <div className="min-w-0">
-                              <div className="truncate text-xs font-medium text-slate-800">
+                              <div className="truncate text-xs font-medium text-ink">
                                 {customerName(c) || c.email}
                               </div>
-                              <div className="truncate font-mono text-[11px] text-slate-400">{c.code}</div>
+                              <div className="truncate font-mono text-[11px] text-ink/60">{c.code}</div>
                             </div>
                             <button
                               type="button"
                               onClick={() => void linkTo(c.id)}
                               disabled={linkBusy}
-                              className="shrink-0 rounded-md bg-blue-600 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                              className="shrink-0 rounded-md bg-brand px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               {t("whatsapp.link", locale)}
                             </button>

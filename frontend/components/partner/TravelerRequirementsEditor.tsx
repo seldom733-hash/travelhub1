@@ -72,13 +72,13 @@ const FIELD_GROUPS = {
 // ── State color coding ─────────────────────────────────────────────────────
 
 const STATE_COLORS: Record<TravelerRequirementState, string> = {
-  NOT_REQUESTED: "bg-slate-100 text-slate-500 border-slate-200",
+  NOT_REQUESTED: "bg-panel text-ink/60 border-line",
   OPTIONAL: "bg-amber-50 text-amber-700 border-amber-200",
   REQUIRED: "bg-emerald-50 text-emerald-700 border-emerald-200",
 };
 
 const STATE_ACTIVE_COLORS: Record<TravelerRequirementState, string> = {
-  NOT_REQUESTED: "bg-slate-200 text-slate-700 border-slate-300",
+  NOT_REQUESTED: "bg-panel text-ink border-line",
   OPTIONAL: "bg-amber-200 text-amber-800 border-amber-300",
   REQUIRED: "bg-emerald-200 text-emerald-800 border-emerald-300",
 };
@@ -159,7 +159,7 @@ export default function TravelerRequirementsEditor({
     <div className="space-y-4" role="group" aria-label={pt("partner.form.traveler_requirements", locale)}>
       {/* Status indicator */}
       <div className="flex items-center justify-between">
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-ink/60">
           {hasOverride
             ? pt("partner.form.traveler_requirements_overridden", locale)
             : pt("partner.form.traveler_requirements_default", locale)}
@@ -179,7 +179,7 @@ export default function TravelerRequirementsEditor({
       {/* Field groups */}
       {Object.entries(FIELD_GROUPS).map(([groupKey, group]) => (
         <div key={groupKey} className="space-y-2">
-          <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+          <h3 className="text-xs font-medium text-ink/60 uppercase tracking-wide">
             {pt(group.labelKey, locale)}
           </h3>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -190,9 +190,9 @@ export default function TravelerRequirementsEditor({
               return (
                 <div
                   key={field}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2"
+                  className="flex items-center justify-between rounded-lg border border-line bg-white px-3 py-2"
                 >
-                  <span className="text-sm text-slate-700">
+                  <span className="text-sm text-ink">
                     {FIELD_LABELS[field][locale] ?? FIELD_LABELS[field].en}
                     {isCustomized && (
                       <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" title="Custom override" />

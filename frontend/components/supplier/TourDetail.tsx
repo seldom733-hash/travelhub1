@@ -133,6 +133,10 @@ export default function TourDetail({
       hotelExternalId,
       hotel: cleanHotelName,
       destination,
+      // Ключевое поле для VOYAGER/KOMPAS: адаптер сопоставляет страну со своим
+      // STATEINC. В `destination` карточки лежит supplier-native id программы
+      // ("2676"), который НЕ является страной — без country календарь пуст.
+      country: (attributes?.countryCode as string) || (attributes?.country as string) || undefined,
       departureCity,
       nights,
       adults,

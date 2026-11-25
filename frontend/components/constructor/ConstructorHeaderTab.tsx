@@ -92,27 +92,27 @@ export default function ConstructorHeaderTab({ slug, config, onSaved, onSaving, 
   return (
     <div className="space-y-6">
       {/* Logo */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">{t("constructor.header_logo", locale)}</h3>
+      <div className="rounded-lg border border-line bg-white p-5">
+        <h3 className="mb-4 text-sm font-semibold text-ink">{t("constructor.header_logo", locale)}</h3>
         {cfg.logo ? (
           <div className="flex items-start gap-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={cfg.logo.url} alt="Logo" className="h-16 w-auto rounded border border-slate-200 bg-white p-1 object-contain" />
-            <div className="flex-1 text-xs text-slate-500 space-y-1">
+            <img src={cfg.logo.url} alt="Logo" className="h-16 w-auto rounded border border-line bg-white p-1 object-contain" />
+            <div className="flex-1 text-xs text-ink/60 space-y-1">
               <div>{cfg.logo.width} × {cfg.logo.height}</div>
               <div>{cfg.logo.format} · {(cfg.logo.size / 1024).toFixed(0)} KB</div>
             </div>
-            <button onClick={removeLogo} className="rounded p-1 text-slate-400 hover:text-red-500" aria-label="Remove logo">
+            <button onClick={removeLogo} className="rounded p-1 text-ink/60 hover:text-red-500" aria-label="Remove logo">
               <X className="h-4 w-4" />
             </button>
           </div>
         ) : (
           <div
             onClick={() => fileRef.current?.click()}
-            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 px-6 py-8 transition-colors hover:border-blue-300 hover:bg-blue-50"
+            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-line bg-panel px-6 py-8 transition-colors hover:border-brand/25 hover:bg-brand/10"
           >
-            <Upload className="h-5 w-5 text-slate-400" />
-            <span className="text-sm text-slate-500">
+            <Upload className="h-5 w-5 text-ink/60" />
+            <span className="text-sm text-ink/60">
               {uploading ? t("constructor.saving", locale) : t("constructor.header_upload_logo", locale)}
             </span>
           </div>
@@ -121,24 +121,24 @@ export default function ConstructorHeaderTab({ slug, config, onSaved, onSaving, 
       </div>
 
       {/* Brand Name (single value — not locale-dependent) */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">{t("constructor.header_brand_name", locale)}</h3>
+      <div className="rounded-lg border border-line bg-white p-5">
+        <h3 className="mb-4 text-sm font-semibold text-ink">{t("constructor.header_brand_name", locale)}</h3>
         <input
           type="text"
           value={cfg.brandName ?? ""}
           onChange={(e) => setCfg((prev) => ({ ...prev, brandName: e.target.value }))}
           placeholder="TravelHub"
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+          className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-brand focus:ring-1 focus:ring-brand/20"
         />
-        <p className="mt-2 text-xs text-slate-400">{t("constructor.header_brand_name_hint", locale)}</p>
+        <p className="mt-2 text-xs text-ink/60">{t("constructor.header_brand_name_hint", locale)}</p>
       </div>
 
       {/* Contacts */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">{t("constructor.header_phone", locale)} / {t("constructor.header_email", locale)}</h3>
+      <div className="rounded-lg border border-line bg-white p-5">
+        <h3 className="mb-4 text-sm font-semibold text-ink">{t("constructor.header_phone", locale)} / {t("constructor.header_email", locale)}</h3>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+            <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-ink/60">
               <Phone className="h-3 w-3" /> {t("constructor.header_phone", locale)}
             </label>
             <input
@@ -146,11 +146,11 @@ export default function ConstructorHeaderTab({ slug, config, onSaved, onSaving, 
               value={cfg.phone ?? ""}
               onChange={(e) => setCfg((prev) => ({ ...prev, phone: e.target.value }))}
               placeholder="+994 12 345 67 89"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-brand focus:ring-1 focus:ring-brand/20"
             />
           </div>
           <div>
-            <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+            <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-ink/60">
               <EnvelopeSimple className="h-3 w-3" /> {t("constructor.header_email", locale)}
             </label>
             <input
@@ -158,12 +158,12 @@ export default function ConstructorHeaderTab({ slug, config, onSaved, onSaving, 
               value={cfg.email ?? ""}
               onChange={(e) => setCfg((prev) => ({ ...prev, email: e.target.value }))}
               placeholder="info@travelhub.az"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-brand focus:ring-1 focus:ring-brand/20"
             />
           </div>
         </div>
         <div className="mt-3">
-          <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+          <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-ink/60">
             <MapPin className="h-3 w-3" /> {t("constructor.header_address", locale)}
           </label>
           <input
@@ -171,27 +171,27 @@ export default function ConstructorHeaderTab({ slug, config, onSaved, onSaving, 
             value={cfg.address ?? ""}
             onChange={(e) => setCfg((prev) => ({ ...prev, address: e.target.value }))}
             placeholder="Баку, Азербайджан"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-brand focus:ring-1 focus:ring-brand/20"
           />
         </div>
       </div>
 
       {/* Navigation visibility */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5">
+      <div className="rounded-lg border border-line bg-white p-5">
         <label className="flex items-center gap-3">
           <input
             type="checkbox"
             checked={cfg.navVisible ?? true}
             onChange={(e) => setCfg((prev) => ({ ...prev, navVisible: e.target.checked }))}
-            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            className="h-4 w-4 rounded border-line text-brand focus:ring-brand"
           />
-          <span className="text-sm text-slate-700">{t("constructor.tab_header", locale)} — Navigation</span>
+          <span className="text-sm text-ink">{t("constructor.tab_header", locale)} — Navigation</span>
         </label>
       </div>
 
       {/* Save + Default actions */}
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={handleSave} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700">
+        <button onClick={handleSave} className="rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-dark">
           {t("constructor.header_save", locale)}
         </button>
         <DefaultConfigActions

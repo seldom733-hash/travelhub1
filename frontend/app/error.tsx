@@ -33,12 +33,12 @@ export default function GlobalError({
       <div className="w-full max-w-md rounded-2xl border border-line bg-white p-6 text-center shadow-sm">
         <div
           aria-hidden="true"
-          className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-slate-100 text-2xl"
+          className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-panel text-2xl"
         >
           !
         </div>
         <h1 className="text-lg font-semibold text-ink">{t("error.title", locale)}</h1>
-        <p className="mt-2 text-sm text-slate-600">{t("error.description", locale)}</p>
+        <p className="mt-2 text-sm text-ink/60">{t("error.description", locale)}</p>
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
           <button
             type="button"
@@ -49,7 +49,7 @@ export default function GlobalError({
           </button>
           <Link
             href="/"
-            className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+            className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-panel"
           >
             {t("error.home", locale)}
           </Link>

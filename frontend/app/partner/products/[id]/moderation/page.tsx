@@ -8,8 +8,8 @@ import { pt } from "@/lib/partner-i18n";
 import { partnerApi, type PartnerModerationView, type PartnerProductDetail } from "@/lib/partner-api";
 
 const DOT: Record<string, string> = {
-  SUBMITTED: "bg-blue-500",
-  IN_REVIEW: "bg-indigo-500",
+  SUBMITTED: "bg-brand",
+  IN_REVIEW: "bg-brand",
   APPROVED: "bg-emerald-500",
   REJECTED: "bg-rose-500",
   CHANGES_REQUESTED: "bg-rose-400",
@@ -74,30 +74,30 @@ export default function ProductModerationPage() {
   };
 
   if (!history) {
-    return <div className="py-16 text-center text-sm text-slate-400">{pt("partner.state.loading", locale)}</div>;
+    return <div className="py-16 text-center text-sm text-ink/60">{pt("partner.state.loading", locale)}</div>;
   }
 
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-5">
-        <Link href={`/partner/products/${id}`} className="text-sm text-slate-500 hover:text-emerald-700">
+        <Link href={`/partner/products/${id}`} className="text-sm text-ink/60 hover:text-emerald-700">
           {pt("partner.product.back", locale)}
         </Link>
-        <h1 className="mt-1 text-2xl font-bold text-slate-900">{pt("partner.moderation.title", locale)}</h1>
+        <h1 className="mt-1 text-2xl font-bold text-ink">{pt("partner.moderation.title", locale)}</h1>
       </div>
 
       {error && <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {notice && <div className="mb-4 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
 
       {active && (
-        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        <div className="mb-4 rounded-xl border border-brand/20 bg-brand/10 px-4 py-3 text-sm text-ink">
           {pt("partner.moderation.pending", locale)} — {pt(`partner.moderation.${active.status}`, locale)}
         </div>
       )}
 
       {canSubmit && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
-          <p className="flex-1 text-sm text-slate-600">
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white p-4">
+          <p className="flex-1 text-sm text-ink/60">
             {latest?.status === "CHANGES_REQUESTED" ? pt("partner.moderation.resubmit_hint", locale) : pt("partner.moderation.submit", locale)}
           </p>
           <button
@@ -122,24 +122,24 @@ export default function ProductModerationPage() {
       )}
 
       {history.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-400">
+        <div className="rounded-2xl border border-dashed border-line bg-white p-10 text-center text-sm text-ink/60">
           {pt("partner.moderation.empty", locale)}
         </div>
       ) : (
         <ol className="space-y-3">
           {history.map((m, i) => (
-            <li key={m.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+            <li key={m.id} className="rounded-2xl border border-line bg-white p-4">
               <div className="flex items-start gap-3">
-                <span className={`mt-1 size-2.5 shrink-0 rounded-full ${DOT[m.status] ?? "bg-slate-300"}`} aria-hidden />
+                <span className={`mt-1 size-2.5 shrink-0 rounded-full ${DOT[m.status] ?? "bg-panel"}`} aria-hidden />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-800">{pt(`partner.moderation.${m.status}`, locale)}</span>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-sm font-semibold text-ink">{pt(`partner.moderation.${m.status}`, locale)}</span>
+                    <span className="text-xs text-ink/60">
                       {i === 0 && latest?.status === m.status ? " · " : ""}
                       {pt("partner.moderation.submitted_at", locale)}: {formatDate(m.submittedAt, locale)}
                     </span>
                   </div>
-                  <div className="mt-0.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-400">
+                  <div className="mt-0.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-ink/60">
                     <span>
                       {pt("partner.moderation.version", locale)} v{m.productVersion}
                       {m.draftVersion !== null ? ` · N+1 rev ${m.draftVersion}` : ""}

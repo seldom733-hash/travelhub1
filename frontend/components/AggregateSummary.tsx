@@ -75,19 +75,19 @@ export default function AggregateSummary({
   if (loading) {
     /* §SKELETON-PARITY: тот же каркас, что и у реальной строки (:86-87) —
        карточка с градиентом и `shadow-sm` + ряд метрик `gap-x-5 gap-y-1.5`;
-       прежний вариант был `bg-slate-50` с одной длинной полосой. */
+       прежний вариант был `bg-panel` с одной длинной полосой. */
     return (
       <div
-        className="rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 to-white px-4 py-2.5 shadow-sm"
+        className="rounded-xl border border-line bg-gradient-to-r from-panel to-white px-4 py-2.5 shadow-sm"
         aria-busy="true"
         aria-label="loading"
       >
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
-          <div className="h-3 w-40 animate-pulse rounded bg-slate-100" />
-          <div className="h-4 w-20 animate-pulse rounded bg-slate-200" />
-          <div className="h-4 w-24 animate-pulse rounded bg-slate-200" />
-          <div className="h-4 w-24 animate-pulse rounded bg-slate-200" />
-          <div className="h-4 w-24 animate-pulse rounded bg-slate-200" />
+          <div className="h-3 w-40 animate-pulse rounded bg-panel" />
+          <div className="h-4 w-20 animate-pulse rounded bg-panel" />
+          <div className="h-4 w-24 animate-pulse rounded bg-panel" />
+          <div className="h-4 w-24 animate-pulse rounded bg-panel" />
+          <div className="h-4 w-24 animate-pulse rounded bg-panel" />
         </div>
       </div>
     );
@@ -96,27 +96,27 @@ export default function AggregateSummary({
   if (empty) return null;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 to-white px-4 py-2.5 shadow-sm">
+    <div className="rounded-xl border border-line bg-gradient-to-r from-panel to-white px-4 py-2.5 shadow-sm">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
         {/* Header label */}
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <span className="text-xs font-semibold uppercase tracking-wide text-ink/60">
           {t("aggregate.title", locale) || "Итого по текущей выборке"}
         </span>
 
         {/* Total records */}
-        <span className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+        <span className="inline-flex items-center gap-1.5 text-xs text-ink">
           <span className="font-semibold">{totalRecords}</span>
-          <span className="text-slate-400">{t("aggregate.records", locale) || "записей"}</span>
+          <span className="text-ink/60">{t("aggregate.records", locale) || "записей"}</span>
         </span>
 
         {/* Aggregate fields */}
         {fields.map((f, i) => (
           <span
             key={`${f.label}-${i}`}
-            className={`inline-flex items-center gap-1.5 text-xs ${f.isDerived ? "text-slate-500" : "text-slate-700"}`}
+            className={`inline-flex items-center gap-1.5 text-xs ${f.isDerived ? "text-ink/60" : "text-ink"}`}
             title={f.hint}
           >
-            <span className="text-slate-400">{f.label}:</span>
+            <span className="text-ink/60">{f.label}:</span>
             <span className={`font-semibold ${f.isDerived ? "italic" : ""}`}>
               {fmt(f.value, f.isMoney, f.currency)}
             </span>
@@ -129,11 +129,11 @@ export default function AggregateSummary({
             {currencyTotals.map((ct) => (
               <span
                 key={ct.currency}
-                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500"
+                className="inline-flex items-center gap-1 rounded-full border border-line bg-white px-2 py-0.5 text-[10px] font-medium text-ink/60"
               >
-                <span className="font-semibold text-slate-700">{ct.currency}</span>
+                <span className="font-semibold text-ink">{ct.currency}</span>
                 {ct.fields.map((f, i) => (
-                  <span key={`${ct.currency}-${f.label}-${i}`} className="text-slate-500">
+                  <span key={`${ct.currency}-${f.label}-${i}`} className="text-ink/60">
                     {f.label}: {fmt(f.value, f.isMoney)}
                   </span>
                 ))}

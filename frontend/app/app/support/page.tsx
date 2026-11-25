@@ -24,11 +24,11 @@ function Filters({
   locale: "ru" | "az" | "en";
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white px-4 py-3 shadow-sm">
       <select
         value={filters.status}
         onChange={(e) => onChange({ ...filters, status: e.target.value })}
-        className="rounded-lg border border-slate-200 px-2 py-1 text-xs outline-none focus:border-blue-400"
+        className="rounded-lg border border-line px-2 py-1 text-xs outline-none focus:border-brand"
       >
         <option value="">{t("support.filter.all_status", locale)}</option>
         {Object.keys(VALID_TRANSITIONS).map((s) => (
@@ -38,7 +38,7 @@ function Filters({
       <select
         value={filters.priority}
         onChange={(e) => onChange({ ...filters, priority: e.target.value })}
-        className="rounded-lg border border-slate-200 px-2 py-1 text-xs outline-none focus:border-blue-400"
+        className="rounded-lg border border-line px-2 py-1 text-xs outline-none focus:border-brand"
       >
         <option value="">{t("support.filter.all_priority", locale)}</option>
         {PRIORITIES.map((p) => (
@@ -48,7 +48,7 @@ function Filters({
       <select
         value={filters.caseType}
         onChange={(e) => onChange({ ...filters, caseType: e.target.value })}
-        className="rounded-lg border border-slate-200 px-2 py-1 text-xs outline-none focus:border-blue-400"
+        className="rounded-lg border border-line px-2 py-1 text-xs outline-none focus:border-brand"
       >
         <option value="">{t("support.filter.all_type", locale)}</option>
         {CASE_TYPES.map((ty) => (
@@ -112,7 +112,7 @@ function SupportListContent() {
             {canCreate && (
               <button
                 onClick={() => router.push("/app/support/new")}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+                className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-dark"
               >
                 {t("support.create_case", effectiveLocale)}
               </button>
@@ -127,7 +127,7 @@ function SupportListContent() {
             />
             <button
               onClick={() => { void loadCases(); void loadStats(); }}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel"
             >
               ⟳
             </button>
@@ -165,9 +165,9 @@ function SupportListContent() {
           </div>
         )}
 
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+            <thead className="border-b border-line bg-panel text-xs uppercase tracking-wide text-ink/60">
               <tr>
                 <th className="px-4 py-2.5">{t("support.col.code", effectiveLocale)}</th>
                 <th className="px-4 py-2.5">{t("support.col.title", effectiveLocale)}</th>
@@ -182,27 +182,27 @@ function SupportListContent() {
               {(cases?.items ?? []).map((c) => (
                 <tr
                   key={c.id}
-                  className="cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50"
+                  className="cursor-pointer border-b border-line transition-colors hover:bg-brand/50"
                   onClick={() => router.push(`/app/support/${c.id}`)}
                 >
                   <td className="px-4 py-2.5">
-                    <span className="font-mono text-xs text-blue-600">{c.code}</span>
+                    <span className="font-mono text-xs text-brand">{c.code}</span>
                   </td>
-                  <td className="px-4 py-2.5 font-medium text-slate-800 max-w-[200px] truncate">{c.title}</td>
-                  <td className="px-4 py-2.5 text-xs text-slate-500">{t(`support.type.${c.caseType}`, effectiveLocale)}</td>
-                  <td className="px-4 py-2.5 text-xs text-slate-500">{t(`support.priority.${c.priority}`, effectiveLocale)}</td>
+                  <td className="px-4 py-2.5 font-medium text-ink max-w-[200px] truncate">{c.title}</td>
+                  <td className="px-4 py-2.5 text-xs text-ink/60">{t(`support.type.${c.caseType}`, effectiveLocale)}</td>
+                  <td className="px-4 py-2.5 text-xs text-ink/60">{t(`support.priority.${c.priority}`, effectiveLocale)}</td>
                   <td className="px-4 py-2.5"><StatusBadge status={c.status} /></td>
-                  <td className="px-4 py-2.5 text-xs text-slate-500">
+                  <td className="px-4 py-2.5 text-xs text-ink/60">
                     {c.assignedToId ? c.assignedToId.substring(0, 8) + "…" : "—"}
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-slate-400">
+                  <td className="px-4 py-2.5 text-xs text-ink/60">
                     {new Date(c.createdAt).toLocaleDateString(effectiveLocale)}
                   </td>
                 </tr>
               ))}
               {(cases?.items ?? []).length === 0 && !loading && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400">
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-ink/60">
                     {t("support.cases_empty", effectiveLocale)}
                   </td>
                 </tr>

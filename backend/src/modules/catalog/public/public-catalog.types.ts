@@ -91,6 +91,24 @@ export interface PublicSeller {
  * Поля location/duration/rating/discount/inventory НЕ моделируются в Catalog —
  * не выдумываются и отсутствуют.
  */
+/**
+ * Сводка предложений физической гостиницы / сопоставимого тура на карточке.
+ * Цена уже приведена к одной валюте; при смешанных валютах minPrice = null
+ * (minimum не выдумывается). Код партнёра — публичный CRM Partner.code
+ * продавца самого дешёвого предложения, не внутренний partnerId.
+ */
+export interface PublicOfferSummary {
+  minPrice: string | null;
+  minPriceCurrency: string;
+  minPartnerCode: string | null;
+  /** Всего предложений, включая текущую карточку. */
+  offersCount: number;
+  /** Есть ли предложения других поставщиков. */
+  hasAlternatives: boolean;
+  /** Id физического отеля — нужен frontend для раскрытия полного списка. */
+  hotelId?: string | null;
+}
+
 export interface PublicProductCard {
   id: string;
   /** Каталожный код продукта (PRD-*) — используется в публичных ссылках /products/PRD-*. */
@@ -134,6 +152,8 @@ export interface PublicProductCard {
   availabilitySummary: PublicAvailabilitySummary | null;
   /** Seller-safe проекция (§8, Step 1.11); null — идентичность скрыта/не задана. */
   seller: PublicSeller | null;
+  /** Лучшее предложение среди одного отеля / сопоставимых туров. */
+  bestOffer?: PublicOfferSummary | null;
   publishedAt: string;
 }
 
@@ -175,6 +195,8 @@ export interface PublicProductDetail {
     seller: PublicSeller | null;
     /** CRM Partner.code — code-only supplier marker on PDP. */
     partnerCode: string | null;
+    /** Лучшее предложение и код его партнёра (общая карточка отеля/тура). */
+    bestOffer?: PublicOfferSummary | null;
     publishedAt: string;
     version: number;
     /**
@@ -230,6 +252,10 @@ export interface PublicProductListQuery {
   geoCountry?: string;
   geoCity?: string;
   geoResort?: string;
+  /** Filter by public supplier code (attributes.supplierCode, e.g. SUMMERTOUR). */
+  supplierCode?: string;
+  /** Filter by tour program (attributes.tourIncName, e.g. "Antalya 2027"). */
+  program?: string;
 }
 
 export interface PublicProductListResult {

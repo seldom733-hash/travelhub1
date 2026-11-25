@@ -51,9 +51,13 @@ export class SupplierController {
   // ── Summer Sync ───────────────────────────────────────────────────
 
   /**
-   * Обновить реестр отелей после синка. Сбой сопоставления НЕ отменяет уже
-   * записанный каталог: это восстановимый шаг (повторный вызов идемпотентен),
-   * поэтому логируем ошибку и возвращаем результат синка.
+   * Обновить реестр отелей после синка. Вызывается и после hotel-sync, и после
+   * tour-sync: HotelMatching.buildRefs собирает ключи из PRODUCT(type=HOTEL) и
+   * PRODUCT(type=TOUR), поэтому новые туры получают канонического отеля сразу,
+   * без отдельного прохода по «Отелям». Это и есть автоподхват новых записей.
+   * Сбой сопоставления НЕ отменяет уже записанный каталог: шаг восстановимый
+   * (повторный вызов идемпотентен), поэтому логируем ошибку и возвращаем
+   * результат синка.
    */
   private async syncHotelRegistry(supplierCode: string): Promise<void> {
     try {
@@ -71,13 +75,17 @@ export class SupplierController {
     if (!partner) {
       throw new Error("Summer partner not found — run summer-partner-seed first");
     }
-    return this.summerSync.runSync(partner.id);
+    const result = await this.summerSync.runSync(partner.id);
+    await this.syncHotelRegistry("SUMMERTOUR");
+    return result;
   }
 
   @Post("summertour/bulk-sync")
   @RequirePermissions("supplier.search.manage")
   async summerBulkSyncEndpoint(@CurrentUser() actor: AuthedRequest["user"]) {
-    return this.summerBulkSync.runBulkSync();
+    const result = await this.summerBulkSync.runBulkSync();
+    await this.syncHotelRegistry("SUMMERTOUR");
+    return result;
   }
 
   // ── KOMPAS Sync ──────────────────────────────────────────────────
@@ -95,12 +103,14 @@ export class SupplierController {
     if (!partner) {
       throw new Error("KOMPAS partner not found — run partner seed first");
     }
-    return this.kompasSync.runSync(partner.id, {
+    const result = await this.kompasSync.runSync(partner.id, {
       countryNameContains: country,
       dateFrom,
       dateTo,
       geoCountryCode,
     });
+    await this.syncHotelRegistry("KOMPAS");
+    return result;
   }
 
   // ── KOMPAS Hotel Sync ─────────────────────────────────────────────
@@ -149,12 +159,14 @@ export class SupplierController {
     if (!partner) {
       throw new Error("KazUnion partner not found — sync cannot run");
     }
-    return this.kazunionSync.runSync(partner.id, {
+    const result = await this.kazunionSync.runSync(partner.id, {
       countryNameContains: country,
       dateFrom,
       dateTo,
       geoCountryCode,
     });
+    await this.syncHotelRegistry("KAZUNION");
+    return result;
   }
 
   /**
@@ -212,7 +224,7 @@ export class SupplierController {
     if (!partner) {
       throw new Error("Voyager partner not found — sync cannot run");
     }
-    return this.voyagerSync.runSync({
+    const result = await this.voyagerSync.runSync({
       countryIsos: countryIsos
         ? countryIsos.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
         : undefined,
@@ -220,6 +232,8 @@ export class SupplierController {
       dateTo,
       maxPages: maxPages ? parseInt(maxPages, 10) : undefined,
     });
+    await this.syncHotelRegistry("VOYAGER");
+    return result;
   }
 
   /**
@@ -265,12 +279,14 @@ export class SupplierController {
     if (!partner) {
       throw new Error("ANEX partner not found — run partner seed first");
     }
-    return this.anexSync.runSync(partner.id, {
+    const result = await this.anexSync.runSync(partner.id, {
       countryNameContains: country,
       dateFrom,
       dateTo,
       geoCountryCode,
     });
+    await this.syncHotelRegistry("ANEX");
+    return result;
   }
 
   @Post("fstravel/sync")

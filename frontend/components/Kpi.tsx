@@ -41,8 +41,8 @@ export default function Kpi({ items, period }: KpiProps) {
               {k.icon}
             </div>
             <div className="min-w-0">
-              <div className="truncate text-[11px] font-medium uppercase tracking-wide text-slate-400">{k.label}</div>
-              <div className="truncate text-lg font-bold text-slate-900">{k.value}</div>
+              <div className="truncate text-[11px] font-medium uppercase tracking-wide text-ink/60">{k.label}</div>
+              <div className="truncate text-lg font-bold text-ink">{k.value}</div>
             </div>
           </>
         );
@@ -52,7 +52,7 @@ export default function Kpi({ items, period }: KpiProps) {
             <Link
               key={k.label}
               href={href}
-              className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all hover:shadow-md hover:border-blue-300 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer"
+              className="flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-3 shadow-sm transition-all hover:shadow-md hover:border-brand/25 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand cursor-pointer"
               aria-label={`${k.label}: ${k.value}`}
             >
               {inner}
@@ -63,7 +63,7 @@ export default function Kpi({ items, period }: KpiProps) {
         return (
           <div
             key={k.label}
-            className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+            className="flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-3 shadow-sm"
           >
             {inner}
           </div>

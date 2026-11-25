@@ -20,6 +20,8 @@ export interface AznMetric {
   unknownCount?: number;
   knownCount?: number;
   note?: string;
+  /** Стабильный код причины для i18n: finance.overview.note.<code>. */
+  noteCode?: string | null;
 }
 
 export interface CurrencyAmount {

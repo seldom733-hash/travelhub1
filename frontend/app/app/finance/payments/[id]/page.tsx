@@ -24,7 +24,7 @@ export default function FinancePaymentsDetailRedirect() {
 
   return (
     <div className="flex h-full items-center justify-center">
-      <div className="h-8 w-48 animate-pulse rounded bg-slate-100" />
+      <div className="h-8 w-48 animate-pulse rounded bg-panel" />
     </div>
   );
 }

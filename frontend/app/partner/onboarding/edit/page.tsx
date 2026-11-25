@@ -110,21 +110,21 @@ export default function PartnerOnboardingEditPage() {
     }
   };
 
-  if (loading) return <div className="py-10 text-center text-sm text-slate-400">{t("state.loading", locale)}</div>;
+  if (loading) return <div className="py-10 text-center text-sm text-ink/60">{t("state.loading", locale)}</div>;
   if (!app) return null;
 
   const inputCls =
-    "w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100";
-  const labelCls = "mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500";
+    "w-full rounded-lg border border-line bg-panel px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand";
+  const labelCls = "mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60";
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{t("partner.edit_title", locale)}</h1>
-          <p className="mt-1 text-sm text-slate-500">{t("partner.edit_hint", locale)}</p>
+          <h1 className="text-2xl font-bold text-ink">{t("partner.edit_title", locale)}</h1>
+          <p className="mt-1 text-sm text-ink/60">{t("partner.edit_hint", locale)}</p>
         </div>
-        <Link href="/partner/onboarding" className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100">
+        <Link href="/partner/onboarding" className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink/60 hover:bg-panel">
           ← {t("partner.back_status", locale)}
         </Link>
       </div>
@@ -132,7 +132,7 @@ export default function PartnerOnboardingEditPage() {
       {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600">{error}</div>}
       {saved && <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700">{t("account.saved", locale)}</div>}
 
-      <form onSubmit={(e) => void save(e)} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <form onSubmit={(e) => void save(e)} className="space-y-4 rounded-2xl border border-line bg-white p-6 shadow-sm">
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label htmlFor="e-brand" className={labelCls}>{t("partner.brand_name", locale)}</label>
@@ -186,7 +186,7 @@ export default function PartnerOnboardingEditPage() {
         </div>
 
         <fieldset>
-          <legend className="mb-2 text-sm font-semibold text-slate-700">{t("partner.service_categories", locale)}</legend>
+          <legend className="mb-2 text-sm font-semibold text-ink">{t("partner.service_categories", locale)}</legend>
           <div className="flex flex-wrap gap-2">
             {categories.map((c) => {
               const on = serviceCategories.includes(c.slug);
@@ -197,7 +197,7 @@ export default function PartnerOnboardingEditPage() {
                   onClick={() => toggleCategory(c.slug)}
                   aria-pressed={on}
                   className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                    on ? "border-emerald-500 bg-emerald-50 font-medium text-emerald-700" : "border-slate-200 text-slate-600 hover:border-emerald-300"
+                    on ? "border-emerald-500 bg-emerald-50 font-medium text-emerald-700" : "border-line text-ink/60 hover:border-emerald-300"
                   }`}
                 >
                   {c.title}
@@ -211,11 +211,11 @@ export default function PartnerOnboardingEditPage() {
           <button
             type="submit"
             disabled={busy || !brandName || !country}
-            className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? t("account.saving", locale) : t("account.save", locale)}
           </button>
-          <Link href="/partner/onboarding" className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100">
+          <Link href="/partner/onboarding" className="rounded-lg border border-line px-4 py-2.5 text-sm font-medium text-ink/60 hover:bg-panel">
             {t("partner.cancel", locale)}
           </Link>
         </div>

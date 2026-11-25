@@ -49,17 +49,17 @@ export default function StorefrontRequestForm({
 
   return (
     <section id="request" className="mx-auto max-w-3xl px-4 py-12">
-      <h2 className="text-xl font-bold text-slate-900">{heading}</h2>
-      {body && <p className="mt-2 text-sm text-slate-600">{body}</p>}
+      <h2 className="text-xl font-bold text-ink">{heading}</h2>
+      {body && <p className="mt-2 text-sm text-ink/60">{body}</p>}
       {done ? (
         <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{successMessage}</div>
       ) : (
         <form onSubmit={submit} className="mt-5 space-y-3">
-          <input required minLength={2} maxLength={120} value={name} onChange={(e) => setName(e.target.value)} placeholder="Ваше имя" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-          <input required minLength={3} maxLength={160} value={contact} onChange={(e) => setContact(e.target.value)} placeholder="Телефон или email" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-          <textarea value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} rows={4} placeholder="Комментарий" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+          <input required minLength={2} maxLength={120} value={name} onChange={(e) => setName(e.target.value)} placeholder="Ваше имя" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+          <input required minLength={3} maxLength={160} value={contact} onChange={(e) => setContact(e.target.value)} placeholder="Телефон или email" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+          <textarea value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} rows={4} placeholder="Комментарий" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
           <input tabIndex={-1} autoComplete="off" value={company} onChange={(e) => setCompany(e.target.value)} className="hidden" aria-hidden="true" />
-          <label className="flex items-start gap-2 text-xs text-slate-500">
+          <label className="flex items-start gap-2 text-xs text-ink/60">
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" />
             Согласен на обработку персональных данных
           </label>

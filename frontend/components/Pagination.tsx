@@ -53,19 +53,19 @@ export default function Pagination({
   }
 
   return (
-    <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
-      <span className="text-xs text-slate-500">{rangeLabel}</span>
+    <div className="flex items-center justify-between border-t border-line px-4 py-3">
+      <span className="text-xs text-ink/60">{rangeLabel}</span>
       <div className="flex items-center gap-1">
         <button
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
-          className="rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300"
+          className="rounded px-2 py-1 text-xs font-medium text-ink/60 hover:bg-panel disabled:cursor-not-allowed disabled:text-ink/60"
         >
           ‹
         </button>
         {pages.map((p, i) =>
           p === "..." ? (
-            <span key={`dots-${i}`} className="px-1 text-xs text-slate-400">
+            <span key={`dots-${i}`} className="px-1 text-xs text-ink/60">
               …
             </span>
           ) : (
@@ -74,8 +74,8 @@ export default function Pagination({
               onClick={() => onPageChange(p)}
               className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
                 p === page
-                  ? "bg-blue-600 text-white"
-                  : "text-slate-600 hover:bg-slate-100"
+                  ? "bg-brand text-white"
+                  : "text-ink/60 hover:bg-panel"
               }`}
             >
               {p}
@@ -85,7 +85,7 @@ export default function Pagination({
         <button
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
-          className="rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300"
+          className="rounded px-2 py-1 text-xs font-medium text-ink/60 hover:bg-panel disabled:cursor-not-allowed disabled:text-ink/60"
         >
           ›
         </button>

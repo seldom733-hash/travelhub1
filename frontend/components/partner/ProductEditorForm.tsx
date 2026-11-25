@@ -47,9 +47,9 @@ export interface ProductEditorFormProps {
 
 function Panel({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-      {hint && <p className="mb-4 mt-0.5 text-xs text-slate-400">{hint}</p>}
+    <section className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+      <h2 className="text-base font-semibold text-ink">{title}</h2>
+      {hint && <p className="mb-4 mt-0.5 text-xs text-ink/60">{hint}</p>}
       {children}
     </section>
   );
@@ -90,7 +90,7 @@ export default function ProductEditorForm(props: ProductEditorFormProps) {
   return (
     <div className="space-y-5">
       {lockBanner && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">{lockBanner}</div>
+        <div className="rounded-xl border border-brand/20 bg-brand/10 px-4 py-3 text-sm text-ink">{lockBanner}</div>
       )}
       {proposalBanner && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
@@ -102,7 +102,7 @@ export default function ProductEditorForm(props: ProductEditorFormProps) {
       <Panel title={pt("partner.form.basic", locale)} hint={pt("partner.form.basic_hint", locale)}>
         <div className="space-y-4">
           <div>
-            <label htmlFor="pef-title" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="pef-title" className="mb-1 block text-sm font-medium text-ink">
               {pt("partner.form.title", locale)}
               <span className="ml-1 text-rose-500" aria-hidden>
                 *
@@ -114,12 +114,12 @@ export default function ProductEditorForm(props: ProductEditorFormProps) {
               onChange={(e) => set({ title: e.target.value })}
               disabled={readOnly}
               placeholder={pt("partner.form.title_ph", locale)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:bg-panel"
             />
           </div>
 
           <div>
-            <label htmlFor="pef-category" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="pef-category" className="mb-1 block text-sm font-medium text-ink">
               {pt("partner.form.category", locale)}
               {onSelectCategory && (
                 <span className="ml-1 text-rose-500" aria-hidden>
@@ -132,7 +132,7 @@ export default function ProductEditorForm(props: ProductEditorFormProps) {
                 id="pef-category"
                 value={categoryId ?? ""}
                 onChange={(e) => onSelectCategory(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400"
               >
                 <option value="">{pt("partner.form.category_ph", locale)}</option>
                 {categories.map((c) => (
@@ -142,14 +142,14 @@ export default function ProductEditorForm(props: ProductEditorFormProps) {
                 ))}
               </select>
             ) : (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink/60">
                 {categories.find((c) => c.id === categoryId)?.title ?? pt("partner.product.no_category", locale)}
               </div>
             )}
           </div>
 
           <div>
-            <label htmlFor="pef-description" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="pef-description" className="mb-1 block text-sm font-medium text-ink">
               {pt("partner.form.description", locale)}
             </label>
             <textarea
@@ -159,7 +159,7 @@ export default function ProductEditorForm(props: ProductEditorFormProps) {
               disabled={readOnly}
               rows={5}
               placeholder={pt("partner.form.description_ph", locale)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:bg-panel"
             />
           </div>
         </div>
@@ -167,7 +167,7 @@ export default function ProductEditorForm(props: ProductEditorFormProps) {
 
       <Panel title={pt("partner.form.attributes", locale)} hint={pt("partner.form.attributes_hint", locale)}>
         {!categoryId ? (
-          <p className="text-sm text-slate-400">{pt("partner.form.choose_category_first", locale)}</p>
+          <p className="text-sm text-ink/60">{pt("partner.form.choose_category_first", locale)}</p>
         ) : schemaLoading ? (
           /* §SKELETON-PARITY: реальная форма атрибутов — `DynamicSchemaForm`
              (`space-y-4`, подпись `text-sm` + контрол `w-full rounded-lg border
@@ -176,9 +176,9 @@ export default function ProductEditorForm(props: ProductEditorFormProps) {
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i}>
                 <div className="mb-1 flex items-baseline justify-between gap-2">
-                  <div className="h-4 w-32 animate-pulse rounded bg-slate-100" />
+                  <div className="h-4 w-32 animate-pulse rounded bg-panel" />
                 </div>
-                <div className="h-10 w-full animate-pulse rounded-lg border border-slate-200 bg-slate-50" />
+                <div className="h-10 w-full animate-pulse rounded-lg border border-line bg-panel" />
               </div>
             ))}
           </div>
@@ -200,32 +200,32 @@ export default function ProductEditorForm(props: ProductEditorFormProps) {
 
       <Panel title={pt("partner.form.availability", locale)}>
         {availabilityRows.length === 0 ? (
-          <p className="text-sm text-slate-400">{pt("partner.form.no_availability", locale)}</p>
+          <p className="text-sm text-ink/60">{pt("partner.form.no_availability", locale)}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-72 text-left text-xs">
-              <thead className="border-b border-slate-100 text-[10px] uppercase text-slate-400">
+              <thead className="border-b border-line text-[10px] uppercase text-ink/60">
                 <tr>
                   <th className="py-2 pr-3 font-medium">{pt("partner.form.category", locale)}</th>
                   <th className="py-2 pr-3 font-medium">{pt("partner.moderation.version", locale)}</th>
                   <th className="py-2 font-medium">slots</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-line">
                 {availabilityRows.map((a) => (
                   <tr key={a.id}>
-                    <td className="py-2 pr-3 text-slate-700">{formatDate(a.date, locale)}</td>
-                    <td className="py-2 pr-3 text-slate-500">
+                    <td className="py-2 pr-3 text-ink">{formatDate(a.date, locale)}</td>
+                    <td className="py-2 pr-3 text-ink/60">
                       {a.slotsTotal} ({a.slotsBooked + a.slotsReserved} / {a.slotsTotal})
                     </td>
-                    <td className="py-2 text-slate-400">{a.tariffId ? "tariff" : "—"}</td>
+                    <td className="py-2 text-ink/60">{a.tariffId ? "tariff" : "—"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-        <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500">
+        <p className="mt-3 rounded-lg bg-panel px-3 py-2 text-[11px] leading-relaxed text-ink/60">
           {pt("partner.form.availability_readonly", locale)}
         </p>
       </Panel>
@@ -234,12 +234,12 @@ export default function ProductEditorForm(props: ProductEditorFormProps) {
         {mediaRequirements && (
           <div className="mb-3 flex flex-wrap gap-2 text-[11px]">
             {mediaRequirements.minImages !== undefined && (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
+              <span className="rounded-full bg-panel px-2 py-0.5 text-ink/60">
                 {pt("partner.media.min_images", locale)}: {mediaRequirements.minImages}
               </span>
             )}
             {mediaRequirements.maxImages !== undefined && (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
+              <span className="rounded-full bg-panel px-2 py-0.5 text-ink/60">
                 {pt("partner.media.max_images", locale)}: {mediaRequirements.maxImages}
               </span>
             )}
@@ -247,13 +247,13 @@ export default function ProductEditorForm(props: ProductEditorFormProps) {
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">{pt("partner.media.primary_required", locale)}</span>
             )}
             {mediaRequirements.allowedMediaTypes && (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
+              <span className="rounded-full bg-panel px-2 py-0.5 text-ink/60">
                 {pt("partner.media.allowed_types", locale)}: {mediaRequirements.allowedMediaTypes.join(", ")}
               </span>
             )}
           </div>
         )}
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-ink/60">
           {mediaCount} {pt("partner.products.count", locale)}
         </p>
         {mediaHref && (

@@ -47,7 +47,10 @@ export interface AznMetric {
   /** Компоненты без данных (для PARTIAL/UNKNOWN). */
   unknownCount?: number;
   knownCount?: number;
+  /** Человекочитаемое пояснение (EN) — fallback, если noteCode неизвестен фронту. */
   note?: string;
+  /** Стабильный код причины для i18n: finance.overview.note.<code>. */
+  noteCode?: string;
 }
 
 export interface CurrencyAmount {
@@ -168,11 +171,13 @@ export class FinanceOverviewService {
       actualProfit: {
         amount: null,
         availability: "UNAVAILABLE",
+        noteCode: "ACTUAL_PROFIT_POLICY",
         note: "Actual profit requires a documented recognition policy over confirmed service events (Phase 5); not derived from captured−payouts.",
       },
       netCashFlow: {
         amount: null,
         availability: "UNAVAILABLE",
+        noteCode: "NET_CASH_FLOW_POLICY",
         note: "Net cash flow requires complete explicit incoming/outgoing movement sources (Phase 5); not derived here.",
       },
       generatedAt: new Date().toISOString(),
@@ -331,6 +336,7 @@ export class FinanceOverviewService {
         availability: unknown > 0 ? "UNKNOWN" : "OK",
         knownCount: 0,
         unknownCount: unknown,
+        noteCode: unknown > 0 ? "MARGIN_NO_SNAPSHOT" : undefined,
         note: unknown > 0 ? "No frozen AZN commercial snapshot available for margin." : undefined,
       };
     }
@@ -339,6 +345,7 @@ export class FinanceOverviewService {
       availability: unknown > 0 ? "PARTIAL" : "OK",
       knownCount: known,
       unknownCount: unknown,
+      noteCode: unknown > 0 ? "MARGIN_PARTIAL" : undefined,
       note: unknown > 0 ? `Margin covers ${known} of ${known + unknown} orders; ${unknown} lack frozen AZN snapshot.` : undefined,
     };
   }
@@ -361,6 +368,7 @@ export class FinanceOverviewService {
       azn: {
         amount: null,
         availability: "UNKNOWN",
+        noteCode: "RECEIPTS_AZN_NO_FX",
         note: "AZN conversion of historical captured payments requires a frozen per-payment FX rate (not stored); source-currency totals disclosed instead.",
       },
     };
@@ -397,6 +405,7 @@ export class FinanceOverviewService {
       azn: {
         amount: null,
         availability: "UNKNOWN",
+        noteCode: "DEBT_AZN_NO_FROZEN",
         note: "AZN debt requires frozen per-order AZN amount; source-currency debt disclosed instead.",
       },
     };

@@ -100,7 +100,7 @@ export default function MediaManager({ productId }: { productId: string }) {
   const liveLocked = (m: PartnerMediaItem): boolean => m.status === "PUBLISHED";
 
   if (!media) {
-    return <div className="py-10 text-center text-sm text-slate-400">{pt("partner.state.loading", locale)}</div>;
+    return <div className="py-10 text-center text-sm text-ink/60">{pt("partner.state.loading", locale)}</div>;
   }
 
   return (
@@ -108,8 +108,8 @@ export default function MediaManager({ productId }: { productId: string }) {
       {error && <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       {requirements && (
-        <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4">
-          <h3 className="mb-2 text-sm font-semibold text-slate-700">{pt("partner.media.requirements", locale)}</h3>
+        <div className="mb-4 rounded-2xl border border-line bg-white p-4">
+          <h3 className="mb-2 text-sm font-semibold text-ink">{pt("partner.media.requirements", locale)}</h3>
           <div className="flex flex-wrap gap-2 text-[11px]">
             {requirements.minImages !== undefined && (
               <span className={`rounded-full px-2 py-0.5 ${media.length < requirements.minImages ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>
@@ -117,7 +117,7 @@ export default function MediaManager({ productId }: { productId: string }) {
               </span>
             )}
             {requirements.maxImages !== undefined && (
-              <span className={`rounded-full px-2 py-0.5 ${media.length > requirements.maxImages ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"}`}>
+              <span className={`rounded-full px-2 py-0.5 ${media.length > requirements.maxImages ? "bg-rose-100 text-rose-700" : "bg-panel text-ink/60"}`}>
                 {pt("partner.media.max_images", locale)}: {media.length}/{requirements.maxImages}
               </span>
             )}
@@ -127,7 +127,7 @@ export default function MediaManager({ productId }: { productId: string }) {
               </span>
             )}
             {requirements.allowedMediaTypes && (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
+              <span className="rounded-full bg-panel px-2 py-0.5 text-ink/60">
                 {pt("partner.media.allowed_types", locale)}: {requirements.allowedMediaTypes.join(", ")}
               </span>
             )}
@@ -160,7 +160,7 @@ export default function MediaManager({ productId }: { productId: string }) {
       </div>
 
       {media.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-400">
+        <div className="rounded-2xl border border-dashed border-line bg-white p-10 text-center text-sm text-ink/60">
           {pt("partner.media.empty", locale)}
         </div>
       ) : (
@@ -169,13 +169,13 @@ export default function MediaManager({ productId }: { productId: string }) {
             const url = thumbUrl(m);
             const locked = liveLocked(m);
             return (
-              <div key={m.id} className={`rounded-2xl border bg-white p-3 shadow-sm ${m.isPrimary ? "border-emerald-300" : "border-slate-200"}`}>
-                <div className="relative mb-2 flex h-32 items-center justify-center overflow-hidden rounded-xl bg-slate-100">
+              <div key={m.id} className={`rounded-2xl border bg-white p-3 shadow-sm ${m.isPrimary ? "border-emerald-300" : "border-line"}`}>
+                <div className="relative mb-2 flex h-32 items-center justify-center overflow-hidden rounded-xl bg-panel">
                   {url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={url} alt={m.altText ?? m.originalFileName} className="size-full object-cover" />
                   ) : (
-                    <span className="text-slate-300">…</span>
+                    <span className="text-ink/60">…</span>
                   )}
                   {m.isPrimary && (
                     <span className="absolute left-1.5 top-1.5 rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-semibold uppercase text-white">
@@ -224,7 +224,7 @@ export default function MediaManager({ productId }: { productId: string }) {
                           type="button"
                           disabled={busy || m.sortOrder === 0}
                           onClick={() => run(() => partnerApi.reorderMedia(productId, move(media, m.id, -1).map((x) => x.id)))}
-                          className="rounded-md bg-slate-50 px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-100"
+                          className="rounded-md bg-panel px-2 py-1 text-[10px] text-ink/60 hover:bg-panel"
                           aria-label={pt("partner.media.up", locale)}
                         >
                           ↑
@@ -233,12 +233,12 @@ export default function MediaManager({ productId }: { productId: string }) {
                           type="button"
                           disabled={busy || m.sortOrder === media.length - 1}
                           onClick={() => run(() => partnerApi.reorderMedia(productId, move(media, m.id, 1).map((x) => x.id)))}
-                          className="rounded-md bg-slate-50 px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-100"
+                          className="rounded-md bg-panel px-2 py-1 text-[10px] text-ink/60 hover:bg-panel"
                           aria-label={pt("partner.media.down", locale)}
                         >
                           ↓
                         </button>
-                        <label className="cursor-pointer rounded-md bg-slate-50 px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-100">
+                        <label className="cursor-pointer rounded-md bg-panel px-2 py-1 text-[10px] text-ink/60 hover:bg-panel">
                           {pt("partner.media.replace", locale)}
                           <input
                             ref={(el) => {
@@ -319,7 +319,7 @@ function MetaInput({
         }}
         placeholder={label}
         disabled={disabled}
-        className="w-full rounded-md border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-emerald-400 disabled:bg-slate-50"
+        className="w-full rounded-md border border-line px-2 py-1 text-[11px] outline-none focus:border-emerald-400 disabled:bg-panel"
       />
     </div>
   );

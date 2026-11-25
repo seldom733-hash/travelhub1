@@ -49,6 +49,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/app/requests/create", icon: "➕", labelKey: "nav.request_create", permissions: ["order.edit_noncritical"] },
       { href: "/app/finance/deals", icon: "🗂️", labelKey: "nav.finance_deals", permissions: ["finance.overview.read"] },
+      { href: "/app/documents", icon: "📄", labelKey: "nav.documents", permissions: ["documents.read"] },
     ],
   },
   {
@@ -67,6 +68,7 @@ export const NAV_GROUPS: NavGroup[] = [
     headingKey: "nav.group.commercial",
     items: [
       { href: "/app/catalog", icon: "📚", labelKey: "nav.catalog", permissions: ["catalog.product.read"] },
+      { href: "/app/hotel-matching", icon: "🧩", labelKey: "nav.hotel_matching", permissions: ["catalog.product.read"] },
       { href: "/app/crm", icon: "🤝", labelKey: "nav.crm", permissions: ["crm.customer.read", "crm.partner.read"] },
       { href: "/app/sales/assignment", icon: "🧭", labelKey: "nav.assignment", permissions: ["request.assignment.read"] },
       { href: "/app/my-status", icon: "🟢", labelKey: "nav.my_status", permissions: ["request.load.read"] },
@@ -152,6 +154,7 @@ export const ROUTE_ACCESS: RouteAccess[] = [
   { prefix: "/app/finance/fx-rates", permissions: ["finance.fx_rate.read"] },
   { prefix: "/app/pricing/markup", permissions: ["pricing.markup.read"] },
   { prefix: "/app/catalog", permissions: ["catalog.product.read"] },
+  { prefix: "/app/hotel-matching", permissions: ["catalog.product.read"] },
   { prefix: "/app/crm/customers", permissions: ["crm.customer.read"] },
   { prefix: "/app/crm/partners", permissions: ["crm.partner.read"] },
   { prefix: "/app/crm", permissions: ["crm.customer.read", "crm.partner.read"] },

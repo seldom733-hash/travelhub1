@@ -93,10 +93,10 @@ export default function StorefrontBlocks({
         if (!body) return null;
         return (
           <section key={section.blockInstanceId} className="mx-auto max-w-6xl px-4 py-10">
-            <h2 className="text-xl font-bold text-slate-900">{heading}</h2>
-            <p className="mt-3 max-w-3xl whitespace-pre-line text-sm leading-relaxed text-slate-600">{body}</p>
+            <h2 className="text-xl font-bold text-ink">{heading}</h2>
+            <p className="mt-3 max-w-3xl whitespace-pre-line text-sm leading-relaxed text-ink/60">{body}</p>
             {formatLocation(sf.countryCode, sf.cityCode, locale) && (
-              <div className="mt-4 text-sm text-slate-500">📍 {formatLocation(sf.countryCode, sf.cityCode, locale)}</div>
+              <div className="mt-4 text-sm text-ink/60">📍 {formatLocation(sf.countryCode, sf.cityCode, locale)}</div>
             )}
           </section>
         );
@@ -106,9 +106,9 @@ export default function StorefrontBlocks({
         const pageSize = Math.min(24, Math.max(1, Number(section.settings.pageSize) || 12));
         return (
           <section key={section.blockInstanceId} id="products" className="mx-auto w-full max-w-6xl px-4 pb-12">
-            <h2 className="text-xl font-bold text-slate-900">{heading}</h2>
+            <h2 className="text-xl font-bold text-ink">{heading}</h2>
             {!products || products.items.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-400">{t("storefront.no_products", locale)}</p>
+              <p className="mt-4 text-sm text-ink/60">{t("storefront.no_products", locale)}</p>
             ) : (
               <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {products.items.slice(0, pageSize).map((p) => (
@@ -125,9 +125,9 @@ export default function StorefrontBlocks({
         const label = text(section.settings.label);
         if (!heading && !label) return null;
         return (
-          <section key={section.blockInstanceId} className="border-y border-slate-100 bg-slate-50">
+          <section key={section.blockInstanceId} className="border-y border-line bg-panel">
             <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-10">
-              {heading && <h2 className="text-xl font-bold text-slate-900">{heading}</h2>}
+              {heading && <h2 className="text-xl font-bold text-ink">{heading}</h2>}
               {label && (
                 <a href={safeHref(section.settings.href, "#contacts")} style={accentColor ? { backgroundColor: accentColor } : undefined} className={`rounded-lg px-5 py-2.5 text-sm font-semibold text-white ${theme.accent}`}>
                   {label}
@@ -140,10 +140,10 @@ export default function StorefrontBlocks({
       case "storefront-contacts": {
         const heading = text(section.settings.heading, t("storefront.contacts", locale));
         return (
-          <section key={section.blockInstanceId} id="contacts" className="border-t border-slate-100 bg-slate-50">
+          <section key={section.blockInstanceId} id="contacts" className="border-t border-line bg-panel">
             <div className="mx-auto max-w-6xl px-4 py-10">
-              <h2 className="text-xl font-bold text-slate-900">{heading}</h2>
-              <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-sm text-slate-600">
+              <h2 className="text-xl font-bold text-ink">{heading}</h2>
+              <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-sm text-ink/60">
                 {sf.publicPhone && <a href={`tel:${sf.publicPhone.replace(/[^+\d]/g, "")}`} onClick={() => fireContactClick(sf.slug, "PHONE")} className={theme.accentHover}>📞 {sf.publicPhone}</a>}
                 {sf.publicEmail && <a href={`mailto:${sf.publicEmail}`} onClick={() => fireContactClick(sf.slug, "EMAIL")} className={theme.accentHover}>✉️ {sf.publicEmail}</a>}
                 {sf.whatsapp && <a href={`https://wa.me/${sf.whatsapp.replace(/[^+\d]/g, "")}`} target="_blank" rel="noopener noreferrer" onClick={() => fireContactClick(sf.slug, "WHATSAPP")} className={theme.accentHover}>💬 WhatsApp</a>}
@@ -164,12 +164,12 @@ export default function StorefrontBlocks({
         if (items.length === 0) return null;
         return (
           <section key={section.blockInstanceId} className="mx-auto max-w-4xl px-4 py-10">
-            <h2 className="text-xl font-bold text-slate-900">{heading}</h2>
+            <h2 className="text-xl font-bold text-ink">{heading}</h2>
             <div className="mt-5 space-y-2">
               {items.map(({ question, answer }, i) => (
-                <details key={`${section.blockInstanceId}-${i}`} className="rounded-lg border border-slate-200 bg-white p-4">
-                  <summary className="cursor-pointer text-sm font-semibold text-slate-800">{question}</summary>
-                  <p className="mt-2 whitespace-pre-line text-sm text-slate-600">{answer}</p>
+                <details key={`${section.blockInstanceId}-${i}`} className="rounded-lg border border-line bg-white p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-ink">{question}</summary>
+                  <p className="mt-2 whitespace-pre-line text-sm text-ink/60">{answer}</p>
                 </details>
               ))}
             </div>
@@ -188,7 +188,7 @@ export default function StorefrontBlocks({
         if (images.length === 0) return null;
         return (
           <section key={section.blockInstanceId} className="mx-auto max-w-6xl px-4 py-10">
-            {heading && <h2 className="mb-5 text-xl font-bold text-slate-900">{heading}</h2>}
+            {heading && <h2 className="mb-5 text-xl font-bold text-ink">{heading}</h2>}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {images.map((src, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -213,9 +213,9 @@ export default function StorefrontBlocks({
       case "storefront-footer": {
         const footerText = text(section.settings.text, name);
         return (
-          <footer key={section.blockInstanceId} className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-400">
+          <footer key={section.blockInstanceId} className="border-t border-line bg-white py-6 text-center text-xs text-ink/60">
             {footerText}
-            {!brandingLoading && <> — {t("storefront.powered_by", locale)} <Link href="/" className="text-slate-500 hover:underline">{brandName}</Link></>}
+            {!brandingLoading && <> — {t("storefront.powered_by", locale)} <Link href="/" className="text-ink/60 hover:underline">{brandName}</Link></>}
           </footer>
         );
       }
@@ -239,12 +239,12 @@ export default function StorefrontBlocks({
           </div>
           <nav className="ml-auto flex items-center gap-1 text-sm" aria-label="Storefront">
             {menu.map((item) => (
-              <Link key={item.slug} href={item.isHome ? `/store/${sf.slug}` : `/store/${sf.slug}/${item.slug}`} className={`rounded-lg px-3 py-1.5 text-slate-600 ${theme.accentHover}`}>
+              <Link key={item.slug} href={item.isHome ? `/store/${sf.slug}` : `/store/${sf.slug}/${item.slug}`} className={`rounded-lg px-3 py-1.5 text-ink/60 ${theme.accentHover}`}>
                 {item.name}
               </Link>
             ))}
-            {hasProducts && <a href="#products" className={`rounded-lg px-3 py-1.5 text-slate-600 ${theme.accentHover}`}>{t("storefront.products", locale)}</a>}
-            {hasContacts && <a href="#contacts" className={`rounded-lg px-3 py-1.5 text-slate-600 ${theme.accentHover}`}>{t("storefront.contacts", locale)}</a>}
+            {hasProducts && <a href="#products" className={`rounded-lg px-3 py-1.5 text-ink/60 ${theme.accentHover}`}>{t("storefront.products", locale)}</a>}
+            {hasContacts && <a href="#contacts" className={`rounded-lg px-3 py-1.5 text-ink/60 ${theme.accentHover}`}>{t("storefront.contacts", locale)}</a>}
           </nav>
         </div>
       </header>

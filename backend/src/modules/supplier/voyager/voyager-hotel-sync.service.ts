@@ -15,7 +15,8 @@
  * never invented) and writes the PUBLIC AZN amount; a missing rate falls
  * open (source currency, no FX) — same boundary as the tour sync.
  */
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
+import { ProductHistoryRecorder } from "../product-history-recorder.service";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
 import { VoyagerHotelAdapter } from "./voyager-hotel.adapter";
@@ -90,6 +91,7 @@ export class VoyagerHotelSyncService {
     private readonly http: VoyagerHttpService,
     private readonly pricing: SupplierPricingService,
     private readonly ids: IdsService,
+    @Optional() private readonly history?: ProductHistoryRecorder,
   ) {}
 
   async getVoyagerPartner(): Promise<{ id: string } | null> {
@@ -396,6 +398,9 @@ export class VoyagerHotelSyncService {
         if (geoCountryId && !(existing as any).geoCountryId) patch.geoCountryId = geoCountryId;
         if (Object.keys(patch).length > 0) {
           await tx.product.update({ where: { id: existing.id }, data: patch });
+        }
+        if (this.history) {
+          await this.history.record(tx, existing.id, existing.version, patch);
         }
         const counts = await this.upsertTariffs(tx, existing.id, tariffs);
         result.tariffsCreated += counts.created;

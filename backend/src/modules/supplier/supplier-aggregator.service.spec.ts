@@ -39,6 +39,8 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
   let mockOfferService: { search: jest.Mock };
   let mockPrisma: {
     supplierGeoLink: { findMany: jest.Mock };
+    hotelSupplierRef: { findMany: jest.Mock };
+    geoCountry: { findUnique: jest.Mock };
     geoCity: { findUnique: jest.Mock };
     geoResort: { findUnique: jest.Mock };
     partner: { findFirst: jest.Mock };
@@ -104,6 +106,8 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
 
     mockPrisma = {
       supplierGeoLink: { findMany: jest.fn().mockResolvedValue([]) },
+      hotelSupplierRef: { findMany: jest.fn().mockResolvedValue([]) },
+      geoCountry: { findUnique: jest.fn().mockResolvedValue(null) },
       geoCity: { findUnique: jest.fn().mockResolvedValue(null) },
       geoResort: { findUnique: jest.fn().mockResolvedValue(null) },
       // CRM gate: no partner → legacy behaviour (supplier stays enabled).
@@ -483,6 +487,28 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
     const resolved = await aggregator.resolveSuppliers("tours", baseQuery);
 
     expect(resolved).toEqual(["KOMPAS"]);
+  });
+
+  it("выбранный отель без SupplierGeoLink резолвится через единый реестр отелей", async () => {
+    // VOYAGER/HURAWALHI 23280: в geo-инжесте нет записи, но HotelSupplierRef есть.
+    mockPrisma.hotelSupplierRef.findMany.mockResolvedValue([
+      { supplierCode: "KOMPAS", externalKey: "23280", hotel: { name: "Hurawalhi Island Resort" } },
+    ]);
+    mockOfferService.search.mockImplementation((code: string, q: SupplierSearchQuery) => {
+      searchedSuppliers.push(code);
+      searchedQueries.push(q);
+      return Promise.resolve([makeOffer(code, "HURAWALHI ISLAND RESORT. 5*")]);
+    });
+
+    const result = await aggregator.searchByService("tours", {
+      country: "MV",
+      hotel: "HURAWALHI ISLAND RESORT",
+      adults: 2,
+    });
+
+    expect(searchedQueries[0].hotelExternalId).toBe("23280");
+    expect(result.offers).toHaveLength(2); // SUMMERTOUR не поддерживает MV; остальные проходят фильтр по имени
+    expect(result.offers.every((o) => /HURAWALHI/i.test(o.hotel))).toBe(true);
   });
 });
 

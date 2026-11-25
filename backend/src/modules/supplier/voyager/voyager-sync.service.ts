@@ -14,7 +14,7 @@
  * catalog write converts USD→AZN through SupplierFxRateService (seeded rate,
  * never invented) and writes the public AZN price.
  */
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
 import { VoyagerAdapter } from "./voyager.adapter";
@@ -25,6 +25,7 @@ import {
 } from "./voyager-countries";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
 import { resolveGeoCountryId } from "../geo-country-resolver";
+import { ProductHistoryRecorder } from "../product-history-recorder.service";
 import type { SupplierOffer } from "../supplier.types";
 
 export interface VoyagerSyncResult {
@@ -60,6 +61,7 @@ export class VoyagerSyncService {
     private readonly http: VoyagerHttpService,
     private readonly pricing: SupplierPricingService,
     private readonly ids: IdsService,
+    @Optional() private readonly history?: ProductHistoryRecorder,
   ) {}
 
   /** Find (or create) the Voyager supplier partner under the PRN-* scheme. */
@@ -314,6 +316,10 @@ export class VoyagerSyncService {
                 where: { id: existing.id },
                 data: { geoCountryId },
               });
+              patch.geoCountryId = geoCountryId;
+            }
+            if (this.history) {
+              await this.history.record(tx, existing.id, existing.version, patch);
             }
           });
           if (minPrice > 0 && (existing.attributes as any)?.startingPrice !== minPrice) {

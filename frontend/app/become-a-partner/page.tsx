@@ -103,24 +103,24 @@ function BecomeAPartnerInner() {
   };
 
   const inputCls =
-    "w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100";
-  const labelCls = "mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500";
+    "w-full rounded-lg border border-line bg-panel px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand";
+  const labelCls = "mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60";
 
   return (
     <PublicLayout>
       <div className="mx-auto max-w-3xl px-4 py-10">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-emerald-600 text-xl font-bold text-white">T</div>
-          <h1 className="text-2xl font-bold text-slate-900">{t("partner.reg_title", locale)}</h1>
-          <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500">{t("partner.reg_subtitle", locale)}</p>
+          <h1 className="text-2xl font-bold text-ink">{t("partner.reg_title", locale)}</h1>
+          <p className="mx-auto mt-2 max-w-xl text-sm text-ink/60">{t("partner.reg_subtitle", locale)}</p>
           <div className="mx-auto mt-4 inline-flex max-w-xl items-center gap-2 rounded-full bg-amber-50 px-4 py-1.5 text-xs text-amber-700">
             <span aria-hidden>⏳</span> {t("partner.reg_notice", locale)}
           </div>
         </div>
 
-        <form onSubmit={(e) => void submit(e)} className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <form onSubmit={(e) => void submit(e)} className="space-y-5 rounded-2xl border border-line bg-white p-6 shadow-sm">
           <fieldset>
-            <legend className="mb-3 text-sm font-semibold text-slate-700">{t("partner.identity_section", locale)}</legend>
+            <legend className="mb-3 text-sm font-semibold text-ink">{t("partner.identity_section", locale)}</legend>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="p-first" className={labelCls}>{t("register.first_name", locale)}</label>
@@ -146,7 +146,7 @@ function BecomeAPartnerInner() {
           </fieldset>
 
           <fieldset>
-            <legend className="mb-3 text-sm font-semibold text-slate-700">{t("partner.business_section", locale)}</legend>
+            <legend className="mb-3 text-sm font-semibold text-ink">{t("partner.business_section", locale)}</legend>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="p-type" className={labelCls}>{t("partner.applicant_type", locale)}</label>
@@ -208,8 +208,8 @@ function BecomeAPartnerInner() {
           </fieldset>
 
           <fieldset>
-            <legend className="mb-2 text-sm font-semibold text-slate-700">{t("partner.service_categories", locale)}</legend>
-            <p className="mb-2 text-xs text-slate-400">{t("partner.categories_hint", locale)}</p>
+            <legend className="mb-2 text-sm font-semibold text-ink">{t("partner.service_categories", locale)}</legend>
+            <p className="mb-2 text-xs text-ink/60">{t("partner.categories_hint", locale)}</p>
             <div className="flex flex-wrap gap-2">
               {categories.map((c) => {
                 const on = serviceCategories.includes(c.slug);
@@ -220,7 +220,7 @@ function BecomeAPartnerInner() {
                     onClick={() => toggleCategory(c.slug)}
                     aria-pressed={on}
                     className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                      on ? "border-emerald-500 bg-emerald-50 font-medium text-emerald-700" : "border-slate-200 text-slate-600 hover:border-emerald-300"
+                      on ? "border-emerald-500 bg-emerald-50 font-medium text-emerald-700" : "border-line text-ink/60 hover:border-emerald-300"
                     }`}
                   >
                     {c.title}
@@ -230,8 +230,8 @@ function BecomeAPartnerInner() {
             </div>
           </fieldset>
 
-          <label className="flex items-start gap-2 text-sm text-slate-600">
-            <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} className="mt-0.5 size-4 rounded border-slate-300" />
+          <label className="flex items-start gap-2 text-sm text-ink/60">
+            <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} className="mt-0.5 size-4 rounded border-line" />
             <span>{t("partner.terms_label", locale)}</span>
           </label>
 
@@ -245,9 +245,9 @@ function BecomeAPartnerInner() {
             {busy ? t("partner.reg_busy", locale) : t("partner.reg_submit", locale)}
           </button>
 
-          <p className="text-center text-xs text-slate-400">
+          <p className="text-center text-xs text-ink/60">
             {t("auth.has_account", locale)}{" "}
-            <Link href="/login" className="font-medium text-blue-600 hover:text-blue-700">
+            <Link href="/login" className="font-medium text-brand hover:text-brand-dark">
               {t("auth.login_link", locale)}
             </Link>
           </p>

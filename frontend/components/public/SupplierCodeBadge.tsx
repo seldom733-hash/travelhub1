@@ -10,7 +10,7 @@ export default function SupplierCodeBadge({ code, className }: { code: string | 
   const locale = useLocale();
   if (!code) return null;
   return (
-    <p className={className ?? "text-[11px] text-slate-500"}>
+    <p className={className ?? "text-[11px] text-ink/60"}>
       {t("card.supplier_code", locale)}: <span className="font-mono">{code}</span>
     </p>
   );

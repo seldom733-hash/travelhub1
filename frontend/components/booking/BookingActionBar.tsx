@@ -17,13 +17,13 @@ import { t, useLocale } from "@/lib/i18n";
  * returnToOrder.
  */
 const ACTION_UI: Record<string, { labelKey: string; cls: string; confirmKey?: string }> = {
-  prepare: { labelKey: "booking.action_short.prepare", cls: "bg-sky-600 hover:bg-sky-700" },
-  send: { labelKey: "booking.action_short.send", cls: "bg-blue-600 hover:bg-blue-700" },
-  requestClarification: { labelKey: "booking.action_short.requestClarification", cls: "bg-slate-500 hover:bg-slate-600" },
-  resume: { labelKey: "booking.action_short.resume", cls: "bg-sky-600 hover:bg-sky-700" },
+  prepare: { labelKey: "booking.action_short.prepare", cls: "bg-brand hover:bg-brand-dark" },
+  send: { labelKey: "booking.action_short.send", cls: "bg-brand hover:bg-brand-dark" },
+  requestClarification: { labelKey: "booking.action_short.requestClarification", cls: "bg-ink hover:bg-brand" },
+  resume: { labelKey: "booking.action_short.resume", cls: "bg-brand hover:bg-brand-dark" },
   confirm: { labelKey: "booking.action_short.confirm", cls: "bg-emerald-600 hover:bg-emerald-700" },
   reject: { labelKey: "booking.action_short.reject", cls: "bg-red-500 hover:bg-red-600" },
-  service: { labelKey: "booking.action_short.service", cls: "bg-indigo-600 hover:bg-indigo-700" },
+  service: { labelKey: "booking.action_short.service", cls: "bg-brand hover:bg-brand-dark" },
   requestChange: { labelKey: "booking.action_short.requestChange", cls: "bg-orange-500 hover:bg-orange-600" },
   resolveChange: { labelKey: "booking.action_short.resolveChange", cls: "bg-emerald-500 hover:bg-emerald-600" },
   requestCancellation: { labelKey: "booking.action_short.requestCancellation", cls: "bg-red-400 hover:bg-red-500" },
@@ -58,7 +58,7 @@ export default function BookingActionBar({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {actions.map((action) => {
-        const ui = ACTION_UI[action] ?? { labelKey: action, cls: "bg-slate-600 hover:bg-slate-700" };
+        const ui = ACTION_UI[action] ?? { labelKey: action, cls: "bg-brand hover:bg-brand-dark" };
         const busy = busyAction === action;
         return (
           <button

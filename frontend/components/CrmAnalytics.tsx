@@ -41,7 +41,7 @@ export default function CrmAnalytics() {
   if (loading && !data) {
     return (
       <div className="flex h-32 items-center justify-center">
-        <div className="text-sm text-slate-400">{t("crm.analytics.loading", locale)}</div>
+        <div className="text-sm text-ink/60">{t("crm.analytics.loading", locale)}</div>
       </div>
     );
   }
@@ -125,8 +125,8 @@ export default function CrmAnalytics() {
       <Kpi items={kpiItems} />
 
       {/* Period Preset Filter */}
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <span className="text-xs font-medium text-slate-500">{t("crm.analytics.filter.period", locale)}</span>
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white px-4 py-3 shadow-sm">
+        <span className="text-xs font-medium text-ink/60">{t("crm.analytics.filter.period", locale)}</span>
         {([
           { value: "TODAY" as CrmAnalyticsPreset, label: t("analytics.preset.TODAY", locale) },
           { value: "LAST_3_DAYS" as CrmAnalyticsPreset, label: t("analytics.preset.LAST_3_DAYS", locale) },
@@ -140,8 +140,8 @@ export default function CrmAnalytics() {
             onClick={() => setPreset(p.value)}
             className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
               preset === p.value
-                ? "border-blue-400 bg-blue-50 text-blue-700"
-                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                ? "border-brand bg-brand/10 text-brand-dark"
+                : "border-line bg-white text-ink/60 hover:bg-panel"
             }`}
           >
             {p.label}
@@ -208,17 +208,17 @@ function BreakdownCard({
   const total = entries.reduce((sum, [, v]) => sum + v, 0);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3">
+    <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+      <div className="flex items-center gap-2 border-b border-line bg-panel px-4 py-3">
         <span className="text-base">{icon}</span>
-        <span className="text-sm font-semibold text-slate-700">{title}</span>
-        <span className="ml-auto text-xs font-medium text-slate-400">
+        <span className="text-sm font-semibold text-ink">{title}</span>
+        <span className="ml-auto text-xs font-medium text-ink/60">
           {total}
         </span>
       </div>
       <div className="p-4">
         {entries.length === 0 ? (
-          <div className="text-center text-xs text-slate-400">
+          <div className="text-center text-xs text-ink/60">
             {t("crm.analytics.no_data", locale)}
           </div>
         ) : (
@@ -229,16 +229,16 @@ function BreakdownCard({
                 <div key={key} className="flex items-center gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-700">
+                      <span className="text-xs font-medium text-ink">
                         {labelFn(key)}
                       </span>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-ink/60">
                         {count} ({pct}%)
                       </span>
                     </div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-panel">
                       <div
-                        className="h-full rounded-full bg-blue-500"
+                        className="h-full rounded-full bg-brand"
                         style={{ width: `${pct}%` }}
                       />
                     </div>

@@ -24,10 +24,10 @@ export default function EntityTimeline({
         .filter((i) => i.timestamp)
         .map((i) => (
           <div key={i.key} className="flex items-start gap-3">
-            <div className="mt-0.5 h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" />
+            <div className="mt-0.5 h-2 w-2 flex-shrink-0 rounded-full bg-brand" />
             <div>
-              <div className="text-xs font-medium text-slate-700">{i.label}</div>
-              <div className="font-mono text-[11px] text-slate-400">{fmt(i.timestamp)}</div>
+              <div className="text-xs font-medium text-ink">{i.label}</div>
+              <div className="font-mono text-[11px] text-ink/60">{fmt(i.timestamp)}</div>
             </div>
           </div>
         ))}

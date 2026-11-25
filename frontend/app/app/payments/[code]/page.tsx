@@ -43,8 +43,8 @@ interface PaymentDetail {
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start gap-4 py-2">
-      <span className="w-40 shrink-0 text-xs font-medium text-slate-400">{label}</span>
-      <span className="text-sm text-slate-700">{value ?? "—"}</span>
+      <span className="w-40 shrink-0 text-xs font-medium text-ink/60">{label}</span>
+      <span className="text-sm text-ink">{value ?? "—"}</span>
     </div>
   );
 }
@@ -100,7 +100,7 @@ export default function PaymentDetailPage() {
         actions={
           <Link
             href="/app/payments"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel"
           >
             {t("common.back", locale)}
           </Link>
@@ -114,20 +114,20 @@ export default function PaymentDetailPage() {
              с строками `divide-y`, `DetailRow` = `flex items-start gap-4 py-2`.
              Раньше были две короткие полоски вместо двух карточек. */
           <div role="status" aria-busy="true" className="space-y-6">
-            <div className="flex items-center gap-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-6 rounded-xl border border-line bg-white p-6 shadow-sm">
               <div className="flex-1">
-                <div className="h-7 w-40 animate-pulse rounded bg-slate-200" />
-                <div className="mt-1 h-3 w-32 animate-pulse rounded bg-slate-100" />
+                <div className="h-7 w-40 animate-pulse rounded bg-panel" />
+                <div className="mt-1 h-3 w-32 animate-pulse rounded bg-panel" />
               </div>
-              <div className="h-6 w-24 animate-pulse rounded-full bg-slate-100" />
+              <div className="h-6 w-24 animate-pulse rounded-full bg-panel" />
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-4 h-4 w-24 animate-pulse rounded bg-slate-100" />
-              <div className="divide-y divide-slate-100">
+            <div className="rounded-xl border border-line bg-white p-6 shadow-sm">
+              <div className="mb-4 h-4 w-24 animate-pulse rounded bg-panel" />
+              <div className="divide-y divide-line">
                 {Array.from({ length: 6 }, (_, i) => (
                   <div key={i} className="flex items-start gap-4 py-2">
-                    <div className="h-3 w-40 shrink-0 animate-pulse rounded bg-slate-100" />
-                    <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
+                    <div className="h-3 w-40 shrink-0 animate-pulse rounded bg-panel" />
+                    <div className="h-4 w-32 animate-pulse rounded bg-panel" />
                   </div>
                 ))}
               </div>
@@ -143,12 +143,12 @@ export default function PaymentDetailPage() {
         {payment && (
           <div className="space-y-6">
             {/* Status + Amount hero */}
-            <div className="flex items-center gap-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-6 rounded-xl border border-line bg-white p-6 shadow-sm">
               <div className="flex-1">
-                <div className="mb-1 text-2xl font-bold text-slate-800">
+                <div className="mb-1 text-2xl font-bold text-ink">
                   {fmt(payment.amount, payment.currency)}
                 </div>
-                <div className="text-xs text-slate-400">
+                <div className="text-xs text-ink/60">
                   {t("common.id", locale)}: {payment.referenceNumber}
                 </div>
               </div>
@@ -156,11 +156,11 @@ export default function PaymentDetailPage() {
             </div>
 
             {/* Detail card */}
-            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="mb-4 text-sm font-semibold text-slate-700">
+            <div className="rounded-xl border border-line bg-white p-6 shadow-sm">
+              <h3 className="mb-4 text-sm font-semibold text-ink">
                 {t("common.detail", locale)}
               </h3>
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-line">
                 <DetailRow label={t("finance.col.code", locale) || "Код"} value={payment.referenceNumber} />
                 <DetailRow label={t("finance.col.status", locale) || "Статус"} value={<StatusBadge status={payment.status} />} />
                 <DetailRow label={t("finance.col.amount", locale) || "Сумма"} value={fmt(payment.amount, payment.currency)} />
@@ -174,7 +174,7 @@ export default function PaymentDetailPage() {
                   value={
                     <Link
                       href={`/app/orders/${payment.orderId}`}
-                      className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                      className="font-mono text-xs text-brand hover:text-ink hover:underline"
                     >
                       {payment.orderId.slice(0, 8)}…
                     </Link>

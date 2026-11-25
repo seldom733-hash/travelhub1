@@ -100,7 +100,7 @@ export default function StorefrontPreviewPage() {
   }
 
   if (!sf) {
-    return <div className="py-16 text-center text-sm text-slate-400">{pt("partner.state.loading", locale)}</div>;
+    return <div className="py-16 text-center text-sm text-ink/60">{pt("partner.state.loading", locale)}</div>;
   }
 
   const publicSf: PublicStorefront = {
@@ -127,8 +127,8 @@ export default function StorefrontPreviewPage() {
   };
 
   return (
-    <div className="bg-slate-100">
-      <div className="mx-auto max-w-6xl px-4 py-3 text-center text-xs text-slate-500">
+    <div className="bg-panel">
+      <div className="mx-auto max-w-6xl px-4 py-3 text-center text-xs text-ink/60">
         {pt("storefront.preview_top_bar", locale)}{" "}
         <button onClick={() => router.push("/partner/storefront")} className="ml-2 text-emerald-600 hover:underline">
           ← {pt("storefront.back_management", locale)}

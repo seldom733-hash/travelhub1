@@ -155,7 +155,7 @@ export default function RolesPermissionsPage() {
     return (
       <div>
         <PageHeader title={t("rbac.title", locale)} breadcrumbs={["Navitravel", t("nav.users", locale), t("rbac.title", locale)]} />
-        <div className="p-6 text-sm text-slate-600">{t("rbac.no_access", locale)}</div>
+        <div className="p-6 text-sm text-ink/60">{t("rbac.no_access", locale)}</div>
       </div>
     );
   }
@@ -166,7 +166,7 @@ export default function RolesPermissionsPage() {
         title={t("rbac.title", locale)}
         breadcrumbs={["Navitravel", t("nav.users", locale), t("rbac.title", locale)]}
         actions={
-          <Link href="/app/users" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+          <Link href="/app/users" className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel">
             {t("rbac.back_to_users", locale)}
           </Link>
         }
@@ -177,7 +177,7 @@ export default function RolesPermissionsPage() {
 
         <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
           <section className="rounded-xl border border-line bg-white">
-            <div className="border-b border-line px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <div className="border-b border-line px-3 py-2 text-xs font-semibold uppercase tracking-wide text-ink/60">
               {t("rbac.roles", locale)}
             </div>
             <ul className="max-h-[70vh] divide-y divide-line overflow-auto">
@@ -186,13 +186,13 @@ export default function RolesPermissionsPage() {
                   <button
                     type="button"
                     onClick={() => void selectRole(role.code)}
-                    className={`w-full px-3 py-2 text-left hover:bg-slate-50 ${selected === role.code ? "bg-blue-50" : ""}`}
+                    className={`w-full px-3 py-2 text-left hover:bg-panel ${selected === role.code ? "bg-brand/10" : ""}`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-slate-800">{role.title}</span>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{role.userCount}</span>
+                      <span className="text-sm font-medium text-ink">{role.title}</span>
+                      <span className="rounded-full bg-panel px-2 py-0.5 text-[11px] text-ink/60">{role.userCount}</span>
                     </div>
-                    <div className="font-mono text-[11px] text-slate-400">{role.code}</div>
+                    <div className="font-mono text-[11px] text-ink/60">{role.code}</div>
                   </button>
                 </li>
               ))}
@@ -202,8 +202,8 @@ export default function RolesPermissionsPage() {
           <section className="rounded-xl border border-line bg-white">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
               <div>
-                <h2 className="text-sm font-semibold text-slate-800">{selectedRole?.title ?? "—"}</h2>
-                <p className="text-xs text-slate-500">{selectedRole?.description}</p>
+                <h2 className="text-sm font-semibold text-ink">{selectedRole?.title ?? "—"}</h2>
+                <p className="text-xs text-ink/60">{selectedRole?.description}</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -213,7 +213,7 @@ export default function RolesPermissionsPage() {
                     setDraft(new Set(original));
                     setNotice("");
                   }}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 disabled:opacity-50"
+                  className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink/60 disabled:opacity-50"
                 >
                   {t("rbac.cancel", locale)}
                 </button>
@@ -232,11 +232,11 @@ export default function RolesPermissionsPage() {
                 const allOn = permissions.every((p) => draft.has(p.code));
                 return (
                   <div key={group} className="mb-4 rounded-lg border border-line">
-                    <div className="flex items-center justify-between border-b border-line bg-slate-50 px-3 py-2">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <div className="flex items-center justify-between border-b border-line bg-panel px-3 py-2">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-ink/60">
                         {permissionGroupLabel(group, locale)}
                       </span>
-                      <label className="flex items-center gap-1 text-[11px] text-slate-500">
+                      <label className="flex items-center gap-1 text-[11px] text-ink/60">
                         <input
                           type="checkbox"
                           checked={allOn}
@@ -248,7 +248,7 @@ export default function RolesPermissionsPage() {
                     </div>
                     <div className="grid gap-1 p-2 sm:grid-cols-2">
                       {permissions.map((p) => (
-                        <label key={p.code} className="flex items-start gap-2 rounded px-2 py-1 text-xs hover:bg-slate-50">
+                        <label key={p.code} className="flex items-start gap-2 rounded px-2 py-1 text-xs hover:bg-panel">
                           <input
                             type="checkbox"
                             checked={draft.has(p.code)}
@@ -256,7 +256,7 @@ export default function RolesPermissionsPage() {
                             className="mt-0.5 size-3.5"
                           />
                           <span>
-                            <PermissionLabel code={p.code} locale={locale} className="text-[12px] font-medium text-slate-700" />
+                            <PermissionLabel code={p.code} locale={locale} className="text-[12px] font-medium text-ink" />
                           </span>
                         </label>
                       ))}
@@ -269,19 +269,19 @@ export default function RolesPermissionsPage() {
           </section>
 
           <section className="rounded-xl border border-line bg-white">
-            <div className="border-b border-line px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <div className="border-b border-line px-3 py-2 text-xs font-semibold uppercase tracking-wide text-ink/60">
               {t("rbac.history", locale)}
             </div>
             <ul className="max-h-[70vh] divide-y divide-line overflow-auto">
               {history.map((h) => (
                 <li key={h.id} className="px-3 py-2 text-xs">
-                  <div className="font-medium text-slate-700">{h.actor ?? "—"}</div>
-                  <div className="text-slate-400">{h.createdAt.slice(0, 19).replace("T", " ")}</div>
+                  <div className="font-medium text-ink">{h.actor ?? "—"}</div>
+                  <div className="text-ink/60">{h.createdAt.slice(0, 19).replace("T", " ")}</div>
                   {h.details?.added?.length ? <div className="mt-1 text-emerald-700">+{h.details.added.join(", ")}</div> : null}
                   {h.details?.removed?.length ? <div className="text-rose-700">−{h.details.removed.join(", ")}</div> : null}
                 </li>
               ))}
-              {history.length === 0 && <li className="px-3 py-6 text-center text-xs text-slate-500">{t("rbac.no_history", locale)}</li>}
+              {history.length === 0 && <li className="px-3 py-6 text-center text-xs text-ink/60">{t("rbac.no_history", locale)}</li>}
             </ul>
           </section>
         </div>

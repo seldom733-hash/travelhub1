@@ -8,6 +8,7 @@ import GuestCheckoutForm from "@/components/public/GuestCheckoutForm";
 import Price from "@/components/public/Price";
 import { PublicErrorState, PublicNotFound } from "@/components/public/PublicStates";
 import SupplierCodeBadge from "@/components/public/SupplierCodeBadge";
+import BestOfferPanel from "@/components/public/BestOfferPanel";
 import { categoryLabel } from "@/lib/category-label";
 import { PdpSkeleton } from "@/components/public/Skeletons";
 import { formatDate, formatPrice as formatPriceRaw, t, useLocale } from "@/lib/i18n";
@@ -142,6 +143,8 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
             attributeSections={sectionsFor(p.attributes, locale)}
           />
         )}
+
+        {p.bestOffer && <BestOfferPanel summary={p.bestOffer} product={{ id: p.id, type: p.type }} />}
       </div>
     );
   }

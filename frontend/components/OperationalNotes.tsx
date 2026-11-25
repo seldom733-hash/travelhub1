@@ -193,8 +193,8 @@ export default function OperationalNotes({
   // Forbidden state
   if (forbidden) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
-        <div className="text-center text-sm text-slate-400">
+      <div className="rounded-xl border border-line bg-white p-6">
+        <div className="text-center text-sm text-ink/60">
           <div className="mb-2 text-lg">🔒</div>
           {t("notes.forbidden", locale)}
         </div>
@@ -205,9 +205,9 @@ export default function OperationalNotes({
   // Loading state
   if (loading && !pageData) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="rounded-xl border border-line bg-white p-6">
         <div className="flex items-center justify-center py-8">
-          <div className="text-sm text-slate-400">{t("state.loading", locale)}</div>
+          <div className="text-sm text-ink/60">{t("state.loading", locale)}</div>
         </div>
       </div>
     );
@@ -216,12 +216,12 @@ export default function OperationalNotes({
   // Error state
   if (error && !pageData) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="rounded-xl border border-line bg-white p-6">
         <div className="text-center">
           <div className="mb-2 text-sm text-red-500">{error}</div>
           <button
             onClick={() => void loadNotes()}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            className="rounded-lg border border-line bg-white px-4 py-2 text-xs font-medium text-ink/60 hover:bg-panel"
           >
             {t("notes.retry", locale)}
           </button>
@@ -235,19 +235,19 @@ export default function OperationalNotes({
   const total = pageData?.total ?? 0;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white">
+    <div className="rounded-xl border border-line bg-white">
       {/* Header */}
-      <div className="border-b border-slate-100 px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-700">
+      <div className="border-b border-line px-4 py-3">
+        <h3 className="text-sm font-semibold text-ink">
           {t("notes.title", locale)}
-          {total > 0 && <span className="ml-2 text-xs font-normal text-slate-400">({total})</span>}
+          {total > 0 && <span className="ml-2 text-xs font-normal text-ink/60">({total})</span>}
         </h3>
       </div>
 
       {/* Create form */}
       {canCreate && (
-        <div className="border-b border-slate-100 px-4 py-3">
-          <label className="mb-1 block text-xs font-medium text-slate-500" htmlFor={`note-create-${entityType}-${entityId}`}>
+        <div className="border-b border-line px-4 py-3">
+          <label className="mb-1 block text-xs font-medium text-ink/60" htmlFor={`note-create-${entityType}-${entityId}`}>
             {t("notes.add_placeholder", locale)}
           </label>
           <textarea
@@ -256,18 +256,18 @@ export default function OperationalNotes({
             onChange={(e) => setNewText(e.target.value)}
             maxLength={5000}
             rows={3}
-            className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+            className="w-full resize-none rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-brand focus:ring-1 focus:ring-brand"
             placeholder={t("notes.add_placeholder", locale)}
           />
           <div className="mt-2 flex items-center justify-between">
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-ink/60">
               {newText.length}/5000
             </span>
             <div className="flex gap-2">
               {newText.trim() && (
                 <button
                   onClick={() => { setNewText(""); setCreateError(""); }}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
+                  className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel"
                 >
                   {t("notes.cancel", locale)}
                 </button>
@@ -275,7 +275,7 @@ export default function OperationalNotes({
               <button
                 onClick={() => void handleCreate()}
                 disabled={creating || !newText.trim()}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                className="rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-dark disabled:opacity-50"
               >
                 {creating ? t("notes.creating", locale) : t("notes.add", locale)}
               </button>
@@ -286,9 +286,9 @@ export default function OperationalNotes({
       )}
 
       {/* Notes list */}
-      <div className="divide-y divide-slate-50">
+      <div className="divide-y divide-line">
         {notes.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-slate-400">
+          <div className="px-4 py-8 text-center text-sm text-ink/60">
             {t("notes.empty", locale)}
           </div>
         ) : (
@@ -302,21 +302,21 @@ export default function OperationalNotes({
                     onChange={(e) => setEditText(e.target.value)}
                     maxLength={5000}
                     rows={3}
-                    className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                    className="w-full resize-none rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-1 focus:ring-brand"
                   />
                   <div className="mt-2 flex items-center justify-between">
-                    <span className="text-xs text-slate-400">{editText.length}/5000</span>
+                    <span className="text-xs text-ink/60">{editText.length}/5000</span>
                     <div className="flex gap-2">
                       <button
                         onClick={cancelEdit}
-                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
+                        className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel"
                       >
                         {t("notes.cancel", locale)}
                       </button>
                       <button
                         onClick={() => void handleSave(note.id)}
                         disabled={saving}
-                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                        className="rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-dark disabled:opacity-50"
                       >
                         {saving ? t("notes.saving", locale) : t("notes.save", locale)}
                       </button>
@@ -328,8 +328,8 @@ export default function OperationalNotes({
                 /* Read mode */
                 <div>
                   {/* Author + timestamps */}
-                  <div className="mb-1 flex items-center gap-2 text-xs text-slate-400">
-                    <span className="font-medium text-slate-600">
+                  <div className="mb-1 flex items-center gap-2 text-xs text-ink/60">
+                    <span className="font-medium text-ink/60">
                       {note.authorName || t("notes.unknown_author", locale)}
                     </span>
                     <span>·</span>
@@ -343,7 +343,7 @@ export default function OperationalNotes({
                   </div>
 
                   {/* Note text — plain text, XSS-safe */}
-                  <div className="whitespace-pre-wrap text-sm text-slate-700">
+                  <div className="whitespace-pre-wrap text-sm text-ink">
                     {note.text}
                   </div>
 
@@ -353,7 +353,7 @@ export default function OperationalNotes({
                       {canEditNote(note) && (
                         <button
                           onClick={() => startEdit(note)}
-                          className="text-xs text-slate-400 hover:text-blue-600"
+                          className="text-xs text-ink/60 hover:text-brand"
                         >
                           {t("notes.edit", locale)}
                         </button>
@@ -372,7 +372,7 @@ export default function OperationalNotes({
                               </button>
                               <button
                                 onClick={() => setConfirmDeleteId(null)}
-                                className="text-xs text-slate-400 hover:text-slate-600"
+                                className="text-xs text-ink/60 hover:text-ink/60"
                               >
                                 {t("notes.cancel", locale)}
                               </button>
@@ -380,7 +380,7 @@ export default function OperationalNotes({
                           ) : (
                             <button
                               onClick={() => setConfirmDeleteId(note.id)}
-                              className="text-xs text-slate-400 hover:text-red-600"
+                              className="text-xs text-ink/60 hover:text-red-600"
                             >
                               {t("notes.delete", locale)}
                             </button>
@@ -398,22 +398,22 @@ export default function OperationalNotes({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
-          <span className="text-xs text-slate-400">
+        <div className="flex items-center justify-between border-t border-line px-4 py-3">
+          <span className="text-xs text-ink/60">
             {t("pagination.page", locale)} {currentPage} {t("pagination.of", locale)} {totalPages}
           </span>
           <div className="flex gap-2">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage <= 1}
-              className="rounded border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+              className="rounded border border-line bg-white px-3 py-1 text-xs text-ink/60 hover:bg-panel disabled:opacity-40"
             >
               {t("pagination.prev", locale)}
             </button>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage >= totalPages}
-              className="rounded border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+              className="rounded border border-line bg-white px-3 py-1 text-xs text-ink/60 hover:bg-panel disabled:opacity-40"
             >
               {t("pagination.next", locale)}
             </button>

@@ -50,7 +50,7 @@ export default function StorefrontPdp({ sf, detail }: { sf: PublicStorefront; de
           <Link href={`/store/${sf.slug}`} className={`text-sm font-bold ${theme.headerText}`}>
             {name}
           </Link>
-          <Link href={`/store/${sf.slug}`} className={`ml-auto text-xs text-slate-500 ${theme.accentHover}`}>
+          <Link href={`/store/${sf.slug}`} className={`ml-auto text-xs text-ink/60 ${theme.accentHover}`}>
             ← {t("storefront.back_home", locale)}
           </Link>
         </div>
@@ -60,26 +60,26 @@ export default function StorefrontPdp({ sf, detail }: { sf: PublicStorefront; de
         <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
           {/* ── Left: gallery + content ── */}
           <div>
-            <nav className="mb-3 text-xs text-slate-400" aria-label="breadcrumb">
+            <nav className="mb-3 text-xs text-ink/60" aria-label="breadcrumb">
               <Link href={`/store/${sf.slug}`} className={theme.accentHover}>
                 {name}
               </Link>
               {p.category && (
                 <>
                   <span className="mx-1.5">/</span>
-                  <span className="text-slate-500">{categoryLabel(p.category, locale)}</span>
+                  <span className="text-ink/60">{categoryLabel(p.category, locale)}</span>
                 </>
               )}
               <span className="mx-1.5">/</span>
-              <span className="text-slate-600" aria-current="page">
+              <span className="text-ink/60" aria-current="page">
                 {p.title}
               </span>
             </nav>
 
-            <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">{p.title}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+            <h1 className="text-2xl font-bold text-ink sm:text-3xl">{p.title}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-ink/60">
               {p.category && (
-                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-medium text-slate-600">{categoryLabel(p.category, locale)}</span>
+                <span className="rounded-full bg-panel px-2.5 py-0.5 font-medium text-ink/60">{categoryLabel(p.category, locale)}</span>
               )}
               <span>
                 {t("pdp.published_on", locale)}: {formatDate(p.publishedAt, locale)}
@@ -91,28 +91,28 @@ export default function StorefrontPdp({ sf, detail }: { sf: PublicStorefront; de
             </div>
 
             <section className="mt-8" aria-labelledby="sf-pdp-description">
-              <h2 id="sf-pdp-description" className="text-lg font-bold text-slate-900">
+              <h2 id="sf-pdp-description" className="text-lg font-bold text-ink">
                 {t("pdp.description_title", locale)}
               </h2>
-              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">
+              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink/60">
                 {p.description ?? t("pdp.description_missing", locale)}
               </p>
             </section>
 
             {attributeSections.length > 0 && (
               <section className="mt-8" aria-labelledby="sf-pdp-attrs">
-                <h2 id="sf-pdp-attrs" className="text-lg font-bold text-slate-900">
+                <h2 id="sf-pdp-attrs" className="text-lg font-bold text-ink">
                   {t("pdp.attributes_title", locale)}
                 </h2>
                 <div className="mt-3 space-y-4">
                   {attributeSections.map((s) => (
-                    <div key={s.section} className="rounded-2xl border border-slate-200 bg-white p-4">
-                      <h3 className="text-sm font-semibold text-slate-800">{sectionLabel(s.section, locale)}</h3>
+                    <div key={s.section} className="rounded-2xl border border-line bg-white p-4">
+                      <h3 className="text-sm font-semibold text-ink">{sectionLabel(s.section, locale)}</h3>
                       <dl className="mt-2 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
                         {s.items.map((i) => (
                           <div key={i.key} className="flex flex-col">
-                            <dt className="text-[11px] uppercase tracking-wide text-slate-400">{i.label}</dt>
-                            <dd className="whitespace-pre-line text-slate-700">{i.value}</dd>
+                            <dt className="text-[11px] uppercase tracking-wide text-ink/60">{i.label}</dt>
+                            <dd className="whitespace-pre-line text-ink">{i.value}</dd>
                           </div>
                         ))}
                       </dl>
@@ -124,22 +124,22 @@ export default function StorefrontPdp({ sf, detail }: { sf: PublicStorefront; de
 
             {p.tariffs.length > 0 && (
               <section className="mt-8" aria-labelledby="sf-pdp-tariffs">
-                <h2 id="sf-pdp-tariffs" className="text-lg font-bold text-slate-900">
+                <h2 id="sf-pdp-tariffs" className="text-lg font-bold text-ink">
                   {t("pdp.tariffs_title", locale)}
                 </h2>
-                <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200">
+                <div className="mt-3 overflow-hidden rounded-2xl border border-line">
                   {p.tariffs.map((tariff, i) => (
-                    <div key={tariff.id} className={`flex items-center justify-between gap-3 bg-white px-4 py-3 ${i === p.tariffs.length - 1 ? "" : "border-b border-slate-100"}`}>
+                    <div key={tariff.id} className={`flex items-center justify-between gap-3 bg-white px-4 py-3 ${i === p.tariffs.length - 1 ? "" : "border-b border-line"}`}>
                       <div>
-                        <div className="text-sm font-medium text-slate-800">{tariff.name}</div>
+                        <div className="text-sm font-medium text-ink">{tariff.name}</div>
                         {tariff.validFrom && (
-                          <div className="text-[11px] text-slate-400">
+                          <div className="text-[11px] text-ink/60">
                             {formatDate(tariff.validFrom, locale)}
                             {tariff.validTo ? ` – ${formatDate(tariff.validTo, locale)}` : ""}
                           </div>
                         )}
                       </div>
-                      <div className="shrink-0 text-sm font-semibold text-slate-900">
+                      <div className="shrink-0 text-sm font-semibold text-ink">
                         <Price amount={tariff.price} currency={tariff.currency} size="sm" withPrefix={false} />
                       </div>
                     </div>
@@ -149,7 +149,7 @@ export default function StorefrontPdp({ sf, detail }: { sf: PublicStorefront; de
             )}
 
             <section className="mt-8" aria-labelledby="sf-pdp-availability">
-              <h2 id="sf-pdp-availability" className="text-lg font-bold text-slate-900">
+              <h2 id="sf-pdp-availability" className="text-lg font-bold text-ink">
                 {t("pdp.availability_title", locale)}
               </h2>
               <div
@@ -158,7 +158,7 @@ export default function StorefrontPdp({ sf, detail }: { sf: PublicStorefront; de
                     ? "border-emerald-100 bg-emerald-50 text-emerald-800"
                     : availability.tone === "limited"
                       ? "border-amber-100 bg-amber-50 text-amber-800"
-                      : "border-slate-100 bg-slate-50 text-slate-500"
+                      : "border-line bg-panel text-ink/60"
                 }`}
               >
                 <div className="font-medium">{availability.title}</div>
@@ -170,23 +170,23 @@ export default function StorefrontPdp({ sf, detail }: { sf: PublicStorefront; de
 
           {/* ── Right: price / CTA / Storefront business identity + contacts ── */}
           <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
-              <div className="text-xs uppercase tracking-wide text-slate-400">{t("pdp.price_from", locale)}</div>
+            <div className="rounded-2xl border border-line bg-white p-5">
+              <div className="text-xs uppercase tracking-wide text-ink/60">{t("pdp.price_from", locale)}</div>
               <div className="mt-1">
                 <Price amount={p.priceFrom} currency={p.currency} size="lg" withPrefix={false} />
               </div>
               <button type="button" className={`mt-4 w-full rounded-xl px-4 py-3 text-sm font-semibold ${theme.accent}`}>
                 {t("pdp.primary_cta", locale)}
               </button>
-              <p className="mt-2 text-[11px] leading-relaxed text-slate-400">{t("pdp.cta_placeholder", locale)}</p>
+              <p className="mt-2 text-[11px] leading-relaxed text-ink/60">{t("pdp.cta_placeholder", locale)}</p>
             </div>
 
             {/* Storefront business identity + contacts (только Storefront-контекст) */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm">
-              <div className="text-xs uppercase tracking-wide text-slate-400">{t("storefront.about", locale)}</div>
-              <div className="mt-1 font-semibold text-slate-800">{sf.businessName ?? sf.slug}</div>
-              {location && <div className="mt-0.5 text-xs text-slate-500">📍 {location}</div>}
-              <div className="mt-3 space-y-1.5 text-xs text-slate-600">
+            <div className="rounded-2xl border border-line bg-white p-5 text-sm">
+              <div className="text-xs uppercase tracking-wide text-ink/60">{t("storefront.about", locale)}</div>
+              <div className="mt-1 font-semibold text-ink">{sf.businessName ?? sf.slug}</div>
+              {location && <div className="mt-0.5 text-xs text-ink/60">📍 {location}</div>}
+              <div className="mt-3 space-y-1.5 text-xs text-ink/60">
                 {sf.publicPhone && (
                   <a href={`tel:${sf.publicPhone.replace(/[^+\d]/g, "")}`} onClick={() => fireContactClick(sf.slug, "PHONE")} className={`block ${theme.accentHover}`}>
                     📞 {sf.publicPhone}
@@ -218,12 +218,12 @@ export default function StorefrontPdp({ sf, detail }: { sf: PublicStorefront; de
         </div>
       </main>
 
-      <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-400">
+      <footer className="border-t border-line bg-white py-6 text-center text-xs text-ink/60">
         {name}
         {!brandingLoading && (
           <>
             {" "}— {t("storefront.powered_by", locale)}{" "}
-            <Link href="/" className="text-slate-500 hover:underline">
+            <Link href="/" className="text-ink/60 hover:underline">
               {brandName}
             </Link>
           </>

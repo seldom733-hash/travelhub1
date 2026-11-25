@@ -210,7 +210,7 @@ function MarketingContent() {
               {tab === "campaigns" && (
                 <button
                   onClick={() => setShowCreate(true)}
-                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+                  className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-dark"
                 >
                   ＋ {t("marketing.create_campaign", locale)}
                 </button>
@@ -220,7 +220,7 @@ function MarketingContent() {
               )}
               <button
                 onClick={() => tab === "campaigns" && void loadCampaigns()}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel"
               >
                 ⟳
               </button>
@@ -229,13 +229,13 @@ function MarketingContent() {
         />
 
         {/* Tabs */}
-        <div className="flex gap-1 border-b border-slate-200 bg-slate-50 px-6 pt-2">
+        <div className="flex gap-1 border-b border-line bg-panel px-6 pt-2">
           {(["campaigns", "audiences", "attributions"] as const).map((t_) => (
             <button
               key={t_}
               onClick={() => { setTab(t_); setExpandedCampaign(null); setAudiences(null); setAttributions(null); }}
               className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${
-                tab === t_ ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                tab === t_ ? "bg-white text-brand shadow-sm" : "text-ink/60 hover:text-ink"
               }`}
             >
               {t(`marketing.tab.${t_}`, locale)}
@@ -267,9 +267,9 @@ function MarketingContent() {
 
           {/* Campaigns Tab */}
           {tab === "campaigns" && (
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
               <table className="w-full text-left text-sm">
-                <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+                <thead className="border-b border-line bg-panel text-xs uppercase tracking-wide text-ink/60">
                   <tr>
                     <th className="px-4 py-2.5">{t("marketing.col.code", locale)}</th>
                     <th className="px-4 py-2.5">{t("marketing.col.name", locale)}</th>
@@ -282,20 +282,20 @@ function MarketingContent() {
                 <tbody>
                   {(campaigns?.items ?? []).map((c) => (
                     <Fragment key={c.id}>
-                      <tr className="border-b border-slate-50 transition-colors hover:bg-blue-50/50">
+                      <tr className="border-b border-line transition-colors hover:bg-brand/50">
                         <td className="px-4 py-2.5">
-                          <button onClick={() => void toggleCampaignDetail(c.id)} className="font-mono text-xs text-blue-600 hover:underline">
+                          <button onClick={() => void toggleCampaignDetail(c.id)} className="font-mono text-xs text-brand hover:underline">
                             {c.code}
                           </button>
                         </td>
-                        <td className="px-4 py-2.5 font-medium text-slate-800">{c.name}</td>
+                        <td className="px-4 py-2.5 font-medium text-ink">{c.name}</td>
                         <td className="px-4 py-2.5">
                           <StatusBadge status={c.status} />
                         </td>
-                        <td className="px-4 py-2.5 text-slate-500">
+                        <td className="px-4 py-2.5 text-ink/60">
                           {c.partnerId ? c.partnerId.substring(0, 8) + "…" : t("marketing.scope.platform", locale)}
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-slate-400">
+                        <td className="px-4 py-2.5 text-xs text-ink/60">
                           {new Date(c.createdAt).toLocaleDateString(locale)}
                         </td>
                         <td className="px-4 py-2.5 text-right">
@@ -304,7 +304,7 @@ function MarketingContent() {
                               <button
                                 key={next}
                                 onClick={() => void transitionCampaign(c.id, next)}
-                                className="rounded border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+                                className="rounded border border-line px-2 py-0.5 text-[10px] font-medium text-ink/60 transition-colors hover:bg-panel hover:text-ink"
                               >
                                 → {t(STATUS_LABELS[next] ?? next, locale)}
                               </button>
@@ -315,32 +315,32 @@ function MarketingContent() {
                       {/* Expanded detail row */}
                       {expandedCampaign === c.id && (
                         <tr key={`${c.id}-detail`}>
-                          <td colSpan={6} className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+                          <td colSpan={6} className="border-b border-line bg-panel/50 px-6 py-4">
                             <div className="space-y-4">
                               {c.description && (
-                                <div className="text-sm text-slate-600">{c.description}</div>
+                                <div className="text-sm text-ink/60">{c.description}</div>
                               )}
 
                               {/* Audiences */}
                               <div>
-                                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">
                                   {t("marketing.tab.audiences", locale)} ({audiences?.length ?? 0})
                                 </h4>
                                 {audiences && audiences.length > 0 ? (
                                   <div className="space-y-1">
                                     {audiences.map((a) => (
-                                      <div key={a.id} className="flex items-center gap-3 rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs">
-                                        <span className="font-mono text-blue-600">{a.code}</span>
-                                        <span className="font-medium text-slate-700">{a.name}</span>
+                                      <div key={a.id} className="flex items-center gap-3 rounded-lg border border-line bg-white px-3 py-2 text-xs">
+                                        <span className="font-mono text-brand">{a.code}</span>
+                                        <span className="font-medium text-ink">{a.name}</span>
                                         {a.criteria && (
                                           <div className="flex flex-wrap gap-1">
                                             {formatCriteria(a.criteria, locale).map(({ key, value }) => (
-                                              <span key={key} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                                              <span key={key} className="rounded bg-panel px-1.5 py-0.5 text-[10px] text-ink/60">
                                                 {key}: {value}
                                               </span>
                                             ))}
                                             {formatCriteria(a.criteria, locale).length === 0 && (
-                                              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                                              <span className="rounded bg-panel px-1.5 py-0.5 text-[10px] text-ink/60">
                                                 {JSON.stringify(a.criteria)}
                                               </span>
                                             )}
@@ -350,27 +350,27 @@ function MarketingContent() {
                                     ))}
                                   </div>
                                 ) : (
-                                  <div className="text-xs text-slate-400">{t("marketing.audiences_empty", locale)}</div>
+                                  <div className="text-xs text-ink/60">{t("marketing.audiences_empty", locale)}</div>
                                 )}
                               </div>
 
                               {/* Attributions */}
                               <div>
-                                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/60">
                                   {t("marketing.tab.attributions", locale)} ({attributions?.length ?? 0})
                                 </h4>
                                 {attributions && attributions.length > 0 ? (
                                   <div className="space-y-1">
                                     {attributions.map((a) => (
-                                      <div key={a.id} className="flex items-center gap-3 rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs">
-                                        <span className="rounded bg-blue-100 px-1.5 py-0.5 font-semibold text-blue-700">{a.entityType}</span>
-                                        <span className="font-mono text-slate-500">{a.entityId.substring(0, 8)}…</span>
-                                        <span className="text-slate-400">{a.attributionType}</span>
+                                      <div key={a.id} className="flex items-center gap-3 rounded-lg border border-line bg-white px-3 py-2 text-xs">
+                                        <span className="rounded bg-brand/15 px-1.5 py-0.5 font-semibold text-brand-dark">{a.entityType}</span>
+                                        <span className="font-mono text-ink/60">{a.entityId.substring(0, 8)}…</span>
+                                        <span className="text-ink/60">{a.attributionType}</span>
                                       </div>
                                     ))}
                                   </div>
                                 ) : (
-                                  <div className="text-xs text-slate-400">{t("marketing.attributions_empty", locale)}</div>
+                                  <div className="text-xs text-ink/60">{t("marketing.attributions_empty", locale)}</div>
                                 )}
                               </div>
                             </div>
@@ -381,7 +381,7 @@ function MarketingContent() {
                   ))}
                   {(campaigns?.items ?? []).length === 0 && !loading && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">
+                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-ink/60">
                         {t("marketing.campaigns_empty", locale)}
                       </td>
                     </tr>
@@ -396,8 +396,8 @@ function MarketingContent() {
 
           {/* Audiences Tab (all campaigns) */}
           {tab === "audiences" && (
-            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="text-sm text-slate-500">
+            <div className="rounded-xl border border-line bg-white p-6 shadow-sm">
+              <div className="text-sm text-ink/60">
                 {t("marketing.audiences_empty", locale)}
               </div>
             </div>
@@ -405,8 +405,8 @@ function MarketingContent() {
 
           {/* Attributions Tab (all campaigns) */}
           {tab === "attributions" && (
-            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="text-sm text-slate-500">
+            <div className="rounded-xl border border-line bg-white p-6 shadow-sm">
+              <div className="text-sm text-ink/60">
                 {t("marketing.attributions_empty", locale)}
               </div>
             </div>
@@ -422,18 +422,18 @@ function MarketingContent() {
           onClose={() => setShowCreate(false)}
         >
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
               {t("marketing.create.form.name", locale)} *
             </label>
             <input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
               maxLength={200}
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
               {t("marketing.create.form.description", locale)}
             </label>
             <textarea
@@ -441,17 +441,17 @@ function MarketingContent() {
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={3}
               maxLength={2000}
-              className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+              className="w-full resize-none rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
               {t("marketing.create.form.objective", locale)}
             </label>
             <select
               value={form.objective}
               onChange={(e) => setForm({ ...form, objective: e.target.value })}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
             >
               <option value="">—</option>
               {Object.entries(OBJECTIVE_OPTIONS).map(([val, i18nKey]) => (
@@ -462,7 +462,7 @@ function MarketingContent() {
           <button
             onClick={() => void createCampaign()}
             disabled={creating || !form.name.trim()}
-            className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
           >
             {creating ? "…" : t("marketing.create.submit", locale)}
           </button>

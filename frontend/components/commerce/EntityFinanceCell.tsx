@@ -10,11 +10,11 @@ import EntityEmptyValue from "./EntityEmptyValue";
  * Business fields may differ; visual grammar must not.
  */
 const TONES = {
-  neutral: { cell: "bg-slate-50", value: "text-slate-700" },
+  neutral: { cell: "bg-panel", value: "text-ink" },
   positive: { cell: "bg-green-50", value: "text-green-700" },
   negative: { cell: "bg-red-50", value: "text-red-700" },
   warning: { cell: "bg-amber-50", value: "text-amber-700" },
-  info: { cell: "bg-blue-50", value: "text-blue-700" },
+  info: { cell: "bg-brand/10", value: "text-brand-dark" },
 } as const;
 
 export default function EntityFinanceCell({
@@ -29,7 +29,7 @@ export default function EntityFinanceCell({
   const t = TONES[tone];
   return (
     <div className={`rounded-lg px-4 py-3 ${t.cell}`}>
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-400">
+      <div className="text-xs font-medium uppercase tracking-wide text-ink/60">
         {label}
       </div>
       <div className={`mt-0.5 text-sm font-semibold ${t.value}`}>

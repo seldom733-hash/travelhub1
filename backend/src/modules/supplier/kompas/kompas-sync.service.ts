@@ -4,13 +4,14 @@
  * §10: Discover ALL countries from Baku → per-country programs → per-program search → upsert Products.
  * §7: Departure city fixed to Baku (TOWNFROMINC=1411).
  */
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
 import { KompasSupplierAdapter, KOMPAS_CURRENCY_INC } from "./kompas.adapter";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
 import type { SupplierOffer } from "../supplier.types";
 import { buildGeoCountryMap } from "../geo-country-resolver";
+import { ProductHistoryRecorder } from "../product-history-recorder.service";
 
 export interface KompasSyncResult {
   countriesDiscovered: number;
@@ -47,6 +48,7 @@ export class KompasSyncService {
     private readonly kompas: KompasSupplierAdapter,
     private readonly pricing: SupplierPricingService,
     private readonly ids: IdsService,
+    @Optional() private readonly history?: ProductHistoryRecorder,
   ) {}
 
   async getKompasPartner(): Promise<{ id: string } | null> {
@@ -261,18 +263,22 @@ export class KompasSyncService {
         if (existing) {
           await this.prisma.$transaction(async (tx: any) => {
             const currentAttrs = existing.attributes as any;
+            const changed: Record<string, unknown> = {};
             // Self-heal unified title «Отель (Страна)» (чинит старые карточки).
             if (existing.title !== title) {
               await tx.product.update({
                 where: { id: existing.id },
                 data: { title },
               });
+              changed.title = title;
             }
             if (currentAttrs?.startingPrice !== minPrice) {
               await tx.product.update({
                 where: { id: existing.id },
                 data: { attributes: { ...currentAttrs, startingPrice: minPrice, currency } },
               });
+              changed.startingPrice = minPrice;
+              changed.currency = currency;
             }
             const tariff = await tx.tariff.findFirst({
               where: { productId: existing.id },
@@ -298,6 +304,10 @@ export class KompasSyncService {
                 where: { id: existing.id },
                 data: geoPatch,
               });
+              changed.geoCountryId = geoPatch.geoCountryId;
+            }
+            if (this.history) {
+              await this.history.record(tx, existing.id, existing.version, changed);
             }
           });
           if (minPrice > 0 && (existing.attributes as any)?.startingPrice !== minPrice) {

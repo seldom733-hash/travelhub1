@@ -6,13 +6,14 @@
  *
  * ANEX serves 21 countries from Baku (verified live).
  */
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { buildGeoCountryMap } from "../geo-country-resolver";
 import { IdsService } from "../../../shared/ids.service";
 import { AnexAdapter } from "./anex.adapter";
 import { AnexProvider, type AnexState } from "./anex.provider";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
+import { ProductHistoryRecorder } from "../product-history-recorder.service";
 import type { SupplierOffer } from "../supplier.types";
 
 export interface AnexSyncResult {
@@ -44,6 +45,7 @@ export class AnexSyncService {
     private readonly anexProvider: AnexProvider,
     private readonly pricing: SupplierPricingService,
     private readonly ids: IdsService,
+    @Optional() private readonly history?: ProductHistoryRecorder,
   ) {}
 
   async getAnexPartner(): Promise<{ id: string } | null> {
@@ -207,14 +209,18 @@ export class AnexSyncService {
         if (existing) {
           await this.prisma.$transaction(async (tx: any) => {
             const currentAttrs = existing.attributes as any;
+            const changed: Record<string, unknown> = {};
             if (existing.title !== title) {
               await tx.product.update({ where: { id: existing.id }, data: { title } });
+              changed.title = title;
             }
             if (currentAttrs?.startingPrice !== minPrice) {
               await tx.product.update({
                 where: { id: existing.id },
                 data: { attributes: { ...currentAttrs, startingPrice: minPrice, supplierBasePrice, supplierBaseCurrency: currency, currency } },
               });
+              changed.startingPrice = minPrice;
+              changed.currency = currency;
             }
             const tariff = await tx.tariff.findFirst({
               where: { productId: existing.id },
@@ -230,6 +236,10 @@ export class AnexSyncService {
             }
             if (Object.keys(geoPatch).length > 0) {
               await tx.product.update({ where: { id: existing.id }, data: geoPatch });
+              changed.geoCountryId = geoPatch.geoCountryId;
+            }
+            if (this.history) {
+              await this.history.record(tx, existing.id, existing.version, changed);
             }
           });
           if (minPrice > 0 && (existing.attributes as any)?.startingPrice !== minPrice) {

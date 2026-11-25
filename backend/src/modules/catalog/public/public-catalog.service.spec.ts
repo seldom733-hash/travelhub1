@@ -89,6 +89,8 @@ interface PrismaStub {
   publicSellerProfile: { findMany: jest.Mock };
   partner: { findMany: jest.Mock };
   supplierFxRate: { findMany: jest.Mock };
+  hotelSupplierRef: { findUnique: jest.Mock };
+  hotelPhotoRef: { findUnique: jest.Mock };
   geoCountry: { findUnique: jest.Mock };
   geoCity: { findUnique: jest.Mock };
   geoResort: { findUnique: jest.Mock };
@@ -105,6 +107,8 @@ function makePrismaStub(overrides?: Record<string, unknown>): PrismaStub {
     publicSellerProfile: { findMany: jest.fn().mockResolvedValue([]) },
     partner: { findMany: jest.fn().mockResolvedValue([]) },
     supplierFxRate: { findMany: jest.fn().mockResolvedValue([]) },
+    hotelSupplierRef: { findUnique: jest.fn().mockResolvedValue(null) },
+    hotelPhotoRef: { findUnique: jest.fn().mockResolvedValue(null) },
     geoCountry: { findUnique: jest.fn().mockResolvedValue(null) },
     geoCity: { findUnique: jest.fn().mockResolvedValue(null) },
     geoResort: { findUnique: jest.fn().mockResolvedValue(null) },
@@ -199,6 +203,33 @@ describe("PublicCatalogService (Phase 1 Step 1.5 + review fixes) — unit", () =
       const countSql = flattenSql(rawSqlCall(prisma, 1));
       expect(countSql).toContain("count(*)");
       expect(countSql).not.toContain("LIMIT");
+    });
+
+    it("bestOffer в списке считается батчем: минимальная цена и код партнёра", async () => {
+      const prisma = makePrismaStub();
+      mockMatch(prisma, ["prod-1"], 1);
+      prisma.$queryRaw.mockResolvedValueOnce([
+        { cardId: "prod-1", partnerId: "par-1", price: new Prisma.Decimal(1200), currency: "AZN" },
+        { cardId: "prod-1", partnerId: "par-2", price: new Prisma.Decimal(800), currency: "AZN" },
+      ]);
+      prisma.product.findMany.mockResolvedValue([PUBLISHED_PRODUCT]);
+      prisma.partner.findMany.mockResolvedValue([
+        { id: "par-1", code: "PAR-1" },
+        { id: "par-2", code: "PAR-2" },
+      ]);
+      prisma.supplierFxRate.findMany.mockResolvedValue([]);
+
+      const result = await makeService(prisma).listProducts({ page: 1, pageSize: 10 });
+
+      expect(result.items[0].bestOffer).toEqual({
+        minPrice: "800.00",
+        minPriceCurrency: "AZN",
+        minPartnerCode: "PAR-2",
+        offersCount: 2,
+        hasAlternatives: true,
+      });
+      // 3-й SQL — батч предложений, не N+1 вызов на карточку.
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
     });
 
     it("card mapper: без internal полей, priceFrom=min tariff, primary image со СТАБИЛЬНЫМ public URL (FIX 1)", async () => {
@@ -467,6 +498,67 @@ describe("PublicCatalogService (Phase 1 Step 1.5 + review fixes) — unit", () =
       const where = prisma.product.findFirst.mock.calls[0][0].where;
       expect(where.OR).toEqual([{ id: "PRD-00000001" }, { code: "PRD-00000001" }]);
       expect(JSON.stringify(where)).not.toContain("slug");
+    });
+
+    it("общая карточка: минимальная цена и код партнёра лучшего предложения", async () => {
+      const prisma = makePrismaStub();
+      const row = {
+        ...PUBLISHED_PRODUCT,
+        attributes: { startingPrice: 1000, currency: "AZN", supplierCode: "KOMPAS", hotelKey: "1" },
+      };
+      prisma.product.findFirst.mockResolvedValue(row);
+      prisma.partner.findMany.mockResolvedValue([
+        { id: "par-1", code: "PAR-1" },
+        { id: "par-2", code: "PAR-2" },
+      ]);
+      const tourMatching = {
+        findComparableTours: jest.fn().mockResolvedValue([
+          { id: "alt-1", code: "PRD-00000002", title: "Alt", price: 800, currency: "AZN", partnerId: "par-2" },
+        ]),
+      };
+      const service = new PublicCatalogService(prisma as never, makeStorageStub() as never, undefined, tourMatching as never);
+
+      const detail = await service.getProductDetail("PRD-00000001");
+
+      expect(detail.product.bestOffer).toEqual({
+        minPrice: "800",
+        minPriceCurrency: "AZN",
+        minPartnerCode: "PAR-2",
+        offersCount: 2,
+        hasAlternatives: true,
+      });
+    });
+
+    it("сопоставимые туры: PRD-код и internal id ведут к одной группе, наружу только partnerCode", async () => {
+      const prisma = makePrismaStub();
+      const row = {
+        ...PUBLISHED_PRODUCT,
+        id: "internal-id",
+        attributes: { startingPrice: 1000, currency: "AZN", supplierCode: "KOMPAS", hotelKey: "1" },
+      };
+      prisma.product.findFirst.mockResolvedValue(row);
+      prisma.partner.findMany.mockResolvedValue([
+        { id: "par-1", code: "PAR-1" },
+        { id: "par-2", code: "PAR-2" },
+      ]);
+      const tourMatching = {
+        findComparableTours: jest.fn().mockResolvedValue([
+          { id: "alt-1", code: "PRD-2", title: "Alt", price: 800, currency: "AZN", partnerId: "par-2" },
+        ]),
+      };
+      const service = new PublicCatalogService(prisma as never, makeStorageStub() as never, undefined, tourMatching as never);
+
+      const byCode = await service.getComparableTours("PRD-00000001");
+      const byId = await service.getComparableTours("internal-id");
+
+      expect(byCode.count).toBe(2);
+      expect(byId.count).toBe(2);
+      expect(byCode.minPrice).toBe(800);
+      expect(byCode.minPartnerCode).toBe("PAR-2");
+      expect(byCode.comparable[0].partnerCode).toBe("PAR-2");
+      // internal partnerId в публичном контуре не появляется
+      expect(JSON.stringify(byCode)).not.toContain("partnerId");
+      expect(tourMatching.findComparableTours).toHaveBeenCalledWith("internal-id", expect.anything());
     });
 
     it("PDP mapper: без internal полей, media со СТАБИЛЬНЫМ delivery URL (FIX 1), tariffs/availability/provider", async () => {

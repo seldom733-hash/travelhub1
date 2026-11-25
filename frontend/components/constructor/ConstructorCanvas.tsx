@@ -47,9 +47,9 @@ export default function ConstructorCanvas({ slug }: Props) {
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="h-8 w-64 animate-pulse rounded bg-slate-100" />
-        <div className="h-10 animate-pulse rounded bg-slate-100" />
-        <div className="h-64 animate-pulse rounded border border-slate-200 bg-white" />
+        <div className="h-8 w-64 animate-pulse rounded bg-panel" />
+        <div className="h-10 animate-pulse rounded bg-panel" />
+        <div className="h-64 animate-pulse rounded border border-line bg-white" />
       </div>
     );
   }

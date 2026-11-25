@@ -46,10 +46,14 @@ export class DocumentsController {
     @Query("pageSize") pageSize?: string,
     @Query("type") type?: DocumentType,
     @Query("status") status?: DocumentStatus,
+    @Query("q") q?: string,
+    @Query("sortBy") sortBy?: string,
+    @Query("sortDirection") sortDirection?: string,
   ) {
     const p = Math.max(1, Number(page) || 1);
     const ps = Math.min(100, Math.max(1, Number(pageSize) || 20));
-    return this.documents.listAllDocuments(p, ps, type, status);
+    const dir: "asc" | "desc" = sortDirection === "asc" ? "asc" : "desc";
+    return this.documents.listAllDocuments(p, ps, type, status, q, sortBy, dir);
   }
 
   @RequirePermissions("documents.read")

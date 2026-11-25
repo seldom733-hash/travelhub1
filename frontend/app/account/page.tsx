@@ -102,55 +102,55 @@ export default function AccountOverviewPage() {
   return (
     <div className="space-y-6">
       {/* ── Buyer summary ── */}
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
-          <p className="text-xs font-semibold uppercase tracking-wider text-blue-100">{t("account.buyer_summary", locale)}</p>
+      <section className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
+        <div className="bg-gradient-to-r from-brand to-brand-dark px-6 py-5 text-white">
+          <p className="text-xs font-semibold uppercase tracking-wider text-white">{t("account.buyer_summary", locale)}</p>
           <h1 className="mt-1 text-2xl font-bold">{displayName}</h1>
-          <p className="mt-0.5 text-sm text-blue-100">{info?.email ?? user.email ?? ""}</p>
+          <p className="mt-0.5 text-sm text-white">{info?.email ?? user.email ?? ""}</p>
         </div>
         <dl className="grid gap-x-6 gap-y-3 px-6 py-5 text-sm sm:grid-cols-3">
           <div>
-            <dt className="text-slate-500">{t("account.customer_ref", locale)}</dt>
-            <dd className="font-medium text-slate-900">{customer ? customer.code : "—"}</dd>
+            <dt className="text-ink/60">{t("account.customer_ref", locale)}</dt>
+            <dd className="font-medium text-ink">{customer ? customer.code : "—"}</dd>
           </div>
           <div>
-            <dt className="text-slate-500">{t("account.status", locale)}</dt>
+            <dt className="text-ink/60">{t("account.status", locale)}</dt>
             <dd className="font-medium text-emerald-600">{info?.status ?? "ACTIVE"}</dd>
           </div>
           <div>
-            <dt className="text-slate-500">{t("account.profile_completeness", locale)}</dt>
+            <dt className="text-ink/60">{t("account.profile_completeness", locale)}</dt>
             <dd>
               <div className="mt-1.5 flex items-center gap-2">
-                <div className="h-1.5 w-28 overflow-hidden rounded-full bg-slate-200" role="presentation">
+                <div className="h-1.5 w-28 overflow-hidden rounded-full bg-panel" role="presentation">
                   <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${completeness}%` }} />
                 </div>
-                <span className="text-xs font-medium text-slate-600">{completeness}%</span>
+                <span className="text-xs font-medium text-ink/60">{completeness}%</span>
               </div>
             </dd>
           </div>
         </dl>
-        <div className="border-t border-slate-100 px-6 py-3 text-xs text-slate-500">
+        <div className="border-t border-line px-6 py-3 text-xs text-ink/60">
           {completeness === 100 ? t("account.profile_complete", locale) : t("account.profile_partial", locale)}
         </div>
       </section>
 
       {/* ── Purchase sections ── */}
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{t("account.purchase_sections", locale)}</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/60">{t("account.purchase_sections", locale)}</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {sections.map((s) => (
             <Link
               key={s.href}
               href={s.href}
-              className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
+              className="group rounded-2xl border border-line bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/25 hover:shadow-md"
             >
               <div className="flex items-center gap-3">
-                <span className="flex size-10 items-center justify-center rounded-xl bg-slate-50 text-lg transition-colors group-hover:bg-blue-50" aria-hidden>
+                <span className="flex size-10 items-center justify-center rounded-xl bg-panel text-lg transition-colors group-hover:bg-brand/10" aria-hidden>
                   {s.icon}
                 </span>
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-slate-900">{s.title}</div>
-                  <div className="truncate text-sm text-slate-500">{s.body}</div>
+                  <div className="truncate text-sm font-semibold text-ink">{s.title}</div>
+                  <div className="truncate text-sm text-ink/60">{s.body}</div>
                 </div>
               </div>
             </Link>
@@ -158,12 +158,12 @@ export default function AccountOverviewPage() {
         </div>
       </section>
 
-      <p className="text-center text-xs text-slate-400">
-        <Link href="/account/profile" className="text-blue-600 hover:text-blue-700">
+      <p className="text-center text-xs text-ink/60">
+        <Link href="/account/profile" className="text-brand hover:text-brand-dark">
           {t("account.profile", locale)}
         </Link>
         {" · "}
-        <Link href="/" className="text-blue-600 hover:text-blue-700">
+        <Link href="/" className="text-brand hover:text-brand-dark">
           {t("nav.to_marketplace", locale)}
         </Link>
       </p>

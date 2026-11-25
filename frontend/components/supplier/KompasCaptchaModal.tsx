@@ -71,19 +71,19 @@ export function KompasCaptchaModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h3 className="text-base font-semibold text-slate-900">Проверка {supplier === "SUMMERTOUR" ? "Summertour" : "KOMPAS"}</h3>
+        <div className="flex items-center justify-between border-b border-line px-6 py-4">
+          <h3 className="text-base font-semibold text-ink">Проверка {supplier === "SUMMERTOUR" ? "Summertour" : "KOMPAS"}</h3>
           <button
             onClick={onCancel}
             aria-label="Закрыть"
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-lg p-1.5 text-ink/60 hover:bg-panel hover:text-ink/60"
           >
             ×
           </button>
         </div>
 
         <div className="space-y-4 px-6 py-5">
-          <p className="text-sm text-slate-600">Для обновления цен необходимо пройти проверку {supplier === "SUMMERTOUR" ? "Summertour" : "KOMPAS"}.</p>
+          <p className="text-sm text-ink/60">Для обновления цен необходимо пройти проверку {supplier === "SUMMERTOUR" ? "Summertour" : "KOMPAS"}.</p>
 
           {/* Captcha image — real #icaptcha src, never fake */}
           <div className="flex justify-center">
@@ -92,11 +92,11 @@ export function KompasCaptchaModal({
                 id="kompas-captcha-image"
                 src={captchaImage}
                 alt="Captcha"
-                className="rounded-lg border border-slate-200 bg-slate-50"
+                className="rounded-lg border border-line bg-panel"
                 style={{ maxWidth: "100%", height: "auto" }}
               />
             ) : (
-              <div className="flex h-20 w-full items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-400">
+              <div className="flex h-20 w-full items-center justify-center rounded-lg border border-dashed border-line bg-panel text-sm text-ink/60">
                 Изображение CAPTCHA не загружено
               </div>
             )}
@@ -125,7 +125,7 @@ export function KompasCaptchaModal({
 
           {/* Answer field — maps to #fcaptcha on backend */}
           <div>
-            <label htmlFor="kompas-captcha-input" className="mb-1.5 block text-sm font-medium text-slate-700">
+            <label htmlFor="kompas-captcha-input" className="mb-1.5 block text-sm font-medium text-ink">
               Код с изображения
             </label>
             <input
@@ -143,7 +143,7 @@ export function KompasCaptchaModal({
               }}
               disabled={submitting || refreshing || isSessionLost}
               placeholder="Введите символы"
-              className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100"
+              className="w-full rounded-xl border border-line px-3 py-2.5 text-sm text-ink placeholder:text-ink/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-panel"
             />
           </div>
 
@@ -152,20 +152,20 @@ export function KompasCaptchaModal({
             <button
               onClick={handleRefresh}
               disabled={submitting || refreshing}
-              className="flex-1 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="flex-1 rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-medium text-ink hover:bg-panel disabled:opacity-50"
             >
               {refreshing ? "Обновление…" : "Обновить"}
             </button>
             <button
               onClick={handleSubmit}
               disabled={submitting || refreshing || isSessionLost || isExpired}
-              className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
             >
               {submitting ? "Проверка…" : "Продолжить"}
             </button>
           </div>
 
-          <p className="text-center text-xs text-slate-400">challengeId: {challengeId.slice(0, 8)}…</p>
+          <p className="text-center text-xs text-ink/60">challengeId: {challengeId.slice(0, 8)}…</p>
         </div>
       </div>
     </div>

@@ -183,14 +183,14 @@ export default function TravelerCollectionPanel({ orderId }: { orderId: string }
   };
 
   if (loading) {
-    return <div className="text-sm text-slate-400">{t("common.loading", locale)}</div>;
+    return <div className="text-sm text-ink/60">{t("common.loading", locale)}</div>;
   }
   if (loadError || !view) {
     return <div className="text-sm text-red-500">{loadError || t("d3.load_failed", locale)}</div>;
   }
   if (!pinned) {
     return (
-      <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-500">{t("d3.legacy_no_pinned", locale)}</div>
+      <div className="rounded-lg bg-panel px-4 py-3 text-xs text-ink/60">{t("d3.legacy_no_pinned", locale)}</div>
     );
   }
 
@@ -200,29 +200,29 @@ export default function TravelerCollectionPanel({ orderId }: { orderId: string }
     <div className="space-y-4">
       {/* ── D3 milestones (server-owned; не updatedAt) ── */}
       <div className="grid grid-cols-3 gap-3 text-[11px]">
-        <div className="rounded-lg bg-slate-50 px-3 py-2">
-          <div className="text-slate-400">{t("d3.terms_accepted_at", locale)}</div>
-          <div className="mt-0.5 font-medium text-slate-700">{fmtTs(view.termsAcceptedAt, locale)}</div>
+        <div className="rounded-lg bg-panel px-3 py-2">
+          <div className="text-ink/60">{t("d3.terms_accepted_at", locale)}</div>
+          <div className="mt-0.5 font-medium text-ink">{fmtTs(view.termsAcceptedAt, locale)}</div>
         </div>
-        <div className="rounded-lg bg-slate-50 px-3 py-2">
-          <div className="text-slate-400">{t("d3.data_completed_at", locale)}</div>
-          <div className="mt-0.5 font-medium text-slate-700">{fmtTs(view.travelerDataCompletedAt, locale)}</div>
+        <div className="rounded-lg bg-panel px-3 py-2">
+          <div className="text-ink/60">{t("d3.data_completed_at", locale)}</div>
+          <div className="mt-0.5 font-medium text-ink">{fmtTs(view.travelerDataCompletedAt, locale)}</div>
         </div>
-        <div className="rounded-lg bg-slate-50 px-3 py-2">
-          <div className="text-slate-400">{t("d3.final_confirmed_at", locale)}</div>
-          <div className={`mt-0.5 font-medium ${locked ? "text-emerald-700" : "text-slate-700"}`}>{fmtTs(view.finalConfirmedAt, locale)}</div>
+        <div className="rounded-lg bg-panel px-3 py-2">
+          <div className="text-ink/60">{t("d3.final_confirmed_at", locale)}</div>
+          <div className={`mt-0.5 font-medium ${locked ? "text-emerald-700" : "text-ink"}`}>{fmtTs(view.finalConfirmedAt, locale)}</div>
         </div>
       </div>
 
       {notice && <div className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{notice}</div>}
       {error && <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
-      {locked && <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">{t("d3.locked", locale)}</div>}
+      {locked && <div className="rounded-lg bg-panel px-3 py-2 text-xs text-ink/60">{t("d3.locked", locale)}</div>}
       {!canEdit && !locked && (
         <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">{t("d3.need_edit_permission", locale)}</div>
       )}
 
       {travelers.length === 0 ? (
-        <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-500">
+        <div className="rounded-lg bg-panel px-4 py-3 text-xs text-ink/60">
           {t("d3.no_travelers", locale)} · {ti("d3.expected_count", locale, { n: travelerCount })}
         </div>
       ) : (
@@ -241,9 +241,9 @@ export default function TravelerCollectionPanel({ orderId }: { orderId: string }
                   ? { tone: "warn" as const, key: "d3.passport_expiring_hint" }
                   : null;
             return (
-              <div key={tr.id} className="rounded-lg border border-slate-200 bg-white p-4">
+              <div key={tr.id} className="rounded-lg border border-line bg-white p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-slate-800">
+                  <div className="text-sm font-semibold text-ink">
                     {ti("d3.traveler_of", locale, { n: idx + 1, total: travelers.length })}
                   </div>
                   <span
@@ -271,10 +271,10 @@ export default function TravelerCollectionPanel({ orderId }: { orderId: string }
                     const isDate = DATE_FIELDS.includes(f);
                     return (
                       <label key={f} className="block text-xs">
-                        <span className="mb-1 flex items-center gap-1 text-slate-500">
+                        <span className="mb-1 flex items-center gap-1 text-ink/60">
                           {label}
                           {required && <span className="text-red-500">*</span>}
-                          {!required && <span className="font-normal text-slate-300">({t("d3.optional", locale)})</span>}
+                          {!required && <span className="font-normal text-ink/60">({t("d3.optional", locale)})</span>}
                         </span>
                         <input
                           type={isDate ? "date" : "text"}
@@ -286,8 +286,8 @@ export default function TravelerCollectionPanel({ orderId }: { orderId: string }
                               [tr.id]: { ...(prev[tr.id] ?? {}), [f]: e.target.value },
                             }))
                           }
-                          className={`w-full rounded-md border px-2.5 py-1.5 text-sm outline-none disabled:bg-slate-50 disabled:text-slate-400 ${
-                            dirty ? "border-blue-300 focus:border-blue-400" : "border-slate-200 focus:border-slate-300"
+                          className={`w-full rounded-md border px-2.5 py-1.5 text-sm outline-none disabled:bg-panel disabled:text-ink/60 ${
+                            dirty ? "border-brand/25 focus:border-brand" : "border-line focus:border-line"
                           }`}
                         />
                       </label>
@@ -299,7 +299,7 @@ export default function TravelerCollectionPanel({ orderId }: { orderId: string }
                     type="button"
                     disabled={locked || !canEdit || busyKey !== null}
                     onClick={() => void saveTraveler(tr.id)}
-                    className="rounded-lg bg-slate-800 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-lg bg-ink px-4 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {busyKey === tr.id ? t("d3.saving", locale) : t("d3.save", locale)}
                   </button>
@@ -311,17 +311,17 @@ export default function TravelerCollectionPanel({ orderId }: { orderId: string }
       )}
 
       {/* ── Final confirmation (gate: server-side completion) ── */}
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="rounded-lg border border-line bg-white p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold text-slate-800">{t("d3.final_confirm", locale)}</div>
-            <div className="mt-0.5 text-xs text-slate-400">{t("d3.final_confirm_hint", locale)}</div>
+            <div className="text-sm font-semibold text-ink">{t("d3.final_confirm", locale)}</div>
+            <div className="mt-0.5 text-xs text-ink/60">{t("d3.final_confirm_hint", locale)}</div>
           </div>
           <button
             type="button"
             disabled={locked || !canEdit || busyKey !== null || travelers.length === 0}
             onClick={() => void finalConfirm()}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-brand px-4 py-2 text-xs font-semibold text-white hover:bg-brand disabled:cursor-not-allowed disabled:opacity-40"
           >
             {busyKey === "confirm" ? t("d3.confirming", locale) : t("d3.final_confirm", locale)}
           </button>

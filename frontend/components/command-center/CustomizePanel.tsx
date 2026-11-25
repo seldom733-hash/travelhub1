@@ -51,24 +51,24 @@ function SortableItem({
       ref={setNodeRef}
       style={style}
       className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm ${
-        isDragging ? "border-blue-300 bg-blue-50" : "border-slate-200 bg-white"
+        isDragging ? "border-brand/25 bg-brand/10" : "border-line bg-white"
       }`}
     >
       <button
         {...attributes}
         {...listeners}
-        className="cursor-grab text-slate-400 hover:text-slate-600"
+        className="cursor-grab text-ink/60 hover:text-ink/60"
         aria-label={t("cc.widget_drag", locale)}
       >
         ⠿
       </button>
-      <span className={`flex-1 ${visible ? "text-slate-900" : "text-slate-400 line-through"}`}>
+      <span className={`flex-1 ${visible ? "text-ink" : "text-ink/60 line-through"}`}>
         {title}
-        {required && <span className="ml-1 text-xs text-slate-400">{t("cc.widget_required", locale)}</span>}
+        {required && <span className="ml-1 text-xs text-ink/60">{t("cc.widget_required", locale)}</span>}
       </span>
       <button
         onClick={onToggle}
-        className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+        className="rounded p-1 text-ink/60 hover:bg-panel hover:text-ink/60"
         aria-label={visible ? t("cc.widget_hide", locale) : t("cc.widget_show", locale)}
       >
         {visible ? "👁" : "👁‍🗨"}
@@ -76,7 +76,7 @@ function SortableItem({
       {!required && (
         <button
           onClick={onRemove}
-          className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500"
+          className="rounded p-1 text-ink/60 hover:bg-red-50 hover:text-red-500"
           aria-label={t("cc.widget_remove", locale)}
         >
           ✕
@@ -126,20 +126,20 @@ export function CustomizePanel({
   const availableToAdd = allWidgetDefs.filter((d) => !draftIds.has(d.widgetId));
 
   return (
-    <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4" role="region" aria-label={t("cc.layout_settings", locale)}>
+    <div className="mt-4 rounded-2xl border border-brand/20 bg-brand/10 p-4" role="region" aria-label={t("cc.layout_settings", locale)}>
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-blue-900">{t("cc.layout_settings", locale)}</h3>
+        <h3 className="text-sm font-semibold text-ink">{t("cc.layout_settings", locale)}</h3>
         <div className="flex gap-2">
           <button
             onClick={onReset}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+            className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs text-ink/60 hover:bg-panel"
           >
             {t("cc.reset", locale)}
           </button>
           <button
             onClick={onSave}
             disabled={isSaving}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-dark disabled:opacity-50"
           >
             {t("cc.save", locale)}
           </button>
@@ -175,7 +175,7 @@ export function CustomizePanel({
       <div className="mt-4">
         <button
           onClick={() => setShowAdd(!showAdd)}
-          className="text-xs font-medium text-blue-600 hover:text-blue-800"
+          className="text-xs font-medium text-brand hover:text-ink"
         >
           {showAdd ? t("cc.hide_available", locale) : t("cc.add_widget", locale)}
         </button>
@@ -185,22 +185,22 @@ export function CustomizePanel({
               <button
                 key={w.widgetId}
                 onClick={() => onAdd(w)}
-                className="flex w-full items-center gap-2 rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-600 hover:border-blue-300 hover:bg-blue-50"
+                className="flex w-full items-center gap-2 rounded-lg border border-dashed border-line bg-white px-3 py-2 text-left text-sm text-ink/60 hover:border-brand/25 hover:bg-brand/10"
               >
                 <span>+</span>
                 <span>{w.title}</span>
-                <span className="ml-auto text-xs text-slate-400">{w.sectionPermission?.split(".")[1] ?? w.category}</span>
+                <span className="ml-auto text-xs text-ink/60">{w.sectionPermission?.split(".")[1] ?? w.category}</span>
               </button>
             ))}
           </div>
         )}
         {showAdd && availableToAdd.length === 0 && (
-          <p className="mt-2 text-xs text-slate-400">{t("cc.all_added", locale)}</p>
+          <p className="mt-2 text-xs text-ink/60">{t("cc.all_added", locale)}</p>
         )}
       </div>
 
       {/* Keyboard hint */}
-      <p className="mt-3 text-[10px] text-slate-400">
+      <p className="mt-3 text-[10px] text-ink/60">
         {t("cc.drag_hint", locale)}
       </p>
     </div>

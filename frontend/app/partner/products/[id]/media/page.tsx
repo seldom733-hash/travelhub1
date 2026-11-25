@@ -14,10 +14,10 @@ export default function ProductMediaPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <div className="mb-5">
-        <Link href={`/partner/products/${params.id}`} className="text-sm text-slate-500 hover:text-emerald-700">
+        <Link href={`/partner/products/${params.id}`} className="text-sm text-ink/60 hover:text-emerald-700">
           {pt("partner.product.back", locale)}
         </Link>
-        <h1 className="mt-1 text-2xl font-bold text-slate-900">{pt("partner.media.title", locale)}</h1>
+        <h1 className="mt-1 text-2xl font-bold text-ink">{pt("partner.media.title", locale)}</h1>
       </div>
       <MediaManager productId={params.id} />
     </div>

@@ -50,8 +50,8 @@ export interface PaymentFormPresetOrder {
 type Phase = "idle" | "submitting" | "success";
 
 const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500";
-const labelCls = "mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500";
+  "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand disabled:cursor-not-allowed disabled:bg-panel disabled:text-ink/60";
+const labelCls = "mb-1 block text-xs font-semibold uppercase tracking-wide text-ink/60";
 
 function fmtMoney(amount: string | null | undefined, currency: string | null | undefined, locale: "ru" | "az" | "en"): string {
   if (amount == null || amount === "") return "—";
@@ -353,20 +353,20 @@ export default function CreatePaymentForm({
         className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-lg font-bold text-slate-900">{t("payments.create.title", locale)}</h2>
+        <h2 className="mb-4 text-lg font-bold text-ink">{t("payments.create.title", locale)}</h2>
 
-        <div className="mb-4 flex gap-1 rounded-lg bg-slate-100 p-1 text-xs">
+        <div className="mb-4 flex gap-1 rounded-lg bg-panel p-1 text-xs">
           <button
             type="button"
             onClick={() => setDirection("INCOME")}
-            className={`flex-1 rounded-md px-3 py-2 font-semibold ${direction === "INCOME" ? "bg-emerald-100 text-emerald-800" : "text-slate-500"}`}
+            className={`flex-1 rounded-md px-3 py-2 font-semibold ${direction === "INCOME" ? "bg-emerald-100 text-emerald-800" : "text-ink/60"}`}
           >
             Приход · платёж клиента
           </button>
           <button
             type="button"
             onClick={() => setDirection("EXPENSE")}
-            className={`flex-1 rounded-md px-3 py-2 font-semibold ${direction === "EXPENSE" ? "bg-rose-100 text-rose-700" : "text-slate-500"}`}
+            className={`flex-1 rounded-md px-3 py-2 font-semibold ${direction === "EXPENSE" ? "bg-rose-100 text-rose-700" : "text-ink/60"}`}
           >
             Расход · возврат клиенту
           </button>
@@ -386,7 +386,7 @@ export default function CreatePaymentForm({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-medium text-ink/60 hover:bg-panel"
             >
               {t("payments.create.cancel", locale)}
             </button>
@@ -425,43 +425,43 @@ export default function CreatePaymentForm({
                   ))}
                 </select>
               )}
-              {ordersLoading && <div className="mt-1 text-xs text-slate-400">{t("payments.create.loading_orders", locale)}</div>}
+              {ordersLoading && <div className="mt-1 text-xs text-ink/60">{t("payments.create.loading_orders", locale)}</div>}
               {!presetOrder && !ordersLoading && !ordersError && orders.length === 0 && (
-                <div className="mt-1 text-xs text-slate-400">{t("payments.create.no_orders", locale)}</div>
+                <div className="mt-1 text-xs text-ink/60">{t("payments.create.no_orders", locale)}</div>
               )}
               {ordersError && <div className="mt-1 text-xs text-red-500">{ordersError}</div>}
             </div>
 
             {/* Финансовый контекст заказа — readonly (MULTI/PARTIAL §7) */}
             {activeOrderId && (
-              <div data-testid="create-payment-financials" className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <div data-testid="create-payment-financials" className="rounded-lg border border-line bg-panel px-3 py-2.5">
                 {financialsLoading ? (
-                  <div className="text-xs text-slate-400">{t("payments.create.financials_loading", locale)}</div>
+                  <div className="text-xs text-ink/60">{t("payments.create.financials_loading", locale)}</div>
                 ) : financialsError ? (
                   <div className="text-xs text-red-500">{t("payments.create.financials_error", locale)}</div>
                 ) : financials ? (
                   <>
                     <dl className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
                       <div>
-                        <dt className="font-semibold uppercase tracking-wide text-slate-500">{t("payments.create.order_total", locale)}</dt>
-                        <dd className="mt-0.5 text-sm text-slate-700" data-testid="create-payment-order-total">
+                        <dt className="font-semibold uppercase tracking-wide text-ink/60">{t("payments.create.order_total", locale)}</dt>
+                        <dd className="mt-0.5 text-sm text-ink" data-testid="create-payment-order-total">
                           {fmtMoney(financials.amount, financials.currency, locale)}
                         </dd>
                       </div>
                       <div>
-                        <dt className="font-semibold uppercase tracking-wide text-slate-500">{t("payments.create.paid", locale)}</dt>
+                        <dt className="font-semibold uppercase tracking-wide text-ink/60">{t("payments.create.paid", locale)}</dt>
                         <dd className="mt-0.5 text-sm text-emerald-700" data-testid="create-payment-paid">
                           {fmtMoney(displayedPaid.toFixed(2), financials.currency, locale)}
                         </dd>
                       </div>
                       <div>
-                        <dt className="font-semibold uppercase tracking-wide text-slate-500">{t("payments.create.refunded", locale)}</dt>
+                        <dt className="font-semibold uppercase tracking-wide text-ink/60">{t("payments.create.refunded", locale)}</dt>
                         <dd className="mt-0.5 text-sm text-rose-700" data-testid="create-payment-refunded">
                           {fmtMoney(displayedRefunded.toFixed(2), financials.currency, locale)}
                         </dd>
                       </div>
                       <div>
-                        <dt className="font-semibold uppercase tracking-wide text-slate-500">{t("payments.create.due", locale)}</dt>
+                        <dt className="font-semibold uppercase tracking-wide text-ink/60">{t("payments.create.due", locale)}</dt>
                         <dd className="mt-0.5 text-sm font-semibold text-amber-700" data-testid="create-payment-due">
                           {fmtMoney(displayedDue.toFixed(2), financials.currency, locale)}
                         </dd>
@@ -504,7 +504,7 @@ export default function CreatePaymentForm({
                 placeholder={availableForValidation ?? ""}
                 className={inputCls}
               />
-              <div className="mt-1 text-xs text-slate-400">{t("payments.create.amount_hint", locale)}</div>
+              <div className="mt-1 text-xs text-ink/60">{t("payments.create.amount_hint", locale)}</div>
               {amountTouchedButInvalid && !financialsLoading && (
                 <div role="alert" data-testid="create-payment-amount-error" className="mt-1 text-xs text-red-500">
                   {t("payments.create.error.amount", locale)}
@@ -547,7 +547,7 @@ export default function CreatePaymentForm({
                 maxLength={255}
                 className={inputCls}
               />
-              <div className="mt-1 text-xs text-slate-400">{t("payments.create.reason_hint", locale)}</div>
+              <div className="mt-1 text-xs text-ink/60">{t("payments.create.reason_hint", locale)}</div>
             </div>
 
             {/* Примечание — опционально */}
@@ -583,7 +583,7 @@ export default function CreatePaymentForm({
                 type="submit"
                 data-testid="create-payment-submit"
                 disabled={!canSubmit}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting ? "…" : t("payments.create.submit", locale)}
               </button>
@@ -591,7 +591,7 @@ export default function CreatePaymentForm({
                 type="button"
                 onClick={onClose}
                 disabled={submitting}
-                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-medium text-ink/60 hover:bg-panel disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t("payments.create.cancel", locale)}
               </button>

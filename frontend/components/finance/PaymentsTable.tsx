@@ -258,7 +258,7 @@ export default function PaymentsTable({
           {!ledger && <col style={{ width: "14%" }} />}
           <col style={{ width: "14%" }} />
         </colgroup>
-        <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+        <thead className="border-b border-line bg-panel text-xs uppercase tracking-wide text-ink/60">
           <tr>
             <th className="px-4 py-2.5 font-medium">{t("payments.table.col_ordinal", locale)}</th>
             {dateTh}
@@ -274,12 +274,12 @@ export default function PaymentsTable({
           {rows.map((row) => {
             const codeLabel = row.referenceNumber ?? row.code;
             return (
-              <tr key={row.id} className="border-b border-slate-50 transition-colors hover:bg-blue-50/30" data-testid="payments-table-row">
+              <tr key={row.id} className="border-b border-line transition-colors hover:bg-brand/30" data-testid="payments-table-row">
                 <td className="px-4 py-2.5 align-top">
-                  <div className="text-sm font-medium text-slate-700">{row.ordinal ?? "—"}</div>
-                  <div className="truncate font-mono text-[10px] text-slate-400" title={row.code}>
+                  <div className="text-sm font-medium text-ink">{row.ordinal ?? "—"}</div>
+                  <div className="truncate font-mono text-[10px] text-ink/60" title={row.code}>
                     {row.paymentHref ? (
-                      <Link href={row.paymentHref} className="text-blue-600 hover:underline">
+                      <Link href={row.paymentHref} className="text-brand hover:underline">
                         {codeLabel}
                       </Link>
                     ) : (
@@ -287,14 +287,14 @@ export default function PaymentsTable({
                     )}
                   </div>
                   {row.orderHref && row.orderLabel && (
-                    <div className="truncate font-mono text-[10px] text-slate-400">
-                      <Link href={row.orderHref} className="text-blue-600 hover:underline">
+                    <div className="truncate font-mono text-[10px] text-ink/60">
+                      <Link href={row.orderHref} className="text-brand hover:underline">
                         {row.orderLabel}
                       </Link>
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-2.5 align-top text-xs text-slate-500">{fmtDate(row.createdAt, locale)}</td>
+                <td className="px-4 py-2.5 align-top text-xs text-ink/60">{fmtDate(row.createdAt, locale)}</td>
                 {ledger && (
                   <td className="px-4 py-2.5 align-top text-xs">
                     <span className={row.kind === "SUPPLIER" || row.kind === "CLIENT_REFUND" ? "text-rose-600" : "text-emerald-700"}>
@@ -302,10 +302,10 @@ export default function PaymentsTable({
                     </span>
                   </td>
                 )}
-                <td className="px-4 py-2.5 text-right align-top font-medium text-slate-700">
+                <td className="px-4 py-2.5 text-right align-top font-medium text-ink">
                   {fmtMoney(row.amount, row.currency, locale)}
                 </td>
-                <td className="px-4 py-2.5 text-right align-top text-slate-600">
+                <td className="px-4 py-2.5 text-right align-top text-ink/60">
                   {row.remainingAfter != null ? fmtMoney(row.remainingAfter, row.currency, locale) : "—"}
                 </td>
                 {ledger ? (
@@ -313,7 +313,7 @@ export default function PaymentsTable({
                     {row.incomeAfter != null ? fmtMoney(row.incomeAfter, "AZN", locale) : "—"}
                   </td>
                 ) : (
-                  <td className="px-4 py-2.5 align-top text-xs text-slate-500">{methodLabel(row.paymentMethod, locale)}</td>
+                  <td className="px-4 py-2.5 align-top text-xs text-ink/60">{methodLabel(row.paymentMethod, locale)}</td>
                 )}
                 <td className="px-4 py-2.5 align-top">
                   <StatusBadge status={row.status} label={statusLabel(row.status, locale)} />
@@ -333,14 +333,14 @@ export default function PaymentsTable({
                         data-testid="payment-cancel-button"
                         disabled={actionBusyId !== null}
                         onClick={() => void runAction(row, "cancel")}
-                        className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                        className="rounded border border-line px-1.5 py-0.5 text-[10px] font-medium text-ink/60 hover:bg-panel disabled:opacity-50"
                       >
                         {t("payments.action.cancel", locale)}
                       </button>
                     </div>
                   )}
                   {(!ledger || row.kind === "CLIENT") && canManage && row.kind !== "SUPPLIER" && row.kind !== "SUPPLIER_REFUND" && onEdit && (row.status === "PENDING" || row.status === "CAPTURED") && (
-                    <button type="button" onClick={() => onEdit(row)} className="mt-1.5 rounded border border-slate-300 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-slate-50">Редактировать</button>
+                    <button type="button" onClick={() => onEdit(row)} className="mt-1.5 rounded border border-line px-1.5 py-0.5 text-[10px] font-medium text-ink/60 hover:bg-panel">Редактировать</button>
                   )}
                   {(row.kind === "SUPPLIER" || row.kind === "SUPPLIER_REFUND") && canManageSupplier && row.status === "PENDING" && (
                     <div className="mt-1.5">
@@ -365,7 +365,7 @@ export default function PaymentsTable({
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-2.5 align-top text-xs text-slate-500">{row.acceptedBy ?? "—"}</td>
+                <td className="px-4 py-2.5 align-top text-xs text-ink/60">{row.acceptedBy ?? "—"}</td>
               </tr>
             );
           })}

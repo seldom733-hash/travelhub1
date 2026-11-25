@@ -299,35 +299,35 @@ export default function PartnerStorefrontPage() {
   const countryLabel = countryName(sf?.countryCode ?? null, locale);
 
   if (loading) {
-    return <div className="py-16 text-center text-sm text-slate-400">{pt("partner.state.loading", locale)}</div>;
+    return <div className="py-16 text-center text-sm text-ink/60">{pt("partner.state.loading", locale)}</div>;
   }
 
   // ── No storefront yet → Create CTA ──
   if (!sf) {
     return (
       <div className="mx-auto max-w-2xl">
-        <h1 className="text-2xl font-bold text-slate-900">{pt("storefront.title", locale)}</h1>
-        <p className="mt-2 text-sm text-slate-500">{pt("storefront.no_storefront_hint", locale)}</p>
+        <h1 className="text-2xl font-bold text-ink">{pt("storefront.title", locale)}</h1>
+        <p className="mt-2 text-sm text-ink/60">{pt("storefront.no_storefront_hint", locale)}</p>
         {createMode ? (
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mt-6 rounded-2xl border border-line bg-white p-6 shadow-sm">
             <div className="space-y-4">
               <div>
-                <label htmlFor="sf-slug" className="mb-1 block text-sm font-medium text-slate-700">
+                <label htmlFor="sf-slug" className="mb-1 block text-sm font-medium text-ink">
                   {pt("storefront.slug", locale)} <span className="text-rose-500">*</span>
                 </label>
-                <input id="sf-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="my-business" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                <input id="sf-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="my-business" className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
               </div>
               <div>
-                <label htmlFor="sf-name" className="mb-1 block text-sm font-medium text-slate-700">
+                <label htmlFor="sf-name" className="mb-1 block text-sm font-medium text-ink">
                   {pt("storefront.business_name", locale)}
                 </label>
-                <input id="sf-name" value={createName} onChange={(e) => setCreateName(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                <input id="sf-name" value={createName} onChange={(e) => setCreateName(e.target.value)} className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
               </div>
               <div>
-                <label htmlFor="sf-locale" className="mb-1 block text-sm font-medium text-slate-700">
+                <label htmlFor="sf-locale" className="mb-1 block text-sm font-medium text-ink">
                   {pt("storefront.default_locale", locale)}
                 </label>
-                <select id="sf-locale" value={defaultLocale} onChange={(e) => setDefaultLocale(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                <select id="sf-locale" value={defaultLocale} onChange={(e) => setDefaultLocale(e.target.value)} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
                   {STOREFRONT_LOCALES.map((l) => (
                     <option key={l} value={l}>
                       {l.toUpperCase()}
@@ -339,7 +339,7 @@ export default function PartnerStorefrontPage() {
                 <button onClick={create} disabled={saving || !slug.trim()} className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
                   {saving ? pt("partner.form.saving", locale) : pt("storefront.create", locale)}
                 </button>
-                <button onClick={() => setCreateMode(false)} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50">
+                <button onClick={() => setCreateMode(false)} className="rounded-lg border border-line px-4 py-2.5 text-sm text-ink/60 hover:bg-panel">
                   {pt("storefront.cancel", locale)}
                 </button>
               </div>
@@ -361,11 +361,11 @@ export default function PartnerStorefrontPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-2xl font-bold text-slate-900">{pt("storefront.title", locale)}</h1>
+        <h1 className="text-2xl font-bold text-ink">{pt("storefront.title", locale)}</h1>
         <StatusPill label={pt(`storefront.status.${sf.status}`, locale)} tone={sf.status === "ACTIVE" ? "green" : sf.status === "INACTIVE" ? "amber" : "slate"} />
         <StatusPill label={pt(`storefront.entitlement.${sf.entitlementStatus}`, locale)} tone={entitled ? "green" : sf.entitlementStatus === "NONE" ? "slate" : "red"} />
       </div>
-      <div className="font-mono text-xs text-slate-400">{sf.code} · /store/{sf.slug}</div>
+      <div className="font-mono text-xs text-ink/60">{sf.code} · /store/{sf.slug}</div>
 
       {error && <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {notice && <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
@@ -376,14 +376,14 @@ export default function PartnerStorefrontPage() {
       {/* ── Public URL / actions ── */}
       <div className="flex flex-wrap items-center gap-2">
         {publicLive && (
-          <a href={`/store/${sf.slug}`} target="_blank" rel="noreferrer" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">
+          <a href={`/store/${sf.slug}`} target="_blank" rel="noreferrer" className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
             {pt("storefront.open_public", locale)} ↗
           </a>
         )}
         <Link href="/partner/storefront/builder" className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
           Конструктор сайта
         </Link>
-        <Link href="/partner/storefront/preview" className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:border-emerald-300 hover:text-emerald-700">
+        <Link href="/partner/storefront/preview" className="rounded-lg border border-line px-4 py-2 text-sm text-ink/60 hover:border-emerald-300 hover:text-emerald-700">
           {pt("storefront.preview", locale)}
         </Link>
         {sf.status !== "ACTIVE" ? (
@@ -392,74 +392,74 @@ export default function PartnerStorefrontPage() {
               {pt("storefront.activate", locale)}
             </button>
           ) : (
-            <span className="rounded-lg bg-slate-100 px-4 py-2 text-xs text-slate-500">{pt("storefront.activate_blocked_no_entitlement", locale)}</span>
+            <span className="rounded-lg bg-panel px-4 py-2 text-xs text-ink/60">{pt("storefront.activate_blocked_no_entitlement", locale)}</span>
           )
         ) : (
-          <button onClick={deactivate} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:border-red-300 hover:text-red-700">
+          <button onClick={deactivate} className="rounded-lg border border-line px-4 py-2 text-sm text-ink/60 hover:border-red-300 hover:text-red-700">
             {pt("storefront.deactivate", locale)}
           </button>
         )}
       </div>
 
       {/* ── Business identity (Step 1.12.2 §3/§4) ── */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900">{pt("storefront.business_identity", locale)}</h2>
-        <p className="mb-4 mt-0.5 text-xs text-slate-400">{pt("storefront.identity_hint", locale)}</p>
+      <section className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-ink">{pt("storefront.business_identity", locale)}</h2>
+        <p className="mb-4 mt-0.5 text-xs text-ink/60">{pt("storefront.identity_hint", locale)}</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="sf-business" className="mb-1 block text-sm font-medium text-slate-700">{pt("storefront.business_name", locale)}</label>
-            <input id="sf-business" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
+            <label htmlFor="sf-business" className="mb-1 block text-sm font-medium text-ink">{pt("storefront.business_name", locale)}</label>
+            <input id="sf-business" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-emerald-400" />
           </div>
           <div>
-            <label htmlFor="sf-tagline" className="mb-1 block text-sm font-medium text-slate-700">{pt("storefront.tagline", locale)}</label>
-            <input id="sf-tagline" value={tagline} onChange={(e) => setTagline(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
+            <label htmlFor="sf-tagline" className="mb-1 block text-sm font-medium text-ink">{pt("storefront.tagline", locale)}</label>
+            <input id="sf-tagline" value={tagline} onChange={(e) => setTagline(e.target.value)} className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-emerald-400" />
           </div>
           <div className="sm:col-span-2">
-            <label htmlFor="sf-desc" className="mb-1 block text-sm font-medium text-slate-700">{pt("storefront.description", locale)}</label>
-            <textarea id="sf-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
+            <label htmlFor="sf-desc" className="mb-1 block text-sm font-medium text-ink">{pt("storefront.description", locale)}</label>
+            <textarea id="sf-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-emerald-400" />
           </div>
           <div>
-            <label htmlFor="sf-locale2" className="mb-1 block text-sm font-medium text-slate-700">{pt("storefront.default_locale", locale)}</label>
-            <select id="sf-locale2" value={defaultLocale} onChange={(e) => setDefaultLocale(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+            <label htmlFor="sf-locale2" className="mb-1 block text-sm font-medium text-ink">{pt("storefront.default_locale", locale)}</label>
+            <select id="sf-locale2" value={defaultLocale} onChange={(e) => setDefaultLocale(e.target.value)} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
               {STOREFRONT_LOCALES.map((l) => (
                 <option key={l} value={l}>{l.toUpperCase()}</option>
               ))}
             </select>
           </div>
           <div>
-            <label htmlFor="sf-city" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="sf-city" className="mb-1 block text-sm font-medium text-ink">
               {pt("storefront.city", locale)} {countryLabel ? `(${countryLabel})` : ""}
             </label>
-            <select id="sf-city" value={cityCode} onChange={(e) => setCityCode(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+            <select id="sf-city" value={cityCode} onChange={(e) => setCityCode(e.target.value)} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
               <option value="">—</option>
               {cities.map((c) => (
                 <option key={c.code} value={c.code}>{c.code}</option>
               ))}
             </select>
-            {sf.countryCode && <p className="mt-1 text-[11px] text-slate-400">{pt("storefront.country_system", locale)}: {sf.countryCode}</p>}
+            {sf.countryCode && <p className="mt-1 text-[11px] text-ink/60">{pt("storefront.country_system", locale)}: {sf.countryCode}</p>}
           </div>
         </div>
 
         {/* Contacts */}
-        <div className="mt-5 border-t border-slate-100 pt-4">
-          <h3 className="text-sm font-semibold text-slate-800">{pt("storefront.contacts", locale)}</h3>
-          <p className="mb-3 mt-0.5 text-[11px] text-slate-400">{pt("storefront.contacts_hint", locale)}</p>
+        <div className="mt-5 border-t border-line pt-4">
+          <h3 className="text-sm font-semibold text-ink">{pt("storefront.contacts", locale)}</h3>
+          <p className="mb-3 mt-0.5 text-[11px] text-ink/60">{pt("storefront.contacts_hint", locale)}</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="sf-phone" className="mb-1 block text-sm font-medium text-slate-700">{pt("storefront.phone", locale)}</label>
-              <input id="sf-phone" value={publicPhone} onChange={(e) => setPublicPhone(e.target.value)} placeholder="+994 50 123 45 67" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
+              <label htmlFor="sf-phone" className="mb-1 block text-sm font-medium text-ink">{pt("storefront.phone", locale)}</label>
+              <input id="sf-phone" value={publicPhone} onChange={(e) => setPublicPhone(e.target.value)} placeholder="+994 50 123 45 67" className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-emerald-400" />
             </div>
             <div>
-              <label htmlFor="sf-email" className="mb-1 block text-sm font-medium text-slate-700">{pt("storefront.email", locale)}</label>
-              <input id="sf-email" value={publicEmail} onChange={(e) => setPublicEmail(e.target.value)} placeholder="hello@example.com" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
+              <label htmlFor="sf-email" className="mb-1 block text-sm font-medium text-ink">{pt("storefront.email", locale)}</label>
+              <input id="sf-email" value={publicEmail} onChange={(e) => setPublicEmail(e.target.value)} placeholder="hello@example.com" className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-emerald-400" />
             </div>
             <div>
-              <label htmlFor="sf-site" className="mb-1 block text-sm font-medium text-slate-700">{pt("storefront.website", locale)}</label>
-              <input id="sf-site" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://example.com" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
+              <label htmlFor="sf-site" className="mb-1 block text-sm font-medium text-ink">{pt("storefront.website", locale)}</label>
+              <input id="sf-site" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://example.com" className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-emerald-400" />
             </div>
             <div>
-              <label htmlFor="sf-wa" className="mb-1 block text-sm font-medium text-slate-700">{pt("storefront.whatsapp", locale)}</label>
-              <input id="sf-wa" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+994501234567" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
+              <label htmlFor="sf-wa" className="mb-1 block text-sm font-medium text-ink">{pt("storefront.whatsapp", locale)}</label>
+              <input id="sf-wa" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+994501234567" className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-emerald-400" />
             </div>
           </div>
           <div className="mt-3 space-y-2">
@@ -468,7 +468,7 @@ export default function PartnerStorefrontPage() {
                 <select
                   value={link.platform}
                   onChange={(e) => setSocialLinks(socialLinks.map((l, j) => (j === i ? { ...l, platform: e.target.value } : l)))}
-                  className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                  className="rounded-lg border border-line px-2 py-1.5 text-sm"
                 >
                   {SOCIAL_PLATFORMS.map((p) => (
                     <option key={p} value={p}>{p}</option>
@@ -478,15 +478,15 @@ export default function PartnerStorefrontPage() {
                   value={link.url}
                   onChange={(e) => setSocialLinks(socialLinks.map((l, j) => (j === i ? { ...l, url: e.target.value } : l)))}
                   placeholder="https://…"
-                  className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-emerald-400"
+                  className="flex-1 rounded-lg border border-line px-3 py-1.5 text-sm outline-none focus:border-emerald-400"
                 />
-                <button onClick={() => setSocialLinks(socialLinks.filter((_, j) => j !== i))} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-500 hover:bg-red-50 hover:text-red-600">
+                <button onClick={() => setSocialLinks(socialLinks.filter((_, j) => j !== i))} className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink/60 hover:bg-red-50 hover:text-red-600">
                   ✕
                 </button>
               </div>
             ))}
             {socialLinks.length < 10 && (
-              <button onClick={() => setSocialLinks([...socialLinks, { platform: "instagram", url: "" }])} className="rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs text-slate-500 hover:border-emerald-300 hover:text-emerald-700">
+              <button onClick={() => setSocialLinks([...socialLinks, { platform: "instagram", url: "" }])} className="rounded-lg border border-dashed border-line px-3 py-1.5 text-xs text-ink/60 hover:border-emerald-300 hover:text-emerald-700">
                 + {pt("storefront.add_social", locale)}
               </button>
             )}
@@ -494,20 +494,20 @@ export default function PartnerStorefrontPage() {
         </div>
 
         {/* Branding */}
-        <div className="mt-5 border-t border-slate-100 pt-4">
-          <h3 className="text-sm font-semibold text-slate-800">{pt("storefront.branding", locale)}</h3>
+        <div className="mt-5 border-t border-line pt-4">
+          <h3 className="text-sm font-semibold text-ink">{pt("storefront.branding", locale)}</h3>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="sf-hero-h" className="mb-1 block text-sm font-medium text-slate-700">{pt("storefront.hero_heading", locale)}</label>
-              <input id="sf-hero-h" value={heroHeading} onChange={(e) => setHeroHeading(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
+              <label htmlFor="sf-hero-h" className="mb-1 block text-sm font-medium text-ink">{pt("storefront.hero_heading", locale)}</label>
+              <input id="sf-hero-h" value={heroHeading} onChange={(e) => setHeroHeading(e.target.value)} className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-emerald-400" />
             </div>
             <div>
-              <label htmlFor="sf-hero-s" className="mb-1 block text-sm font-medium text-slate-700">{pt("storefront.hero_subheading", locale)}</label>
-              <input id="sf-hero-s" value={heroSubheading} onChange={(e) => setHeroSubheading(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
+              <label htmlFor="sf-hero-s" className="mb-1 block text-sm font-medium text-ink">{pt("storefront.hero_subheading", locale)}</label>
+              <input id="sf-hero-s" value={heroSubheading} onChange={(e) => setHeroSubheading(e.target.value)} className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-emerald-400" />
             </div>
             <div>
-              <label htmlFor="sf-theme" className="mb-1 block text-sm font-medium text-slate-700">{pt("storefront.theme", locale)}</label>
-              <select id="sf-theme" value={themePreset} onChange={(e) => setThemePreset(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+              <label htmlFor="sf-theme" className="mb-1 block text-sm font-medium text-ink">{pt("storefront.theme", locale)}</label>
+              <select id="sf-theme" value={themePreset} onChange={(e) => setThemePreset(e.target.value)} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
                 {STOREFRONT_THEMES.map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}
@@ -524,9 +524,9 @@ export default function PartnerStorefrontPage() {
       </section>
 
       {/* ── Media (logo/hero) ── */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900">{pt("storefront.media", locale)}</h2>
-        <p className="mb-4 mt-0.5 text-xs text-slate-400">{pt("storefront.media_hint", locale)}</p>
+      <section className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-ink">{pt("storefront.media", locale)}</h2>
+        <p className="mb-4 mt-0.5 text-xs text-ink/60">{pt("storefront.media_hint", locale)}</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <MediaUploader
             title={pt("storefront.logo", locale)}
@@ -548,24 +548,24 @@ export default function PartnerStorefrontPage() {
         <input ref={logoRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => upload("LOGO", e.target.files?.[0])} />
         <input ref={heroRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => upload("HERO", e.target.files?.[0])} />
 
-        <div className="mt-5 border-t border-slate-100 pt-4">
+        <div className="mt-5 border-t border-line pt-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-slate-800">Галерея сайта</h3>
-              <p className="text-xs text-slate-400">До 24 изображений. Можно добавить их в блок «Галерея» в конструкторе.</p>
+              <h3 className="text-sm font-semibold text-ink">Галерея сайта</h3>
+              <p className="text-xs text-ink/60">До 24 изображений. Можно добавить их в блок «Галерея» в конструкторе.</p>
             </div>
-            <button type="button" onClick={() => galleryRef.current?.click()} disabled={uploading === "GALLERY"} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+            <button type="button" onClick={() => galleryRef.current?.click()} disabled={uploading === "GALLERY"} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink hover:bg-panel disabled:opacity-50">
               {uploading === "GALLERY" ? "Загрузка…" : "Добавить изображения"}
             </button>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {sf.media.filter((m) => m.kind === "GALLERY").map((m) => (
-              <div key={m.id} className="group relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+              <div key={m.id} className="group relative overflow-hidden rounded-xl border border-line bg-panel">
                 {mediaPreview.gallery[m.id] ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={mediaPreview.gallery[m.id]} alt={m.altText ?? ""} className="aspect-[4/3] w-full object-cover" />
                 ) : (
-                  <div className="flex aspect-[4/3] items-center justify-center text-xs text-slate-400">—</div>
+                  <div className="flex aspect-[4/3] items-center justify-center text-xs text-ink/60">—</div>
                 )}
                 <button type="button" onClick={() => void removeGallery(m.id)} className="absolute right-1 top-1 rounded bg-white/90 px-1.5 py-0.5 text-[11px] text-rose-600 opacity-0 shadow transition group-hover:opacity-100">
                   Удалить
@@ -578,20 +578,20 @@ export default function PartnerStorefrontPage() {
       </section>
 
       {/* ── Distribution ── */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900">{pt("storefront.distribution", locale)}</h2>
-        <p className="mb-3 mt-0.5 text-xs text-slate-400">{pt("storefront.distribution_hint", locale)}</p>
+      <section className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-ink">{pt("storefront.distribution", locale)}</h2>
+        <p className="mb-3 mt-0.5 text-xs text-ink/60">{pt("storefront.distribution_hint", locale)}</p>
         <Link href="/partner/products" className="inline-block rounded-lg border border-emerald-200 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50">
           {pt("storefront.manage_distribution", locale)} →
         </Link>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900">Свой домен</h2>
-        <p className="mt-0.5 text-xs text-slate-400">Например, tours.example.com. Нужна TXT-запись для подтверждения.</p>
+      <section className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-ink">Свой домен</h2>
+        <p className="mt-0.5 text-xs text-ink/60">Например, tours.example.com. Нужна TXT-запись для подтверждения.</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <input value={domainDraft} onChange={(e) => setDomainDraft(e.target.value)} placeholder="tours.example.com" className="min-w-64 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-          <button type="button" onClick={() => void saveDomain()} disabled={domainBusy || !domainDraft.trim()} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">Сохранить</button>
+          <input value={domainDraft} onChange={(e) => setDomainDraft(e.target.value)} placeholder="tours.example.com" className="min-w-64 flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+          <button type="button" onClick={() => void saveDomain()} disabled={domainBusy || !domainDraft.trim()} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink hover:bg-panel disabled:opacity-50">Сохранить</button>
           {sf.customDomainStatus === "PENDING" && (
             <button type="button" onClick={() => void verifyDomain()} disabled={domainBusy} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">Проверить DNS</button>
           )}
@@ -600,7 +600,7 @@ export default function PartnerStorefrontPage() {
           )}
         </div>
         {sf.customDomain && (
-          <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600">
+          <div className="mt-3 rounded-lg border border-line bg-panel p-3 text-xs text-ink/60">
             <div>Статус: <b>{sf.customDomainStatus}</b></div>
             {sf.customDomainStatus !== "VERIFIED" && sf.customDomainToken && (
               <div className="mt-2">
@@ -616,7 +616,7 @@ export default function PartnerStorefrontPage() {
 }
 
 function StatusPill({ label, tone }: { label: string; tone: "green" | "amber" | "slate" | "red" }) {
-  const cls = tone === "green" ? "bg-emerald-100 text-emerald-700" : tone === "amber" ? "bg-amber-100 text-amber-700" : tone === "red" ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-600";
+  const cls = tone === "green" ? "bg-emerald-100 text-emerald-700" : tone === "amber" ? "bg-amber-100 text-amber-700" : tone === "red" ? "bg-red-100 text-red-700" : "bg-panel text-ink/60";
   return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${cls}`}>{label}</span>;
 }
 
@@ -631,29 +631,29 @@ function StateBanner({ sf, locale }: { sf: StorefrontView; locale: ReturnType<ty
     return <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{pt("storefront.banner_inactive", locale)}</div>;
   }
   if (sf.entitlementStatus === "NONE") {
-    return <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">{pt("storefront.banner_draft_none", locale)}</div>;
+    return <div className="rounded-xl border border-line bg-panel px-4 py-3 text-sm text-ink/60">{pt("storefront.banner_draft_none", locale)}</div>;
   }
-  return <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">{pt("storefront.banner_draft_ready", locale)}</div>;
+  return <div className="rounded-xl border border-brand/20 bg-brand/10 px-4 py-3 text-sm text-ink">{pt("storefront.banner_draft_ready", locale)}</div>;
 }
 
 function MediaUploader({ title, previewUrl, uploading, onPick, onRemove, hasMedia }: { title: string; previewUrl?: string; uploading: boolean; onPick: () => void; onRemove: () => void; hasMedia: boolean }) {
   const locale = useLocale();
   return (
-    <div className="rounded-xl border border-slate-200 p-3">
-      <div className="text-sm font-medium text-slate-700">{title}</div>
+    <div className="rounded-xl border border-line p-3">
+      <div className="text-sm font-medium text-ink">{title}</div>
       <div className="mt-2 flex items-center gap-3">
         {previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={previewUrl} alt={title} className="size-16 rounded-lg object-cover" />
         ) : (
-          <div className="flex size-16 items-center justify-center rounded-lg bg-slate-100 text-2xl text-slate-300">🖼</div>
+          <div className="flex size-16 items-center justify-center rounded-lg bg-panel text-2xl text-ink/60">🖼</div>
         )}
         <div className="flex flex-col gap-1.5">
-          <button onClick={onPick} disabled={uploading} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-50">
+          <button onClick={onPick} disabled={uploading} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink/60 hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-50">
             {uploading ? pt("partner.media.uploading", locale) : hasMedia ? pt("storefront.replace", locale) : pt("storefront.upload", locale)}
           </button>
           {hasMedia && (
-            <button onClick={onRemove} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:border-red-300 hover:text-red-600">
+            <button onClick={onRemove} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink/60 hover:border-red-300 hover:text-red-600">
               {pt("storefront.remove", locale)}
             </button>
           )}

@@ -87,13 +87,13 @@ export default function EntityAuditHistory({
       ) : null}
 
       {!error && loading && items.length === 0 ? (
-        <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-400">
+        <div className="rounded-lg bg-panel px-4 py-3 text-xs text-ink/60">
           {t("crm.loading", locale)}
         </div>
       ) : null}
 
       {!error && !loading && items.length === 0 ? (
-        <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-400">
+        <div className="rounded-lg bg-panel px-4 py-3 text-xs text-ink/60">
           {emptyText ?? t("detail.history.empty", locale)}
         </div>
       ) : null}
@@ -104,27 +104,27 @@ export default function EntityAuditHistory({
             <EntityRow key={h.id} className="items-start">
               <div className="w-full">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-slate-700">{actionLabel(h.action, locale)}</span>
-                  <span className="shrink-0 text-slate-400">{formatTs(h.createdAt, locale)}</span>
+                  <span className="font-semibold text-ink">{actionLabel(h.action, locale)}</span>
+                  <span className="shrink-0 text-ink/60">{formatTs(h.createdAt, locale)}</span>
                 </div>
                 {(h.from || h.to) && (
-                  <div className="mt-0.5 text-slate-500">
+                  <div className="mt-0.5 text-ink/60">
                     {h.from ? <StatusBadge status={h.from} /> : null}
-                    {h.from && h.to ? <span className="mx-1 text-slate-400">→</span> : null}
+                    {h.from && h.to ? <span className="mx-1 text-ink/60">→</span> : null}
                     {h.to ? <StatusBadge status={h.to} /> : null}
                   </div>
                 )}
-                {h.comment && <div className="mt-1 text-slate-500">{h.comment}</div>}
+                {h.comment && <div className="mt-1 text-ink/60">{h.comment}</div>}
                 {Array.isArray(h.fields) && h.fields.length > 0 && (
-                  <ul className="mt-2 space-y-1 rounded-lg bg-slate-50 p-2">
+                  <ul className="mt-2 space-y-1 rounded-lg bg-panel p-2">
                     {h.fields.map((f, idx) => {
                       const labelBase = f.field.includes("traveler[")
                         ? f.field.replace(/^traveler\[\d+\]\./, "")
                         : f.field;
                       return (
-                        <li key={idx} className="flex flex-wrap items-center gap-1 text-[11px] text-slate-600">
+                        <li key={idx} className="flex flex-wrap items-center gap-1 text-[11px] text-ink/60">
                           <span className="font-medium">{fieldLabel ? fieldLabel(labelBase, locale) : labelBase}:</span>
-                          <span className="text-slate-400 line-through">{renderFieldValue(labelBase, f.oldValue)}</span>
+                          <span className="text-ink/60 line-through">{renderFieldValue(labelBase, f.oldValue)}</span>
                           <span>→</span>
                           <span>{renderFieldValue(labelBase, f.newValue)}</span>
                           {f.redacted && <span className="text-amber-600">{t("order.history.redacted", locale)}</span>}
@@ -134,7 +134,7 @@ export default function EntityAuditHistory({
                   </ul>
                 )}
                 {h.actorName && (
-                  <div className="mt-1 text-slate-400">{ti("order.history.author", locale, { name: h.actorName })}</div>
+                  <div className="mt-1 text-ink/60">{ti("order.history.author", locale, { name: h.actorName })}</div>
                 )}
               </div>
             </EntityRow>
@@ -146,7 +146,7 @@ export default function EntityAuditHistory({
         <button
           disabled={loading}
           onClick={onLoadMore}
-          className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          className="mt-2 rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel disabled:opacity-50"
         >
           {loading ? "…" : ti("order.history.show_more", locale, { n: total - items.length })}
         </button>

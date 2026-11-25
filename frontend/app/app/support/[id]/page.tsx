@@ -25,8 +25,8 @@ function historyEventTitle(h: CaseHistory, locale: "ru" | "az" | "en") {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex justify-between">
-      <span className="text-slate-400">{label}</span>
-      <span className="text-right text-slate-700">{children}</span>
+      <span className="text-ink/60">{label}</span>
+      <span className="text-right text-ink">{children}</span>
     </div>
   );
 }
@@ -47,22 +47,22 @@ function DeleteDialog({
   const [reason, setReason] = useState("");
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xl max-w-md w-full space-y-4">
-        <h3 className="text-sm font-semibold text-slate-800">{t("support.delete.title", locale)}</h3>
-        <p className="text-xs text-slate-500">{t("support.delete.warning", locale)}</p>
+      <div className="rounded-xl border border-line bg-white p-6 shadow-xl max-w-md w-full space-y-4">
+        <h3 className="text-sm font-semibold text-ink">{t("support.delete.title", locale)}</h3>
+        <p className="text-xs text-ink/60">{t("support.delete.warning", locale)}</p>
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-400">
+          <label className="mb-1 block text-xs font-medium text-ink/60">
             {t("support.delete.reason_label", locale)} *
           </label>
           <input
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+            className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
             maxLength={2000}
           />
         </div>
         <div className="flex justify-end gap-3">
-          <button onClick={onCancel} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">
+          <button onClick={onCancel} className="rounded-lg border border-line bg-white px-4 py-2 text-xs font-medium text-ink/60 hover:bg-panel">
             {t("support.edit.cancel", locale)}
           </button>
           <button
@@ -99,20 +99,20 @@ function EditPanel({
   const [priority, setPriority] = useState(detail.priority);
 
   return (
-    <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-5 space-y-4">
+    <div className="rounded-xl border border-brand/20 bg-brand/50 p-5 space-y-4">
       <div>
-        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
           {t("support.edit.title_label", locale)}
         </label>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+          className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
           maxLength={200}
         />
       </div>
       <div>
-        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
           {t("support.edit.desc_label", locale)}
         </label>
         <textarea
@@ -120,25 +120,25 @@ function EditPanel({
           onChange={(e) => setDescription(e.target.value)}
           rows={4}
           maxLength={5000}
-          className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+          className="w-full resize-none rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
         />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
             {t("support.edit.type_label", locale)}
           </label>
-          <select value={caseType} onChange={(e) => setCaseType(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400">
+          <select value={caseType} onChange={(e) => setCaseType(e.target.value)} className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand">
             {CASE_TYPES.map((ty) => (
               <option key={ty} value={ty}>{t(`support.type.${ty}`, locale)}</option>
             ))}
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">
             {t("support.edit.priority_label", locale)}
           </label>
-          <select value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400">
+          <select value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand">
             {PRIORITIES.map((p) => (
               <option key={p} value={p}>{t(`support.priority.${p}`, locale)}</option>
             ))}
@@ -146,13 +146,13 @@ function EditPanel({
         </div>
       </div>
       <div className="flex gap-3 pt-2">
-        <button onClick={onCancel} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">
+        <button onClick={onCancel} className="rounded-lg border border-line bg-white px-4 py-2 text-xs font-medium text-ink/60 hover:bg-panel">
           {t("support.edit.cancel", locale)}
         </button>
         <button
           onClick={() => onSave({ title, description, caseType, priority })}
           disabled={saving || !title.trim()}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-brand px-4 py-2 text-xs font-semibold text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? "…" : t("support.edit.save", locale)}
         </button>
@@ -253,13 +253,13 @@ function CaseDetailContent() {
   };
 
   if (loading) {
-    return <div className="flex min-h-[60vh] items-center justify-center text-sm text-slate-400">{t("state.loading", effectiveLocale)}</div>;
+    return <div className="flex min-h-[60vh] items-center justify-center text-sm text-ink/60">{t("state.loading", effectiveLocale)}</div>;
   }
   if (error && !detail) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
         <div className="text-sm text-red-500">{error}</div>
-        <button onClick={() => router.push("/app/support")} className="text-xs text-blue-600 hover:underline">
+        <button onClick={() => router.push("/app/support")} className="text-xs text-brand hover:underline">
           {t("support.detail.back", effectiveLocale)}
         </button>
       </div>
@@ -277,7 +277,7 @@ function CaseDetailContent() {
         actions={
           <div className="flex items-center gap-2">
             {canUpdate && (
-              <button onClick={() => setEditing(!editing)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+              <button onClick={() => setEditing(!editing)} className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel">
                 {t("support.edit.btn", effectiveLocale)}
               </button>
             )}
@@ -286,7 +286,7 @@ function CaseDetailContent() {
                 {t("support.delete.btn", effectiveLocale)}
               </button>
             )}
-            <button onClick={() => router.push("/app/support")} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+            <button onClick={() => router.push("/app/support")} className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel">
               {t("support.detail.back", effectiveLocale)}
             </button>
           </div>
@@ -309,13 +309,13 @@ function CaseDetailContent() {
       <div className="grid grid-cols-1 gap-6 p-6 xl:grid-cols-3">
         {/* Left */}
         <div className="space-y-5 xl:col-span-2">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-line bg-white p-5 shadow-sm">
             <div className="flex items-center gap-3 mb-3">
               <StatusBadge status={detail.status} />
-              <span className="text-xs text-slate-400">{new Date(detail.createdAt).toLocaleString(effectiveLocale)}</span>
+              <span className="text-xs text-ink/60">{new Date(detail.createdAt).toLocaleString(effectiveLocale)}</span>
             </div>
-            <h1 className="text-lg font-semibold text-slate-800 mb-2">{detail.title}</h1>
-            {detail.description && <p className="text-sm text-slate-500 whitespace-pre-wrap">{detail.description}</p>}
+            <h1 className="text-lg font-semibold text-ink mb-2">{detail.title}</h1>
+            {detail.description && <p className="text-sm text-ink/60 whitespace-pre-wrap">{detail.description}</p>}
           </div>
 
           {/* R12: Edit panel */}
@@ -331,17 +331,17 @@ function CaseDetailContent() {
 
           {/* R5: Status dropdown + R11: Priority dropdown */}
           {canUpdate && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <div className="rounded-xl border border-line bg-white p-5 shadow-sm space-y-4">
               <div className="flex flex-wrap items-center gap-6">
                 {/* R5: Status dropdown */}
                 <div className="flex items-center gap-3">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-ink/60">
                     {t("support.detail.status_change", effectiveLocale)}
                   </label>
                   <select
                     value={detail.status}
                     onChange={(e) => void handleStatusChange(e.target.value)}
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-blue-400"
+                    className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink outline-none focus:border-brand"
                   >
                     <option value={detail.status}>{t(`support.status.${detail.status}`, effectiveLocale)}</option>
                     {allowed.map((next) => (
@@ -351,13 +351,13 @@ function CaseDetailContent() {
                 </div>
                 {/* R11: Priority dropdown */}
                 <div className="flex items-center gap-3">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-ink/60">
                     {t("support.detail.priority_change", effectiveLocale)}
                   </label>
                   <select
                     value={detail.priority}
                     onChange={(e) => void handlePriorityChange(e.target.value)}
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-blue-400"
+                    className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink outline-none focus:border-brand"
                   >
                     {PRIORITIES.map((p) => (
                       <option key={p} value={p}>{t(`support.priority.${p}`, effectiveLocale)}</option>
@@ -372,12 +372,12 @@ function CaseDetailContent() {
           )}
 
           {/* Tabs */}
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex gap-1 border-b border-slate-200 bg-slate-50 px-5 pt-2">
+          <div className="rounded-xl border border-line bg-white shadow-sm">
+            <div className="flex gap-1 border-b border-line bg-panel px-5 pt-2">
               {(["comments", "history", "communications"] as const).map((tab_) => (
-                <button key={tab_} onClick={() => setActiveTab(tab_)} className={`rounded-t-lg px-4 py-2 text-xs font-medium transition-colors ${activeTab === tab_ ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                <button key={tab_} onClick={() => setActiveTab(tab_)} className={`rounded-t-lg px-4 py-2 text-xs font-medium transition-colors ${activeTab === tab_ ? "bg-white text-brand shadow-sm" : "text-ink/60 hover:text-ink"}`}>
                   {t(`support.tab.${tab_}`, effectiveLocale)}
-                  {tab_ === "comments" && detail.comments && detail.comments.length > 0 && <span className="ml-1 text-[10px] text-slate-400">({detail.comments.length})</span>}
+                  {tab_ === "comments" && detail.comments && detail.comments.length > 0 && <span className="ml-1 text-[10px] text-ink/60">({detail.comments.length})</span>}
                 </button>
               ))}
             </div>
@@ -385,15 +385,15 @@ function CaseDetailContent() {
               {activeTab === "comments" && (
                 <div className="space-y-3">
                   {(detail.comments ?? []).length === 0 ? (
-                    <div className="text-xs text-slate-400">{t("support.comment.empty", effectiveLocale)}</div>
+                    <div className="text-xs text-ink/60">{t("support.comment.empty", effectiveLocale)}</div>
                   ) : (detail.comments ?? []).map((c) => (
-                    <div key={c.id} className={`rounded-lg border px-3 py-2 text-xs ${c.isInternal ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-white"}`}>
+                    <div key={c.id} className={`rounded-lg border px-3 py-2 text-xs ${c.isInternal ? "border-amber-200 bg-amber-50" : "border-line bg-white"}`}>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-[10px] text-slate-400">{c.authorId.substring(0, 8)}…</span>
-                        <span className="text-[10px] text-slate-400">{new Date(c.createdAt).toLocaleString(effectiveLocale)}</span>
+                        <span className="font-mono text-[10px] text-ink/60">{c.authorId.substring(0, 8)}…</span>
+                        <span className="text-[10px] text-ink/60">{new Date(c.createdAt).toLocaleString(effectiveLocale)}</span>
                         {c.isInternal && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">{t("support.comment.internal_badge", effectiveLocale)}</span>}
                       </div>
-                      <div className="text-slate-700 whitespace-pre-wrap">{c.body}</div>
+                      <div className="text-ink whitespace-pre-wrap">{c.body}</div>
                     </div>
                   ))}
                 </div>
@@ -401,24 +401,24 @@ function CaseDetailContent() {
               {activeTab === "history" && (
                 <div className="space-y-3">
                   {(detail.history ?? []).length === 0 ? (
-                    <div className="text-xs text-slate-400">{t("support.history.empty", effectiveLocale)}</div>
+                    <div className="text-xs text-ink/60">{t("support.history.empty", effectiveLocale)}</div>
                   ) : (detail.history ?? []).map((h) => (
                     <div key={h.id} className="flex items-start gap-3 text-xs">
-                      <span className="mt-1 size-2 shrink-0 rounded-full bg-blue-400" />
+                      <span className="mt-1 size-2 shrink-0 rounded-full bg-brand/30" />
                       <div className="flex-1">
-                        <div className="font-medium text-slate-700">{historyEventTitle(h, effectiveLocale)}</div>
+                        <div className="font-medium text-ink">{historyEventTitle(h, effectiveLocale)}</div>
                         {isStatusTransition(h.action) && h.previousValue && h.newValue && (
-                          <div className="mt-0.5 text-slate-500">
+                          <div className="mt-0.5 text-ink/60">
                             {t(`support.status.${h.previousValue}`, effectiveLocale)} → {t(`support.status.${h.newValue}`, effectiveLocale)}
                           </div>
                         )}
                         {!isStatusTransition(h.action) && h.previousValue && h.newValue && (
-                          <div className="mt-0.5 text-slate-500">
+                          <div className="mt-0.5 text-ink/60">
                             {h.previousValue} → {h.newValue}
                           </div>
                         )}
-                        {h.details && <div className="mt-0.5 text-slate-400">{h.details}</div>}
-                        <div className="mt-0.5 text-[10px] text-slate-400">
+                        {h.details && <div className="mt-0.5 text-ink/60">{h.details}</div>}
+                        <div className="mt-0.5 text-[10px] text-ink/60">
                           {h.actorName ?? h.actorId?.substring(0, 8) ?? "system"} · {new Date(h.createdAt).toLocaleString(effectiveLocale)}
                         </div>
                       </div>
@@ -429,12 +429,12 @@ function CaseDetailContent() {
               {activeTab === "communications" && (
                 <div className="space-y-3">
                   {(detail.caseLinks ?? []).length === 0 ? (
-                    <div className="text-xs text-slate-400">{t("support.comm.empty", effectiveLocale)}</div>
+                    <div className="text-xs text-ink/60">{t("support.comm.empty", effectiveLocale)}</div>
                   ) : (detail.caseLinks ?? []).map((link) => (
-                    <div key={link.id} className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs">
-                      <span className="rounded bg-blue-100 px-1.5 py-0.5 font-semibold text-blue-700">CML</span>
-                      <span className="font-mono text-slate-500">{link.communicationId.substring(0, 8)}…</span>
-                      <span className="text-[10px] text-slate-400">{new Date(link.createdAt).toLocaleString(effectiveLocale)}</span>
+                    <div key={link.id} className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-xs">
+                      <span className="rounded bg-brand/15 px-1.5 py-0.5 font-semibold text-brand-dark">CML</span>
+                      <span className="font-mono text-ink/60">{link.communicationId.substring(0, 8)}…</span>
+                      <span className="text-[10px] text-ink/60">{new Date(link.createdAt).toLocaleString(effectiveLocale)}</span>
                     </div>
                   ))}
                 </div>
@@ -445,8 +445,8 @@ function CaseDetailContent() {
 
         {/* Right sidebar */}
         <div className="space-y-5">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-3 text-xs">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t("support.detail.summary", effectiveLocale)}</h3>
+          <div className="rounded-xl border border-line bg-white p-5 shadow-sm space-y-3 text-xs">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-ink/60">{t("support.detail.summary", effectiveLocale)}</h3>
             <Row label={t("support.detail.status", effectiveLocale)}><StatusBadge status={detail.status} /></Row>
             <Row label={t("support.detail.type", effectiveLocale)}>{t(`support.type.${detail.caseType}`, effectiveLocale)}</Row>
             <Row label={t("support.detail.priority", effectiveLocale)}>{t(`support.priority.${detail.priority}`, effectiveLocale)}</Row>

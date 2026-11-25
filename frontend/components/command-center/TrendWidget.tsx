@@ -109,9 +109,9 @@ export function TrendWidget({
 
   if (unsupported) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{title}</div>
-        <div className="mt-2 text-sm text-slate-400">
+      <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
+        <div className="text-xs font-medium uppercase tracking-wide text-ink/60">{title}</div>
+        <div className="mt-2 text-sm text-ink/60">
           {t("cc.trend_unsupported", locale)}
         </div>
         {/* Screen reader: no data available */}
@@ -123,34 +123,34 @@ export function TrendWidget({
   if (loading) {
     /* §SKELETON-PARITY: тот же каркас, что и у реального виджета (:153-155) —
        карточка `rounded-2xl border bg-white p-4 shadow-sm` + подпись + область
-       диаграммы `mt-3 height:140`; раньше был бесформенный блок `h-48 bg-slate-100`. */
+       диаграммы `mt-3 height:140`; раньше был бесформенный блок `h-48 bg-panel`. */
     return (
       <div
-        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+        className="rounded-2xl border border-line bg-white p-4 shadow-sm"
         aria-busy
         role="status"
         aria-label={t("cc.loading", locale)}
       >
-        <div className="h-3 w-32 animate-pulse rounded bg-slate-100" />
-        <div className="mt-3 h-[140px] animate-pulse rounded-lg bg-slate-100" />
+        <div className="h-3 w-32 animate-pulse rounded bg-panel" />
+        <div className="mt-3 h-[140px] animate-pulse rounded-lg bg-panel" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{title}</div>
-        <div className="mt-2 text-sm text-slate-400">{error}</div>
+      <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
+        <div className="text-xs font-medium uppercase tracking-wide text-ink/60">{title}</div>
+        <div className="mt-2 text-sm text-ink/60">{error}</div>
       </div>
     );
   }
 
   if (!data || data.buckets.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{title}</div>
-        <div className="mt-4 text-center text-sm text-slate-400">{t("cc.no_data", locale)}</div>
+      <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
+        <div className="text-xs font-medium uppercase tracking-wide text-ink/60">{title}</div>
+        <div className="mt-4 text-center text-sm text-ink/60">{t("cc.no_data", locale)}</div>
       </div>
     );
   }
@@ -161,8 +161,8 @@ export function TrendWidget({
   }));
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{title}</div>
+    <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
+      <div className="text-xs font-medium uppercase tracking-wide text-ink/60">{title}</div>
       <div className="mt-3" style={{ height: 140 }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>

@@ -35,16 +35,16 @@ const SORTS: Array<{ value: PartnerListSort; labelKey: string }> = [
 
 const STATUS_BADGE: Record<string, string> = {
   DRAFT: "bg-amber-100 text-amber-700",
-  COMPLETE: "bg-blue-100 text-blue-700",
-  REVIEWED: "bg-indigo-100 text-indigo-700",
+  COMPLETE: "bg-brand/15 text-brand-dark",
+  REVIEWED: "bg-brand/15 text-brand-dark",
   PUBLISHED: "bg-emerald-100 text-emerald-700",
   CHANGED: "bg-orange-100 text-orange-700",
-  ARCHIVED: "bg-slate-200 text-slate-500",
+  ARCHIVED: "bg-panel text-ink/60",
 };
 
 const MODERATION_BADGE: Record<string, string> = {
-  SUBMITTED: "bg-blue-100 text-blue-700",
-  IN_REVIEW: "bg-indigo-100 text-indigo-700",
+  SUBMITTED: "bg-brand/15 text-brand-dark",
+  IN_REVIEW: "bg-brand/15 text-brand-dark",
   APPROVED: "bg-emerald-100 text-emerald-700",
   REJECTED: "bg-rose-100 text-rose-700",
   CHANGES_REQUESTED: "bg-rose-100 text-rose-700",
@@ -165,8 +165,8 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
     <div>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{pt("partner.products.title", locale)}</h1>
-          <p className="mt-1 text-sm text-slate-500">{pt("partner.products.subtitle", locale)}</p>
+          <h1 className="text-2xl font-bold text-ink">{pt("partner.products.title", locale)}</h1>
+          <p className="mt-1 text-sm text-ink/60">{pt("partner.products.subtitle", locale)}</p>
         </div>
         <div className="flex items-center gap-2">
           <Link
@@ -195,7 +195,7 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
             value={draftQ}
             onChange={(e) => setDraftQ(e.target.value)}
             placeholder={pt("partner.products.search", locale)}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+            className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
           />
         </form>
 
@@ -207,7 +207,7 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
               onClick={() => changeFilter(f.value)}
               aria-pressed={filter === f.value}
               className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                filter === f.value ? "bg-emerald-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:border-emerald-300"
+                filter === f.value ? "bg-emerald-600 text-white" : "bg-white text-ink/60 border border-line hover:border-emerald-300"
               }`}
             >
               {pt(f.labelKey, locale)}
@@ -223,7 +223,7 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
             id="partner-category"
             value={categoryId}
             onChange={(e) => changeCategory(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs outline-none focus:border-emerald-400"
+            className="rounded-lg border border-line bg-white px-2 py-2 text-xs outline-none focus:border-emerald-400"
           >
             <option value="">{pt("partner.product.category", locale)}: {pt("partner.filter.all", locale)}</option>
             {categories.map((c) => (
@@ -240,7 +240,7 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
             id="partner-sort"
             value={sort}
             onChange={(e) => changeSort(e.target.value as PartnerListSort)}
-            className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs outline-none focus:border-emerald-400"
+            className="rounded-lg border border-line bg-white px-2 py-2 text-xs outline-none focus:border-emerald-400"
           >
             {SORTS.map((s) => (
               <option key={s.value} value={s.value}>
@@ -254,10 +254,10 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
       {error && <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       {/* Table */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
+            <thead className="border-b border-line bg-panel text-[11px] uppercase tracking-wide text-ink/60">
               <tr>
                 <th className="px-4 py-3 font-medium">#</th>
                 <th className="px-4 py-3 font-medium">{pt("partner.form.title", locale)}</th>
@@ -269,38 +269,38 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
                 <th className="px-4 py-3 text-right font-medium">→</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-line">
               {items === null &&
                 Array.from({ length: 5 }).map((_, i) => (
                   /* §SKELETON-PARITY: строка повторяет реальную (:288-…): 8 ячеек
                      `px-4 py-3`, превью `size-10` в колонке названия. Раньше была
                      одна полоса `colSpan={8} h-4` — другая высота строки и ритм. */
                   <tr key={i} className="animate-pulse">
-                    <td className="px-4 py-3"><div className="h-3 w-4 rounded bg-slate-100" /></td>
+                    <td className="px-4 py-3"><div className="h-3 w-4 rounded bg-panel" /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="size-10 shrink-0 rounded-lg bg-slate-100" />
-                        <div className="h-4 w-40 rounded bg-slate-100" />
+                        <div className="size-10 shrink-0 rounded-lg bg-panel" />
+                        <div className="h-4 w-40 rounded bg-panel" />
                       </div>
                     </td>
-                    <td className="px-4 py-3"><div className="h-4 w-20 rounded bg-slate-100" /></td>
-                    <td className="px-4 py-3"><div className="h-5 w-20 rounded-full bg-slate-100" /></td>
-                    <td className="px-4 py-3"><div className="h-4 w-24 rounded bg-slate-100" /></td>
-                    <td className="px-4 py-3"><div className="h-4 w-16 rounded bg-slate-100" /></td>
-                    <td className="px-4 py-3"><div className="h-4 w-24 rounded bg-slate-100" /></td>
-                    <td className="px-4 py-3 text-right"><div className="ml-auto h-4 w-8 rounded bg-slate-100" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-20 rounded bg-panel" /></td>
+                    <td className="px-4 py-3"><div className="h-5 w-20 rounded-full bg-panel" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-24 rounded bg-panel" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-16 rounded bg-panel" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-24 rounded bg-panel" /></td>
+                    <td className="px-4 py-3 text-right"><div className="ml-auto h-4 w-8 rounded bg-panel" /></td>
                   </tr>
                 ))}
               {items?.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-400">
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-ink/60">
                     {q || filter || categoryId ? pt("partner.products.no_results", locale) : pt("partner.products.empty", locale)}
                   </td>
                 </tr>
               )}
               {items?.map((p, idx) => (
-                <tr key={p.id} className="transition-colors hover:bg-slate-50/70">
-                  <td className="px-4 py-3 text-xs text-slate-400">{(page - 1) * pageSize + idx + 1}</td>
+                <tr key={p.id} className="transition-colors hover:bg-panel/70">
+                  <td className="px-4 py-3 text-xs text-ink/60">{(page - 1) * pageSize + idx + 1}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       {p.thumbnail ? (
@@ -311,47 +311,47 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
                           loading="lazy"
                         />
                       ) : (
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-300">🖼</div>
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-panel text-ink/60">🖼</div>
                       )}
                       <div className="min-w-0">
-                        <Link href={`/partner/products/${p.id}`} className="block truncate font-medium text-slate-800 hover:text-emerald-700">
+                        <Link href={`/partner/products/${p.id}`} className="block truncate font-medium text-ink hover:text-emerald-700">
                           {p.title}
                         </Link>
-                        <div className="text-[11px] text-slate-400">{p.code}</div>
+                        <div className="text-[11px] text-ink/60">{p.code}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-500">{p.category?.title ?? pt("partner.product.no_category", locale)}</td>
+                  <td className="px-4 py-3 text-xs text-ink/60">{p.category?.title ?? pt("partner.product.no_category", locale)}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_BADGE[p.status] ?? "bg-slate-100 text-slate-600"}`}>
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_BADGE[p.status] ?? "bg-panel text-ink/60"}`}>
                       {pt(`partner.status.${p.status}`, locale)}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     {p.moderation ? (
                       <div className="flex flex-col items-start gap-0.5">
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${MODERATION_BADGE[p.moderation.status] ?? "bg-slate-100 text-slate-600"}`}>
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${MODERATION_BADGE[p.moderation.status] ?? "bg-panel text-ink/60"}`}>
                           {pt(`partner.moderation.${p.moderation.status}`, locale)}
                         </span>
-                        {p.moderation.reasonCode && <span className="text-[10px] text-slate-400">{pt(`partner.reason.${p.moderation.reasonCode}`, locale)}</span>}
+                        {p.moderation.reasonCode && <span className="text-[10px] text-ink/60">{pt(`partner.reason.${p.moderation.reasonCode}`, locale)}</span>}
                       </div>
                     ) : (
-                      <span className="text-xs text-slate-300">—</span>
+                      <span className="text-xs text-ink/60">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-600">
+                  <td className="px-4 py-3 text-xs text-ink/60">
                     {formatPrice(p.priceFrom, p.currency, locale) ?? pt("partner.product.price_on_request", locale)}
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-400">{formatDate(p.updatedAt, locale)}</td>
+                  <td className="px-4 py-3 text-xs text-ink/60">{formatDate(p.updatedAt, locale)}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1 text-[11px]">
-                      <Link href={`/partner/products/${p.id}`} className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800">
+                      <Link href={`/partner/products/${p.id}`} className="rounded-md px-2 py-1 text-ink/60 hover:bg-panel hover:text-ink">
                         {pt("partner.product.view", locale)}
                       </Link>
-                      <Link href={`/partner/products/${p.id}/edit`} className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800">
+                      <Link href={`/partner/products/${p.id}/edit`} className="rounded-md px-2 py-1 text-ink/60 hover:bg-panel hover:text-ink">
                         {pt("partner.product.edit", locale)}
                       </Link>
-                      <Link href={`/partner/products/${p.id}/moderation`} className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800">
+                      <Link href={`/partner/products/${p.id}/moderation`} className="rounded-md px-2 py-1 text-ink/60 hover:bg-panel hover:text-ink">
                         {pt("partner.product.moderation", locale)}
                       </Link>
                     </div>
@@ -365,7 +365,7 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
 
       {/* Pagination */}
       {items && total > 0 && (
-        <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+        <div className="mt-4 flex items-center justify-between text-xs text-ink/60">
           <span>
             {total} {pt("partner.products.count", locale)}
           </span>
@@ -374,7 +374,7 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
               type="button"
               disabled={page <= 1}
               onClick={() => goPage(page - 1)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-40"
+              className="rounded-lg border border-line px-3 py-1.5 disabled:opacity-40"
             >
               {pt("pagination.prev", locale)}
             </button>
@@ -385,7 +385,7 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
               type="button"
               disabled={page >= pages}
               onClick={() => goPage(page + 1)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-40"
+              className="rounded-lg border border-line px-3 py-1.5 disabled:opacity-40"
             >
               {pt("pagination.next", locale)}
             </button>

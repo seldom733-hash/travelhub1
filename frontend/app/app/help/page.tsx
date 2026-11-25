@@ -69,10 +69,10 @@ function EntryTypeBadge({ type, locale }: { type: HelpEntryType; locale: Locale 
   const label = typeBadge(type, locale);
   const cls =
     type === "kpi"
-      ? "border-blue-200 bg-blue-50 text-blue-700"
+      ? "border-brand/20 bg-brand/10 text-brand-dark"
       : type === "status"
         ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-        : "border-slate-200 bg-slate-100 text-slate-600";
+        : "border-line bg-panel text-ink/60";
   return (
     <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}>
       {label}
@@ -91,50 +91,50 @@ function TopicDetail({ entry, locale }: { entry: HelpEntry; locale: Locale }) {
   return (
     <section
       aria-label={helpTitle(entry, locale)}
-      className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+      className="mb-6 rounded-2xl border border-line bg-white p-5 shadow-sm"
     >
       <div className="flex flex-wrap items-center gap-2">
         <EntryTypeBadge type={entry.type} locale={locale} />
         {groupTitle && (
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-ink/60">
             {helpT("help.metadata.group", locale)}: {groupTitle}
           </span>
         )}
       </div>
-      <h2 className="mt-3 text-xl font-bold tracking-tight text-slate-900">{helpTitle(entry, locale)}</h2>
-      <p className="mt-1 font-mono text-xs text-slate-400">{entry.id}</p>
-      <p className="mt-3 text-sm leading-relaxed text-slate-700">{helpDescription(entry, locale)}</p>
+      <h2 className="mt-3 text-xl font-bold tracking-tight text-ink">{helpTitle(entry, locale)}</h2>
+      <p className="mt-1 font-mono text-xs text-ink/60">{entry.id}</p>
+      <p className="mt-3 text-sm leading-relaxed text-ink">{helpDescription(entry, locale)}</p>
 
-      <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-2 border-t border-slate-100 pt-3 text-xs sm:grid-cols-2">
+      <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-2 border-t border-line pt-3 text-xs sm:grid-cols-2">
         <div>
-          <dt className="font-semibold text-slate-500">{helpT("help.metadata.source", locale)}</dt>
-          <dd className="mt-0.5 font-mono text-slate-700">{entry.source}</dd>
+          <dt className="font-semibold text-ink/60">{helpT("help.metadata.source", locale)}</dt>
+          <dd className="mt-0.5 font-mono text-ink">{entry.source}</dd>
         </div>
         <div>
-          <dt className="font-semibold text-slate-500">{helpT("help.metadata.scope", locale)}</dt>
-          <dd className="mt-0.5 text-slate-700">{scopeLabel(entry, locale)}</dd>
+          <dt className="font-semibold text-ink/60">{helpT("help.metadata.scope", locale)}</dt>
+          <dd className="mt-0.5 text-ink">{scopeLabel(entry, locale)}</dd>
         </div>
         {entry.period === "global" && (
           <div>
-            <dt className="font-semibold text-slate-500">{helpT("help.metadata.period", locale)}</dt>
-            <dd className="mt-0.5 text-slate-700">{helpT("help.period.global", locale)}</dd>
+            <dt className="font-semibold text-ink/60">{helpT("help.metadata.period", locale)}</dt>
+            <dd className="mt-0.5 text-ink">{helpT("help.period.global", locale)}</dd>
           </div>
         )}
         {entry.formula && (
           <div className="sm:col-span-2">
-            <dt className="font-semibold text-slate-500">{helpT("help.metadata.formula", locale)}</dt>
-            <dd className="mt-0.5 font-mono text-slate-700">{entry.formula}</dd>
+            <dt className="font-semibold text-ink/60">{helpT("help.metadata.formula", locale)}</dt>
+            <dd className="mt-0.5 font-mono text-ink">{entry.formula}</dd>
           </div>
         )}
         {entry.inclusions && (
           <div className="sm:col-span-2">
-            <dt className="font-semibold text-slate-500">{helpT("help.metadata.inclusions", locale)}</dt>
-            <dd className="mt-0.5 text-slate-700">{entry.inclusions}</dd>
+            <dt className="font-semibold text-ink/60">{helpT("help.metadata.inclusions", locale)}</dt>
+            <dd className="mt-0.5 text-ink">{entry.inclusions}</dd>
           </div>
         )}
         <div>
-          <dt className="font-semibold text-slate-500">{helpT("help.metadata.contract", locale)}</dt>
-          <dd className="mt-0.5 text-slate-700">{entry.contractVersion}</dd>
+          <dt className="font-semibold text-ink/60">{helpT("help.metadata.contract", locale)}</dt>
+          <dd className="mt-0.5 text-ink">{entry.contractVersion}</dd>
         </div>
       </dl>
     </section>
@@ -148,16 +148,16 @@ function TopicCard({ entry, locale, activeTopic }: { entry: HelpEntry; locale: L
       <Link
         href={`/app/help?topic=${encodeURIComponent(entry.id)}`}
         aria-current={active ? "true" : undefined}
-        className={`flex h-full flex-col rounded-xl border p-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
-          active ? "border-blue-300 bg-blue-50" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+        className={`flex h-full flex-col rounded-xl border p-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+          active ? "border-brand/25 bg-brand/10" : "border-line bg-white hover:border-line hover:bg-panel"
         }`}
       >
         <span className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-slate-900">{helpTitle(entry, locale)}</span>
+          <span className="text-sm font-semibold text-ink">{helpTitle(entry, locale)}</span>
           <EntryTypeBadge type={entry.type} locale={locale} />
         </span>
-        <span className="mt-1 font-mono text-[10px] text-slate-400">{entry.id}</span>
-        <span className="mt-1.5 text-xs leading-relaxed text-slate-600">{helpShort(entry, locale)}</span>
+        <span className="mt-1 font-mono text-[10px] text-ink/60">{entry.id}</span>
+        <span className="mt-1.5 text-xs leading-relaxed text-ink/60">{helpShort(entry, locale)}</span>
       </Link>
     </li>
   );
@@ -179,10 +179,10 @@ function ChipButton({
       type="button"
       aria-pressed={pressed}
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
         pressed
-          ? "border-blue-400 bg-blue-600 text-white shadow-sm"
-          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+          ? "border-brand bg-brand text-white shadow-sm"
+          : "border-line bg-white text-ink/60 hover:border-line hover:bg-panel"
       }`}
     >
       {label}
@@ -254,14 +254,14 @@ function HelpCenterContent() {
   return (
     <div className="mx-auto w-full max-w-[1200px] px-6 py-6">
       <header className="mb-5">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">{helpT("help.title", locale)}</h1>
-        <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500">{helpT("help.intro", locale)}</p>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">{helpT("help.title", locale)}</h1>
+        <p className="mt-1 max-w-3xl text-sm leading-relaxed text-ink/60">{helpT("help.intro", locale)}</p>
       </header>
 
       {/* Search — Registry metadata only (lib/help-search.ts), never business data. */}
       <div className="mb-4 max-w-xl">
         <div className="relative">
-          <span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+          <span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink/60">
             🔍
           </span>
           <input
@@ -274,7 +274,7 @@ function HelpCenterContent() {
               setQDraft(v);
               go({ ...query, q: v.trim() ? v : undefined });
             }}
-            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            className="w-full rounded-xl border border-line bg-white py-2 pl-9 pr-9 text-sm text-ink shadow-sm placeholder:text-ink/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand"
           />
           {qDraft && (
             <button
@@ -284,7 +284,7 @@ function HelpCenterContent() {
                 setQDraft("");
                 go({ ...query, q: undefined });
               }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full px-2 py-0.5 text-xs text-slate-400 transition-colors hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full px-2 py-0.5 text-xs text-ink/60 transition-colors hover:text-ink/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             >
               ✕
             </button>
@@ -333,7 +333,7 @@ function HelpCenterContent() {
         <>
           <Link
             href={backHref}
-            className="mb-3 inline-block text-xs font-medium text-slate-500 transition-colors hover:text-blue-600"
+            className="mb-3 inline-block text-xs font-medium text-ink/60 transition-colors hover:text-brand"
           >
             {helpT("help.back_topics", locale)}
           </Link>
@@ -350,20 +350,20 @@ function HelpCenterContent() {
       )}
 
       {showEmptyState ? (
-        <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-center">
-          <div className="text-sm font-semibold text-slate-700">{helpT("help.search_no_results", locale)}</div>
-          <p className="mt-1 text-xs text-slate-500">{helpT("help.search_no_results_hint", locale)}</p>
+        <div className="mb-6 rounded-xl border border-line bg-panel px-4 py-6 text-center">
+          <div className="text-sm font-semibold text-ink">{helpT("help.search_no_results", locale)}</div>
+          <p className="mt-1 text-xs text-ink/60">{helpT("help.search_no_results_hint", locale)}</p>
           <button
             type="button"
             onClick={resetFilters}
-            className="mt-3 inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            className="mt-3 inline-flex items-center rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink/60 transition-colors hover:border-line hover:bg-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             {helpT("help.filter_all_topics", locale)}
           </button>
         </div>
       ) : (
         <section aria-label={helpT("help.domains_title", locale)}>
-          <h2 className="mb-3 text-base font-bold uppercase tracking-wide text-slate-400">
+          <h2 className="mb-3 text-base font-bold uppercase tracking-wide text-ink/60">
             {helpT("help.domains_title", locale)}
           </h2>
 
@@ -373,17 +373,17 @@ function HelpCenterContent() {
             return (
               <section key={area} aria-label={helpT(areaLabelKey(area), locale)} className="mb-6">
                 <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
-                  <h3 className="text-base font-bold tracking-tight text-slate-900">
+                  <h3 className="text-base font-bold tracking-tight text-ink">
                     {helpT(areaLabelKey(area), locale)}
                   </h3>
-                  <span className="text-xs text-slate-400">{domains.reduce((s, d) => s + d.entries.length, 0)}</span>
+                  <span className="text-xs text-ink/60">{domains.reduce((s, d) => s + d.entries.length, 0)}</span>
                 </div>
 
                 {/* Finance special rule: Payments is CURRENT capability with Finance ownership,
                     never an implemented Finance Center. */}
                 {area === "finance" && (
-                  <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
-                    <p className="font-medium text-slate-700">{helpT("help.finance_center_status", locale)}</p>
+                  <div className="mb-3 rounded-lg border border-line bg-panel px-3 py-2 text-xs leading-relaxed text-ink/60">
+                    <p className="font-medium text-ink">{helpT("help.finance_center_status", locale)}</p>
                     <p className="mt-0.5">{helpT("help.payments_finance_ownership", locale)}</p>
                   </div>
                 )}
@@ -391,10 +391,10 @@ function HelpCenterContent() {
                 {domains.map(({ domain, entries }) => (
                   <section key={domain} aria-label={t(DOMAIN_LABEL_KEY[domain], locale)} className="mb-4">
                     <div className="mb-2 flex items-baseline justify-between gap-3">
-                      <h4 className="text-sm font-bold tracking-tight text-slate-700">
+                      <h4 className="text-sm font-bold tracking-tight text-ink">
                         {t(DOMAIN_LABEL_KEY[domain], locale)}
                       </h4>
-                      <span className="text-xs text-slate-400">{entries.length}</span>
+                      <span className="text-xs text-ink/60">{entries.length}</span>
                     </div>
                     {entries.length > 0 ? (
                       <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -403,7 +403,7 @@ function HelpCenterContent() {
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-xs text-slate-400">{helpT("help.search_no_results", locale)}</p>
+                      <p className="text-xs text-ink/60">{helpT("help.search_no_results", locale)}</p>
                     )}
                   </section>
                 ))}
@@ -415,16 +415,16 @@ function HelpCenterContent() {
 
       {/* Future areas — explicit NOT STARTED states, never fake content or counts. */}
       {futureAreas.length > 0 && (
-        <section aria-label={helpT("help.future_sections", locale)} className="mt-8 border-t border-slate-100 pt-4">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">
+        <section aria-label={helpT("help.future_sections", locale)} className="mt-8 border-t border-line pt-4">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-ink/60">
             {helpT("help.future_sections", locale)}
           </h2>
-          <p className="mt-1 text-xs text-slate-400">{helpT("help.future_area_note", locale)}</p>
+          <p className="mt-1 text-xs text-ink/60">{helpT("help.future_area_note", locale)}</p>
           <ul className="mt-3 flex flex-wrap gap-2">
             {futureAreas.map((area) => (
               <li
                 key={area}
-                className="inline-flex items-center rounded-full border border-dashed border-slate-200 px-3 py-1.5 text-xs text-slate-400"
+                className="inline-flex items-center rounded-full border border-dashed border-line px-3 py-1.5 text-xs text-ink/60"
               >
                 {helpT(areaLabelKey(area), locale)}
               </li>

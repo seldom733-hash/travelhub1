@@ -49,7 +49,7 @@ export default function ConstructorBlockList({ sections, onReorder, onToggle, on
 
   if (sections.length === 0) {
     return (
-      <div className="rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center text-sm text-slate-400">
+      <div className="rounded-lg border-2 border-dashed border-line bg-panel px-6 py-12 text-center text-sm text-ink/60">
         {t("constructor.empty_canvas", locale)}
       </div>
     );
@@ -109,12 +109,12 @@ function SortableBlockItem({
       ref={setNodeRef}
       style={style}
       className={`flex items-center gap-3 rounded-lg border bg-white px-4 py-3 shadow-sm transition-colors ${
-        isDragging ? "border-blue-300 bg-blue-50 opacity-70" : "border-slate-200"
+        isDragging ? "border-brand/25 bg-brand/10 opacity-70" : "border-line"
       } ${!section.enabled ? "opacity-50" : ""}`}
     >
       {/* Drag handle */}
       <button
-        className="cursor-grab text-slate-400 hover:text-slate-600 active:cursor-grabbing"
+        className="cursor-grab text-ink/60 hover:text-ink/60 active:cursor-grabbing"
         {...attributes}
         {...listeners}
         aria-label={t("constructor.drag_handle", locale)}
@@ -125,9 +125,9 @@ function SortableBlockItem({
       {/* Block info */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-slate-900">{displayName}</span>
+          <span className="text-sm font-medium text-ink">{displayName}</span>
           {isSystem && (
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+            <span className="rounded bg-panel px-1.5 py-0.5 text-[10px] font-medium text-ink/60">
               {t("constructor.system_badge", locale)}
             </span>
           )}
@@ -137,7 +137,7 @@ function SortableBlockItem({
             </span>
           )}
         </div>
-        <p className="mt-0.5 text-xs text-slate-400">{section.blockType}</p>
+        <p className="mt-0.5 text-xs text-ink/60">{section.blockType}</p>
       </div>
 
       {/* Actions */}
@@ -147,7 +147,7 @@ function SortableBlockItem({
           onClick={() => onToggle(section.blockInstanceId)}
           className={`rounded p-1.5 transition-colors ${
             section.enabled
-              ? "text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              ? "text-ink/60 hover:bg-panel hover:text-ink/60"
               : "text-amber-500 hover:bg-amber-50 hover:text-amber-600"
           }`}
           aria-label={section.enabled ? t("constructor.disable", locale) : t("constructor.enable", locale)}
@@ -159,7 +159,7 @@ function SortableBlockItem({
         {!isSystem && isRemovable && (
           <button
             onClick={() => onRemove(section.blockInstanceId)}
-            className="rounded p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+            className="rounded p-1.5 text-ink/60 transition-colors hover:bg-red-50 hover:text-red-500"
             aria-label={t("constructor.remove", locale)}
           >
             <X className="h-4 w-4" />

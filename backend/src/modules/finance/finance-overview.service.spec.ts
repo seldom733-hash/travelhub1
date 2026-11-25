@@ -115,6 +115,7 @@ describe("FinanceOverviewService (UNIFIED FINANCE CENTER Phase 3)", () => {
     expect(o.expectedMargin.amount).toBeNull();
     expect(o.expectedMargin.availability).toBe("UNKNOWN");
     expect(o.expectedMargin.unknownCount).toBe(1);
+    expect(o.expectedMargin.noteCode).toBe("MARGIN_NO_SNAPSHOT");
   });
 
   it("expectedMargin: смесь known/unknown → PARTIAL с раскрытием", async () => {
@@ -124,6 +125,7 @@ describe("FinanceOverviewService (UNIFIED FINANCE CENTER Phase 3)", () => {
     expect(o.expectedMargin.availability).toBe("PARTIAL");
     expect(o.expectedMargin.knownCount).toBe(1);
     expect(o.expectedMargin.unknownCount).toBe(1);
+    expect(o.expectedMargin.noteCode).toBe("MARGIN_PARTIAL");
   });
 
   it("customerReceipts: byCurrency из CAPTURED, AZN=UNKNOWN (не изобретаем)", async () => {
@@ -135,6 +137,7 @@ describe("FinanceOverviewService (UNIFIED FINANCE CENTER Phase 3)", () => {
     ]);
     expect(o.customerReceipts.azn.amount).toBeNull();
     expect(o.customerReceipts.azn.availability).toBe("UNKNOWN");
+    expect(o.customerReceipts.azn.noteCode).toBe("RECEIPTS_AZN_NO_FX");
   });
 
   it("customerDebt: byCurrency (amount − paid), AZN=UNKNOWN", async () => {
@@ -143,6 +146,7 @@ describe("FinanceOverviewService (UNIFIED FINANCE CENTER Phase 3)", () => {
     expect(o.customerDebt.byCurrency).toEqual([{ currency: "USD", amount: "600" }]);
     expect(o.customerDebt.azn.amount).toBeNull();
     expect(o.customerDebt.azn.availability).toBe("UNKNOWN");
+    expect(o.customerDebt.azn.noteCode).toBe("DEBT_AZN_NO_FROZEN");
   });
 
   it("actualProfit и netCashFlow — UNAVAILABLE (не «captured − payouts»)", async () => {
@@ -154,8 +158,10 @@ describe("FinanceOverviewService (UNIFIED FINANCE CENTER Phase 3)", () => {
     const o = await s.getOverview();
     expect(o.actualProfit.amount).toBeNull();
     expect(o.actualProfit.availability).toBe("UNAVAILABLE");
+    expect(o.actualProfit.noteCode).toBe("ACTUAL_PROFIT_POLICY");
     expect(o.netCashFlow.amount).toBeNull();
     expect(o.netCashFlow.availability).toBe("UNAVAILABLE");
+    expect(o.netCashFlow.noteCode).toBe("NET_CASH_FLOW_POLICY");
     // Никогда не выводит profit как captured(2000) − payouts(0) = 2000.
     expect(o.actualProfit.amount).not.toBe("2000");
   });

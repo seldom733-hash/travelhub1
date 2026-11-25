@@ -15,7 +15,7 @@ function ChannelToggle({ label, checked, onChange, disabled }: { label: string; 
       disabled={disabled}
       aria-pressed={checked}
       className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-        checked ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+        checked ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-line bg-white text-ink/60 hover:border-line"
       }`}
     >
       <span className="mr-1.5">{checked ? "✓" : "○"}</span>
@@ -26,11 +26,11 @@ function ChannelToggle({ label, checked, onChange, disabled }: { label: string; 
 
 const STATUS_BADGE: Record<string, string> = {
   DRAFT: "bg-amber-100 text-amber-700",
-  COMPLETE: "bg-blue-100 text-blue-700",
-  REVIEWED: "bg-indigo-100 text-indigo-700",
+  COMPLETE: "bg-brand/15 text-brand-dark",
+  REVIEWED: "bg-brand/15 text-brand-dark",
   PUBLISHED: "bg-emerald-100 text-emerald-700",
   CHANGED: "bg-orange-100 text-orange-700",
-  ARCHIVED: "bg-slate-200 text-slate-500",
+  ARCHIVED: "bg-panel text-ink/60",
 };
 
 export default function ProductDetailPage() {
@@ -125,7 +125,7 @@ export default function ProductDetailPage() {
     );
   }
   if (!product) {
-    return <div className="py-16 text-center text-sm text-slate-400">{pt("partner.state.loading", locale)}</div>;
+    return <div className="py-16 text-center text-sm text-ink/60">{pt("partner.state.loading", locale)}</div>;
   }
 
   const attrEntries = product.attributes ? Object.entries(product.attributes) : [];
@@ -133,21 +133,21 @@ export default function ProductDetailPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-5">
-        <Link href="/partner/products" className="text-sm text-slate-500 hover:text-emerald-700">
+        <Link href="/partner/products" className="text-sm text-ink/60 hover:text-emerald-700">
           {pt("partner.product.back", locale)}
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-bold text-slate-900">{product.title}</h1>
-          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[product.status] ?? "bg-slate-100 text-slate-600"}`}>
+          <h1 className="text-2xl font-bold text-ink">{product.title}</h1>
+          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[product.status] ?? "bg-panel text-ink/60"}`}>
             {pt(`partner.status.${product.status}`, locale)}
           </span>
           {latestSubmission && (
-            <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+            <span className="inline-flex rounded-full bg-panel px-2 py-0.5 text-[11px] font-semibold text-ink/60">
               {pt(`partner.moderation.${latestSubmission.status}`, locale)}
             </span>
           )}
         </div>
-        <div className="mt-1 font-mono text-xs text-slate-400">{product.code}</div>
+        <div className="mt-1 font-mono text-xs text-ink/60">{product.code}</div>
       </div>
 
       {error && <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -169,21 +169,21 @@ export default function ProductDetailPage() {
             href={`/products/${product.code}`}
             target="_blank"
             rel="noreferrer"
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700"
+            className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-dark"
           >
             {pt("partner.product.published_link", locale)} ↗
           </a>
         )}
-        <Link href={`/partner/products/${product.id}/preview`} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:border-emerald-300 hover:text-emerald-700">
+        <Link href={`/partner/products/${product.id}/preview`} className="rounded-lg border border-line px-4 py-2 text-sm text-ink/60 hover:border-emerald-300 hover:text-emerald-700">
           {pt("partner.product.preview", locale)}
         </Link>
-        <Link href={`/partner/products/${product.id}/edit`} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:border-emerald-300 hover:text-emerald-700">
+        <Link href={`/partner/products/${product.id}/edit`} className="rounded-lg border border-line px-4 py-2 text-sm text-ink/60 hover:border-emerald-300 hover:text-emerald-700">
           {pt("partner.product.edit", locale)}
         </Link>
-        <Link href={`/partner/products/${product.id}/media`} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:border-emerald-300 hover:text-emerald-700">
+        <Link href={`/partner/products/${product.id}/media`} className="rounded-lg border border-line px-4 py-2 text-sm text-ink/60 hover:border-emerald-300 hover:text-emerald-700">
           {pt("partner.product.media", locale)}
         </Link>
-        <Link href={`/partner/products/${product.id}/moderation`} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:border-emerald-300 hover:text-emerald-700">
+        <Link href={`/partner/products/${product.id}/moderation`} className="rounded-lg border border-line px-4 py-2 text-sm text-ink/60 hover:border-emerald-300 hover:text-emerald-700">
           {pt("partner.product.moderation", locale)}
         </Link>
         {canSubmit && (
@@ -197,7 +197,7 @@ export default function ProductDetailPage() {
           </button>
         )}
         {activeSubmission && (
-          <span className="inline-flex items-center rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">
+          <span className="inline-flex items-center rounded-lg bg-brand/10 px-3 py-2 text-xs font-medium text-brand-dark">
             {pt("partner.moderation.pending", locale)} — {activeSubmission.status}
           </span>
         )}
@@ -205,41 +205,41 @@ export default function ProductDetailPage() {
 
       {/* Key info */}
       <div className="space-y-5">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-3 text-base font-semibold text-slate-900">{pt("partner.form.basic", locale)}</h2>
+        <section className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+          <h2 className="mb-3 text-base font-semibold text-ink">{pt("partner.form.basic", locale)}</h2>
           <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
             <div>
-              <dt className="text-xs text-slate-400">{pt("partner.product.category", locale)}</dt>
-              <dd className="text-slate-700">{product.category?.title ?? pt("partner.product.no_category", locale)}</dd>
+              <dt className="text-xs text-ink/60">{pt("partner.product.category", locale)}</dt>
+              <dd className="text-ink">{product.category?.title ?? pt("partner.product.no_category", locale)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-slate-400">{pt("partner.product.price_from", locale)}</dt>
-              <dd className="text-slate-700">
+              <dt className="text-xs text-ink/60">{pt("partner.product.price_from", locale)}</dt>
+              <dd className="text-ink">
                 {product.tariffs.length > 0
                   ? formatPrice(product.tariffs[0].price, product.tariffs[0].currency, locale) ?? pt("partner.product.price_on_request", locale)
                   : pt("partner.product.price_on_request", locale)}
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-slate-400">{pt("partner.product.updated", locale)}</dt>
-              <dd className="text-slate-700">{formatDate(product.updatedAt, locale)}</dd>
+              <dt className="text-xs text-ink/60">{pt("partner.product.updated", locale)}</dt>
+              <dd className="text-ink">{formatDate(product.updatedAt, locale)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-slate-400">{pt("partner.moderation.version", locale)}</dt>
-              <dd className="text-slate-700">v{product.version}</dd>
+              <dt className="text-xs text-ink/60">{pt("partner.moderation.version", locale)}</dt>
+              <dd className="text-ink">v{product.version}</dd>
             </div>
           </dl>
-          {product.description && <p className="mt-3 whitespace-pre-line text-sm text-slate-600">{product.description}</p>}
+          {product.description && <p className="mt-3 whitespace-pre-line text-sm text-ink/60">{product.description}</p>}
         </section>
 
         {attrEntries.length > 0 && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-3 text-base font-semibold text-slate-900">{pt("partner.form.attributes", locale)}</h2>
+          <section className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+            <h2 className="mb-3 text-base font-semibold text-ink">{pt("partner.form.attributes", locale)}</h2>
             <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
               {attrEntries.map(([k, v]) => (
                 <div key={k}>
-                  <dt className="text-xs text-slate-400">{k}</dt>
-                  <dd className="truncate text-slate-700">{String(v)}</dd>
+                  <dt className="text-xs text-ink/60">{k}</dt>
+                  <dd className="truncate text-ink">{String(v)}</dd>
                 </div>
               ))}
             </dl>
@@ -247,9 +247,9 @@ export default function ProductDetailPage() {
         )}
 
         {/* Step 1.12.2 §8: Publication channels (Marketplace / Моя витрина) — отдельно от lifecycle. */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-3 text-base font-semibold text-slate-900">{pt("storefront.distribution", locale)}</h2>
-          <p className="mb-3 text-xs text-slate-400">{pt("storefront.distribution_hint", locale)}</p>
+        <section className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+          <h2 className="mb-3 text-base font-semibold text-ink">{pt("storefront.distribution", locale)}</h2>
+          <p className="mb-3 text-xs text-ink/60">{pt("storefront.distribution_hint", locale)}</p>
           <div className="flex flex-wrap gap-3">
             <ChannelToggle
               label={pt("storefront.channel_marketplace", locale)}
@@ -272,28 +272,28 @@ export default function ProductDetailPage() {
               {channelsSaving ? pt("partner.form.saving", locale) : pt("partner.form.save", locale)}
             </button>
             {channelsNotice && <span className="text-xs text-emerald-700">{channelsNotice}</span>}
-            <span className="text-[11px] text-slate-400">{pt("storefront.channels_lifecycle_note", locale)}</span>
+            <span className="text-[11px] text-ink/60">{pt("storefront.channels_lifecycle_note", locale)}</span>
           </div>
         </section>
 
         {product.tariffs.length > 0 && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-3 text-base font-semibold text-slate-900">{pt("partner.form.tariffs", locale)}</h2>
+          <section className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+            <h2 className="mb-3 text-base font-semibold text-ink">{pt("partner.form.tariffs", locale)}</h2>
             <div className="overflow-x-auto">
               <table className="w-full min-w-72 text-left text-sm">
-                <thead className="border-b border-slate-100 text-[10px] uppercase text-slate-400">
+                <thead className="border-b border-line text-[10px] uppercase text-ink/60">
                   <tr>
                     <th className="py-2 pr-3 font-medium">{pt("partner.form.tariff_name", locale)}</th>
                     <th className="py-2 pr-3 font-medium">{pt("partner.form.tariff_price", locale)}</th>
                     <th className="py-2 font-medium">{pt("partner.form.tariff_currency", locale)}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-line">
                   {product.tariffs.map((t) => (
                     <tr key={t.id}>
-                      <td className="py-2 pr-3 text-slate-700">{t.name}</td>
-                      <td className="py-2 pr-3 text-slate-600">{String(t.price)}</td>
-                      <td className="py-2 text-slate-400">{t.currency}</td>
+                      <td className="py-2 pr-3 text-ink">{t.name}</td>
+                      <td className="py-2 pr-3 text-ink/60">{String(t.price)}</td>
+                      <td className="py-2 text-ink/60">{t.currency}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -303,8 +303,8 @@ export default function ProductDetailPage() {
         )}
 
         {product.media.length > 0 && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-3 text-base font-semibold text-slate-900">{pt("partner.form.media", locale)}</h2>
+          <section className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+            <h2 className="mb-3 text-base font-semibold text-ink">{pt("partner.form.media", locale)}</h2>
             <div className="flex flex-wrap gap-2">
               {product.media.map((m) => (
                 <img
@@ -320,16 +320,16 @@ export default function ProductDetailPage() {
         )}
 
         {moderation.length > 0 && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-3 text-base font-semibold text-slate-900">{pt("partner.moderation.history", locale)}</h2>
+          <section className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+            <h2 className="mb-3 text-base font-semibold text-ink">{pt("partner.moderation.history", locale)}</h2>
             {moderation.slice(0, 5).map((m) => (
-              <div key={m.id} className="border-l-2 border-slate-200 py-2 pl-4">
+              <div key={m.id} className="border-l-2 border-line py-2 pl-4">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="font-medium text-slate-700">{pt(`partner.moderation.${m.status}`, locale)}</span>
-                  <span className="text-xs text-slate-400">{formatDate(m.submittedAt, locale)}</span>
+                  <span className="font-medium text-ink">{pt(`partner.moderation.${m.status}`, locale)}</span>
+                  <span className="text-xs text-ink/60">{formatDate(m.submittedAt, locale)}</span>
                 </div>
-                {m.reasonCode && <div className="mt-0.5 text-xs text-slate-500">{pt(`partner.reason.${m.reasonCode}`, locale)}</div>}
-                {m.comment && <div className="mt-0.5 text-xs text-slate-500">«{m.comment}»</div>}
+                {m.reasonCode && <div className="mt-0.5 text-xs text-ink/60">{pt(`partner.reason.${m.reasonCode}`, locale)}</div>}
+                {m.comment && <div className="mt-0.5 text-xs text-ink/60">«{m.comment}»</div>}
               </div>
             ))}
             <Link href={`/partner/products/${product.id}/moderation`} className="mt-3 inline-block text-sm text-emerald-600 hover:underline">

@@ -17,13 +17,13 @@ const STATUS_LABEL_KEYS: Record<string, string> = {
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  DRAFT: "bg-slate-100 text-slate-600",
-  SUBMITTED: "bg-blue-50 text-blue-700",
+  DRAFT: "bg-panel text-ink/60",
+  SUBMITTED: "bg-brand/10 text-brand-dark",
   IN_REVIEW: "bg-amber-50 text-amber-700",
   APPROVED: "bg-emerald-50 text-emerald-700",
   REJECTED: "bg-red-50 text-red-600",
   CHANGES_REQUESTED: "bg-amber-50 text-amber-700",
-  CANCELLED: "bg-slate-100 text-slate-500",
+  CANCELLED: "bg-panel text-ink/60",
 };
 
 /**
@@ -79,7 +79,7 @@ export default function PartnerOnboardingPage() {
     }
   };
 
-  if (loading) return <div className="py-10 text-center text-sm text-slate-400">{t("state.loading", locale)}</div>;
+  if (loading) return <div className="py-10 text-center text-sm text-ink/60">{t("state.loading", locale)}</div>;
   if (error) return <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600">{error}</div>;
   if (!app) return null;
 
@@ -88,28 +88,28 @@ export default function PartnerOnboardingPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">{t("partner.onboarding_title", locale)}</h1>
-        <p className="mt-1 text-sm text-slate-500">{t("partner.onboarding_hint", locale)}</p>
+        <h1 className="text-2xl font-bold text-ink">{t("partner.onboarding_title", locale)}</h1>
+        <p className="mt-1 text-sm text-ink/60">{t("partner.onboarding_hint", locale)}</p>
       </div>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-line bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${STATUS_STYLES[app.status] ?? "bg-slate-100 text-slate-600"}`}>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${STATUS_STYLES[app.status] ?? "bg-panel text-ink/60"}`}>
             {t(STATUS_LABEL_KEYS[app.status] ?? app.status, locale)}
           </span>
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-ink/60">
             {app.code} · {app.applicantType}
           </span>
         </div>
 
         <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-          <div className="flex justify-between gap-4"><dt className="text-slate-500">{t("partner.brand_name", locale)}</dt><dd className="font-medium text-slate-900">{app.brandName}</dd></div>
-          <div className="flex justify-between gap-4"><dt className="text-slate-500">{t("partner.country", locale)}</dt><dd className="font-medium text-slate-900">{app.country}</dd></div>
-          <div className="flex justify-between gap-4"><dt className="text-slate-500">{t("partner.contact_email", locale)}</dt><dd className="font-medium text-slate-900">{app.contactEmail}</dd></div>
-          {app.legalName && <div className="flex justify-between gap-4"><dt className="text-slate-500">{t("partner.legal_name", locale)}</dt><dd className="font-medium text-slate-900">{app.legalName}</dd></div>}
-          {app.registrationNumber && <div className="flex justify-between gap-4"><dt className="text-slate-500">{t("partner.registration_number", locale)}</dt><dd className="font-medium text-slate-900">{app.registrationNumber}</dd></div>}
+          <div className="flex justify-between gap-4"><dt className="text-ink/60">{t("partner.brand_name", locale)}</dt><dd className="font-medium text-ink">{app.brandName}</dd></div>
+          <div className="flex justify-between gap-4"><dt className="text-ink/60">{t("partner.country", locale)}</dt><dd className="font-medium text-ink">{app.country}</dd></div>
+          <div className="flex justify-between gap-4"><dt className="text-ink/60">{t("partner.contact_email", locale)}</dt><dd className="font-medium text-ink">{app.contactEmail}</dd></div>
+          {app.legalName && <div className="flex justify-between gap-4"><dt className="text-ink/60">{t("partner.legal_name", locale)}</dt><dd className="font-medium text-ink">{app.legalName}</dd></div>}
+          {app.registrationNumber && <div className="flex justify-between gap-4"><dt className="text-ink/60">{t("partner.registration_number", locale)}</dt><dd className="font-medium text-ink">{app.registrationNumber}</dd></div>}
           {app.serviceCategories && app.serviceCategories.length > 0 && (
-            <div className="flex justify-between gap-4"><dt className="text-slate-500">{t("partner.service_categories", locale)}</dt><dd className="font-medium text-slate-900">{app.serviceCategories.length}</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-ink/60">{t("partner.service_categories", locale)}</dt><dd className="font-medium text-ink">{app.serviceCategories.length}</dd></div>
           )}
         </dl>
 
@@ -131,30 +131,30 @@ export default function PartnerOnboardingPage() {
           )}
           {isEditable && (
             <>
-              <Link href="/partner/onboarding/edit" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-emerald-300 hover:text-emerald-700">
+              <Link href="/partner/onboarding/edit" className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink hover:border-emerald-300 hover:text-emerald-700">
                 {t("partner.edit_application", locale)}
               </Link>
-              <button onClick={() => void submit()} disabled={busy} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+              <button onClick={() => void submit()} disabled={busy} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50">
                 {busy ? t("state.loading", locale) : t("partner.submit_application", locale)}
               </button>
             </>
           )}
           {!isEditable && app.status !== "APPROVED" && (
-            <p className="text-xs text-slate-400">{t("partner.readonly_hint", locale)}</p>
+            <p className="text-xs text-ink/60">{t("partner.readonly_hint", locale)}</p>
           )}
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{t("partner.history_title", locale)}</h2>
+      <section className="rounded-2xl border border-line bg-white p-6 shadow-sm">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/60">{t("partner.history_title", locale)}</h2>
         <ol className="space-y-2">
           {app.history.map((h) => (
             <li key={h.id} className="flex items-start gap-3 text-sm">
               <span className="mt-1 size-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
               <div>
-                <span className="font-medium text-slate-700">{h.action.replaceAll("_", " ")}</span>
-                {h.comment && <span className="text-slate-500"> — {h.comment}</span>}
-                <div className="text-xs text-slate-400">{new Date(h.createdAt).toLocaleString()}</div>
+                <span className="font-medium text-ink">{h.action.replaceAll("_", " ")}</span>
+                {h.comment && <span className="text-ink/60"> — {h.comment}</span>}
+                <div className="text-xs text-ink/60">{new Date(h.createdAt).toLocaleString()}</div>
               </div>
             </li>
           ))}

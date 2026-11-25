@@ -16,9 +16,9 @@ export default function EntitySectionCard({
   className?: string;
 }) {
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white p-4 ${className ?? ""}`}>
+    <div className={`rounded-xl border border-line bg-white p-4 ${className ?? ""}`}>
       {title && (
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink/60">
           {title}
         </h3>
       )}

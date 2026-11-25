@@ -196,10 +196,44 @@ export class HotelMatchReviewService {
         };
       }
 
+      const duplicateRefs = await tx.hotelSupplierRef.findMany({
+        where: { hotelId: duplicateId },
+        select: { supplierCode: true, externalKey: true },
+      });
       await tx.hotelSupplierRef.updateMany({
         where: { hotelId: duplicateId },
         data: { hotelId: canonicalId, lastSeenAt: new Date() },
       });
+
+      // Продукты дубликата получают каноническое имя и историю изменения —
+      // витрина читает имя из Hotel, но аудит слияния должен быть виден и здесь.
+      for (const ref of duplicateRefs) {
+        const products = await tx.product.findMany({
+          where: {
+            type: "HOTEL",
+            attributes: { path: ["supplierCode"], equals: ref.supplierCode },
+          },
+          select: { id: true, version: true, attributes: true },
+        });
+        for (const product of products) {
+          const attrs = (product.attributes ?? {}) as Record<string, unknown>;
+          if (attrs.hotelKey !== ref.externalKey && attrs.hotelExternalId !== ref.externalKey) continue;
+          await tx.product.update({
+            where: { id: product.id },
+            data: { attributes: { ...attrs, canonicalHotelName: canonical.name } },
+          });
+          await tx.productHistory.create({
+            data: {
+              productId: product.id,
+              version: product.version,
+              action: "hotel.matching.merge",
+              fields: { canonicalHotelName: canonical.name, mergedFrom: duplicateId } as Prisma.InputJsonValue,
+              actorId: actor.id ?? null,
+              actorName: actor.username ?? null,
+            },
+          });
+        }
+      }
 
       // Канонические поля не перезаписываем: заполняем только пустые. Фото
       // переносим вместе со всеми метаданными, иначе карточка потеряет атрибуцию.

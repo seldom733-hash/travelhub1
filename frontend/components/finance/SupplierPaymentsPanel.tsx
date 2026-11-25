@@ -124,17 +124,17 @@ export default function SupplierPaymentsPanel({
   };
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <div className="rounded-xl border border-line bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">Платежи поставщикам</h3>
-          <p className="mt-1 text-xs text-slate-500">
+          <h3 className="text-sm font-semibold text-ink">Платежи поставщикам</h3>
+          <p className="mt-1 text-xs text-ink/60">
             {orderCode}
             {bookingCode ? ` · ${bookingCode}` : ""}
           </p>
         </div>
         <div className="flex items-center gap-3 text-xs">
-          <span className="text-slate-500">Оплачено: <b className="text-slate-800">{formatPrice(paidAzn.toFixed(2), "AZN", locale) ?? "—"}</b></span>
+          <span className="text-ink/60">Оплачено: <b className="text-ink">{formatPrice(paidAzn.toFixed(2), "AZN", locale) ?? "—"}</b></span>
           <span className="text-amber-700">Осталось: <b>{formatPrice(remainingAzn.toFixed(2), "AZN", locale) ?? "—"}</b></span>
           <button
             type="button"
@@ -145,7 +145,7 @@ export default function SupplierPaymentsPanel({
             + Платёж поставщику
           </button>
           {onClose && (
-            <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700" aria-label="Close">
+            <button type="button" onClick={onClose} className="text-ink/60 hover:text-ink" aria-label="Close">
               ✕
             </button>
           )}
@@ -158,21 +158,21 @@ export default function SupplierPaymentsPanel({
             <button
               type="button"
               onClick={() => setForm({ ...form, direction: "OUTGOING" })}
-              className={`rounded-md px-3 py-1.5 font-medium ${form.direction === "OUTGOING" ? "bg-rose-100 text-rose-700" : "text-slate-500"}`}
+              className={`rounded-md px-3 py-1.5 font-medium ${form.direction === "OUTGOING" ? "bg-rose-100 text-rose-700" : "text-ink/60"}`}
             >
               Расход · платёж поставщику
             </button>
             <button
               type="button"
               onClick={() => setForm({ ...form, direction: "INCOMING" })}
-              className={`rounded-md px-3 py-1.5 font-medium ${form.direction === "INCOMING" ? "bg-emerald-100 text-emerald-700" : "text-slate-500"}`}
+              className={`rounded-md px-3 py-1.5 font-medium ${form.direction === "INCOMING" ? "bg-emerald-100 text-emerald-700" : "text-ink/60"}`}
             >
               Приход · возврат от поставщика
             </button>
           </div>
           <div className="grid gap-2 md:grid-cols-[2fr_1fr_1fr_auto]">
             {form.direction === "OUTGOING" && (
-              <div className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-600">
+              <div className="rounded-lg border border-line bg-white px-2 py-2 text-xs text-ink/60">
                 {selected ? `Услуга: ${selected.supplierCode ?? "—"} · остаток ${formatPrice(selected.remainingAmount ?? "0", "AZN", locale) ?? "—"}` : "Услуга не выбрана"}
               </div>
             )}
@@ -181,13 +181,13 @@ export default function SupplierPaymentsPanel({
               value={form.amount}
               onChange={(event) => setForm({ ...form, amount: event.target.value })}
               placeholder="Сумма, AZN"
-              className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs"
+              className="rounded-lg border border-line bg-white px-2 py-2 text-xs"
             />
             <input
               value={form.method}
               onChange={(event) => setForm({ ...form, method: event.target.value })}
               placeholder={t("finance.supplier_payments.field.method", locale)}
-              className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs"
+              className="rounded-lg border border-line bg-white px-2 py-2 text-xs"
             />
             <button
               type="button"
@@ -202,10 +202,10 @@ export default function SupplierPaymentsPanel({
             value={form.reason}
             onChange={(event) => setForm({ ...form, reason: event.target.value })}
             placeholder="Основание / комментарий"
-            className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs"
+            className="mt-2 w-full rounded-lg border border-line bg-white px-2 py-2 text-xs"
           />
           {form.direction === "OUTGOING" && selected && (
-            <p className="mt-2 text-[11px] text-slate-500">
+            <p className="mt-2 text-[11px] text-ink/60">
               Заказ: {selected.orderCode ?? orderCode} · Бронь: {selected.bookingCode ?? selected.bookingId} · Поставщик: {selected.supplierCode ?? "—"} · Остаток: {formatPrice(selected.remainingAmount ?? "0", "AZN", locale)}
             </p>
           )}
@@ -214,13 +214,13 @@ export default function SupplierPaymentsPanel({
 
       {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
       {!compact && (loading ? (
-        <p className="mt-3 text-xs text-slate-400">Загрузка…</p>
+        <p className="mt-3 text-xs text-ink/60">Загрузка…</p>
       ) : payments.length === 0 ? (
-        <p className="mt-3 text-xs text-slate-400">Платежей поставщикам по этому заказу пока нет.</p>
+        <p className="mt-3 text-xs text-ink/60">Платежей поставщикам по этому заказу пока нет.</p>
       ) : (
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-slate-100 text-[10px] uppercase tracking-wide text-slate-400">
+            <thead className="border-b border-line text-[10px] uppercase tracking-wide text-ink/60">
               <tr>
                 <th className="py-2">Оплата</th>
                 <th className="py-2">Заказ / бронь</th>
@@ -231,12 +231,12 @@ export default function SupplierPaymentsPanel({
             </thead>
             <tbody>
               {payments.map((payment) => (
-                <tr key={payment.id} className="border-b border-slate-50">
-                  <td className="py-2 font-mono text-slate-700">{payment.code}</td>
-                  <td className="py-2 text-slate-500">{payment.orderCode ?? orderCode}{payment.bookingCode ? ` · ${payment.bookingCode}` : ""}</td>
-                  <td className="py-2 text-slate-600">{payment.supplierCode ?? "—"}</td>
-                  <td className="py-2 text-right text-slate-700">{formatPrice(payment.amount, payment.currency, locale)}</td>
-                  <td className="py-2 text-slate-600">{payment.status}</td>
+                <tr key={payment.id} className="border-b border-line">
+                  <td className="py-2 font-mono text-ink">{payment.code}</td>
+                  <td className="py-2 text-ink/60">{payment.orderCode ?? orderCode}{payment.bookingCode ? ` · ${payment.bookingCode}` : ""}</td>
+                  <td className="py-2 text-ink/60">{payment.supplierCode ?? "—"}</td>
+                  <td className="py-2 text-right text-ink">{formatPrice(payment.amount, payment.currency, locale)}</td>
+                  <td className="py-2 text-ink/60">{payment.status}</td>
                 </tr>
               ))}
             </tbody>

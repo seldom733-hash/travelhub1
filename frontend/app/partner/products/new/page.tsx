@@ -102,10 +102,10 @@ export default function NewProductPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-5">
-        <a href="/partner/products" className="text-sm text-slate-500 hover:text-emerald-700">
+        <a href="/partner/products" className="text-sm text-ink/60 hover:text-emerald-700">
           {pt("partner.product.back", locale)}
         </a>
-        <h1 className="mt-1 text-2xl font-bold text-slate-900">{pt("partner.products.new", locale)}</h1>
+        <h1 className="mt-1 text-2xl font-bold text-ink">{pt("partner.products.new", locale)}</h1>
       </div>
 
       {error && <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -129,17 +129,17 @@ export default function NewProductPage() {
 
       {/* Примечание */}
       <div className="mt-4">
-        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("notes.initial_note", locale)}</label>
+        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/60">{pt("notes.initial_note", locale)}</label>
         <textarea
           value={initialNote}
           onChange={(e) => setInitialNote(e.target.value)}
           rows={3}
           maxLength={5000}
           aria-label={pt("notes.initial_note", locale)}
-          className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+          className="w-full resize-none rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
           placeholder={pt("notes.initial_note_helper", locale)}
         />
-        <div className="mt-1 text-right text-xs text-slate-400">
+        <div className="mt-1 text-right text-xs text-ink/60">
           {initialNote.length}/5000 {pt("notes.initial_note_max", locale)}
         </div>
       </div>

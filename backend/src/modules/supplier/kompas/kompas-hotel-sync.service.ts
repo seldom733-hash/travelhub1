@@ -13,7 +13,8 @@
  * applies the KOMPAS markup and writes the public selling price (no FX step —
  * an AZN source is an identity), exactly like the tour import.
  */
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
+import { ProductHistoryRecorder } from "../product-history-recorder.service";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
 import {
@@ -86,6 +87,7 @@ export class KompasHotelSyncService {
     private readonly kompas: KompasSupplierAdapter,
     private readonly pricing: SupplierPricingService,
     private readonly ids: IdsService,
+    @Optional() private readonly history?: ProductHistoryRecorder,
   ) {}
 
   async getKompasPartner(): Promise<{ id: string } | null> {
@@ -317,6 +319,9 @@ export class KompasHotelSyncService {
         if (geoCountryId && !(existing as any).geoCountryId) patch.geoCountryId = geoCountryId;
         if (Object.keys(patch).length > 0) {
           await tx.product.update({ where: { id: existing.id }, data: patch });
+        }
+        if (this.history) {
+          await this.history.record(tx, existing.id, existing.version, patch);
         }
         const tariffCounts = await this.upsertTariffs(tx, existing.id, tariffs);
         result.tariffsCreated += tariffCounts.created;

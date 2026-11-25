@@ -13,7 +13,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { MetricsPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import PageHeader from "@/components/PageHeader";
-import { useLocale, t, formatPrice } from "@/lib/i18n";
+import { useLocale, t, formatPrice, type Locale } from "@/lib/i18n";
 import { financeCenterApi, type FinanceOverview, type AznMetric, type CurrencyAmount } from "@/lib/finance-center-api";
 import DateTextInput from "@/components/forms/DateTextInput";
 import { useCan } from "@/lib/use-can";
@@ -43,9 +43,30 @@ function AvailabilityBadge({ a }: { a: string }) {
   );
 }
 
+/**
+ * Локализованное пояснение AZN-метрики: сначала noteCode → i18n
+ * (finance.overview.note.<code>), иначе — EN-note с бэкенда (fallback).
+ */
+function noteText(metric: AznMetric, locale: Locale): string | null {
+  const code = metric.noteCode;
+  if (code) {
+    const key = `finance.overview.note.${code.toLowerCase()}`;
+    const localized = t(key, locale);
+    if (localized !== key) {
+      const total = (metric.knownCount ?? 0) + (metric.unknownCount ?? 0);
+      return localized
+        .replace("{known}", String(metric.knownCount ?? 0))
+        .replace("{total}", String(total))
+        .replace("{unknown}", String(metric.unknownCount ?? 0));
+    }
+  }
+  return metric.note ?? null;
+}
+
 /** KPI-карточка AZN-метрики: сумма (или честный UNKNOWN), availability, note. */
 function AznCard({ titleKey, metric }: { titleKey: string; metric: AznMetric }) {
   const locale = useLocale();
+  const note = noteText(metric, locale);
   return (
     <div className="rounded-xl border border-line bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">
@@ -62,8 +83,8 @@ function AznCard({ titleKey, metric }: { titleKey: string; metric: AznMetric }) 
           <span className="text-lg font-medium text-ink/60">{t("finance.overview.unknown_value", locale)}</span>
         )}
       </div>
-      {metric.availability === "UNAVAILABLE" && metric.note && (
-        <p className="mt-2 text-[11px] leading-snug text-ink/60">{metric.note}</p>
+      {metric.availability === "UNAVAILABLE" && note && (
+        <p className="mt-2 text-[11px] leading-snug text-ink/60">{note}</p>
       )}
       {typeof metric.knownCount === "number" && typeof metric.unknownCount === "number" && metric.unknownCount > 0 && (
         <p className="mt-2 text-[11px] text-amber-600">
@@ -77,6 +98,7 @@ function AznCard({ titleKey, metric }: { titleKey: string; metric: AznMetric }) 
 /** Полоска source-currency разбивки (поступления/долги: AZN=UNKNOWN). */
 function CurrencyBreakdown({ titleKey, rows, azn }: { titleKey: string; rows: CurrencyAmount[]; azn: AznMetric }) {
   const locale = useLocale();
+  const note = noteText(azn, locale);
   return (
     <div className="rounded-xl border border-line bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">
@@ -92,7 +114,7 @@ function CurrencyBreakdown({ titleKey, rows, azn }: { titleKey: string; rows: Cu
           </div>
         ))}
       </div>
-      <p className="mt-3 text-[11px] leading-snug text-ink/60">{azn.note}</p>
+      {note && <p className="mt-3 text-[11px] leading-snug text-ink/60">{note}</p>}
     </div>
   );
 }

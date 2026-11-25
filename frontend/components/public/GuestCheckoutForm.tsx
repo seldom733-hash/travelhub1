@@ -19,8 +19,8 @@ interface GuestCheckoutFormProps {
 }
 
 const fieldCls =
-  "mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none";
-const labelCls = "block text-xs font-medium uppercase tracking-wide text-slate-500";
+  "mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink/60 focus:border-brand focus:outline-none";
+const labelCls = "block text-xs font-medium uppercase tracking-wide text-ink/60";
 
 export default function GuestCheckoutForm({ productId }: GuestCheckoutFormProps) {
   const locale = useLocale();
@@ -87,7 +87,7 @@ export default function GuestCheckoutForm({ productId }: GuestCheckoutFormProps)
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-3 w-full rounded-xl border border-blue-600 px-4 py-3 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-500"
+        className="mt-3 w-full rounded-xl border border-brand px-4 py-3 text-sm font-semibold text-brand-dark transition-colors hover:bg-brand/10 focus-visible:outline-2 focus-visible:outline-brand"
       >
         {t("checkout.guest_cta", locale)}
       </button>
@@ -96,13 +96,13 @@ export default function GuestCheckoutForm({ productId }: GuestCheckoutFormProps)
 
   return (
     <form
-      className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-white p-4"
+      className="mt-3 space-y-3 rounded-xl border border-line bg-white p-4"
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
       }}
     >
-      <p className="text-xs leading-relaxed text-slate-500">{t("checkout.guest_subtitle", locale)}</p>
+      <p className="text-xs leading-relaxed text-ink/60">{t("checkout.guest_subtitle", locale)}</p>
 
       <div>
         <label htmlFor="guest-checkout-email" className={labelCls}>
@@ -211,7 +211,7 @@ export default function GuestCheckoutForm({ productId }: GuestCheckoutFormProps)
         <button
           type="submit"
           disabled={busy}
-          className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex-1 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? "…" : t("checkout.guest_submit", locale)}
         </button>
@@ -219,7 +219,7 @@ export default function GuestCheckoutForm({ productId }: GuestCheckoutFormProps)
           type="button"
           onClick={() => setOpen(false)}
           disabled={busy}
-          className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+          className="rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-ink/60 hover:bg-panel disabled:opacity-60"
         >
           {t("checkout.guest_cancel", locale)}
         </button>

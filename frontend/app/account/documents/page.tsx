@@ -19,7 +19,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   ISSUED: "bg-green-100 text-green-700",
-  SUPERSEDED: "bg-slate-100 text-slate-500",
+  SUPERSEDED: "bg-panel text-ink/60",
   INVALIDATED: "bg-red-100 text-red-600",
   NOT_ISSUED: "bg-amber-100 text-amber-700",
 };
@@ -60,47 +60,47 @@ export default function AccountDocumentsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">{t("account.documents_title", locale)}</h1>
-        <p className="mt-1 text-sm text-slate-500">{t("account.documents", locale)}</p>
+        <h1 className="text-2xl font-bold text-ink">{t("account.documents_title", locale)}</h1>
+        <p className="mt-1 text-sm text-ink/60">{t("account.documents", locale)}</p>
       </div>
 
       {!loaded ? (
         <div className="space-y-3" aria-busy="true" aria-label="loading">
           {/* §SKELETON-PARITY: реальная форма (:77-121) — список строк
-              `flex items-center justify-between rounded-xl border border-slate-200
+              `flex items-center justify-between rounded-xl border border-line
               bg-white p-4`, а не один блок `h-32`. */}
           {Array.from({ length: 4 }, (_, i) => (
             <div
               key={i}
-              className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4"
+              className="flex items-center justify-between rounded-xl border border-line bg-white p-4"
             >
               <div className="flex items-center gap-4">
-                <div className="size-8 animate-pulse rounded-full bg-slate-100" />
+                <div className="size-8 animate-pulse rounded-full bg-panel" />
                 <div className="space-y-1.5">
-                  <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
-                  <div className="h-3 w-56 animate-pulse rounded bg-slate-100" />
+                  <div className="h-4 w-40 animate-pulse rounded bg-panel" />
+                  <div className="h-3 w-56 animate-pulse rounded bg-panel" />
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <div className="h-4 w-16 animate-pulse rounded bg-slate-100" />
-                <div className="h-5 w-20 animate-pulse rounded-full bg-slate-100" />
+                <div className="h-4 w-16 animate-pulse rounded bg-panel" />
+                <div className="h-5 w-20 animate-pulse rounded-full bg-panel" />
               </div>
             </div>
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center">
-          <p className="text-base font-medium text-slate-700">{t("account.documents_empty", locale)}</p>
-          <p className="mt-1 text-sm text-slate-500">{t("account.not_yet", locale)}</p>
+        <div className="rounded-2xl border border-dashed border-line p-8 text-center">
+          <p className="text-base font-medium text-ink">{t("account.documents_empty", locale)}</p>
+          <p className="mt-1 text-sm text-ink/60">{t("account.not_yet", locale)}</p>
         </div>
       ) : (
         <>
-          <p className="text-sm text-slate-500">{total} document{total !== 1 ? "s" : ""}</p>
+          <p className="text-sm text-ink/60">{total} document{total !== 1 ? "s" : ""}</p>
           <div className="space-y-3">
             {items.map((doc) => (
               <div
                 key={doc.id}
-                className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 hover:border-slate-300"
+                className="flex items-center justify-between rounded-xl border border-line bg-white p-4 hover:border-line"
               >
                 <div className="flex items-center gap-4">
                   <span className="text-2xl">
@@ -108,10 +108,10 @@ export default function AccountDocumentsPage() {
                   </span>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-900">{doc.code}</span>
-                      <span className="text-xs text-slate-400">{TYPE_LABELS[doc.type] ?? doc.type}</span>
+                      <span className="font-semibold text-ink">{doc.code}</span>
+                      <span className="text-xs text-ink/60">{TYPE_LABELS[doc.type] ?? doc.type}</span>
                     </div>
-                    <div className="mt-0.5 text-sm text-slate-500">
+                    <div className="mt-0.5 text-sm text-ink/60">
                       {doc.bookingCode && <span>Booking: {doc.bookingCode}</span>}
                       {doc.serviceDate && <span className="ml-2">Service: {new Date(doc.serviceDate).toLocaleDateString()}</span>}
                     </div>
@@ -119,7 +119,7 @@ export default function AccountDocumentsPage() {
                 </div>
                 <div className="flex items-center gap-4">
                   {doc.totalAmount && (
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-ink">
                       {doc.totalAmount} {doc.currency}
                     </span>
                   )}
@@ -129,7 +129,7 @@ export default function AccountDocumentsPage() {
                   {doc.status === "ISSUED" && (
                     <a
                       href={`/api/v1/account/documents/${doc.id}/download`}
-                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                      className="rounded-lg bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark"
                     >
                       Download
                     </a>
@@ -143,15 +143,15 @@ export default function AccountDocumentsPage() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-50"
+                className="rounded-lg border border-line px-3 py-1.5 text-sm disabled:opacity-50"
               >
                 Previous
               </button>
-              <span className="px-3 py-1.5 text-sm text-slate-600">Page {page}</span>
+              <span className="px-3 py-1.5 text-sm text-ink/60">Page {page}</span>
               <button
                 onClick={() => setPage((p) => p + 1)}
                 disabled={items.length < 20}
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-50"
+                className="rounded-lg border border-line px-3 py-1.5 text-sm disabled:opacity-50"
               >
                 Next
               </button>

@@ -75,7 +75,7 @@ export default function BuyerAccountLayout({ children }: { children: React.React
   };
 
   if (!mounted || !user || user.role !== "BUYER") {
-    return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-400">…</div>;
+    return <div className="flex min-h-screen items-center justify-center bg-panel text-ink/60">…</div>;
   }
 
   const nav = [
@@ -94,17 +94,17 @@ export default function BuyerAccountLayout({ children }: { children: React.React
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-panel">
       {/* ── Header ── */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-line bg-white/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-4 py-3">
           <Link href="/" className="flex shrink-0 items-center gap-2" aria-label={brandName}>
-            <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-base font-bold text-white shadow-sm">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-dark text-base font-bold text-white shadow-sm">
               T
             </div>
-            <span className="text-base font-bold text-slate-900">
+            <span className="text-base font-bold text-ink">
               {brandName}
-              <span className="ml-2 hidden rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700 sm:inline">
+              <span className="ml-2 hidden rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-dark sm:inline">
                 {t("account.buyer_summary", locale)}
               </span>
             </span>
@@ -118,7 +118,7 @@ export default function BuyerAccountLayout({ children }: { children: React.React
                 href={item.href}
                 aria-current={isActive(item) ? "page" : undefined}
                 className={`whitespace-nowrap rounded-lg px-3 py-1.5 transition-colors ${
-                  isActive(item) ? "bg-blue-50 font-medium text-blue-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  isActive(item) ? "bg-brand/10 font-medium text-brand-dark" : "text-ink/60 hover:bg-panel hover:text-ink"
                 }`}
               >
                 {item.label}
@@ -133,22 +133,22 @@ export default function BuyerAccountLayout({ children }: { children: React.React
 
           {/* Buyer summary (desktop) */}
           <div className="ml-auto hidden min-w-0 items-center gap-2 md:flex">
-            <div className="min-w-0 max-w-[10rem] rounded-lg bg-slate-50 px-3 py-1.5">
-              <div className="truncate text-xs font-semibold text-slate-800">{user.fullName ?? user.username}</div>
-              <div className="truncate text-[11px] text-slate-500">{user.email ?? user.username}</div>
+            <div className="min-w-0 max-w-[10rem] rounded-lg bg-panel px-3 py-1.5">
+              <div className="truncate text-xs font-semibold text-ink">{user.fullName ?? user.username}</div>
+              <div className="truncate text-[11px] text-ink/60">{user.email ?? user.username}</div>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Link
               href="/"
-              className="hidden rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 transition-colors hover:border-blue-300 hover:text-blue-700 sm:block"
+              className="hidden rounded-lg border border-line px-3 py-1.5 text-xs text-ink/60 transition-colors hover:border-brand/25 hover:text-brand-dark sm:block"
             >
               {t("nav.to_marketplace", locale)}
             </Link>
             <LocaleSelector />
             <button
               onClick={logout}
-              className="hidden rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 transition-colors hover:bg-slate-100 sm:block"
+              className="hidden rounded-lg border border-line px-3 py-1.5 text-xs text-ink/60 transition-colors hover:bg-panel sm:block"
             >
               {t("nav.logout", locale)}
             </button>
@@ -157,7 +157,7 @@ export default function BuyerAccountLayout({ children }: { children: React.React
               onClick={() => setMenuOpen((v) => !v)}
               aria-expanded={menuOpen}
               aria-label={t("account.menu", locale)}
-              className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-slate-600 transition-colors hover:bg-slate-100 md:hidden"
+              className="rounded-lg border border-line px-2.5 py-1.5 text-ink/60 transition-colors hover:bg-panel md:hidden"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
                 {menuOpen ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
@@ -168,15 +168,15 @@ export default function BuyerAccountLayout({ children }: { children: React.React
 
         {/* Mobile nav */}
         {menuOpen && (
-          <nav className="border-t border-slate-200 bg-white px-4 py-3 md:hidden" aria-label={t("nav.account", locale)}>
-            <div className="mb-3 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+          <nav className="border-t border-line bg-white px-4 py-3 md:hidden" aria-label={t("nav.account", locale)}>
+            <div className="mb-3 flex items-center justify-between rounded-xl bg-panel px-3 py-2">
               <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-slate-900">{user.fullName ?? user.username}</div>
-                <div className="truncate text-xs text-slate-500">{user.email ?? ""}</div>
+                <div className="truncate text-sm font-semibold text-ink">{user.fullName ?? user.username}</div>
+                <div className="truncate text-xs text-ink/60">{user.email ?? ""}</div>
               </div>
               <button
                 onClick={logout}
-                className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 transition-colors hover:bg-slate-100"
+                className="shrink-0 rounded-lg border border-line bg-white px-3 py-1.5 text-xs text-ink/60 transition-colors hover:bg-panel"
               >
                 {t("nav.logout", locale)}
               </button>
@@ -189,7 +189,7 @@ export default function BuyerAccountLayout({ children }: { children: React.React
                     onClick={() => setMenuOpen(false)}
                     aria-current={isActive(item) ? "page" : undefined}
                     className={`block rounded-lg px-3 py-2 text-sm transition-colors ${
-                      isActive(item) ? "bg-blue-50 font-medium text-blue-700" : "text-slate-700 hover:bg-slate-100"
+                      isActive(item) ? "bg-brand/10 font-medium text-brand-dark" : "text-ink hover:bg-panel"
                     }`}
                   >
                     {item.label}
@@ -205,7 +205,7 @@ export default function BuyerAccountLayout({ children }: { children: React.React
             <Link
               href="/"
               onClick={() => setMenuOpen(false)}
-              className="mt-3 block rounded-lg border border-slate-200 px-3 py-2 text-center text-sm text-slate-600 transition-colors hover:bg-slate-100"
+              className="mt-3 block rounded-lg border border-line px-3 py-2 text-center text-sm text-ink/60 transition-colors hover:bg-panel"
             >
               {t("nav.to_marketplace", locale)}
             </Link>
@@ -215,7 +215,7 @@ export default function BuyerAccountLayout({ children }: { children: React.React
 
       {/* ── Content ── */}
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
-      <footer className="border-t border-slate-200 bg-white py-5 text-center text-xs text-slate-400">
+      <footer className="border-t border-line bg-white py-5 text-center text-xs text-ink/60">
         {brandName} — {t("account.title", locale)}
       </footer>
     </div>

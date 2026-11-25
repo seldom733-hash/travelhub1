@@ -35,11 +35,11 @@ export default function TariffEditor({
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Тарифы</label>
+        <label className="text-xs font-medium uppercase tracking-wide text-ink/60">Тарифы</label>
         <button
           type="button"
           onClick={() => onChange([...value, newTariffDraft()])}
-          className="text-xs font-medium text-blue-600 hover:underline"
+          className="text-xs font-medium text-brand hover:underline"
         >
           ＋ добавить
         </button>
@@ -51,25 +51,25 @@ export default function TariffEditor({
               value={t.name}
               onChange={(e) => onChange(value.map((x) => (x.id === t.id ? { ...x, name: e.target.value } : x)))}
               placeholder="Название"
-              className="w-28 rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
+              className="w-28 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
             />
             <input
               type="number"
               value={t.price}
               onChange={(e) => onChange(value.map((x) => (x.id === t.id ? { ...x, price: e.target.value } : x)))}
               placeholder="Цена"
-              className="w-24 rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
+              className="w-24 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
             />
             <input
               value={t.currency}
               onChange={(e) => onChange(value.map((x) => (x.id === t.id ? { ...x, currency: e.target.value } : x)))}
-              className="w-16 rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
+              className="w-16 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
             />
             {value.length > 1 && (
               <button
                 type="button"
                 onClick={() => onChange(value.filter((x) => x.id !== t.id))}
-                className="text-slate-400 transition-colors hover:text-red-500"
+                className="text-ink/60 transition-colors hover:text-red-500"
               >
                 ✕
               </button>

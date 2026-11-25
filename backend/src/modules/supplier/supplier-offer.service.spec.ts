@@ -175,6 +175,13 @@ function makeHarness(): Harness {
     cache as unknown as SupplierCacheService,
     resilience as never,
     pricing,
+    // SummerGdsFlightAddonService: в этих тестах авианадбавка не нужна —
+    // возвращаем вход без изменений (pre-addon поведение).
+    {
+      applyToOffers: jest.fn(async (offers: unknown[]) => offers),
+      addonFor: jest.fn(async () => null),
+      applyToCalendar: jest.fn(async (entries: unknown[]) => entries),
+    } as never,
   );
   return { service, adapter, registry, cache, pricing };
 }

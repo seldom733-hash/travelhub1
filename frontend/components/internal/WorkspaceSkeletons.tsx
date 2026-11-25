@@ -43,30 +43,30 @@ function Blocks({ count, className }: { count: number; className: string }) {
 
 /**
  * Полоса-шапка страницы = `components/PageHeader.tsx:20`
- * (`flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-4`,
+ * (`flex flex-wrap items-center justify-between gap-3 border-b border-line bg-white px-6 py-4`,
  * хлебные крошки `text-xs` :22, h1 `mt-0.5 text-lg font-bold` :30).
  */
 function HeaderStrip({ actions = true }: { actions?: boolean }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-4">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-white px-6 py-4">
       <div>
-        <div className="h-3 w-40 animate-pulse rounded bg-slate-100" />
-        <div className="mt-1 h-6 w-48 animate-pulse rounded bg-slate-200" />
+        <div className="h-3 w-40 animate-pulse rounded bg-panel" />
+        <div className="mt-1 h-6 w-48 animate-pulse rounded bg-panel" />
       </div>
-      {actions && <div className="h-9 w-28 animate-pulse rounded-lg bg-slate-100" />}
+      {actions && <div className="h-9 w-28 animate-pulse rounded-lg bg-panel" />}
     </div>
   );
 }
 
 /**
  * KPI-строка = `components/Kpi.tsx:25` (`grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6`)
- * + карточка :66 (`flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm`,
+ * + карточка :66 (`flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-3 shadow-sm`,
  * высота ≈ 62px: `py-3`×2 + иконка `size-9`). Не `h-24`/`rounded-2xl`, как было в прежнем скелетоне.
  */
 function KpiRow({ count = 6 }: { count?: number }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-      <Blocks count={count} className="h-[62px] rounded-xl border border-slate-200 bg-white" />
+      <Blocks count={count} className="h-[62px] rounded-xl border border-line bg-white" />
     </div>
   );
 }
@@ -74,14 +74,14 @@ function KpiRow({ count = 6 }: { count?: number }) {
 /** Панель-реестр = `OperationsRegistrySlot` (`OperationsCenterShell.tsx:279`). */
 function RegistryPanel({ rows = 5, header = true }: { rows?: number; header?: boolean }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
       {header && (
-        <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-          <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+        <div className="border-b border-line bg-panel px-4 py-3">
+          <div className="h-4 w-40 animate-pulse rounded bg-panel" />
         </div>
       )}
       <div className="space-y-2 p-4">
-        <Blocks count={rows} className="h-10 rounded-lg bg-slate-100" />
+        <Blocks count={rows} className="h-10 rounded-lg bg-panel" />
       </div>
     </div>
   );
@@ -91,8 +91,8 @@ function RegistryPanel({ rows = 5, header = true }: { rows?: number; header?: bo
 function ToolbarRow() {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="h-9 w-56 animate-pulse rounded-lg border border-slate-200 bg-white" />
-      <div className="h-9 w-32 animate-pulse rounded-lg border border-slate-200 bg-white" />
+      <div className="h-9 w-56 animate-pulse rounded-lg border border-line bg-white" />
+      <div className="h-9 w-32 animate-pulse rounded-lg border border-line bg-white" />
     </div>
   );
 }
@@ -141,7 +141,7 @@ export function WorkspaceKpiPageSkeleton() {
  * `finance/overview/page.tsx:187-205` — под полосой `PageHeader` контент
  * `space-y-6 p-6`: сетка метрик `grid gap-4 sm:grid-cols-2 lg:grid-cols-3` (:193)
  * и две сетки по две карточки `grid gap-4 sm:grid-cols-2` (:198, :202);
- * карточка — `rounded-xl border border-slate-200 bg-white p-4 shadow-sm`
+ * карточка — `rounded-xl border border-line bg-white p-4 shadow-sm`
  * (`AznCard` :47, `CurrencyBreakdown` :78, `ObligationsCard` :102).
  * Отличие от `WorkspacePageSkeleton`: там `space-y-4` + панель-реестр (таблица),
  * здесь `space-y-6` + сетки карточек — до этой правки у страницы вообще не было
@@ -153,13 +153,13 @@ export function MetricsPageSkeleton() {
       <HeaderStrip />
       <div className="space-y-6 p-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Blocks count={3} className="h-32 rounded-xl border border-slate-200 bg-white shadow-sm" />
+          <Blocks count={3} className="h-32 rounded-xl border border-line bg-white shadow-sm" />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Blocks count={2} className="h-32 rounded-xl border border-slate-200 bg-white shadow-sm" />
+          <Blocks count={2} className="h-32 rounded-xl border border-line bg-white shadow-sm" />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Blocks count={2} className="h-32 rounded-xl border border-slate-200 bg-white shadow-sm" />
+          <Blocks count={2} className="h-32 rounded-xl border border-line bg-white shadow-sm" />
         </div>
       </div>
     </SkeletonFrame>
@@ -177,15 +177,15 @@ export function MetricsPageSkeleton() {
 export function OperationsPageSkeleton() {
   return (
     <SkeletonFrame className="flex h-full flex-col">
-      <div className="shrink-0 border-b border-slate-200 bg-white">
+      <div className="shrink-0 border-b border-line bg-white">
         <div className="mx-auto w-full max-w-[1440px] px-6 pt-5">
-          <div className="mb-2 h-3 w-56 animate-pulse rounded bg-slate-100" />
+          <div className="mb-2 h-3 w-56 animate-pulse rounded bg-panel" />
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
-            <div className="h-8 w-64 animate-pulse rounded bg-slate-200" />
-            <div className="h-8 w-56 animate-pulse rounded-lg bg-slate-100" />
+            <div className="h-8 w-64 animate-pulse rounded bg-panel" />
+            <div className="h-8 w-56 animate-pulse rounded-lg bg-panel" />
           </div>
           <div className="-mb-px flex items-center gap-1 overflow-x-auto pb-px">
-            <Blocks count={5} className="h-9 w-28 shrink-0 rounded-t-lg bg-slate-100" />
+            <Blocks count={5} className="h-9 w-28 shrink-0 rounded-t-lg bg-panel" />
           </div>
         </div>
       </div>
@@ -210,30 +210,30 @@ export function OperationsPageSkeleton() {
  * (h1 `text-lg`) + вторичная полоса `border-b bg-white px-6 py-4` +
  * `flex-1 overflow-y-auto p-6` с сеткой `EntityDetailLayout.tsx:21`
  * (`grid grid-cols-1 gap-4 lg:grid-cols-3`) и карточками
- * `EntitySectionCard.tsx:19` (`rounded-xl border border-slate-200 bg-white p-4`).
+ * `EntitySectionCard.tsx:19` (`rounded-xl border border-line bg-white p-4`).
  */
 export function EntityDetailSkeleton() {
   return (
     <SkeletonFrame className="flex h-full flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-white px-6 py-4">
         <div>
-          <div className="h-3 w-44 animate-pulse rounded bg-slate-100" />
-          <div className="mt-1 h-6 w-56 animate-pulse rounded bg-slate-200" />
+          <div className="h-3 w-44 animate-pulse rounded bg-panel" />
+          <div className="mt-1 h-6 w-56 animate-pulse rounded bg-panel" />
         </div>
         <div className="flex items-center gap-2">
-          <Blocks count={2} className="h-9 w-24 rounded-lg bg-slate-100" />
+          <Blocks count={2} className="h-9 w-24 rounded-lg bg-panel" />
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-6 border-b border-slate-200 bg-white px-6 py-4">
-        <Blocks count={4} className="h-4 w-28 rounded bg-slate-100" />
+      <div className="flex flex-wrap items-center gap-6 border-b border-line bg-white px-6 py-4">
+        <Blocks count={4} className="h-4 w-28 rounded bg-panel" />
       </div>
       <div className="thin-scroll flex-1 overflow-y-auto p-6">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="min-w-0 space-y-4 lg:col-span-2">
-            <Blocks count={2} className="h-48 rounded-xl border border-slate-200 bg-white" />
+            <Blocks count={2} className="h-48 rounded-xl border border-line bg-white" />
           </div>
           <div className="min-w-0 space-y-4 lg:col-span-1">
-            <Blocks count={2} className="h-32 rounded-xl border border-slate-200 bg-white" />
+            <Blocks count={2} className="h-32 rounded-xl border border-line bg-white" />
           </div>
         </div>
       </div>
@@ -246,14 +246,14 @@ export function EntityDetailSkeleton() {
 /**
  * `p-6 lg:p-10` + h1 `text-2xl` (`dashboard/page.tsx:114-115`) + сетка карточек
  * `mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3` (:117), карточка
- * `rounded-2xl border border-slate-200 bg-white p-5 shadow-sm` (:122).
+ * `rounded-2xl border border-line bg-white p-5 shadow-sm` (:122).
  */
 export function DashboardPageSkeleton() {
   return (
     <SkeletonFrame className="p-6 lg:p-10">
-      <div className="h-8 w-56 animate-pulse rounded bg-slate-200" />
+      <div className="h-8 w-56 animate-pulse rounded bg-panel" />
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Blocks count={6} className="h-40 rounded-2xl border border-slate-200 bg-white" />
+        <Blocks count={6} className="h-40 rounded-2xl border border-line bg-white" />
       </div>
     </SkeletonFrame>
   );
@@ -263,7 +263,7 @@ export function DashboardPageSkeleton() {
 
 /**
  * `ManualCreateForm.tsx:219` — `mx-auto max-w-3xl space-y-4 p-6`, h1 `text-xl` (:221),
- * карточка :267 (`space-y-4 rounded-xl border border-slate-200 bg-white p-6`) с сеткой
+ * карточка :267 (`space-y-4 rounded-xl border border-line bg-white p-6`) с сеткой
  * полей :268 (`grid grid-cols-1 gap-4 sm:grid-cols-2`).
  * `support/new` (`page.tsx:38,42,50`) — `PageHeader` + `max-w-xl space-y-5 p-6` + карточка.
  */
@@ -279,19 +279,19 @@ export function FormPageSkeleton({
       {header && <HeaderStrip />}
       <div className={`mx-auto w-full ${maxWidth} space-y-4 p-6`}>
         <div>
-          <div className="h-7 w-56 animate-pulse rounded bg-slate-200" />
-          <div className="mt-1.5 h-4 w-72 animate-pulse rounded bg-slate-100" />
+          <div className="h-7 w-56 animate-pulse rounded bg-panel" />
+          <div className="mt-1.5 h-4 w-72 animate-pulse rounded bg-panel" />
         </div>
-        <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6">
+        <div className="space-y-4 rounded-xl border border-line bg-white p-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {Array.from({ length: 4 }, (_, i) => (
               <div key={i} className="space-y-1">
-                <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
-                <div className="h-10 w-full animate-pulse rounded-lg border border-slate-200 bg-slate-50" />
+                <div className="h-3 w-24 animate-pulse rounded bg-panel" />
+                <div className="h-10 w-full animate-pulse rounded-lg border border-line bg-panel" />
               </div>
             ))}
           </div>
-          <div className="h-10 w-40 animate-pulse rounded-lg bg-blue-100" />
+          <div className="h-10 w-40 animate-pulse rounded-lg bg-brand/15" />
         </div>
       </div>
     </SkeletonFrame>
@@ -304,30 +304,30 @@ export function FormPageSkeleton({
  * `partners/onboarding/page.tsx:96` / `seller-profiles/page.tsx:129` —
  * корень `space-y-4` БЕЗ page-padding и БЕЗ `PageHeader`, h1 `text-xl`,
  * сетка `grid gap-4 lg:grid-cols-2` (:119) с карточками
- * `rounded-2xl border border-slate-200 bg-white shadow-sm` (:121).
+ * `rounded-2xl border border-line bg-white shadow-sm` (:121).
  */
 export function QueuePageSkeleton() {
   return (
     <SkeletonFrame className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="h-6 w-56 animate-pulse rounded bg-slate-200" />
-          <div className="mt-1 h-3 w-40 animate-pulse rounded bg-slate-100" />
+          <div className="h-6 w-56 animate-pulse rounded bg-panel" />
+          <div className="mt-1 h-3 w-40 animate-pulse rounded bg-panel" />
         </div>
         <div className="flex items-center gap-2">
-          <Blocks count={2} className="h-8 w-32 rounded-lg border border-slate-200 bg-white" />
+          <Blocks count={2} className="h-8 w-32 rounded-lg border border-line bg-white" />
         </div>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         {[0, 1].map((i) => (
-          <section key={i} className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-100 px-4 py-2.5">
-              <div className="h-3 w-32 animate-pulse rounded bg-slate-100" />
+          <section key={i} className="rounded-2xl border border-line bg-white shadow-sm">
+            <div className="border-b border-line px-4 py-2.5">
+              <div className="h-3 w-32 animate-pulse rounded bg-panel" />
             </div>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-line">
               {Array.from({ length: 5 }, (_, j) => (
                 <div key={j} className="px-4 py-3">
-                  <div className="h-4 w-3/5 animate-pulse rounded bg-slate-100" />
+                  <div className="h-4 w-3/5 animate-pulse rounded bg-panel" />
                 </div>
               ))}
             </div>
@@ -342,7 +342,7 @@ export function QueuePageSkeleton() {
 
 /**
  * `crm/page.tsx:264-310` — `flex h-full` → `flex min-w-0 flex-1 flex-col` →
- * `PageHeader` → табы `flex gap-1 border-b border-slate-200 bg-slate-50 px-6 pt-2` (:295)
+ * `PageHeader` → табы `flex gap-1 border-b border-line bg-panel px-6 pt-2` (:295)
  * → `space-y-4 p-6` (:307) с `Kpi` (:310).
  */
 export function TabsPageSkeleton() {
@@ -350,8 +350,8 @@ export function TabsPageSkeleton() {
     <SkeletonFrame className="flex h-full">
       <div className="flex min-w-0 flex-1 flex-col">
         <HeaderStrip />
-        <div className="flex gap-1 border-b border-slate-200 bg-slate-50 px-6 pt-2">
-          <Blocks count={3} className="h-9 w-28 rounded-t-lg bg-slate-100" />
+        <div className="flex gap-1 border-b border-line bg-panel px-6 pt-2">
+          <Blocks count={3} className="h-9 w-28 rounded-t-lg bg-panel" />
         </div>
         <div className="space-y-4 p-6">
           <KpiRow />
@@ -376,19 +376,19 @@ export function CanvasPageSkeleton() {
       <div className="flex-1 p-6">
         <div className="flex items-center justify-between pb-4">
           <div>
-            <div className="h-6 w-48 animate-pulse rounded bg-slate-200" />
-            <div className="mt-1 h-4 w-72 animate-pulse rounded bg-slate-100" />
+            <div className="h-6 w-48 animate-pulse rounded bg-panel" />
+            <div className="mt-1 h-4 w-72 animate-pulse rounded bg-panel" />
           </div>
-          <div className="h-9 w-32 animate-pulse rounded-lg bg-slate-100" />
+          <div className="h-9 w-32 animate-pulse rounded-lg bg-panel" />
         </div>
-        <div className="flex gap-1 border-b border-slate-200 pb-2">
-          <Blocks count={4} className="h-8 w-24 rounded-t-lg bg-slate-100" />
+        <div className="flex gap-1 border-b border-line pb-2">
+          <Blocks count={4} className="h-8 w-24 rounded-t-lg bg-panel" />
         </div>
         <div className="mt-6 grid gap-6 lg:grid-cols-[280px_1fr]">
           <div className="space-y-2">
-            <Blocks count={5} className="h-12 rounded-lg border border-slate-200 bg-white" />
+            <Blocks count={5} className="h-12 rounded-lg border border-line bg-white" />
           </div>
-          <div className="h-80 animate-pulse rounded-lg border border-slate-200 bg-white" />
+          <div className="h-80 animate-pulse rounded-lg border border-line bg-white" />
         </div>
       </div>
     </SkeletonFrame>
@@ -405,20 +405,20 @@ export function HelpPageSkeleton() {
   return (
     <SkeletonFrame className="mx-auto w-full max-w-[1200px] px-6 py-6">
       <div className="mb-5">
-        <div className="h-8 w-64 animate-pulse rounded bg-slate-200" />
-        <div className="mt-2 h-4 w-full max-w-3xl animate-pulse rounded bg-slate-100" />
+        <div className="h-8 w-64 animate-pulse rounded bg-panel" />
+        <div className="mt-2 h-4 w-full max-w-3xl animate-pulse rounded bg-panel" />
       </div>
       <div className="mb-4 max-w-xl">
-        <div className="h-10 w-full animate-pulse rounded-xl border border-slate-200 bg-white shadow-sm" />
+        <div className="h-10 w-full animate-pulse rounded-xl border border-line bg-white shadow-sm" />
       </div>
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <Blocks count={3} className="h-8 w-28 rounded-full bg-slate-100" />
+        <Blocks count={3} className="h-8 w-28 rounded-full bg-panel" />
       </div>
       <div className="mb-6 flex flex-wrap items-center gap-2">
-        <Blocks count={4} className="h-8 w-24 rounded-full bg-slate-100" />
+        <Blocks count={4} className="h-8 w-24 rounded-full bg-panel" />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Blocks count={6} className="h-32 rounded-xl border border-slate-200 bg-white" />
+        <Blocks count={6} className="h-32 rounded-xl border border-line bg-white" />
       </div>
     </SkeletonFrame>
   );
@@ -429,22 +429,22 @@ export function HelpPageSkeleton() {
 /**
  * `whatsapp/page.tsx:330-350` — `space-y-4 p-6`, h1 `text-lg` (:333) + кнопка обновления,
  * затем `grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)_340px]` (:348)
- * и три панели `rounded-xl border border-slate-200 bg-white` (:350).
+ * и три панели `rounded-xl border border-line bg-white` (:350).
  */
 export function WhatsappPageSkeleton() {
   return (
     <SkeletonFrame className="space-y-4 p-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="h-6 w-40 animate-pulse rounded bg-slate-200" />
-          <div className="mt-1 h-3 w-56 animate-pulse rounded bg-slate-100" />
+          <div className="h-6 w-40 animate-pulse rounded bg-panel" />
+          <div className="mt-1 h-3 w-56 animate-pulse rounded bg-panel" />
         </div>
-        <div className="h-9 w-28 animate-pulse rounded-lg border border-slate-200 bg-white" />
+        <div className="h-9 w-28 animate-pulse rounded-lg border border-line bg-white" />
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)_340px]">
-        <div className="h-[420px] animate-pulse rounded-xl border border-slate-200 bg-white" />
-        <div className="h-[420px] animate-pulse rounded-xl border border-slate-200 bg-white" />
-        <div className="h-[420px] animate-pulse rounded-xl border border-slate-200 bg-white" />
+        <div className="h-[420px] animate-pulse rounded-xl border border-line bg-white" />
+        <div className="h-[420px] animate-pulse rounded-xl border border-line bg-white" />
+        <div className="h-[420px] animate-pulse rounded-xl border border-line bg-white" />
       </div>
     </SkeletonFrame>
   );
@@ -472,15 +472,15 @@ export function SettingsPageSkeleton() {
 /**
  * `documents/[id]/page.tsx:87-149` — `mx-auto max-w-4xl space-y-6 p-6`,
  * хлебные крошки (:89), h1 `text-2xl` (:107), карточки
- * `rounded-lg border border-slate-200 bg-white p-4` (:134, :149).
+ * `rounded-lg border border-line bg-white p-4` (:134, :149).
  */
 export function DocumentPageSkeleton() {
   return (
     <SkeletonFrame className="mx-auto w-full max-w-4xl space-y-6 p-6">
-      <div className="h-3 w-48 animate-pulse rounded bg-slate-100" />
-      <div className="h-8 w-72 animate-pulse rounded bg-slate-200" />
+      <div className="h-3 w-48 animate-pulse rounded bg-panel" />
+      <div className="h-8 w-72 animate-pulse rounded bg-panel" />
       <div className="space-y-4">
-        <Blocks count={3} className="h-28 rounded-lg border border-slate-200 bg-white" />
+        <Blocks count={3} className="h-28 rounded-lg border border-line bg-white" />
       </div>
     </SkeletonFrame>
   );

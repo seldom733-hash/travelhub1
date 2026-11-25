@@ -38,6 +38,26 @@ export interface DocumentListItem {
   type: DocumentType;
   status: DocumentStatus;
   bookingCode: string | null;
+  bookingId?: string | null;
+  orderId: string;
+  orderCode?: string | null;
+  dealSequence?: string | null;
+  serviceDate: Date | null;
+  totalAmount: Prisma.Decimal | null;
+  paidAmount: Prisma.Decimal | null;
+  currency: string | null;
+  paymentStatus: string | null;
+  version: number;
+  createdAt: Date;
+}
+
+/** Поля Document, нужные для enrich (findMany без select возвращает их все). */
+interface DocumentEnrichRow {
+  id: string;
+  code: string;
+  type: DocumentType;
+  status: DocumentStatus;
+  bookingId: string | null;
   orderId: string;
   serviceDate: Date | null;
   totalAmount: Prisma.Decimal | null;
@@ -47,6 +67,18 @@ export interface DocumentListItem {
   version: number;
   createdAt: Date;
 }
+
+/** Whitelist полей серверной сортировки реестра документов. */
+const DOCUMENT_SORT_FIELDS = new Set([
+  "code",
+  "type",
+  "status",
+  "serviceDate",
+  "totalAmount",
+  "paidAmount",
+  "version",
+  "createdAt",
+]);
 
 @Injectable()
 export class DocumentsService {
@@ -287,13 +319,48 @@ export class DocumentsService {
     ]);
 
     return {
-      items: items.map((d) => ({
+      items: await this.enrichDocumentItems(items),
+      total,
+    };
+  }
+
+  /**
+   * Resolve display references (booking/order/deal) for a page of documents.
+   * Single source of truth for BOTH the admin registry and the buyer cabinet,
+   * so the contract cannot drift between them.
+   */
+  private async enrichDocumentItems(items: DocumentEnrichRow[]): Promise<DocumentListItem[]> {
+    const orderIds = [...new Set(items.map((d) => d.orderId))];
+    const bookingIds = [...new Set(items.map((d) => d.bookingId).filter((id): id is string => Boolean(id)))];
+    const [orders, bookings] = await Promise.all([
+      orderIds.length
+        ? this.prisma.order.findMany({
+            where: { id: { in: orderIds } },
+            select: { id: true, code: true, commerceSequence: true },
+          })
+        : Promise.resolve([]),
+      bookingIds.length
+        ? this.prisma.booking.findMany({ where: { id: { in: bookingIds } }, select: { id: true, code: true } })
+        : Promise.resolve([]),
+    ]);
+    const orderMap = new Map(orders.map((o) => [o.id, o]));
+    const bookingMap = new Map(bookings.map((b) => [b.id, b]));
+
+    return items.map((d) => {
+      const order = orderMap.get(d.orderId);
+      const booking = d.bookingId ? bookingMap.get(d.bookingId) : null;
+      return {
         id: d.id,
         code: d.code,
         type: d.type,
         status: d.status,
-        bookingCode: null,
-        orderId: d.orderId, // resolved separately if needed
+        bookingCode: booking?.code ?? null,
+        bookingId: d.bookingId,
+        orderId: d.orderId,
+        orderCode: order?.code ?? null,
+        // Только commerceSequence: ссылка /app/finance/deals/[sequence] резолвится
+        // именно по нему; fallback на хвост referenceNumber давал битые ссылки.
+        dealSequence: order?.commerceSequence ?? null,
         serviceDate: d.serviceDate,
         totalAmount: d.totalAmount,
         paidAmount: d.paidAmount,
@@ -301,9 +368,8 @@ export class DocumentsService {
         paymentStatus: d.paymentStatus,
         version: d.version,
         createdAt: d.createdAt,
-      })),
-      total,
-    };
+      };
+    });
   }
 
   /**
@@ -314,6 +380,9 @@ export class DocumentsService {
     pageSize = 20,
     type?: DocumentType,
     status?: DocumentStatus,
+    q?: string,
+    sortBy?: string,
+    sortDirection?: "asc" | "desc",
   ): Promise<{
     items: DocumentListItem[];
     total: number;
@@ -323,10 +392,42 @@ export class DocumentsService {
     if (type) where.type = type;
     if (status) where.status = status;
 
+    // Server-side search: document code + referenced order/booking codes.
+    // Without it the registry search only filtered the current 20-row page.
+    const query = q?.trim();
+    if (query) {
+      const [orders, bookings] = await Promise.all([
+        this.prisma.order.findMany({
+          where: {
+            OR: [
+              { code: { contains: query, mode: "insensitive" } },
+              { referenceNumber: { contains: query, mode: "insensitive" } },
+              { commerceSequence: { contains: query } },
+            ],
+          },
+          select: { id: true },
+          take: 500,
+        }),
+        this.prisma.booking.findMany({
+          where: { code: { contains: query, mode: "insensitive" } },
+          select: { id: true },
+          take: 500,
+        }),
+      ]);
+      const or: Prisma.DocumentWhereInput[] = [{ code: { contains: query, mode: "insensitive" } }];
+      if (orders.length > 0) or.push({ orderId: { in: orders.map((o) => o.id) } });
+      if (bookings.length > 0) or.push({ bookingId: { in: bookings.map((b) => b.id) } });
+      where.OR = or;
+    }
+
+    const sortField = sortBy && DOCUMENT_SORT_FIELDS.has(sortBy) ? sortBy : "createdAt";
+    const sortDir = sortDirection === "asc" ? "asc" : "desc";
+    const orderBy = { [sortField]: sortDir } as Prisma.DocumentOrderByWithRelationInput;
+
     const [items, total, typeAgg] = await Promise.all([
       this.prisma.document.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -345,21 +446,7 @@ export class DocumentsService {
     }
 
     return {
-      items: items.map((d) => ({
-        id: d.id,
-        code: d.code,
-        type: d.type,
-        status: d.status,
-        bookingCode: null,
-        orderId: d.orderId,
-        serviceDate: d.serviceDate,
-        totalAmount: d.totalAmount,
-        paidAmount: d.paidAmount,
-        currency: d.currency,
-        paymentStatus: d.paymentStatus,
-        version: d.version,
-        createdAt: d.createdAt,
-      })),
+      items: await this.enrichDocumentItems(items),
       total,
       aggregates: { type: typeCounts as { VOUCHER: number; PARTIAL_PAYMENT: number; REFUND: number } },
     };

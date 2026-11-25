@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Query, Res } from "@nestjs/common";
-import { IsBoolean, IsISO8601, IsObject, IsOptional, IsString, Min } from "class-validator";
+import { IsBoolean, IsISO8601, IsObject, IsOptional, IsString, MaxLength, Min } from "class-validator";
 import { Transform, Type } from "class-transformer";
 import { Response } from "express";
 import { Public } from "../../../security/auth/decorators";
@@ -58,6 +58,16 @@ export class PublicProductListDto implements PublicProductListQuery {
   @IsOptional()
   @IsString()
   geoResort?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  supplierCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  program?: string;
 }
 
 /** Pagination-параметры списка продуктов витрины (только page/pageSize). */

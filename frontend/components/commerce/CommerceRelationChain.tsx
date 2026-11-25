@@ -88,7 +88,7 @@ export default function CommerceRelationChain({
             {i > 0 && (
               <span
                 aria-hidden
-                className="select-none self-center px-1 text-lg font-light text-slate-300"
+                className="select-none self-center px-1 text-lg font-light text-ink/60"
               >
                 <span className="md:hidden">↓</span>
                 <span className="hidden md:inline">→</span>
@@ -98,18 +98,18 @@ export default function CommerceRelationChain({
               aria-current={isCurrent ? "true" : undefined}
               className={`flex-1 min-w-0 rounded-xl border p-3 ${
                 isCurrent
-                  ? "border-blue-400 bg-blue-50/60 ring-1 ring-blue-200"
+                  ? "border-brand bg-brand/60 ring-1 ring-brand"
                   : entity
-                    ? "border-slate-200 bg-white"
-                    : "border-dashed border-slate-300 bg-slate-50"
+                    ? "border-line bg-white"
+                    : "border-dashed border-line bg-panel"
               }`}
             >
               <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-ink/60">
                   {t(meta.labelKey, locale)}
                 </span>
                 {isCurrent && (
-                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+                  <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-dark">
                     {t("detail.chain.current", locale)}
                   </span>
                 )}
@@ -125,7 +125,7 @@ export default function CommerceRelationChain({
                   <StatusBadge status={entity.status} />
                 </div>
               ) : (
-                <div className="text-xs text-slate-400">{t(meta.absentKey, locale)}</div>
+                <div className="text-xs text-ink/60">{t(meta.absentKey, locale)}</div>
               )}
             </div>
           </div>

@@ -24,7 +24,7 @@ function hrefToPage(href: string): string {
 
 describe("navigation integrity", () => {
   it("has the approved v2 shape", () => {
-    expect(NAV_ITEMS).toHaveLength(28);
+    expect(NAV_ITEMS).toHaveLength(30);
     expect(NAV_GROUPS).toHaveLength(10);
     expect(NAV_GROUPS.filter((group) => group.headingKey)).toHaveLength(9);
   });

@@ -9,7 +9,10 @@ export interface DocumentListItem {
   type: DocumentType;
   status: DocumentStatus;
   bookingCode: string | null;
+  bookingId?: string | null;
   orderId: string;
+  orderCode?: string | null;
+  dealSequence?: string | null;
   serviceDate: string | null;
   totalAmount: string | null;
   paidAmount: string | null;
@@ -52,15 +55,45 @@ export interface DocumentDetail {
 export const DOCUMENT_TYPES: readonly DocumentType[] = ["VOUCHER", "PARTIAL_PAYMENT", "REFUND"] as const;
 export const DOCUMENT_STATUSES: readonly DocumentStatus[] = ["NOT_ISSUED", "ISSUED", "SUPERSEDED", "INVALIDATED"] as const;
 
+/** Fields accepted by the server-side documents sort whitelist. */
+export type DocumentSortField =
+  | "code"
+  | "type"
+  | "status"
+  | "serviceDate"
+  | "totalAmount"
+  | "paidAmount"
+  | "version"
+  | "createdAt";
+
+/**
+ * Documents registry response: aggregates are nested by dimension
+ * (`{ type: { VOUCHER: n } }`), unlike the flat `Page<T>` placeholder.
+ */
+export type DocumentsListResponse = Omit<Page<DocumentListItem>, "aggregates"> & {
+  aggregates: { type: Record<string, number> };
+};
+
 export const documentsApi = {
-  list: (opts?: { page?: number; pageSize?: number; type?: DocumentType; status?: DocumentStatus }) => {
+  list: (opts?: {
+    page?: number;
+    pageSize?: number;
+    type?: DocumentType;
+    status?: DocumentStatus;
+    q?: string;
+    sortBy?: DocumentSortField;
+    sortDirection?: "asc" | "desc";
+  }) => {
     const sp = new URLSearchParams();
     if (opts?.page) sp.set("page", String(opts.page));
     if (opts?.pageSize) sp.set("pageSize", String(opts.pageSize));
     if (opts?.type) sp.set("type", opts.type);
     if (opts?.status) sp.set("status", opts.status);
+    if (opts?.q) sp.set("q", opts.q);
+    if (opts?.sortBy) sp.set("sortBy", opts.sortBy);
+    if (opts?.sortDirection) sp.set("sortDirection", opts.sortDirection);
     const qs = sp.toString();
-    return api.get<Page<DocumentListItem>>(`/documents${qs ? `?${qs}` : ""}`);
+    return api.get<DocumentsListResponse>(`/documents${qs ? `?${qs}` : ""}`);
   },
 
   get: (id: string) => api.get<DocumentDetail>(`/documents/${id}`),

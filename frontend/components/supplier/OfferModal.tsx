@@ -122,16 +122,16 @@ export default function OfferModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header (4.8.1): title · tour · date/nights/travelers */}
-        <div className="sticky top-0 z-10 border-b border-slate-200 bg-white px-6 py-4">
+        <div className="sticky top-0 z-10 border-b border-line bg-white px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-bold text-slate-900">
+              <h3 className="text-lg font-bold text-ink">
                 {t("offer.request_title", locale)}
               </h3>
-              <div className="mt-0.5 text-sm font-medium text-slate-700">
+              <div className="mt-0.5 text-sm font-medium text-ink">
                 {tour}
               </div>
-              <div className="mt-1 flex flex-wrap gap-1 text-xs text-slate-500">
+              <div className="mt-1 flex flex-wrap gap-1 text-xs text-ink/60">
                 <span>{date}</span>
                 <span>·</span>
                 <span>
@@ -150,7 +150,7 @@ export default function OfferModal({
             </div>
             <button
               onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-ink/60 transition-colors hover:bg-panel hover:text-ink/60"
               aria-label="Close"
             >
               ✕
@@ -160,12 +160,12 @@ export default function OfferModal({
 
         {/* Offer rows (4.8.4): variants list with per-offer submit */}
         <div className="p-6">
-          <h4 className="mb-2 text-sm font-semibold text-slate-800">
+          <h4 className="mb-2 text-sm font-semibold text-ink">
             {t("offer.variants_title", locale)}
           </h4>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-line">
             {offers.length === 0 ? (
-              <p className="py-8 text-center text-sm text-slate-500">
+              <p className="py-8 text-center text-sm text-ink/60">
                 {t("tour.no_offers", locale)}
               </p>
             ) : (
@@ -185,17 +185,17 @@ export default function OfferModal({
           </div>
 
           {/* 4.8.13: traveler data below the variants */}
-          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <h4 className="mb-3 text-sm font-semibold text-slate-800">
+          <div className="mt-6 rounded-xl border border-line bg-panel p-4">
+            <h4 className="mb-3 text-sm font-semibold text-ink">
               {t("offer.customer_title", locale)}
             </h4>
             {isClient ? (
-              <p className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+              <p className="mb-3 rounded-lg border border-brand/20 bg-brand/10 px-3 py-2 text-xs text-brand-dark">
                 Данные заполнены из профиля и не редактируются здесь.{" "}
                 <a href="/account/profile" className="font-semibold underline">Изменить в профиле</a>
               </p>
             ) : user ? (
-              <p className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+              <p className="mb-3 rounded-lg border border-brand/20 bg-brand/10 px-3 py-2 text-xs text-brand-dark">
                 {t("offer.registered_hint", locale)}
               </p>
             ) : null}
@@ -257,7 +257,7 @@ export function TravelerFields({
       <div>
         <label
           htmlFor="offer-first-name"
-          className="mb-1 block text-xs font-medium text-slate-600"
+          className="mb-1 block text-xs font-medium text-ink/60"
         >
           {t("checkout.guest_first_name", locale)}
         </label>
@@ -269,14 +269,14 @@ export function TravelerFields({
           onChange={(e) => onFirstName(e.target.value)}
           readOnly={readOnly}
           aria-readonly={readOnly}
-          className={`w-full rounded-lg border px-3 py-2 text-sm ${readOnly ? "cursor-not-allowed bg-slate-100 text-slate-500" : "bg-white text-slate-900"} ${nameError ? "border-red-300" : "border-slate-300"}`}
+          className={`w-full rounded-lg border px-3 py-2 text-sm ${readOnly ? "cursor-not-allowed bg-panel text-ink/60" : "bg-white text-ink"} ${nameError ? "border-red-300" : "border-line"}`}
         />
         {nameError && <p role="alert" className="mt-1 text-xs text-red-600">{nameError}</p>}
       </div>
       <div>
         <label
           htmlFor="offer-last-name"
-          className="mb-1 block text-xs font-medium text-slate-600"
+          className="mb-1 block text-xs font-medium text-ink/60"
         >
           {t("checkout.guest_last_name", locale)}
         </label>
@@ -288,13 +288,13 @@ export function TravelerFields({
           onChange={(e) => onLastName(e.target.value)}
           readOnly={readOnly}
           aria-readonly={readOnly}
-          className={`w-full rounded-lg border px-3 py-2 text-sm ${readOnly ? "cursor-not-allowed bg-slate-100 text-slate-500" : "bg-white text-slate-900"} ${nameError ? "border-red-300" : "border-slate-300"}`}
+          className={`w-full rounded-lg border px-3 py-2 text-sm ${readOnly ? "cursor-not-allowed bg-panel text-ink/60" : "bg-white text-ink"} ${nameError ? "border-red-300" : "border-line"}`}
         />
       </div>
       <div>
         <label
           htmlFor="offer-phone"
-          className="mb-1 block text-xs font-medium text-slate-600"
+          className="mb-1 block text-xs font-medium text-ink/60"
         >
           {t("checkout.guest_phone", locale)} *
         </label>
@@ -307,8 +307,8 @@ export function TravelerFields({
           onChange={(e) => onPhone(e.target.value)}
           readOnly={readOnly}
           aria-readonly={readOnly}
-          className={`w-full rounded-lg border px-3 py-2 text-sm ${readOnly ? "cursor-not-allowed bg-slate-100 text-slate-500" : "bg-white text-slate-900"} ${
-            phoneError ? "border-red-300" : "border-slate-300"
+          className={`w-full rounded-lg border px-3 py-2 text-sm ${readOnly ? "cursor-not-allowed bg-panel text-ink/60" : "bg-white text-ink"} ${
+            phoneError ? "border-red-300" : "border-line"
           }`}
         />
         {phoneError && (
@@ -320,7 +320,7 @@ export function TravelerFields({
       <div>
         <label
           htmlFor="offer-email"
-          className="mb-1 block text-xs font-medium text-slate-600"
+          className="mb-1 block text-xs font-medium text-ink/60"
         >
           {t("checkout.guest_email", locale)}
         </label>
@@ -332,8 +332,8 @@ export function TravelerFields({
           onChange={(e) => onEmail(e.target.value)}
           readOnly={readOnly}
           aria-readonly={readOnly}
-          className={`w-full rounded-lg border px-3 py-2 text-sm ${readOnly ? "cursor-not-allowed bg-slate-100 text-slate-500" : "bg-white text-slate-900"} ${
-            emailError ? "border-red-300" : "border-slate-300"
+          className={`w-full rounded-lg border px-3 py-2 text-sm ${readOnly ? "cursor-not-allowed bg-panel text-ink/60" : "bg-white text-ink"} ${
+            emailError ? "border-red-300" : "border-line"
           }`}
         />
         {emailError && (

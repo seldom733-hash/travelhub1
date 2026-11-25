@@ -109,14 +109,14 @@ export default function Customer360Page() {
     c.companyName ?? (`${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() || "—");
 
   if (loading) {
-    return <div className="flex h-full items-center justify-center"><div className="text-sm text-slate-400">{t("crm.loading", locale)}</div></div>;
+    return <div className="flex h-full items-center justify-center"><div className="text-sm text-ink/60">{t("crm.loading", locale)}</div></div>;
   }
 
   if (error || !customer) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <div className="text-sm text-red-500">{error || t("crm.not_found", locale)}</div>
-        <Link href="/app/crm" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">{t("crm.back_to_list", locale)}</Link>
+        <Link href="/app/crm" className="rounded-lg border border-line bg-white px-4 py-2 text-sm text-ink/60 hover:bg-panel">{t("crm.back_to_list", locale)}</Link>
       </div>
     );
   }
@@ -128,26 +128,26 @@ export default function Customer360Page() {
       <PageHeader
         title={displayName(customer)}
         breadcrumbs={["TravelHub", t("crm.title", locale), t("crm.tab.customers", locale), displayName(customer)]}
-        actions={<Link href="/app/crm" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">← {t("crm.back_to_list", locale)}</Link>}
+        actions={<Link href="/app/crm" className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 hover:bg-panel">← {t("crm.back_to_list", locale)}</Link>}
       />
 
-      <div className="border-b border-slate-200 bg-white px-6 py-4">
+      <div className="border-b border-line bg-white px-6 py-4">
         <div className="flex items-center gap-4">
           <div>
-            <div className="font-mono text-xs text-blue-600">{customer.code}</div>
-            <div className="text-lg font-bold text-slate-900">{displayName(customer)}</div>
+            <div className="font-mono text-xs text-brand">{customer.code}</div>
+            <div className="text-lg font-bold text-ink">{displayName(customer)}</div>
             <div className="mt-1 flex items-center gap-2">
               <StatusBadge status={customer.status} />
-              <span className="text-xs text-slate-400">{customer.email}</span>
-              {customer.phone && <span className="text-xs text-slate-400">· {customer.phone}</span>}
+              <span className="text-xs text-ink/60">{customer.email}</span>
+              {customer.phone && <span className="text-xs text-ink/60">· {customer.phone}</span>}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="flex gap-1 border-b border-slate-200 bg-slate-50 px-6 pt-2">
+      <div className="flex gap-1 border-b border-line bg-panel px-6 pt-2">
         {tabs.map((dt) => (
-          <button key={dt} onClick={() => handleTabChange(dt)} className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${tab === dt ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+          <button key={dt} onClick={() => handleTabChange(dt)} className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${tab === dt ? "bg-white text-brand shadow-sm" : "text-ink/60 hover:text-ink"}`}>
             {t(`crm.detail.${dt}`, locale)}
           </button>
         ))}
@@ -159,12 +159,12 @@ export default function Customer360Page() {
           {tab === "overview" && (
             <>
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.col.email", locale)}</div><div className="break-all font-medium text-slate-700">{customer.email}</div></div>
-                <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.create.form.phone", locale)}</div><div className="font-medium text-slate-700">{customer.phone ?? "—"}</div></div>
+                <div className="rounded-lg bg-panel px-4 py-3"><div className="text-ink/60">{t("crm.col.email", locale)}</div><div className="break-all font-medium text-ink">{customer.email}</div></div>
+                <div className="rounded-lg bg-panel px-4 py-3"><div className="text-ink/60">{t("crm.create.form.phone", locale)}</div><div className="font-medium text-ink">{customer.phone ?? "—"}</div></div>
               </div>
               <div className="grid grid-cols-3 gap-3 text-xs md:grid-cols-6">
-                <div className="rounded-lg bg-indigo-50 px-4 py-3 text-center"><div className="font-bold text-indigo-700">{customer.summary.totalRequests}</div><div className="text-indigo-500">Заявки</div></div>
-                <div className="rounded-lg bg-blue-50 px-4 py-3 text-center"><div className="font-bold text-blue-700">{customer.summary.totalOrders}</div><div className="text-blue-500">{t("crm.detail.total_orders", locale)}</div></div>
+                <div className="rounded-lg bg-brand/10 px-4 py-3 text-center"><div className="font-bold text-brand-dark">{customer.summary.totalRequests}</div><div className="text-brand">Заявки</div></div>
+                <div className="rounded-lg bg-brand/10 px-4 py-3 text-center"><div className="font-bold text-brand-dark">{customer.summary.totalOrders}</div><div className="text-brand">{t("crm.detail.total_orders", locale)}</div></div>
                 <div className="rounded-lg bg-green-50 px-4 py-3 text-center"><div className="font-bold text-green-700">{customer.summary.totalBookings}</div><div className="text-green-500">{t("crm.detail.total_bookings", locale)}</div></div>
                 <div className="rounded-lg bg-purple-50 px-4 py-3 text-center"><div className="font-bold text-purple-700">{customer.summary.totalPayments}</div><div className="text-purple-500">{t("crm.detail.total_payments", locale)}</div></div>
                 <div className="rounded-lg bg-red-50 px-4 py-3 text-center"><div className="font-bold text-red-700">{customer.summary.totalRefunds ?? 0}</div><div className="text-red-500">{t("crm.detail.total_refunds", locale)}</div></div>
@@ -180,12 +180,12 @@ export default function Customer360Page() {
 
           {/* Requests — first card before Orders */}
           {tab === "requests" && (
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              <div className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs font-medium text-slate-600">
+            <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+              <div className="border-b border-line bg-panel px-4 py-2 text-xs font-medium text-ink/60">
                 Заявки клиента
               </div>
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                <thead className="border-b border-line bg-panel text-[10px] uppercase tracking-wide text-ink/60">
                   <tr>
                     <th className="px-4 py-2.5">Заявка</th>
                     <th className="px-4 py-2.5">Услуга</th>
@@ -196,27 +196,27 @@ export default function Customer360Page() {
                 </thead>
                 <tbody>
                   {customer.requests.length > 0 ? customer.requests.map((r) => (
-                    <tr key={r.id} className="border-b border-slate-50 hover:bg-indigo-50/30">
+                    <tr key={r.id} className="border-b border-line hover:bg-brand/30">
                       <td className="px-4 py-2.5">
-                        <div className="font-mono text-blue-600">{r.referenceNumber}</div>
-                        <div className="text-[11px] text-slate-400">{r.code}</div>
+                        <div className="font-mono text-brand">{r.referenceNumber}</div>
+                        <div className="text-[11px] text-ink/60">{r.code}</div>
                       </td>
-                      <td className="max-w-[280px] px-4 py-2.5 text-slate-700">{r.serviceTitle || "—"}</td>
+                      <td className="max-w-[280px] px-4 py-2.5 text-ink">{r.serviceTitle || "—"}</td>
                       <td className="px-4 py-2.5">
                         {r.priceChanged ? (
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-slate-400 line-through">{formatPrice(r.oldPrice, r.currency, locale) ?? "—"}</span>
+                            <span className="text-ink/60 line-through">{formatPrice(r.oldPrice, r.currency, locale) ?? "—"}</span>
                             <span className="font-semibold text-emerald-700">{formatPrice(r.newPrice, r.currency, locale) ?? "—"}</span>
                             <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">Цена изменена</span>
                           </div>
                         ) : (
-                          <span className="font-medium text-slate-700">{formatPrice(r.newPrice ?? r.oldPrice, r.currency, locale) ?? "—"}</span>
+                          <span className="font-medium text-ink">{formatPrice(r.newPrice ?? r.oldPrice, r.currency, locale) ?? "—"}</span>
                         )}
                       </td>
                       <td className="px-4 py-2.5"><StatusBadge status={r.status} /></td>
-                      <td className="px-4 py-2.5 text-slate-500">{new Date(r.createdAt).toLocaleDateString()}</td>
+                      <td className="px-4 py-2.5 text-ink/60">{new Date(r.createdAt).toLocaleDateString()}</td>
                     </tr>
-                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Заявок нет</td></tr>}
+                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-ink/60">Заявок нет</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -224,9 +224,9 @@ export default function Customer360Page() {
 
           {/* Orders — TABLE with sortable headers + server-side status filter */}
           {tab === "orders" && (
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
-                <select value={orderStatusFilter ?? ''} onChange={(e) => setOrderStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
+            <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+              <div className="flex items-center gap-2 border-b border-line bg-panel px-4 py-2">
+                <select value={orderStatusFilter ?? ''} onChange={(e) => setOrderStatusFilter(e.target.value || undefined)} className="rounded border border-line bg-white px-2 py-1 text-xs outline-none focus:border-brand">
                   <option value="">{t('crm.filter.status.all', locale)}</option>
                   <option value="NEW">{t('status.order.NEW', locale)}</option>
                   <option value="IN_PROCESSING">{t('status.order.IN_PROCESSING', locale)}</option>
@@ -235,11 +235,11 @@ export default function Customer360Page() {
                   <option value="CLOSED">{t('status.order.CLOSED', locale)}</option>
                   <option value="CANCELLED">{t('status.order.CANCELLED', locale)}</option>
                 </select>
-                {orderStatusFilter && <button onClick={() => setOrderStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+                {orderStatusFilter && <button onClick={() => setOrderStatusFilter(undefined)} className="text-xs text-ink/60 hover:text-ink/60">✕</button>}
                 <div className="ml-auto"><TableExportButton exportUrl={`/api/v1/customers/${id}/orders/export`} extraParams={orderStatusFilter ? { status: orderStatusFilter } : {}} /></div>
               </div>
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                <thead className="border-b border-line bg-panel text-[10px] uppercase tracking-wide text-ink/60">
                   <tr>
                     <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.code", locale)}</SortableHeader>
                     <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>{t("crm.col.number", locale)}</SortableHeader>
@@ -250,14 +250,14 @@ export default function Customer360Page() {
                 </thead>
                 <tbody>
                   {customer.orders.length > 0 ? customer.orders.map((o) => (
-                    <tr key={o.id} className="border-b border-slate-50 hover:bg-blue-50/30">
-                      <td className="px-4 py-2.5"><Link href={`/app/orders/${o.id}`} className="font-mono text-blue-600 hover:underline">{o.referenceNumber}</Link></td>
-                      <td className="px-4 py-2.5 text-slate-500">{o.number}</td>
-                      <td className="px-4 py-2.5 text-slate-500">{new Date(o.createdAt).toLocaleDateString()}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(o.amount, o.currency, locale) ?? "—"}</td>
+                    <tr key={o.id} className="border-b border-line hover:bg-brand/30">
+                      <td className="px-4 py-2.5"><Link href={`/app/orders/${o.id}`} className="font-mono text-brand hover:underline">{o.referenceNumber}</Link></td>
+                      <td className="px-4 py-2.5 text-ink/60">{o.number}</td>
+                      <td className="px-4 py-2.5 text-ink/60">{new Date(o.createdAt).toLocaleDateString()}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-ink">{formatPrice(o.amount, o.currency, locale) ?? "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={o.status} /></td>
                     </tr>
-                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{orderStatusFilter ? t("crm.filter.status.none", locale) : t("crm.detail.no_orders", locale)}</td></tr>}
+                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-ink/60">{orderStatusFilter ? t("crm.filter.status.none", locale) : t("crm.detail.no_orders", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -265,9 +265,9 @@ export default function Customer360Page() {
 
           {/* Bookings — TABLE with sortable headers + server-side status filter */}
           {tab === "bookings" && (
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
-                <select value={bookingStatusFilter ?? ''} onChange={(e) => setBookingStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
+            <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+              <div className="flex items-center gap-2 border-b border-line bg-panel px-4 py-2">
+                <select value={bookingStatusFilter ?? ''} onChange={(e) => setBookingStatusFilter(e.target.value || undefined)} className="rounded border border-line bg-white px-2 py-1 text-xs outline-none focus:border-brand">
                   <option value="">{t('crm.filter.status.all', locale)}</option>
                   <option value="NEW">{t('status.booking.NEW', locale)}</option>
                   <option value="SENT_TO_SUPPLIER">{t('status.booking.SENT_TO_SUPPLIER', locale)}</option>
@@ -277,11 +277,11 @@ export default function Customer360Page() {
                   <option value="COMPLETED">{t('status.booking.COMPLETED', locale)}</option>
                   <option value="CANCELLED">{t('status.booking.CANCELLED', locale)}</option>
                 </select>
-                {bookingStatusFilter && <button onClick={() => setBookingStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+                {bookingStatusFilter && <button onClick={() => setBookingStatusFilter(undefined)} className="text-xs text-ink/60 hover:text-ink/60">✕</button>}
                 <div className="ml-auto"><TableExportButton exportUrl={`/api/v1/customers/${id}/bookings/export`} extraParams={bookingStatusFilter ? { bookingStatus: bookingStatusFilter } : {}} /></div>
               </div>
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                <thead className="border-b border-line bg-panel text-[10px] uppercase tracking-wide text-ink/60">
                   <tr>
                     <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.code", locale)}</SortableHeader>
                     <SortableHeader field="createdAt" currentSort={sortState} onSort={handleSort}>{t("crm.col.created_at", locale)}</SortableHeader>
@@ -291,13 +291,13 @@ export default function Customer360Page() {
                 </thead>
                 <tbody>
                   {customer.bookings.length > 0 ? customer.bookings.map((b) => (
-                    <tr key={b.id} className="border-b border-slate-50 hover:bg-blue-50/30">
-                      <td className="px-4 py-2.5"><Link href={`/app/bookings/${b.id}`} className="font-mono text-blue-600 hover:underline">{b.referenceNumber}</Link></td>
-                      <td className="px-4 py-2.5 text-slate-500">{new Date(b.createdAt).toLocaleDateString()}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(b.amount, b.currency, locale) ?? "—"}</td>
+                    <tr key={b.id} className="border-b border-line hover:bg-brand/30">
+                      <td className="px-4 py-2.5"><Link href={`/app/bookings/${b.id}`} className="font-mono text-brand hover:underline">{b.referenceNumber}</Link></td>
+                      <td className="px-4 py-2.5 text-ink/60">{new Date(b.createdAt).toLocaleDateString()}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-ink">{formatPrice(b.amount, b.currency, locale) ?? "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={b.status} /></td>
                     </tr>
-                  )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">{bookingStatusFilter ? t("crm.filter.status.none", locale) : t("crm.detail.no_bookings", locale)}</td></tr>}
+                  )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-ink/60">{bookingStatusFilter ? t("crm.filter.status.none", locale) : t("crm.detail.no_bookings", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -305,44 +305,44 @@ export default function Customer360Page() {
 
           {/* Payments — TABLE with sortable headers + server-side status filter */}
           {tab === "payments" && (
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
-                <select value={paymentStatusFilter ?? ''} onChange={(e) => setPaymentStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
+            <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+              <div className="flex items-center gap-2 border-b border-line bg-panel px-4 py-2">
+                <select value={paymentStatusFilter ?? ''} onChange={(e) => setPaymentStatusFilter(e.target.value || undefined)} className="rounded border border-line bg-white px-2 py-1 text-xs outline-none focus:border-brand">
                   <option value="">{t('crm.filter.status.all', locale)}</option>
                   <option value="CAPTURED">{t('status.payment.PAID', locale)}</option>
                   <option value="PENDING">{t('status.payment.UNPAID', locale)}</option>
                   <option value="FAILED">{t('status.order.PROBLEM', locale)}</option>
                 </select>
-                {paymentStatusFilter && <button onClick={() => setPaymentStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+                {paymentStatusFilter && <button onClick={() => setPaymentStatusFilter(undefined)} className="text-xs text-ink/60 hover:text-ink/60">✕</button>}
                 <div className="ml-auto"><TableExportButton exportUrl={`/api/v1/customers/${id}/payments/export`} extraParams={paymentStatusFilter ? { paymentStatus: paymentStatusFilter } : {}} /></div>
               </div>
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                <thead className="border-b border-line bg-panel text-[10px] uppercase tracking-wide text-ink/60">
                   <tr>
                     <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.payment_code", locale)}</SortableHeader>
                     <SortableHeader field="paymentDate" currentSort={sortState} onSort={handleSort}>{t("crm.col.payment_date", locale)}</SortableHeader>
-                    <th className="px-4 py-2.5 font-medium text-[10px] uppercase tracking-wide text-slate-400">{t("crm.col.purpose", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium text-[10px] uppercase tracking-wide text-ink/60">{t("crm.col.purpose", locale)}</th>
                     <SortableHeader field="amount" currentSort={sortState} onSort={handleSort} alignRight>{t("crm.col.amount", locale)}</SortableHeader>
-                    <th className="px-4 py-2.5 font-medium text-[10px] uppercase tracking-wide text-slate-400">{t("crm.col.method", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium text-[10px] uppercase tracking-wide text-ink/60">{t("crm.col.method", locale)}</th>
                     <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("crm.col.status", locale)}</SortableHeader>
                   </tr>
                 </thead>
                 <tbody>
                   {customer.payments.length > 0 ? customer.payments.map((p) => (
-                    <tr key={p.id} className="border-b border-slate-50 hover:bg-blue-50/30">
-                      <td className="px-4 py-2.5 font-mono text-slate-600">{p.referenceNumber}</td>
-                      <td className="px-4 py-2.5 text-slate-500">{p.paidAt ? new Date(p.paidAt).toLocaleDateString() : "—"}</td>
-                      <td className="px-4 py-2.5 text-slate-500">
+                    <tr key={p.id} className="border-b border-line hover:bg-brand/30">
+                      <td className="px-4 py-2.5 font-mono text-ink/60">{p.referenceNumber}</td>
+                      <td className="px-4 py-2.5 text-ink/60">{p.paidAt ? new Date(p.paidAt).toLocaleDateString() : "—"}</td>
+                      <td className="px-4 py-2.5 text-ink/60">
                         {p.orderCode ? (
-                          <Link href={`/app/orders/${p.orderId}`} className="text-blue-600 hover:underline">{p.orderCode}</Link>
+                          <Link href={`/app/orders/${p.orderId}`} className="text-brand hover:underline">{p.orderCode}</Link>
                         ) : "—"}
-                        {p.orderNumber && <span className="ml-1 text-slate-400">({p.orderNumber})</span>}
+                        {p.orderNumber && <span className="ml-1 text-ink/60">({p.orderNumber})</span>}
                       </td>
-                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(p.amount, p.currency, locale) ?? "—"}</td>
-                      <td className="px-4 py-2.5 text-slate-500">{p.paymentMethod ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-ink">{formatPrice(p.amount, p.currency, locale) ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-ink/60">{p.paymentMethod ?? "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
                     </tr>
-                  )) : <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">{paymentStatusFilter ? t("crm.filter.status.none", locale) : t("crm.detail.no_payments", locale)}</td></tr>}
+                  )) : <tr><td colSpan={6} className="px-4 py-8 text-center text-ink/60">{paymentStatusFilter ? t("crm.filter.status.none", locale) : t("crm.detail.no_payments", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -350,12 +350,12 @@ export default function Customer360Page() {
 
           {/* Partners — TABLE with commercial aggregates */}
           {tab === "partners" && (
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center justify-end border-b border-slate-100 bg-slate-50 px-4 py-2">
+            <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+              <div className="flex items-center justify-end border-b border-line bg-panel px-4 py-2">
                 <TableExportButton exportUrl={`/api/v1/customers/${id}/partners/export`} />
               </div>
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                <thead className="border-b border-line bg-panel text-[10px] uppercase tracking-wide text-ink/60">
                   <tr>
                     <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>{t("crm.col.partner", locale)}</SortableHeader>
                     <SortableHeader field="orderCount" currentSort={sortState} onSort={handleSort} alignRight>{t("crm.detail.orders", locale)}</SortableHeader>
@@ -366,14 +366,14 @@ export default function Customer360Page() {
                 </thead>
                 <tbody>
                   {partners.length > 0 ? partners.map((p) => (
-                    <tr key={p.partnerId} className="border-b border-slate-50 hover:bg-blue-50/30">
-                      <td className="px-4 py-2.5"><Link href={`/app/crm/partners/${p.partnerId}`} className="font-medium text-blue-600 hover:underline">{p.partnerName}</Link></td>
-                      <td className="px-4 py-2.5 text-right text-slate-600">{p.orderCount}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-600">{p.totalBookings}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(p.totalAmount, p.currency, locale) ?? "—"}</td>
+                    <tr key={p.partnerId} className="border-b border-line hover:bg-brand/30">
+                      <td className="px-4 py-2.5"><Link href={`/app/references/suppliers/${p.partnerId}`} className="font-medium text-brand hover:underline">{p.partnerName}</Link></td>
+                      <td className="px-4 py-2.5 text-right text-ink/60">{p.orderCount}</td>
+                      <td className="px-4 py-2.5 text-right text-ink/60">{p.totalBookings}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-ink">{formatPrice(p.totalAmount, p.currency, locale) ?? "—"}</td>
                       <td className="px-4 py-2.5">{p.partnerStatus ? <StatusBadge status={p.partnerStatus} /> : "—"}</td>
                     </tr>
-                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{t("crm.detail.no_partners", locale)}</td></tr>}
+                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-ink/60">{t("crm.detail.no_partners", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -381,42 +381,42 @@ export default function Customer360Page() {
 
           {/* Refunds — TABLE with sortable headers + client-side status filter (refunds are bounded) */}
           {tab === "refunds" && (
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
-                <select value={refundStatusFilter ?? ''} onChange={(e) => setRefundStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
+            <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+              <div className="flex items-center gap-2 border-b border-line bg-panel px-4 py-2">
+                <select value={refundStatusFilter ?? ''} onChange={(e) => setRefundStatusFilter(e.target.value || undefined)} className="rounded border border-line bg-white px-2 py-1 text-xs outline-none focus:border-brand">
                   <option value="">{t('crm.filter.status.all', locale)}</option>
                   <option value="REQUESTED">{t('status.crm.SUBMITTED', locale)}</option>
                   <option value="APPROVED">{t('status.crm.APPROVED', locale)}</option>
                   <option value="PROCESSED">{t('status.crm.APPROVED', locale)}</option>
                   <option value="REJECTED">{t('status.crm.REJECTED', locale)}</option>
                 </select>
-                {refundStatusFilter && <button onClick={() => setRefundStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+                {refundStatusFilter && <button onClick={() => setRefundStatusFilter(undefined)} className="text-xs text-ink/60 hover:text-ink/60">✕</button>}
               </div>
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                <thead className="border-b border-line bg-panel text-[10px] uppercase tracking-wide text-ink/60">
                   <tr>
                     <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.refund_code", locale)}</SortableHeader>
                     <SortableHeader field="refundDate" currentSort={sortState} onSort={handleSort}>{t("crm.col.refund_date", locale)}</SortableHeader>
-                    <th className="px-4 py-2.5 font-medium text-[10px] uppercase tracking-wide text-slate-400">{t("crm.col.purpose", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium text-[10px] uppercase tracking-wide text-ink/60">{t("crm.col.purpose", locale)}</th>
                     <SortableHeader field="amount" currentSort={sortState} onSort={handleSort} alignRight>{t("crm.col.amount", locale)}</SortableHeader>
                     <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("crm.col.status", locale)}</SortableHeader>
                   </tr>
                 </thead>
                 <tbody>
                   {(refundStatusFilter ? (customer.refunds || []).filter(r => r.status === refundStatusFilter) : (customer.refunds || [])).length > 0 ? (refundStatusFilter ? (customer.refunds || []).filter(r => r.status === refundStatusFilter) : (customer.refunds || [])).map((r) => (
-                    <tr key={r.id} className="border-b border-slate-50 hover:bg-blue-50/30">
-                      <td className="px-4 py-2.5 font-mono text-slate-600">{r.referenceNumber ?? r.code}</td>
-                      <td className="px-4 py-2.5 text-slate-500">{r.processedAt ? new Date(r.processedAt).toLocaleDateString() : "—"}</td>
-                      <td className="px-4 py-2.5 text-slate-500">
+                    <tr key={r.id} className="border-b border-line hover:bg-brand/30">
+                      <td className="px-4 py-2.5 font-mono text-ink/60">{r.referenceNumber ?? r.code}</td>
+                      <td className="px-4 py-2.5 text-ink/60">{r.processedAt ? new Date(r.processedAt).toLocaleDateString() : "—"}</td>
+                      <td className="px-4 py-2.5 text-ink/60">
                         {r.orderCode ? (
-                          <Link href={`/app/orders/${r.orderId}`} className="text-blue-600 hover:underline">{r.orderCode}</Link>
+                          <Link href={`/app/orders/${r.orderId}`} className="text-brand hover:underline">{r.orderCode}</Link>
                         ) : "—"}
-                        {r.orderNumber && <span className="ml-1 text-slate-400">({r.orderNumber})</span>}
+                        {r.orderNumber && <span className="ml-1 text-ink/60">({r.orderNumber})</span>}
                       </td>
-                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(r.amount, r.currency, locale) ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-ink">{formatPrice(r.amount, r.currency, locale) ?? "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={r.status} /></td>
                     </tr>
-                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{refundStatusFilter ? t("crm.filter.status.none", locale) : t("crm.detail.no_refunds", locale)}</td></tr>}
+                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-ink/60">{refundStatusFilter ? t("crm.filter.status.none", locale) : t("crm.detail.no_refunds", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>

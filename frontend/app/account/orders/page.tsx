@@ -47,8 +47,8 @@ export default function AccountOrdersPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{t("account.orders_title", locale)}</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-ink">{t("account.orders_title", locale)}</h1>
+          <p className="mt-1 text-sm text-ink/60">
             {data !== null ? `${t("account.orders", locale)}: ${data.total}` : t("state.loading", locale)}
           </p>
         </div>
@@ -56,51 +56,51 @@ export default function AccountOrdersPage() {
 
       {data === null ? (
         <div
-          className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+          className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm"
           aria-busy="true"
           aria-label="loading"
         >
           {/* §SKELETON-PARITY: реальная форма (:73-124) — таблица на desktop и
               список на mobile; прежние три карточки `h-20` не совпадали ни с чем. */}
           <div className="hidden md:block">
-            <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
+            <div className="border-b border-line bg-panel px-5 py-3">
               <div className="grid grid-cols-6 gap-4">
                 {Array.from({ length: 6 }, (_, i) => (
-                  <div key={i} className="h-3 w-3/4 animate-pulse rounded bg-slate-200" />
+                  <div key={i} className="h-3 w-3/4 animate-pulse rounded bg-panel" />
                 ))}
               </div>
             </div>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-line">
               {Array.from({ length: 5 }, (_, i) => (
                 <div key={i} className="px-5 py-3">
-                  <div className="h-4 w-4/5 animate-pulse rounded bg-slate-100" />
+                  <div className="h-4 w-4/5 animate-pulse rounded bg-panel" />
                 </div>
               ))}
             </div>
           </div>
-          <div className="divide-y divide-slate-100 md:hidden">
+          <div className="divide-y divide-line md:hidden">
             {Array.from({ length: 3 }, (_, i) => (
               <div key={i} className="space-y-2 px-5 py-4">
-                <div className="h-4 w-32 animate-pulse rounded bg-slate-100" />
-                <div className="h-4 w-24 animate-pulse rounded bg-slate-100" />
+                <div className="h-4 w-32 animate-pulse rounded bg-panel" />
+                <div className="h-4 w-24 animate-pulse rounded bg-panel" />
               </div>
             ))}
           </div>
         </div>
       ) : data.items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
-          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-slate-50 text-2xl" aria-hidden>
+        <div className="rounded-2xl border border-dashed border-line bg-white px-6 py-12 text-center">
+          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-panel text-2xl" aria-hidden>
             🧾
           </div>
-          <p className="text-base font-medium text-slate-700">{t("account.orders_empty", locale)}</p>
-          <p className="mt-1 text-sm text-slate-500">{t("account.orders_empty_hint", locale)}</p>
+          <p className="text-base font-medium text-ink">{t("account.orders_empty", locale)}</p>
+          <p className="mt-1 text-sm text-ink/60">{t("account.orders_empty_hint", locale)}</p>
         </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
             {/* Desktop table */}
             <table className="hidden w-full text-left text-sm md:table">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <thead className="border-b border-line bg-panel text-xs uppercase tracking-wide text-ink/60">
                 <tr>
                   <th scope="col" className="px-5 py-3 font-semibold">{t("account.order_code", locale)}</th>
                   <th scope="col" className="px-5 py-3 font-semibold">{t("account.order_status", locale)}</th>
@@ -110,54 +110,54 @@ export default function AccountOrdersPage() {
                   <th scope="col" className="px-5 py-3 font-semibold">{t("account.order_created", locale)}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {data.items.map((o) => (
-                  <tr key={o.id} className="transition-colors hover:bg-slate-50">
-                    <td className="px-5 py-3 font-medium text-slate-900">
+                  <tr key={o.id} className="transition-colors hover:bg-panel">
+                    <td className="px-5 py-3 font-medium text-ink">
                       {o.code}
-                      <div className="text-xs text-slate-400">{o.number}</div>
+                      <div className="text-xs text-ink/60">{o.number}</div>
                     </td>
                     <td className="px-5 py-3">
-                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                      <span className="inline-flex rounded-full bg-panel px-2.5 py-0.5 text-xs font-medium text-ink">
                         {orderStatusLabel(o.status, locale)}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-slate-600">{paymentStatusLabel(o.paymentStatus, locale)}</td>
-                    <td className="px-5 py-3 font-medium text-slate-900">{formatPrice(o.amount, o.currency, locale) ?? "—"}</td>
-                    <td className="px-5 py-3 text-slate-600">{formatDate(o.serviceDate, locale) || "—"}</td>
-                    <td className="px-5 py-3 text-slate-600">{formatDate(o.createdAt, locale)}</td>
+                    <td className="px-5 py-3 text-ink/60">{paymentStatusLabel(o.paymentStatus, locale)}</td>
+                    <td className="px-5 py-3 font-medium text-ink">{formatPrice(o.amount, o.currency, locale) ?? "—"}</td>
+                    <td className="px-5 py-3 text-ink/60">{formatDate(o.serviceDate, locale) || "—"}</td>
+                    <td className="px-5 py-3 text-ink/60">{formatDate(o.createdAt, locale)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
             {/* Mobile cards */}
-            <ul className="divide-y divide-slate-100 md:hidden">
+            <ul className="divide-y divide-line md:hidden">
               {data.items.map((o) => (
                 <li key={o.id} className="px-5 py-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="font-semibold text-slate-900">{o.code}</div>
-                    <span className="inline-flex shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                    <div className="font-semibold text-ink">{o.code}</div>
+                    <span className="inline-flex shrink-0 rounded-full bg-panel px-2.5 py-0.5 text-xs font-medium text-ink">
                       {orderStatusLabel(o.status, locale)}
                     </span>
                   </div>
-                  <div className="mt-1 text-xs text-slate-400">{o.number}</div>
+                  <div className="mt-1 text-xs text-ink/60">{o.number}</div>
                   <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                     <div>
-                      <dt className="text-xs text-slate-500">{t("account.order_amount", locale)}</dt>
-                      <dd className="font-medium text-slate-900">{formatPrice(o.amount, o.currency, locale) ?? "—"}</dd>
+                      <dt className="text-xs text-ink/60">{t("account.order_amount", locale)}</dt>
+                      <dd className="font-medium text-ink">{formatPrice(o.amount, o.currency, locale) ?? "—"}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs text-slate-500">{t("account.order_payment", locale)}</dt>
-                      <dd className="text-slate-700">{paymentStatusLabel(o.paymentStatus, locale)}</dd>
+                      <dt className="text-xs text-ink/60">{t("account.order_payment", locale)}</dt>
+                      <dd className="text-ink">{paymentStatusLabel(o.paymentStatus, locale)}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs text-slate-500">{t("account.order_service_date", locale)}</dt>
-                      <dd className="text-slate-700">{formatDate(o.serviceDate, locale) || "—"}</dd>
+                      <dt className="text-xs text-ink/60">{t("account.order_service_date", locale)}</dt>
+                      <dd className="text-ink">{formatDate(o.serviceDate, locale) || "—"}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs text-slate-500">{t("account.order_created", locale)}</dt>
-                      <dd className="text-slate-700">{formatDate(o.createdAt, locale)}</dd>
+                      <dt className="text-xs text-ink/60">{t("account.order_created", locale)}</dt>
+                      <dd className="text-ink">{formatDate(o.createdAt, locale)}</dd>
                     </div>
                   </dl>
                 </li>
@@ -170,17 +170,17 @@ export default function AccountOrdersPage() {
             <button
               onClick={goPrev}
               disabled={page <= 1}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-lg border border-line bg-white px-3 py-1.5 text-ink transition-colors hover:bg-panel disabled:cursor-not-allowed disabled:opacity-40"
             >
               {t("pagination.prev", locale)}
             </button>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-ink/60">
               {t("pagination.page", locale)} {data.page} {t("pagination.of", locale)} {totalPages} · {data.total}
             </span>
             <button
               onClick={goNext}
               disabled={!data.hasMore}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-lg border border-line bg-white px-3 py-1.5 text-ink transition-colors hover:bg-panel disabled:cursor-not-allowed disabled:opacity-40"
             >
               {t("pagination.next", locale)}
             </button>

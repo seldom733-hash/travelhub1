@@ -77,7 +77,7 @@ function PublicHeader({ user, userReady }: { user: AuthUser | null; userReady: b
   };
 
   return (
-    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-line bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
         {/* Logo → public root */}
         <Link href="/" className="flex shrink-0 items-center gap-2" aria-label={displayBrand || "Home"}>
@@ -88,14 +88,14 @@ function PublicHeader({ user, userReady }: { user: AuthUser | null; userReady: b
             // eslint-disable-next-line @next/next/no-img-element
             <img src="/navitravel-icon.png" alt={displayBrand} className="h-16 w-auto object-contain sm:h-24" />
           )}
-          <span className="hidden font-display text-[22px] font-semibold tracking-[0.005em] text-slate-900 sm:block sm:text-[28px] lg:text-[30px]">{displayBrand}</span>
+          <span className="hidden font-display text-[22px] font-semibold tracking-[0.005em] text-ink sm:block sm:text-[28px] lg:text-[30px]">{displayBrand}</span>
         </Link>
 
         {/* Public nav — только public-safe routes */}
-        <nav className="hidden items-center gap-1 text-sm text-slate-600 md:flex" aria-label="Main">
+        <nav className="hidden items-center gap-1 text-sm text-ink/60 md:flex" aria-label="Main">
           <Link
             href="/search"
-            className="rounded-lg px-3 py-1.5 transition-colors hover:bg-slate-100 hover:text-slate-900"
+            className="rounded-lg px-3 py-1.5 transition-colors hover:bg-panel hover:text-ink"
           >
             {t("nav.services", locale)}
           </Link>
@@ -107,7 +107,7 @@ function PublicHeader({ user, userReady }: { user: AuthUser | null; userReady: b
               onClick={() => setCatOpen((o) => !o)}
               aria-expanded={catOpen}
               aria-haspopup="menu"
-              className="flex items-center gap-1 rounded-lg px-3 py-1.5 transition-colors hover:bg-slate-100 hover:text-slate-900"
+              className="flex items-center gap-1 rounded-lg px-3 py-1.5 transition-colors hover:bg-panel hover:text-ink"
             >
               {t("nav.categories", locale)}
               <span aria-hidden className="text-[10px]">
@@ -117,13 +117,13 @@ function PublicHeader({ user, userReady }: { user: AuthUser | null; userReady: b
             {catOpen && (
               <div
                 role="menu"
-                className="absolute left-0 top-full mt-1 grid max-h-96 w-72 grid-cols-1 gap-1 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl sm:grid-cols-2"
+                className="absolute left-0 top-full mt-1 grid max-h-96 w-72 grid-cols-1 gap-1 overflow-y-auto rounded-2xl border border-line bg-white p-2 shadow-xl sm:grid-cols-2"
               >
                 <Link
                   href="/search"
                   role="menuitem"
                   onClick={() => setCatOpen(false)}
-                  className="col-span-full rounded-lg bg-slate-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50"
+                  className="col-span-full rounded-lg bg-panel px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"
                 >
                   {t("home.categories_all", locale)} →
                 </Link>
@@ -133,13 +133,13 @@ function PublicHeader({ user, userReady }: { user: AuthUser | null; userReady: b
                     href={`/categories/${c.slug}`}
                     role="menuitem"
                     onClick={() => setCatOpen(false)}
-                    className="truncate rounded-lg px-3 py-1.5 text-xs text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                    className="truncate rounded-lg px-3 py-1.5 text-xs text-ink/60 transition-colors hover:bg-panel hover:text-ink"
                   >
                     {c.title}
                   </Link>
                 ))}
                 {categories.length === 0 && (
-                  <div className="col-span-full px-3 py-2 text-xs text-slate-400">{t("state.loading", locale)}</div>
+                  <div className="col-span-full px-3 py-2 text-xs text-ink/60">{t("state.loading", locale)}</div>
                 )}
               </div>
             )}
@@ -156,11 +156,11 @@ function PublicHeader({ user, userReady }: { user: AuthUser | null; userReady: b
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={t("nav.search_placeholder", locale)}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+            className="w-full rounded-lg border border-line bg-panel px-3 py-1.5 text-sm outline-none transition focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand"
           />
           <button
             type="submit"
-            className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            className="shrink-0 rounded-lg bg-brand px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-dark"
           >
             {t("nav.find", locale)}
           </button>
@@ -185,13 +185,13 @@ function PublicHeader({ user, userReady }: { user: AuthUser | null; userReady: b
             <div className="flex items-center gap-2 text-sm">
               <Link
                 href={isPublicPath(pathname) && pathname !== "/" ? `/register?next=${encodeURIComponent(pathname)}` : "/register"}
-                className="hidden rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-700 transition-colors hover:border-blue-300 hover:text-blue-600 sm:inline-flex"
+                className="hidden rounded-lg border border-line px-3 py-1.5 font-medium text-ink transition-colors hover:border-brand/25 hover:text-brand sm:inline-flex"
               >
                 {t("nav.register", locale)}
               </Link>
               <Link
                 href="/login"
-                className="rounded-lg bg-blue-600 px-3 py-1.5 font-medium text-white transition-colors hover:bg-blue-700"
+                className="rounded-lg bg-brand px-3 py-1.5 font-medium text-white transition-colors hover:bg-brand-dark"
               >
                 {t("nav.login", locale)}
               </Link>
@@ -200,20 +200,20 @@ function PublicHeader({ user, userReady }: { user: AuthUser | null; userReady: b
             <div className="flex items-center gap-2 text-sm">
               <Link
                 href="/account"
-                className="hidden rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-700 transition-colors hover:border-blue-300 hover:text-blue-600 sm:inline-flex"
+                className="hidden rounded-lg border border-line px-3 py-1.5 font-medium text-ink transition-colors hover:border-brand/25 hover:text-brand sm:inline-flex"
               >
                 {t("nav.account", locale)}
               </Link>
               <Link
                 href="/app/dashboard"
-                className="rounded-lg bg-slate-900 px-3 py-1.5 font-medium text-white transition-colors hover:bg-slate-700"
+                className="rounded-lg bg-ink px-3 py-1.5 font-medium text-white transition-colors hover:bg-brand-dark"
               >
                 {t("nav.workspace", locale)}
               </Link>
               <button
                 type="button"
                 onClick={logout}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-700 transition-colors hover:bg-slate-100"
+                className="rounded-lg border border-line px-3 py-1.5 font-medium text-ink transition-colors hover:bg-panel"
               >
                 {t("nav.logout", locale)}
               </button>
@@ -222,7 +222,7 @@ function PublicHeader({ user, userReady }: { user: AuthUser | null; userReady: b
             <div className="flex items-center gap-2 text-sm">
               <Link
                 href="/account"
-                className="hidden rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-700 transition-colors hover:border-blue-300 hover:text-blue-600 sm:inline-flex"
+                className="hidden rounded-lg border border-line px-3 py-1.5 font-medium text-ink transition-colors hover:border-brand/25 hover:text-brand sm:inline-flex"
               >
                 {t("nav.account", locale)}
               </Link>
@@ -237,13 +237,13 @@ function PublicHeader({ user, userReady }: { user: AuthUser | null; userReady: b
             <div className="flex items-center gap-2 text-sm">
               <Link
                 href="/account"
-                className="rounded-lg bg-blue-600 px-3 py-1.5 font-medium text-white transition-colors hover:bg-blue-700"
+                className="rounded-lg bg-brand px-3 py-1.5 font-medium text-white transition-colors hover:bg-brand-dark"
               >
                 {t("nav.account", locale)}
               </Link>
               <button
                 onClick={logout}
-                className="hidden rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 transition-colors hover:bg-slate-100 sm:inline-flex"
+                className="hidden rounded-lg border border-line px-3 py-1.5 text-sm text-ink/60 transition-colors hover:bg-panel sm:inline-flex"
               >
                 {t("nav.logout", locale)}
               </button>

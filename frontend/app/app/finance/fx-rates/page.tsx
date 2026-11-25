@@ -197,7 +197,7 @@ function FxRatesContent() {
               <button
                 type="button"
                 onClick={() => openSet()}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+                className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-dark"
               >
                 {t("fx.actions.add", locale)}
               </button>
@@ -205,7 +205,7 @@ function FxRatesContent() {
             <button
               type="button"
               onClick={() => void load()}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+              className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink/60 transition-colors hover:bg-panel"
             >
               {t("admin.table.refresh", locale)}
             </button>
@@ -218,18 +218,18 @@ function FxRatesContent() {
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>
         )}
 
-        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-600">
+        <div className="rounded-lg border border-line bg-panel px-4 py-2 text-xs text-ink/60">
           {t("fx.page.hint", locale)}
         </div>
 
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">{t("nav.fx_rates", locale)}</h2>
-            {busy && <span className="text-xs text-slate-900">{t("admin.table.loading", locale)}</span>}
+        <section className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-line px-4 py-3">
+            <h2 className="text-sm font-semibold text-ink">{t("nav.fx_rates", locale)}</h2>
+            {busy && <span className="text-xs text-ink">{t("admin.table.loading", locale)}</span>}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-900">
+              <thead className="border-b border-line bg-panel text-xs uppercase tracking-wide text-ink">
                 <tr>
                   <th className="px-4 py-2.5 font-medium">{t("fx.table.supplier_code", locale)}</th>
                   <th className="px-4 py-2.5 font-medium">{t("fx.table.supplier_name", locale)}</th>
@@ -240,27 +240,27 @@ function FxRatesContent() {
               </thead>
               <tbody>
                 {groups.map((g) => (
-                  <tr key={g.supplierCode} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                    <td className="px-4 py-2.5 font-mono text-xs font-semibold text-slate-900">
+                  <tr key={g.supplierCode} className="border-b border-line last:border-0 hover:bg-panel">
+                    <td className="px-4 py-2.5 font-mono text-xs font-semibold text-ink">
                       {g.partnerCode ?? g.supplierCode}
                     </td>
-                    <td className="px-4 py-2.5 text-sm text-slate-900">{g.partnerName ?? g.supplierCode}</td>
+                    <td className="px-4 py-2.5 text-sm text-ink">{g.partnerName ?? g.supplierCode}</td>
                     {(["USD", "EUR"] as const).map((iso) => {
                       const rate = iso === "USD" ? g.usd : g.eur;
                       return (
                         <td key={iso} className="px-4 py-2.5">
                           <div className="flex items-center gap-1.5">
-                            <span className="font-mono text-sm font-semibold text-slate-900">
+                            <span className="font-mono text-sm font-semibold text-ink">
                               {rate ? rate.rate : "—"}
                             </span>
-                            {rate && <span className="text-xs text-slate-400">AZN</span>}
+                            {rate && <span className="text-xs text-ink/60">AZN</span>}
                             {canManage && (
                               <button
                                 type="button"
                                 onClick={() => openEditCell(g.supplierCode, iso, rate?.rate ?? "")}
                                 title={t("fx.table.edit", locale)}
                                 aria-label={`${t("fx.table.edit", locale)} ${iso}`}
-                                className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-blue-600"
+                                className="rounded-md p-1 text-ink/60 transition-colors hover:bg-panel hover:text-brand"
                               >
                                 <PencilIcon />
                               </button>
@@ -273,7 +273,7 @@ function FxRatesContent() {
                       <button
                         type="button"
                         onClick={() => void openHistory(g)}
-                        className="text-xs font-medium text-slate-600 hover:text-slate-800"
+                        className="text-xs font-medium text-ink/60 hover:text-ink"
                       >
                         {t("fx.actions.history", locale)}
                       </button>
@@ -282,7 +282,7 @@ function FxRatesContent() {
                 ))}
                 {rows !== null && groups.length === 0 && !busy && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-900">
+                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-ink">
                       {t("ops.empty_no_data", locale)}
                     </td>
                   </tr>
@@ -297,40 +297,40 @@ function FxRatesContent() {
       {showForm && (
         <PanelFrame title={t("fx.form.title", locale)} onClose={() => setShowForm(false)}>
           <div className="space-y-3 p-4">
-            <label className="block text-xs font-medium text-slate-900">
+            <label className="block text-xs font-medium text-ink">
               {t("fx.form.supplier", locale)}
               <input
                 list="fx-supplier-codes"
                 value={form.supplierCode}
                 onChange={(e) => setForm((f) => ({ ...f, supplierCode: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-sm text-slate-900 outline-none focus:border-blue-400"
+                className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 font-mono text-sm text-ink outline-none focus:border-brand"
               />
             </label>
-            <label className="block text-xs font-medium text-slate-900">
+            <label className="block text-xs font-medium text-ink">
               {t("fx.form.source_currency", locale)}
               <input
                 value={form.sourceCurrencyIso}
                 placeholder="USD"
                 maxLength={3}
                 onChange={(e) => setForm((f) => ({ ...f, sourceCurrencyIso: e.target.value.toUpperCase() }))}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-sm uppercase text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-400"
+                className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 font-mono text-sm uppercase text-ink outline-none placeholder:text-ink/60 focus:border-brand"
               />
             </label>
-            <label className="block text-xs font-medium text-slate-900">
+            <label className="block text-xs font-medium text-ink">
               {t("fx.form.rate", locale)}
               <input
                 value={form.rate}
                 placeholder="1.70"
                 onChange={(e) => setForm((f) => ({ ...f, rate: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-400"
+                className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 font-mono text-sm text-ink outline-none placeholder:text-ink/60 focus:border-brand"
               />
-              <span className="mt-1 block text-[11px] text-slate-500">{t("fx.form.rate_hint", locale)}</span>
+              <span className="mt-1 block text-[11px] text-ink/60">{t("fx.form.rate_hint", locale)}</span>
             </label>
             <button
               type="button"
               disabled={saving}
               onClick={() => void handleSave()}
-              className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+              className="w-full rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:opacity-50"
             >
               {saving ? t("admin.table.loading", locale) : t("markup.actions.save", locale)}
             </button>
@@ -353,20 +353,20 @@ function FxRatesContent() {
       {/* ── Append-only history ──────────────────────────────────────────── */}
       {history && (
         <PanelFrame title={t("fx.history.title", locale)} subtitle={history.title} onClose={() => setHistory(null)}>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-line">
             {history.items.map((item) => (
               <div key={item.id} className="px-4 py-3 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-slate-900">
+                  <span className="font-medium text-ink">
                     {item.action}: {item.oldRate ?? "—"} → {item.newRate}
                   </span>
-                  <span className="text-xs text-slate-500">{shortDateTime(item.changedAt)}</span>
+                  <span className="text-xs text-ink/60">{shortDateTime(item.changedAt)}</span>
                 </div>
-                {item.actorName && <div className="mt-0.5 text-xs text-slate-500">{item.actorName}</div>}
+                {item.actorName && <div className="mt-0.5 text-xs text-ink/60">{item.actorName}</div>}
               </div>
             ))}
             {history.items.length === 0 && (
-              <div className="px-4 py-6 text-center text-sm text-slate-500">{t("fx.history.empty", locale)}</div>
+              <div className="px-4 py-6 text-center text-sm text-ink/60">{t("fx.history.empty", locale)}</div>
             )}
           </div>
         </PanelFrame>

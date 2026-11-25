@@ -95,8 +95,8 @@ export default function ConstructorSearchTab({ slug, config, onSaved, onSaving, 
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-slate-200 bg-white p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">{t("constructor.search_service_order", locale)}</h3>
+      <div className="rounded-lg border border-line bg-white p-5">
+        <h3 className="mb-4 text-sm font-semibold text-ink">{t("constructor.search_service_order", locale)}</h3>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={cfg.services.map((s) => s.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-2">
@@ -109,12 +109,12 @@ export default function ConstructorSearchTab({ slug, config, onSaved, onSaving, 
       </div>
 
       {/* Default service */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">{t("constructor.search_default_service", locale)}</h3>
+      <div className="rounded-lg border border-line bg-white p-5">
+        <h3 className="mb-4 text-sm font-semibold text-ink">{t("constructor.search_default_service", locale)}</h3>
         <select
           value={cfg.defaultService}
           onChange={(e) => setCfg((prev) => ({ ...prev, defaultService: e.target.value }))}
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+          className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
         >
           {cfg.services.filter((s) => s.enabled).map((svc) => (
             <option key={svc.id} value={svc.id}>{t(svc.labelKey, locale)}</option>
@@ -123,7 +123,7 @@ export default function ConstructorSearchTab({ slug, config, onSaved, onSaving, 
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={handleSave} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700">
+        <button onClick={handleSave} className="rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-dark">
           {t("constructor.search_save", locale)}
         </button>
         <DefaultConfigActions
@@ -146,16 +146,16 @@ function SortableServiceItem({ service, index, onToggle, locale }: { service: Se
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-3 rounded-lg border bg-white px-4 py-3 shadow-sm transition-colors ${isDragging ? "border-blue-300 bg-blue-50 opacity-70" : "border-slate-200"} ${!service.enabled ? "opacity-50" : ""}`}
+      className={`flex items-center gap-3 rounded-lg border bg-white px-4 py-3 shadow-sm transition-colors ${isDragging ? "border-brand/25 bg-brand/10 opacity-70" : "border-line"} ${!service.enabled ? "opacity-50" : ""}`}
     >
-      <button className="cursor-grab text-slate-400 hover:text-slate-600 active:cursor-grabbing" {...attributes} {...listeners}>
+      <button className="cursor-grab text-ink/60 hover:text-ink/60 active:cursor-grabbing" {...attributes} {...listeners}>
         <List className="h-5 w-5" weight="fill" />
       </button>
-      <span className="text-xs font-medium text-slate-400">{index + 1}.</span>
-      <span className="flex-1 text-sm font-medium text-slate-900">{t(service.labelKey, locale)}</span>
+      <span className="text-xs font-medium text-ink/60">{index + 1}.</span>
+      <span className="flex-1 text-sm font-medium text-ink">{t(service.labelKey, locale)}</span>
       <label className="flex items-center gap-2">
-        <input type="checkbox" checked={service.enabled} onChange={() => onToggle(service.id)} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
-        <span className="text-xs text-slate-500">{service.enabled ? "✓" : "—"}</span>
+        <input type="checkbox" checked={service.enabled} onChange={() => onToggle(service.id)} className="h-4 w-4 rounded border-line text-brand" />
+        <span className="text-xs text-ink/60">{service.enabled ? "✓" : "—"}</span>
       </label>
     </div>
   );

@@ -55,7 +55,7 @@ export default function ProductPreviewPage() {
     return <div className="py-16 text-center text-sm text-rose-600">{pt("partner.error.not_found", locale)}</div>;
   }
   if (!product) {
-    return <div className="py-16 text-center text-sm text-slate-400">{pt("partner.state.loading", locale)}</div>;
+    return <div className="py-16 text-center text-sm text-ink/60">{pt("partner.state.loading", locale)}</div>;
   }
 
   const attrEntries = product.attributes ? Object.entries(product.attributes) : [];
@@ -66,11 +66,11 @@ export default function ProductPreviewPage() {
   return (
     <div className="mx-auto max-w-4xl">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <Link href={`/partner/products/${product.id}`} className="text-sm text-slate-500 hover:text-emerald-700">
+        <Link href={`/partner/products/${product.id}`} className="text-sm text-ink/60 hover:text-emerald-700">
           {pt("partner.preview.back", locale)}
         </Link>
         {isPublic && (
-          <a href={`/products/${product.code}`} target="_blank" rel="noreferrer" className="text-sm text-slate-500 hover:text-emerald-700">
+          <a href={`/products/${product.code}`} target="_blank" rel="noreferrer" className="text-sm text-ink/60 hover:text-emerald-700">
             {pt("partner.preview.open_public", locale)} ↗
           </a>
         )}
@@ -82,9 +82,9 @@ export default function ProductPreviewPage() {
       </div>
 
       {/* ── Мини-PDP из собственных данных ── */}
-      <article className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <article className="overflow-hidden rounded-3xl border border-line bg-white shadow-sm">
         {product.media.length > 0 ? (
-          <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-1 bg-panel p-1 sm:grid-cols-4">
             {product.media.map((m) => (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -96,27 +96,27 @@ export default function ProductPreviewPage() {
             ))}
           </div>
         ) : (
-          <div className="flex h-40 items-center justify-center bg-slate-50 text-sm text-slate-300">—</div>
+          <div className="flex h-40 items-center justify-center bg-panel text-sm text-ink/60">—</div>
         )}
 
         <div className="p-6">
-          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-ink/60">
             <span className="font-mono">{product.code}</span>
             {product.category && <span>· {product.category.title}</span>}
             <span>· {pt(`partner.status.${product.status}`, locale)}</span>
             {product.draft && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">{pt("partner.product.proposal_n", locale)}</span>}
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">{previewTitle}</h1>
-          {previewDescription && <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">{previewDescription}</p>}
+          <h1 className="text-2xl font-bold text-ink">{previewTitle}</h1>
+          {previewDescription && <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink/60">{previewDescription}</p>}
 
           {attrEntries.length > 0 && (
             <div className="mt-6">
-              <h2 className="mb-2 text-sm font-semibold text-slate-800">{pt("pdp.attributes_title", locale)}</h2>
+              <h2 className="mb-2 text-sm font-semibold text-ink">{pt("pdp.attributes_title", locale)}</h2>
               <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                 {attrEntries.map(([k, v]) => (
-                  <div key={k} className="rounded-lg bg-slate-50 px-3 py-2">
-                    <dt className="text-[10px] uppercase tracking-wide text-slate-400">{k}</dt>
-                    <dd className="text-slate-700">{String(v)}</dd>
+                  <div key={k} className="rounded-lg bg-panel px-3 py-2">
+                    <dt className="text-[10px] uppercase tracking-wide text-ink/60">{k}</dt>
+                    <dd className="text-ink">{String(v)}</dd>
                   </div>
                 ))}
               </dl>
@@ -125,23 +125,23 @@ export default function ProductPreviewPage() {
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-slate-400">{pt("pdp.tariffs_title", locale)}</div>
+              <div className="text-[10px] uppercase tracking-wide text-ink/60">{pt("pdp.tariffs_title", locale)}</div>
               {product.tariffs.length > 0 ? (
-                <div className="mt-1 text-lg font-semibold text-slate-900">
+                <div className="mt-1 text-lg font-semibold text-ink">
                   {formatPrice(product.tariffs[0].price, product.tariffs[0].currency, locale) ?? pt("partner.product.price_on_request", locale)}
                 </div>
               ) : (
-                <div className="mt-1 text-sm text-slate-400">{pt("partner.product.price_on_request", locale)}</div>
+                <div className="mt-1 text-sm text-ink/60">{pt("partner.product.price_on_request", locale)}</div>
               )}
             </div>
-            <div className="text-right text-xs text-slate-400">
+            <div className="text-right text-xs text-ink/60">
               <div>{pt("partner.product.updated", locale)}: {formatDate(product.updatedAt, locale)}</div>
               {product.publishedAt && <div>{pt("pdp.published_on", locale)}: {formatDate(product.publishedAt, locale)}</div>}
             </div>
           </div>
 
           {!isPublic && (
-            <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+            <div className="mt-6 rounded-xl border border-line bg-panel px-4 py-3 text-xs text-ink/60">
               {pt("partner.preview.no_public", locale)} — {pt("partner.preview.public_hint", locale)}
             </div>
           )}
